@@ -47,3 +47,23 @@ if (api.tabs && api.tabs.onUpdated) {
     if (info.status === "loading") reset(tabId);
   });
 }
+
+// One-time migration: copy any pre-existing device-local settings into synced
+// storage (only if sync has none yet), so upgrading users keep their settings.
+if (api.runtime && api.runtime.onInstalled && api.storage && api.storage.sync) {
+  api.runtime.onInstalled.addListener(() => {
+    api.storage.sync.get(["domains", "liveSync"], (s) => {
+      if (s && (s.domains || s.liveSync != null)) return; // already synced
+      api.storage.local.get(
+        ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"],
+        (l) => {
+          const copy = {};
+          for (const k of ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"]) {
+            if (l[k] !== undefined) copy[k] = l[k];
+          }
+          if (Object.keys(copy).length) api.storage.sync.set(copy);
+        }
+      );
+    });
+  });
+}

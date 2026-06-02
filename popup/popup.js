@@ -1,6 +1,9 @@
 // Video Speed Controller Pro — popup (Chrome + Firefox)
 const api = (typeof browser !== "undefined") ? browser : chrome;
 
+// Settings sync across devices (Chrome Sync / Firefox Sync); falls back to local.
+const STORE = (api.storage && api.storage.sync) ? api.storage.sync : api.storage.local;
+
 const msg = (key, subs) => api.i18n.getMessage(key, subs);
 
 // Replace text of every [data-i18n] element with its localized string.
@@ -94,7 +97,7 @@ function reflectSyncUI(enabled, target, maxPercent) {
 }
 
 function loadSyncSettings() {
-  api.storage.local.get(["liveSync", "liveSyncTarget", "liveSyncMax"], (result) => {
+  STORE.get(["liveSync", "liveSyncTarget", "liveSyncMax"], (result) => {
     reflectSyncUI(
       !!result.liveSync,
       clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 3),
@@ -105,10 +108,10 @@ function loadSyncSettings() {
 
 function saveDomainSpeed(speed) {
   if (!currentDomain) return;
-  api.storage.local.get(["domains"], (result) => {
+  STORE.get(["domains"], (result) => {
     const domains = result.domains || {};
     domains[currentDomain] = speed;
-    api.storage.local.set({ domains });
+    STORE.set({ domains });
   });
 }
 
@@ -162,11 +165,20 @@ async function init() {
 }
 
 function fallbackFromStorage() {
-  api.storage.local.get(["domains"], (result) => {
+  STORE.get(["domains"], (result) => {
     const domains = result.domains || {};
     updateUI(clamp(domains[currentDomain] || 1.0));
   });
 }
+
+// Debounce writes — storage.sync rate-limits how often you may write, and the
+// range sliders fire many "input" events while dragging.
+function debounce(fn, ms) {
+  let timer = null;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+const saveSyncTarget = debounce((v) => STORE.set({ liveSyncTarget: v }), 350);
+const saveSyncMax = debounce((v) => STORE.set({ liveSyncMax: v }), 350);
 
 // --- Event wiring ---
 document.getElementById("speedSlider").addEventListener("input", (e) => {
@@ -181,17 +193,17 @@ document.getElementById("setDefaultBtn").addEventListener("click", setAsDefault)
 document.getElementById("liveSyncToggle").addEventListener("change", (e) => {
   const enabled = e.target.checked;
   document.getElementById("syncBody").classList.toggle("enabled", enabled);
-  api.storage.local.set({ liveSync: enabled });
+  STORE.set({ liveSync: enabled });
 });
 document.getElementById("syncTarget").addEventListener("input", (e) => {
   const target = clampTarget(e.target.value);
   document.getElementById("syncTargetVal").textContent = target;
-  api.storage.local.set({ liveSyncTarget: target });
+  saveSyncTarget(target);
 });
 document.getElementById("syncMax").addEventListener("input", (e) => {
   const percent = clampMaxPercent(e.target.value);
   document.getElementById("syncMaxVal").textContent = percent;
-  api.storage.local.set({ liveSyncMax: percent / 100 });
+  saveSyncMax(percent / 100);
 });
 
 localize();

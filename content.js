@@ -3,6 +3,11 @@
 // `chrome` is also available in Firefox as a callback-style alias, so we use it.
 const api = (typeof browser !== "undefined") ? browser : chrome;
 
+// Settings sync across the user's devices (Chrome Sync / Firefox Sync, which are
+// separate per browser). Falls back to device-local storage if sync is missing.
+const STORE = (api.storage && api.storage.sync) ? api.storage.sync : api.storage.local;
+const STORE_AREA = (api.storage && STORE === api.storage.sync) ? "sync" : "local";
+
 const MIN_SPEED = 0.1;
 const MAX_SPEED = 16;
 
@@ -213,7 +218,7 @@ function runLiveSync(video) {
 // --- Loading & applying ----------------------------------------------------
 function loadSpeed() {
   if (!ctxValid()) return;
-  api.storage.local.get(
+  STORE.get(
     ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"],
     (result) => {
       const domains = result.domains || {};
@@ -231,10 +236,10 @@ function loadSpeed() {
 
 function persistDomainSpeed(speed) {
   if (!ctxValid()) return;
-  api.storage.local.get(["domains"], (result) => {
+  STORE.get(["domains"], (result) => {
     const domains = result.domains || {};
     domains[getDomain()] = speed;
-    api.storage.local.set({ domains });
+    STORE.set({ domains });
   });
 }
 
@@ -377,7 +382,7 @@ if (document.documentElement) {
 
 // React instantly when settings change in the popup.
 api.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local") return;
+  if (area !== STORE_AREA) return;
   if (changes.liveSync) liveSyncEnabled = !!changes.liveSync.newValue;
   if (changes.liveSyncTarget) liveSyncTarget = clampTarget(changes.liveSyncTarget.newValue);
   if (changes.liveSyncMax) liveSyncMax = clampMax(changes.liveSyncMax.newValue);
