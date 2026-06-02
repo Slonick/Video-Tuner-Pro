@@ -16,11 +16,11 @@ jobs:
     name: Build & attach packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Validate JSON and JS
         run: |
@@ -62,7 +62,7 @@ jobs:
           cd dist && zip -rq "../video-speed-controller-pro-chrome-v${{ steps.meta.outputs.version }}.zip" . && cd ..
 
       - name: Upload packages as workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: extension-packages
           path: video-speed-controller-pro-*.zip
