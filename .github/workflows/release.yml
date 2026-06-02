@@ -48,16 +48,17 @@ jobs:
       - name: Assemble shippable files
         run: |
           mkdir -p dist
-          cp manifest.json content.js dist/
+          cp manifest.json content.js background.js dist/
           cp -r popup icons _locales dist/
 
-      - name: Build Firefox package (full manifest, incl. gecko keys)
+      - name: Build Firefox package (gecko keys; background as event-page scripts)
         run: |
+          jq '.background = {"scripts":["background.js"]}' manifest.json > dist/manifest.json
           cd dist && zip -rq "../video-speed-controller-pro-firefox-v${{ steps.meta.outputs.version }}.zip" . && cd ..
 
-      - name: Build Chrome package (Firefox-only keys stripped)
+      - name: Build Chrome package (Firefox-only keys stripped; background as service worker)
         run: |
-          jq 'del(.browser_specific_settings)' manifest.json > dist/manifest.json
+          jq 'del(.browser_specific_settings) | .background = {"service_worker":"background.js"}' manifest.json > dist/manifest.json
           cd dist && zip -rq "../video-speed-controller-pro-chrome-v${{ steps.meta.outputs.version }}.zip" . && cd ..
 
       - name: Upload packages as workflow artifacts

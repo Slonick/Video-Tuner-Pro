@@ -266,6 +266,41 @@ function applyToVideo(video) {
 
 function applyAll() {
   collectVideos().forEach(applyToVideo);
+  updateBadge();
+}
+
+// --- Toolbar icon ----------------------------------------------------------
+// Tell the background what to draw on the toolbar icon for this tab:
+//   • the speed multiplier badge (e.g. 1.0, 0.5, 1.5, 1.75) is always shown;
+//   • on a live stream the play triangle is drawn red (live: true);
+//   • no video -> clear back to the default icon.
+// The frame that owns the video drives it; a frame that never had a video stays
+// silent so it can't clobber another frame's icon.
+let lastBadge = null;
+let badgeHadVideo = false;
+function speedLabel(s) {
+  // Round to 2 decimals, but always keep at least one decimal: 1 -> "1.0",
+  // 2 -> "2.0", 1.5 -> "1.5", 1.75 -> "1.75".
+  let str = String(Math.round(s * 100) / 100);
+  if (!str.includes(".")) str += ".0";
+  return str;
+}
+function updateBadge() {
+  const hasVideo = collectVideos().length > 0;
+  let payload;
+  if (hasVideo) {
+    payload = { action: "icon", text: speedLabel(currentSpeed), live: onStreamPage() };
+  } else if (badgeHadVideo) {
+    payload = { action: "icon", clear: true }; // had a video, now gone
+  } else {
+    return;                                    // never had one — leave the icon alone
+  }
+  badgeHadVideo = hasVideo;
+  const key = JSON.stringify(payload);
+  if (key === lastBadge) return;
+  lastBadge = key;
+  if (!ctxValid()) return;
+  try { api.runtime.sendMessage(payload); } catch (e) {}
 }
 
 function setSpeed(speed, persist, manual) {
