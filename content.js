@@ -61,8 +61,22 @@ function clampMax(n) {
 
 // --- Live-stream detection -------------------------------------------------
 function isLive(video) {
-  // Live MediaSource streams report an infinite duration (YouTube, Twitch, etc.).
-  return video.duration === Infinity;
+  // Most live MSE streams report an infinite duration (Twitch, many players).
+  if (video.duration === Infinity) return true;
+
+  // YouTube live (including DVR streams) reports a FINITE, growing duration, so
+  // the duration check alone misses it. YouTube adds the "ytp-live" class to the
+  // player and time-display, and shows a live badge — only while a live stream is
+  // playing, never on regular VOD. Use those as the signal.
+  if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
+    const player = (video.closest && video.closest(".html5-video-player")) ||
+                   document.querySelector(".html5-video-player");
+    if (player && player.classList.contains("ytp-live")) return true;
+    if (document.querySelector(".ytp-time-display.ytp-live")) return true;
+    const badge = document.querySelector(".ytp-live-badge");
+    if (badge && badge.offsetParent !== null) return true; // visible = live
+  }
+  return false;
 }
 
 // Seconds of media buffered ahead of the current position. On a live stream the
