@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "Controla la velocidad de reproducción de vídeo en cualquier sitio: ajustes, porcentajes y sincronización inteligente de directos." },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 Velocidad de vídeo" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Cargando…" },
   "speedSuffix": { "message": "x velocidad" },
   "resetButton": { "message": "Restablecer (100%)" },
   "rememberButton": { "message": "Recordar sitio" },
   "savedFeedback": { "message": "✓ Guardado" },
   "noVideo": { "message": "No se encontró vídeo en la página: abre un vídeo y actualiza." },
-  "liveNote": { "message": "🔴 Directo: la velocidad manual no se aplica — la transmisión va al 100% hasta que necesite ponerse al día. La velocidad la gestiona Live-sync." },
-  "syncTitle": { "message": "🔴 Mantener el directo al día" },
+  "liveNote": { "message": "Directo: la velocidad manual no se aplica — la transmisión va al 100% hasta que necesite ponerse al día. La velocidad la gestiona Live-sync." },
+  "syncTitle": { "message": "Mantener el directo al día" },
   "syncSubtitle": { "message": "Ponerse al día con la transmisión en directo automáticamente" },
   "allowedDelay": { "message": "Retraso permitido" },
   "secondsShort": { "message": "s" },
   "maxCatchupSpeed": { "message": "Velocidad máxima de recuperación" },
   "syncHint": { "message": "Si el directo se retrasa más que el valor anterior, la velocidad sube suavemente (hasta el máximo) y vuelve al 100% al ponerse al día. Se respeta el búfer: no acelera cuando hay poco cargado por delante." },
-  "indicatorLive": { "message": "🔴 Directo — 100%" },
+  "indicatorLive": { "message": "Directo — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$% (recuperando)",
+    "message": "Live-sync — $pct$% (recuperando)",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

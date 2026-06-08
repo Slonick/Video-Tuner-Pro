@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "在任何网站控制视频播放速度：预设、百分比和智能直播同步。" },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 视频速度" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "加载中…" },
   "speedSuffix": { "message": "x 速度" },
   "resetButton": { "message": "重置 (100%)" },
   "rememberButton": { "message": "记住此网站" },
   "savedFeedback": { "message": "✓ 已保存" },
   "noVideo": { "message": "页面上未找到视频——请打开视频并刷新。" },
-  "liveNote": { "message": "🔴 直播：不应用手动速度——直播保持 100%，直到需要追赶进度。速度由 Live-sync 管理。" },
-  "syncTitle": { "message": "🔴 保持直播同步" },
+  "liveNote": { "message": "直播：不应用手动速度——直播保持 100%，直到需要追赶进度。速度由 Live-sync 管理。" },
+  "syncTitle": { "message": "保持直播同步" },
   "syncSubtitle": { "message": "自动追赶直播进度" },
   "allowedDelay": { "message": "允许的延迟" },
   "secondsShort": { "message": "秒" },
   "maxCatchupSpeed": { "message": "最大追赶速度" },
   "syncHint": { "message": "如果直播落后超过上述数值，速度会平滑提升（最高到上限），追上后恢复到 100%。会尊重缓冲——前方缓冲较少时不会加速。" },
-  "indicatorLive": { "message": "🔴 直播 — 100%" },
+  "indicatorLive": { "message": "直播 — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$%（追赶中）",
+    "message": "Live-sync — $pct$%（追赶中）",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

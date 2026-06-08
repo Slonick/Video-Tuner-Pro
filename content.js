@@ -1,4 +1,4 @@
-// Video Speed Controller Pro — content script (Chrome + Firefox)
+// Video Tuner Pro — content script (Chrome + Firefox)
 // Cross-browser API alias: Firefox exposes `browser`, Chrome exposes `chrome`.
 // `chrome` is also available in Firefox as a callback-style alias, so we use it.
 const api = (typeof browser !== "undefined") ? browser : chrome;
@@ -27,6 +27,23 @@ let liveSeenAt = 0;               // timestamp of the last live <video> we saw (
 let lastDropped = 0;              // dropped-frame counter from the previous tick
 let liveTick = null;             // handle for the background interval, so we can stop it
 const seenVideos = new WeakSet();
+
+// --- Audio compression (Web Audio) ---
+// Routes each media element through a DynamicsCompressorNode + make-up GainNode to
+// even out loud/quiet passages. Global setting (applies on every site).
+let audioCompEnabled = false;
+// Raw DynamicsCompressor parameters (the popup's "simple" strength slider just
+// writes these too, so the content script only ever applies raw values).
+let audioCompThreshold = -50;    // dB, -100…0  (FrankerFaceZ defaults)
+let audioCompKnee = 40;          // dB, 0…40
+let audioCompRatio = 12;         // x:1, 1…20
+let audioCompAttack = 0;         // s, 0…1
+let audioCompRelease = 0.25;     // s, 0…1
+let audioCompGain = 0;           // make-up gain in dB, 0…24
+let audioCtx = null;
+const audioGraphs = new WeakMap(); // video -> { source, comp, gain }
+const audioSkipped = new WeakSet(); // videos we must not route (CORS-risk / already wired)
+let audioGestureHooked = false;
 
 function getDomain() {
   return window.location.hostname;
@@ -64,6 +81,13 @@ function clampMax(n) {
   return Math.min(3, Math.max(LIVE_MAX_FLOOR, Math.round(n * 100) / 100));
 }
 
+// Clamp a numeric setting to [lo, hi], falling back to def when not a number.
+function clampNum(v, lo, hi, def) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return def;
+  return Math.min(hi, Math.max(lo, n));
+}
+
 // --- Live-stream detection -------------------------------------------------
 function isLive(video) {
   // Most live MSE streams report an infinite duration (Twitch, many players).
@@ -81,7 +105,47 @@ function isLive(video) {
     const badge = document.querySelector(".ytp-live-badge");
     if (badge && badge.offsetParent !== null) return true; // visible = live
   }
+
+  // Generic fallback (covers Twitch low-latency etc., where duration isn't
+  // Infinity): a stream whose media edge advances in real time, set by probeLive.
+  const s = liveProbe.get(video);
+  if (s && s.live) return true;
   return false;
+}
+
+// --- Generic live detection ------------------------------------------------
+// Live content can only be fetched at ~1x real time (it doesn't exist yet),
+// whereas a VOD exposes its whole length immediately (seekable.end = duration,
+// constant) and buffers ahead faster than real time. So we sample the furthest
+// known media position and call it live when it advances at roughly 1x.
+const liveProbe = new WeakMap();
+
+function streamEnd(v) {
+  let end = 0;
+  try {
+    const sk = v.seekable; // some players (Twitch) report a huge sentinel here
+    if (sk && sk.length) { const e = sk.end(sk.length - 1); if (isFinite(e) && e < 1e7) end = Math.max(end, e); }
+    const bf = v.buffered;
+    if (bf && bf.length) end = Math.max(end, bf.end(bf.length - 1));
+    if (isFinite(v.duration) && v.duration < 1e7) end = Math.max(end, v.duration);
+  } catch (e) { /* ignore */ }
+  return end;
+}
+
+function probeLive(v) {
+  if (!v) return;
+  const t = Date.now();
+  if (v.duration === Infinity) { liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, live: true }); return; }
+  const end = streamEnd(v);
+  let s = liveProbe.get(v);
+  if (!s) { liveProbe.set(v, { lastEnd: end, lastT: t, lastGrow: 0, live: false }); return; }
+  const dT = (t - s.lastT) / 1000;
+  if (dT < 0.4) return; // need spacing between samples for a stable rate
+  const rate = (end - s.lastEnd) / dT;
+  s.lastEnd = end; s.lastT = t;
+  // Real-time growth (~1x) = a live edge; VOD is either flat (~0) or bursty (>>1).
+  if (rate > 0.3 && rate < 1.7) s.lastGrow = t;
+  s.live = (t - s.lastGrow) < 12000; // sticky, survives brief stalls/quality switches
 }
 
 // Seconds of media buffered ahead of the current position. On a live stream the
@@ -215,16 +279,189 @@ function runLiveSync(video) {
   }
 }
 
+// --- Audio compression -----------------------------------------------------
+// Routing a media element through Web Audio SILENCES it if the underlying media
+// is cross-origin without CORS. To avoid muting people's audio, only route media
+// that's safe: a MediaStream (srcObject), MSE/blob, data:, same-origin, or an
+// element that opted into CORS.
+function canRouteAudio(video) {
+  // MediaStream playback (e.g. Twitch) leaves src/currentSrc empty — it's local
+  // and routable. This is the case FFZ's canCompress() allows via srcObject.
+  if (video.srcObject) return true;
+  const src = video.currentSrc || video.src || "";
+  if (!src) return false;
+  if (src.startsWith("blob:") || src.startsWith("data:")) return true; // MSE / inline
+  try {
+    if (new URL(src, location.href).origin === location.origin) return true; // same-origin
+  } catch (e) { return false; }
+  return !!video.crossOrigin; // cross-origin only if the site set crossorigin=...
+}
+
+function alog(...args) { try { console.info("[Video Tuner]", ...args); } catch (e) {} }
+
+function resumeAudioCtx() {
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+}
+
+function ensureAudioCtx() {
+  if (audioCtx) return audioCtx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = AC ? new AC() : null;
+  } catch (e) { audioCtx = null; }
+  if (audioCtx) {
+    hookAudioGesture();
+    // A fresh context starts "suspended" until a user gesture. When it finally
+    // resumes, (re)build the graphs we deferred while it was suspended.
+    audioCtx.addEventListener("statechange", () => {
+      alog("AudioContext state:", audioCtx.state);
+      if (audioCtx.state === "running") applyAudioComp();
+    });
+    resumeAudioCtx();
+  }
+  return audioCtx;
+}
+
+let lastAudioSkip = null; // why the most recent setupGraph() bailed: 'cors' | 'inuse' | 'noctx'
+let lastNotRoutableLog = null; // throttles the "not routable yet" diagnostic log
+
+function setupGraph(video) {
+  if (audioGraphs.has(video)) return audioGraphs.get(video);
+  // audioSkipped only holds elements that genuinely can't be captured (another
+  // graph already owns them) — that's permanent for the element's lifetime.
+  if (audioSkipped.has(video)) { lastAudioSkip = "inuse"; return null; }
+  // NOT routable yet: do NOT ban the element. Its src may still be loading or the
+  // player may have just swapped the <video> (common on Twitch). Retry next tick.
+  if (!canRouteAudio(video)) {
+    lastAudioSkip = "cors";
+    const sig = (video.currentSrc || video.src || "") + "|" + !!video.srcObject;
+    if (sig !== lastNotRoutableLog) { // log only when the state changes, not every tick
+      lastNotRoutableLog = sig;
+      alog("audio: not routable yet —", { currentSrc: video.currentSrc || video.src || "", hasSrcObject: !!video.srcObject });
+    }
+    return null;
+  }
+  const ctx = ensureAudioCtx();
+  if (!ctx) { lastAudioSkip = "noctx"; return null; }
+  // Capturing into a suspended context silences the element until it resumes, so
+  // wait until it's running. ensureAudioCtx's statechange handler rebuilds when it
+  // resumes; the 1s tick also retries. (This is what FFZ does.)
+  if (ctx.state !== "running") { lastAudioSkip = "suspended"; resumeAudioCtx(); return null; }
+  let source;
+  try {
+    source = ctx.createMediaElementSource(video);
+  } catch (e) {
+    // Element already feeds another Web Audio graph (another extension or the
+    // player itself) — only one capture per element is allowed.
+    lastAudioSkip = "inuse";
+    audioSkipped.add(video);
+    alog("audio: skipped (element already captured by another extension/player)");
+    return null;
+  }
+  const comp = ctx.createDynamicsCompressor();
+  const gain = ctx.createGain();
+  source.connect(comp);
+  comp.connect(gain);
+  gain.connect(ctx.destination);
+  // Taps for the popup's before/after level meters. Analysers analyze whatever is
+  // fed to them even with no onward connection, so they don't alter the audio.
+  const analyserIn = ctx.createAnalyser();
+  const analyserOut = ctx.createAnalyser();
+  analyserIn.fftSize = analyserOut.fftSize = 1024;
+  analyserIn.smoothingTimeConstant = analyserOut.smoothingTimeConstant = 0.5;
+  source.connect(analyserIn);
+  gain.connect(analyserOut);
+  const g = { source, comp, gain, analyserIn, analyserOut };
+  audioGraphs.set(video, g);
+  // Once audio is routed through a suspended context it goes silent, so resume
+  // whenever this element starts playing.
+  video.addEventListener("playing", resumeAudioCtx, { passive: true });
+  alog("audio: compression graph engaged on a video");
+  return g;
+}
+
+// Ramp an AudioParam toward a value instead of assigning .value directly — an
+// abrupt jump produces an audible click. Short time-constant = quick but smooth.
+function rampParam(param, value) {
+  try {
+    const t = audioCtx ? audioCtx.currentTime : 0;
+    param.cancelScheduledValues(t);
+    param.setTargetAtTime(value, t, 0.02);
+  } catch (e) {
+    try { param.value = value; } catch (_) {}
+  }
+}
+
+// Off = transparent graph (ratio 1:1, unity gain) rather than disconnecting, since
+// a created source can't be cleanly un-routed back to the element's native output.
+// Skipped when nothing changed, so we don't re-poke params every tick (clicks).
+function applyGraphParams(g) {
+  const on = audioCompEnabled;
+  const key = on
+    ? `${audioCompThreshold}|${audioCompKnee}|${audioCompRatio}|${audioCompAttack}|${audioCompRelease}|${audioCompGain}`
+    : "off";
+  if (g._key === key) return;
+  g._key = key;
+  try {
+    rampParam(g.comp.threshold, on ? audioCompThreshold : 0);
+    rampParam(g.comp.knee, on ? audioCompKnee : 0);
+    rampParam(g.comp.ratio, on ? audioCompRatio : 1);
+    rampParam(g.comp.attack, on ? audioCompAttack : 0.003);
+    rampParam(g.comp.release, on ? audioCompRelease : 0.25);
+    rampParam(g.gain.gain, on ? Math.pow(10, audioCompGain / 20) : 1);
+  } catch (e) { /* node detached */ }
+}
+
+function hookAudioGesture() {
+  if (audioGestureHooked) return;
+  audioGestureHooked = true;
+  const resume = () => { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {}); };
+  document.addEventListener("click", resume, { capture: true, passive: true });
+  document.addEventListener("keydown", resume, { capture: true, passive: true });
+}
+
+function applyAudioComp(videos) {
+  const list = videos || collectVideos();
+  let engaged = 0, skipped = 0, reason = null;
+  for (const v of list) {
+    let g = audioGraphs.get(v);
+    if (!g) {
+      if (!audioCompEnabled) continue; // don't capture audio until the user enables it
+      g = setupGraph(v);
+      if (!g) {
+        skipped++;
+        // 'inuse' is the more specific/actionable reason — prefer it.
+        if (lastAudioSkip === "inuse") reason = "inuse";
+        else if (!reason) reason = lastAudioSkip;
+        continue;
+      }
+    }
+    applyGraphParams(g);
+    engaged++;
+  }
+  if (audioCompEnabled) { hookAudioGesture(); resumeAudioCtx(); }
+  return { engaged, skipped, reason };
+}
+
 // --- Loading & applying ----------------------------------------------------
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"],
+    ["domains", "liveSync", "liveSyncTarget", "liveSyncMax",
+     "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
+     "audioCompAttack", "audioCompRelease", "audioCompGain"],
     (result) => {
       const domains = result.domains || {};
       liveSyncEnabled = !!result.liveSync;
       liveSyncTarget = clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 3);
       liveSyncMax = clampMax(result.liveSyncMax != null ? result.liveSyncMax : 1.5);
+      audioCompEnabled = !!result.audioComp;
+      audioCompThreshold = clampNum(result.audioCompThreshold, -100, 0, -50);
+      audioCompKnee = clampNum(result.audioCompKnee, 0, 40, 40);
+      audioCompRatio = clampNum(result.audioCompRatio, 1, 20, 12);
+      audioCompAttack = clampNum(result.audioCompAttack, 0, 1, 0);
+      audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 0.25);
+      audioCompGain = clampNum(result.audioCompGain, 0, 24, 0);
       // Only sites the user explicitly remembered get a saved speed; the rest are 100%.
       currentSpeed = clamp(domains[getDomain()] || 1.0);
       applyAll();
@@ -245,7 +482,11 @@ function persistDomainSpeed(speed) {
 
 function applyToVideo(video) {
   try {
-    video.playbackRate = currentSpeed;
+    // Only set when it actually differs — applyAll runs often (1s tick + every
+    // MutationObserver pass, which is frequent on chat-heavy pages). Re-assigning
+    // playbackRate each time restarts the audio time-stretcher and glitches sound
+    // during sped-up playback.
+    if (Math.abs(video.playbackRate - currentSpeed) > 0.001) video.playbackRate = currentSpeed;
   } catch (e) { /* some players reject rate before metadata is ready */ }
 
   if (seenVideos.has(video)) return;
@@ -270,7 +511,10 @@ function applyToVideo(video) {
 }
 
 function applyAll() {
-  collectVideos().forEach(applyToVideo);
+  const videos = collectVideos();
+  videos.forEach(applyToVideo);
+  videos.forEach(probeLive); // sample media edge for generic live detection
+  applyAudioComp(videos);
   updateBadge();
 }
 
@@ -324,29 +568,78 @@ function setSpeed(speed, persist, manual) {
   showIndicator();
 }
 
-// --- Transient on-screen feedback (popup-style, auto-hides) ----------------
+// --- Transient on-screen feedback (minimal pill, overlaid on the video) -----
 let indicatorEl = null;
 let indicatorTimer = null;
+
+// Largest playing video — what the overlay anchors to.
+function primaryVideo() {
+  let best = null, bestScore = -1;
+  for (const v of collectVideos()) {
+    const r = v.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40) continue;
+    const score = (v.paused ? 0 : 1e9) + r.width * r.height;
+    if (score > bestScore) { bestScore = score; best = v; }
+  }
+  return best;
+}
 
 function showIndicator(text) {
   if (!document.body) return;
   if (!indicatorEl) {
     indicatorEl = document.createElement("div");
     indicatorEl.style.cssText = [
-      "position:fixed", "top:16px", "right:16px", "z-index:2147483647",
-      "background:rgba(40,40,60,0.92)", "color:#fff", "font:600 14px/1 -apple-system,Segoe UI,Roboto,sans-serif",
-      "padding:10px 14px", "border-radius:10px", "pointer-events:none",
-      "box-shadow:0 4px 12px rgba(0,0,0,0.35)", "transition:opacity .25s",
-      "opacity:0"
+      "position:fixed", "z-index:2147483647", "pointer-events:none",
+      "font:500 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
+      "color:#fff", "background:rgba(0,0,0,0.55)", "padding:5px 9px",
+      "border-radius:6px", "white-space:nowrap", "transition:opacity .2s", "opacity:0",
+      "-webkit-backdrop-filter:blur(3px)", "backdrop-filter:blur(3px)"
     ].join(";");
-    document.body.appendChild(indicatorEl);
   }
-  indicatorEl.textContent = text || `⏩ ${Math.round(currentSpeed * 100)}%  (${currentSpeed.toFixed(2)}x)`;
+
+  // Overlay sits over the video via fixed (viewport) coords. Host is normally
+  // <body>; in fullscreen we move it under the fullscreen element, since a body
+  // child wouldn't render over a fullscreen player. We avoid hosting inside the
+  // player container because a transform there would break fixed positioning.
+  const video = primaryVideo();
+  const fsEl = document.fullscreenElement;
+  const host = (fsEl && fsEl.tagName !== "VIDEO") ? fsEl : document.body;
+  if (indicatorEl.parentNode !== host) host.appendChild(indicatorEl);
+
+  if (video) {
+    const r = video.getBoundingClientRect();
+    indicatorEl.style.left = Math.round(r.left + r.width / 2) + "px";
+    indicatorEl.style.top = Math.round(r.top + Math.max(10, r.height * 0.05)) + "px";
+    indicatorEl.style.transform = "translateX(-50%)";
+  } else {
+    indicatorEl.style.left = "50%";
+    indicatorEl.style.top = "14px";
+    indicatorEl.style.transform = "translateX(-50%)";
+  }
+
+  indicatorEl.textContent = text || `${Math.round(currentSpeed * 100)}%`;
   indicatorEl.style.opacity = "1";
   clearTimeout(indicatorTimer);
   indicatorTimer = setTimeout(() => {
     if (indicatorEl) indicatorEl.style.opacity = "0";
   }, 1200);
+}
+
+// After the user flips the audio toggle, the graph may not engage on the very
+// first try (src still loading, context suspended, player swapping the <video>).
+// Poll briefly so we report the real outcome instead of a transient "unavailable".
+let audioAnnounceTimer = null;
+function announceAudioStatus(attempt) {
+  clearTimeout(audioAnnounceTimer);
+  if (!audioCompEnabled) { showIndicator(i18n("audioOff") || "Audio compression off"); return; }
+  const res = applyAudioComp();
+  if (res.engaged > 0) { showIndicator(i18n("audioOn") || "Audio compression on"); return; }
+  if (res.reason === "inuse") { showIndicator(i18n("audioInUse") || "Audio already used by another extension/player"); return; }
+  if ((attempt || 0) < 6) { // ~3s of retries while it loads / resumes
+    audioAnnounceTimer = setTimeout(() => announceAudioStatus((attempt || 0) + 1), 500);
+    return;
+  }
+  showIndicator(i18n("audioUnavailable") || "Compression unavailable on this video");
 }
 
 // --- Init ------------------------------------------------------------------
@@ -390,6 +683,20 @@ api.storage.onChanged.addListener((changes, area) => {
     lastSyncPct = -1;
     controlLive();
   }
+  let audioChanged = false;
+  if (changes.audioComp) { audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
+  if (changes.audioCompThreshold) { audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -50); audioChanged = true; }
+  if (changes.audioCompKnee) { audioCompKnee = clampNum(changes.audioCompKnee.newValue, 0, 40, 40); audioChanged = true; }
+  if (changes.audioCompRatio) { audioCompRatio = clampNum(changes.audioCompRatio.newValue, 1, 20, 12); audioChanged = true; }
+  if (changes.audioCompAttack) { audioCompAttack = clampNum(changes.audioCompAttack.newValue, 0, 1, 0); audioChanged = true; }
+  if (changes.audioCompRelease) { audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 0.25); audioChanged = true; }
+  if (changes.audioCompGain) { audioCompGain = clampNum(changes.audioCompGain.newValue, 0, 24, 0); audioChanged = true; }
+  if (audioChanged) {
+    // Apply immediately; when the user flipped the toggle, also poll briefly and
+    // report the real outcome on screen (it may take a moment to engage).
+    if (changes.audioComp) announceAudioStatus(0);
+    else applyAudioComp();
+  }
 });
 
 // --- Popup messages --------------------------------------------------------
@@ -422,5 +729,49 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse,
       () => ({ speed: currentSpeed, domain: getDomain(), live: onStreamPage() }));
   }
+  if (request.action === "getMonitor") {
+    return replyFromVideoFrame(sendResponse, () => monitorData());
+  }
   return false;
 });
+
+// Everything the popup graphs need, in one round-trip.
+function monitorData() {
+  const v = primaryVideo();
+  const live = onStreamPage();
+  return {
+    audio: audioLevels(),
+    // The buffer graph only makes sense on live streams (lag behind the edge);
+    // on a VOD the buffer is huge and irrelevant, so report nothing.
+    buffer: (v && live) ? forwardBuffer(v) : null,
+    target: liveSyncTarget,
+    live,
+    hasVideo: !!v,
+  };
+}
+
+// RMS level (in dBFS, -100…0) of an analyser's current frame.
+function analyserDb(an) {
+  if (!an._buf) an._buf = new Float32Array(an.fftSize);
+  an.getFloatTimeDomainData(an._buf);
+  let sum = 0;
+  for (let i = 0; i < an._buf.length; i++) sum += an._buf[i] * an._buf[i];
+  const rms = Math.sqrt(sum / an._buf.length);
+  return rms > 0.0000158 ? 20 * Math.log10(rms) : -100; // floor ~ -96 dB
+}
+
+// Before/after levels of the primary video's compressor, for the popup meters.
+function audioLevels() {
+  const v = primaryVideo();
+  const g = v && audioGraphs.get(v);
+  if (!audioCompEnabled || !g || !g.analyserIn) {
+    return { active: false, enabled: audioCompEnabled };
+  }
+  return {
+    active: true,
+    enabled: true,
+    in: analyserDb(g.analyserIn),
+    out: analyserDb(g.analyserOut),
+    threshold: audioCompThreshold,
+  };
+}

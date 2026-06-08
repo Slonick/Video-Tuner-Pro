@@ -1,4 +1,4 @@
-// Video Speed Controller Pro — background (Chrome service worker / Firefox event page)
+// Video Tuner Pro — background (Chrome service worker / Firefox event page)
 // Per tab:
 //   • speed is shown in the native toolbar badge (setBadgeText) — bigger/clearer;
 //   • the icon's play triangle is white normally, red on a live stream

@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "Керування швидкістю відео на будь-якому сайті: пресети, відсотки та розумна синхронізація прямих трансляцій." },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 Швидкість відео" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Завантаження…" },
   "speedSuffix": { "message": "x швидкість" },
   "resetButton": { "message": "Скинути (100%)" },
   "rememberButton": { "message": "Запам’ятати сайт" },
   "savedFeedback": { "message": "✓ Збережено" },
   "noVideo": { "message": "На сторінці не знайдено відео — відкрийте відео та оновіть." },
-  "liveNote": { "message": "🔴 Пряма трансляція: ручна швидкість не застосовується — трансляція йде на 100%, доки не потрібно наздоганяти. Швидкістю керує Live-sync." },
-  "syncTitle": { "message": "🔴 Підтримувати трансляцію актуальною" },
+  "liveNote": { "message": "Пряма трансляція: ручна швидкість не застосовується — трансляція йде на 100%, доки не потрібно наздоганяти. Швидкістю керує Live-sync." },
+  "syncTitle": { "message": "Підтримувати трансляцію актуальною" },
   "syncSubtitle": { "message": "Автоматично наздоганяти пряму трансляцію" },
   "allowedDelay": { "message": "Допустиме відставання" },
   "secondsShort": { "message": "с" },
   "maxCatchupSpeed": { "message": "Максимальна швидкість наздоганяння" },
   "syncHint": { "message": "Якщо трансляція відстає більше за вказане значення, швидкість плавно зростає (до максимуму) і повертається до 100%, щойно наздогнали. Враховується буфер — прискорення не вмикається, якщо даних попереду мало." },
-  "indicatorLive": { "message": "🔴 Ефір — 100%" },
+  "indicatorLive": { "message": "Ефір — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$% (наздоганяємо)",
+    "message": "Live-sync — $pct$% (наздоганяємо)",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

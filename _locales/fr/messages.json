@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "Contrôlez la vitesse de lecture des vidéos sur n'importe quel site : préréglages, pourcentages et synchronisation intelligente des directs." },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 Vitesse de la vidéo" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Chargement…" },
   "speedSuffix": { "message": "x vitesse" },
   "resetButton": { "message": "Réinitialiser (100%)" },
   "rememberButton": { "message": "Mémoriser le site" },
   "savedFeedback": { "message": "✓ Enregistré" },
   "noVideo": { "message": "Aucune vidéo trouvée sur la page — ouvrez une vidéo et actualisez." },
-  "liveNote": { "message": "🔴 Direct : la vitesse manuelle n'est pas appliquée — le flux reste à 100% jusqu'à ce qu'il doive rattraper. La vitesse est gérée par Live-sync." },
-  "syncTitle": { "message": "🔴 Garder le direct à jour" },
+  "liveNote": { "message": "Direct : la vitesse manuelle n'est pas appliquée — le flux reste à 100% jusqu'à ce qu'il doive rattraper. La vitesse est gérée par Live-sync." },
+  "syncTitle": { "message": "Garder le direct à jour" },
   "syncSubtitle": { "message": "Rattraper automatiquement la diffusion en direct" },
   "allowedDelay": { "message": "Retard autorisé" },
   "secondsShort": { "message": "s" },
   "maxCatchupSpeed": { "message": "Vitesse de rattrapage max" },
   "syncHint": { "message": "Si le direct prend plus de retard que la valeur ci-dessus, la vitesse augmente progressivement (jusqu'au maximum) et revient à 100% une fois rattrapée. Le tampon est respecté — la vitesse n'augmente pas quand peu de données sont chargées en avance." },
-  "indicatorLive": { "message": "🔴 Direct — 100%" },
+  "indicatorLive": { "message": "Direct — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$% (rattrapage)",
+    "message": "Live-sync — $pct$% (rattrapage)",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

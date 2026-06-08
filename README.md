@@ -1,8 +1,9 @@
-# Video Speed Controller Pro
+# Video Tuner Pro
 
-A cross-browser (Chrome + Firefox) extension for controlling the playback speed
-of HTML5 video on any website. Speed is expressed as a percentage, set with a
-slider or one-click presets, with smart handling for live streams.
+A cross-browser (Chrome + Firefox) toolkit for better video on any website:
+playback-speed control, smart live-stream sync, and audio compression to even
+out loud and quiet sounds. Speed is expressed as a percentage, set with a slider
+or one-click presets, with smart handling for live streams.
 
 ## Install
 
@@ -16,6 +17,7 @@ slider or one-click presets, with smart handling for live streams.
 - **Per-site memory** — set a speed and click *Remember site* to keep it for that domain. Sites you haven't remembered play at 100%.
 - **Smart live-stream handling** — manual speed is never applied to a live stream; the buffer is protected.
 - **Live-sync** — an optional mode that automatically catches a live stream back up to the live edge when you fall behind, then eases back to normal.
+- **Audio compression** — optional Web-Audio dynamics compressor that evens out loud and quiet passages, with full controls (threshold, knee, ratio, attack, release, make-up gain) and a reset to defaults. Doesn't apply on sites that serve video cross-origin without CORS, where the browser mutes Web-Audio processing.
 - Localized into 10 languages: English, Russian, Ukrainian, Spanish, Portuguese (BR), German, French, Chinese (Simplified), Japanese, and Hindi.
 - No accounts, no analytics, no tracking — all settings are stored locally on your device.
 

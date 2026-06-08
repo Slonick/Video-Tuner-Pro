@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "どんなサイトでも動画の再生速度を制御：プリセット、パーセント、スマートなライブ配信同期。" },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 動画速度" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "読み込み中…" },
   "speedSuffix": { "message": "x 速度" },
   "resetButton": { "message": "リセット (100%)" },
   "rememberButton": { "message": "サイトを記憶" },
   "savedFeedback": { "message": "✓ 保存しました" },
   "noVideo": { "message": "ページに動画が見つかりません — 動画を開いて更新してください。" },
-  "liveNote": { "message": "🔴 ライブ配信：手動速度は適用されません — 追いつきが必要になるまで配信は 100% のままです。速度は Live-sync が管理します。" },
-  "syncTitle": { "message": "🔴 配信を最新に保つ" },
+  "liveNote": { "message": "ライブ配信：手動速度は適用されません — 追いつきが必要になるまで配信は 100% のままです。速度は Live-sync が管理します。" },
+  "syncTitle": { "message": "配信を最新に保つ" },
   "syncSubtitle": { "message": "ライブ配信に自動で追いつく" },
   "allowedDelay": { "message": "許容する遅延" },
   "secondsShort": { "message": "秒" },
   "maxCatchupSpeed": { "message": "最大追いつき速度" },
   "syncHint": { "message": "配信が上記の値より遅れると、速度が滑らかに上がり（最大まで）、追いつくと 100% に戻ります。バッファが考慮され、先読みが少ないときは加速しません。" },
-  "indicatorLive": { "message": "🔴 ライブ — 100%" },
+  "indicatorLive": { "message": "ライブ — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$%（追いつき中）",
+    "message": "Live-sync — $pct$%（追いつき中）",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

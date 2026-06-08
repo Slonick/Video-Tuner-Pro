@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "किसी भी साइट पर वीडियो की प्लेबैक गति नियंत्रित करें: प्रीसेट, प्रतिशत और स्मार्ट लाइव-स्ट्रीम सिंक।" },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 वीडियो गति" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "लोड हो रहा है…" },
   "speedSuffix": { "message": "x गति" },
   "resetButton": { "message": "रीसेट करें (100%)" },
   "rememberButton": { "message": "साइट याद रखें" },
   "savedFeedback": { "message": "✓ सहेजा गया" },
   "noVideo": { "message": "पेज पर कोई वीडियो नहीं मिला — वीडियो खोलें और रीफ़्रेश करें।" },
-  "liveNote": { "message": "🔴 लाइव स्ट्रीम: मैन्युअल गति लागू नहीं होती — जब तक पकड़ने की ज़रूरत न हो, स्ट्रीम 100% पर रहती है। गति Live-sync द्वारा नियंत्रित होती है।" },
-  "syncTitle": { "message": "🔴 स्ट्रीम को लाइव रखें" },
+  "liveNote": { "message": "लाइव स्ट्रीम: मैन्युअल गति लागू नहीं होती — जब तक पकड़ने की ज़रूरत न हो, स्ट्रीम 100% पर रहती है। गति Live-sync द्वारा नियंत्रित होती है।" },
+  "syncTitle": { "message": "स्ट्रीम को लाइव रखें" },
   "syncSubtitle": { "message": "लाइव प्रसारण को स्वचालित रूप से पकड़ें" },
   "allowedDelay": { "message": "अनुमत देरी" },
   "secondsShort": { "message": "से" },
   "maxCatchupSpeed": { "message": "अधिकतम कैच-अप गति" },
   "syncHint": { "message": "यदि स्ट्रीम ऊपर दिए मान से अधिक पिछड़ती है, तो गति सुचारू रूप से बढ़ती है (अधिकतम तक) और पकड़ते ही 100% पर लौट आती है। बफ़र का ध्यान रखा जाता है — आगे कम बफ़र होने पर गति नहीं बढ़ती।" },
-  "indicatorLive": { "message": "🔴 लाइव — 100%" },
+  "indicatorLive": { "message": "लाइव — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$% (पकड़ रहे हैं)",
+    "message": "Live-sync — $pct$% (पकड़ रहे हैं)",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "Controle a velocidade de reprodução de vídeo em qualquer site: predefinições, porcentagens e sincronização inteligente de transmissões ao vivo." },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 Velocidade do vídeo" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Carregando…" },
   "speedSuffix": { "message": "x velocidade" },
   "resetButton": { "message": "Redefinir (100%)" },
   "rememberButton": { "message": "Lembrar site" },
   "savedFeedback": { "message": "✓ Salvo" },
   "noVideo": { "message": "Nenhum vídeo encontrado na página — abra um vídeo e atualize." },
-  "liveNote": { "message": "🔴 Ao vivo: a velocidade manual não é aplicada — a transmissão fica em 100% até precisar recuperar o atraso. A velocidade é gerenciada pelo Live-sync." },
-  "syncTitle": { "message": "🔴 Manter a transmissão ao vivo" },
+  "liveNote": { "message": "Ao vivo: a velocidade manual não é aplicada — a transmissão fica em 100% até precisar recuperar o atraso. A velocidade é gerenciada pelo Live-sync." },
+  "syncTitle": { "message": "Manter a transmissão ao vivo" },
   "syncSubtitle": { "message": "Recuperar o atraso da transmissão ao vivo automaticamente" },
   "allowedDelay": { "message": "Atraso permitido" },
   "secondsShort": { "message": "s" },
   "maxCatchupSpeed": { "message": "Velocidade máxima de recuperação" },
   "syncHint": { "message": "Se a transmissão atrasar mais que o valor acima, a velocidade aumenta suavemente (até o máximo) e volta a 100% assim que recupera. O buffer é respeitado — não acelera quando há pouco carregado à frente." },
-  "indicatorLive": { "message": "🔴 Ao vivo — 100%" },
+  "indicatorLive": { "message": "Ao vivo — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$% (recuperando)",
+    "message": "Live-sync — $pct$% (recuperando)",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }

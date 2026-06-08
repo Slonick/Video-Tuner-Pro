@@ -1,25 +1,25 @@
 {
-  "extName": { "message": "Video Speed Controller Pro" },
+  "extName": { "message": "Video Tuner Pro" },
   "extDescription": { "message": "Steuere die Wiedergabegeschwindigkeit von Videos auf jeder Website: Voreinstellungen, Prozentwerte und intelligente Livestream-Synchronisierung." },
   "pageTitle": { "message": "Video Speed Controller" },
-  "appHeader": { "message": "🎬 Videogeschwindigkeit" },
+  "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Wird geladen…" },
   "speedSuffix": { "message": "x Geschwindigkeit" },
   "resetButton": { "message": "Zurücksetzen (100%)" },
   "rememberButton": { "message": "Seite merken" },
   "savedFeedback": { "message": "✓ Gespeichert" },
   "noVideo": { "message": "Kein Video auf der Seite gefunden — öffne ein Video und aktualisiere." },
-  "liveNote": { "message": "🔴 Livestream: Manuelle Geschwindigkeit wird nicht angewendet — der Stream bleibt bei 100%, bis er aufholen muss. Die Geschwindigkeit steuert Live-sync." },
-  "syncTitle": { "message": "🔴 Stream aktuell halten" },
+  "liveNote": { "message": "Livestream: Manuelle Geschwindigkeit wird nicht angewendet — der Stream bleibt bei 100%, bis er aufholen muss. Die Geschwindigkeit steuert Live-sync." },
+  "syncTitle": { "message": "Stream aktuell halten" },
   "syncSubtitle": { "message": "Automatisch zur Live-Übertragung aufholen" },
   "allowedDelay": { "message": "Erlaubter Rückstand" },
   "secondsShort": { "message": "s" },
   "maxCatchupSpeed": { "message": "Maximale Aufholgeschwindigkeit" },
   "syncHint": { "message": "Fällt der Stream um mehr als den obigen Wert zurück, steigt die Geschwindigkeit sanft (bis zum Maximum) und kehrt zu 100% zurück, sobald aufgeholt wurde. Der Puffer wird berücksichtigt — es wird nicht beschleunigt, wenn wenig vorausgeladen ist." },
-  "indicatorLive": { "message": "🔴 Live — 100%" },
+  "indicatorLive": { "message": "Live — 100%" },
   "indicatorCatchup": {
-    "message": "🔴 Live-sync — $pct$% (holt auf)",
+    "message": "Live-sync — $pct$% (holt auf)",
     "placeholders": { "pct": { "content": "$1" } }
   },
-  "indicatorSynced": { "message": "🔴 Live-sync — 100%" }
+  "indicatorSynced": { "message": "Live-sync — 100%" }
 }
