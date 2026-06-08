@@ -14,8 +14,8 @@
   "syncSubtitle": { "message": "Automatisch zur Live-Übertragung aufholen" },
   "allowedDelay": { "message": "Erlaubter Rückstand" },
   "secondsShort": { "message": "s" },
-  "maxCatchupSpeed": { "message": "Maximale Aufholgeschwindigkeit" },
-  "syncHint": { "message": "Fällt der Stream um mehr als den obigen Wert zurück, steigt die Geschwindigkeit sanft (bis zum Maximum) und kehrt zu 100% zurück, sobald aufgeholt wurde. Der Puffer wird berücksichtigt — es wird nicht beschleunigt, wenn wenig vorausgeladen ist." },
+  "maxCatchupSpeed": { "message": "Aufholtempo" },
+  "syncHint": { "message": "Wenn der Stream weiter als die erlaubte Verzögerung zurückfällt, läuft er mit dem Aufholtempo bis zum Live-Rand und kehrt dann zu 100 % zurück. Bei Bildausfällen wird abgebrochen." },
   "indicatorLive": { "message": "Live — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$% (holt auf)",

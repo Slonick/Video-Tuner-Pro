@@ -12,10 +12,13 @@ const MIN_SPEED = 0.1;
 const MAX_SPEED = 16;
 
 // --- Live-sync tuning ---
-const LIVE_SYNC_GAIN = 0.05;       // extra rate per second of lag over the target
+// Catch-up uses ONE fixed rate with hysteresis: changing playbackRate constantly
+// re-syncs the browser's audio time-stretcher (robotic/crackly sound), so we flip
+// speed only at the band edges, not continuously.
 const MIN_FORWARD_BUFFER = 0.3;    // smallest buffer we'll ever drain down to
-const SMOOTH_ALPHA = 0.34;         // how fast currentSpeed eases toward the target
-const LIVE_MAX_FLOOR = 1.25;       // catch-up max can never be set below 125%
+const LIVE_MAX_FLOOR = 1.25;       // catch-up rate can never be set below 125%
+const CATCHUP_START = 2.0;         // begin catching up once this many seconds beyond the target
+const CATCHUP_STOP = 0.3;          // stop once back within this of the target
 
 let currentSpeed = 1.0;
 // Live-sync mode keeps live streams near the live edge automatically.
@@ -240,34 +243,37 @@ function forceLiveNormal() {
   }
 }
 
-// Sync ON: keep the stream within `liveSyncTarget` seconds of the live edge by
-// gently raising the rate (up to `liveSyncMax`).
+// Sync ON: keep the stream within `liveSyncTarget` seconds of the live edge.
 //
 // We measure lag as the buffered-ahead amount, NOT seekable.end − currentTime:
 // on Twitch `seekable.end` is a useless sentinel (~2^30). The player downloads
 // segments up to the live edge, so (buffered.end − currentTime) is how far behind
 // live we actually are. Speeding up drains that buffer back down toward the target,
 // which self-limits — we stop before the buffer runs out.
+//
+// Catch-up runs at ONE fixed rate (liveSyncMax) with hysteresis: we start only
+// once clearly behind and stop once back near the target. Playback rate therefore
+// changes just twice per cycle, so the audio stays clean (no continuous re-pitch).
 function runLiveSync(video) {
   if (video.paused) return;
 
   const lag = forwardBuffer(video);
   const dropped = droppedFramesDelta(video);
-  const maxBoost = Math.max(LIVE_MAX_FLOOR, liveSyncMax) - 1;
-  // Never drain below a small floor even if the user sets the target to 0.
-  const floor = Math.max(liveSyncTarget, MIN_FORWARD_BUFFER);
-  let desired = 1.0;
-  if (lag > floor && dropped === 0) {
-    desired = 1.0 + Math.min(maxBoost, (lag - liveSyncTarget) * LIVE_SYNC_GAIN);
+  const target = Math.max(liveSyncTarget, MIN_FORWARD_BUFFER);
+  const rate = clamp(Math.max(LIVE_MAX_FLOOR, liveSyncMax)); // fixed catch-up speed
+
+  let desired = currentSpeed;
+  if (currentSpeed > 1.0) {
+    // Already catching up — hold the fixed rate until we're back near the target,
+    // or bail early if frames start dropping (network/decoder can't keep up).
+    if (lag <= target + CATCHUP_STOP || dropped > 0) desired = 1.0;
+  } else {
+    // Normal — start catching up only once we've fallen clearly behind.
+    if (lag > target + CATCHUP_START && dropped === 0) desired = rate;
   }
 
-  // Ease toward the target so the speed change isn't audible as a jump.
-  let next = currentSpeed + (desired - currentSpeed) * SMOOTH_ALPHA;
-  if (Math.abs(next - desired) < 0.005) next = desired;
-  next = clamp(next);
-
-  if (Math.abs(next - currentSpeed) > 0.001) {
-    currentSpeed = next;
+  if (Math.abs(desired - currentSpeed) > 0.001) {
+    currentSpeed = desired;
     applyAll();
   }
 

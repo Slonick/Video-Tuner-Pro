@@ -14,8 +14,8 @@
   "syncSubtitle": { "message": "ライブ配信に自動で追いつく" },
   "allowedDelay": { "message": "許容する遅延" },
   "secondsShort": { "message": "秒" },
-  "maxCatchupSpeed": { "message": "最大追いつき速度" },
-  "syncHint": { "message": "配信が上記の値より遅れると、速度が滑らかに上がり（最大まで）、追いつくと 100% に戻ります。バッファが考慮され、先読みが少ないときは加速しません。" },
+  "maxCatchupSpeed": { "message": "追いつき速度" },
+  "syncHint": { "message": "配信が許容遅延より遅れると、ライブの先端に追いつくまで追いつき速度で再生し、その後100%に戻ります。フレーム落ちが始まると停止します。" },
   "indicatorLive": { "message": "ライブ — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$%（追いつき中）",

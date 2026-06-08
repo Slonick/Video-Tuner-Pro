@@ -14,8 +14,8 @@
   "syncSubtitle": { "message": "Automatically catch up to the live broadcast" },
   "allowedDelay": { "message": "Allowed delay" },
   "secondsShort": { "message": "s" },
-  "maxCatchupSpeed": { "message": "Max catch-up speed" },
-  "syncHint": { "message": "If the stream falls behind by more than the value above, the speed rises smoothly (up to the max) and returns to 100% once caught up. The buffer is respected — it won't speed up when little is buffered ahead." },
+  "maxCatchupSpeed": { "message": "Catch-up speed" },
+  "syncHint": { "message": "When the stream falls behind the allowed delay, it plays at the catch-up speed until it reaches the live edge, then returns to 100%. It backs off if frames start dropping." },
   "indicatorLive": { "message": "Live — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$% (catching up)",
