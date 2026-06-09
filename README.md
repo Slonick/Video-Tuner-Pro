@@ -7,8 +7,8 @@ or one-click presets, with smart handling for live streams.
 
 ## Install
 
-- **Chrome / Edge / Brave:** [Chrome Web Store](https://chromewebstore.google.com/detail/video-speed-controller-pro/ichlipldofdemkhlhnoekfkpfejfanno)
-- **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/video-speed-controller-pro/)
+- **Chrome / Edge / Brave:** [Chrome Web Store](https://chromewebstore.google.com/detail/video-tuner-pro/ichlipldofdemkhlhnoekfkpfejfanno)
+- **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/ru/firefox/addon/video-tuner-pro/)
 
 ## Features
 
