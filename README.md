@@ -5,6 +5,10 @@ on the live edge, and even out loud and quiet sounds — all from one little pop
 Works on virtually any site, in light and dark themes, in 10 languages, with no
 accounts and no tracking.
 
+![Fine-tune any video — speed presets and audio compression](.promo/store-screenshot-1.png)
+
+![Master live streams — Live-sync and real-time buffer](.promo/store-screenshot-2.png)
+
 ## Install
 
 - **Chrome / Edge / Brave:** [Chrome Web Store](https://chromewebstore.google.com/detail/video-tuner-pro/ichlipldofdemkhlhnoekfkpfejfanno)
