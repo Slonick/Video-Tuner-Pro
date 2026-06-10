@@ -841,6 +841,28 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false;
 });
 
+// Estimated download bitrate (bits/s) of the stream, from the decoder's byte
+// counter — unlike Resource Timing, this isn't blocked by cross-origin CDNs.
+// Chromium-only (webkitVideoDecodedByteCount); returns null elsewhere (Firefox).
+//
+// Averaged over a sliding window (total bytes / total time) rather than per-tick,
+// so per-segment fetch spikes don't make the number jump around.
+const BITRATE_WINDOW = 6000; // ms to average the bitrate over
+function streamBitrate(v) {
+  if (!v || typeof v.webkitVideoDecodedByteCount !== "number") return null;
+  const bytes = v.webkitVideoDecodedByteCount + (v.webkitAudioDecodedByteCount || 0);
+  const t = Date.now();
+  const s = v._brSamples || (v._brSamples = []);
+  // Counter went backwards (seek / source or quality switch) → drop the history.
+  if (s.length && bytes < s[s.length - 1].b) s.length = 0;
+  s.push({ t, b: bytes });
+  while (s.length > 2 && t - s[0].t > BITRATE_WINDOW) s.shift();
+  if (s.length < 2) return null;
+  const dt = (s[s.length - 1].t - s[0].t) / 1000;
+  if (dt < 1) return null; // need ~1s of data before showing a number
+  return ((s[s.length - 1].b - s[0].b) * 8) / dt;
+}
+
 // Everything the popup graphs need, in one round-trip.
 function monitorData() {
   const v = primaryVideo();
@@ -850,6 +872,7 @@ function monitorData() {
     // The buffer graph only makes sense on live streams (lag behind the edge);
     // on a VOD the buffer is huge and irrelevant, so report nothing.
     buffer: (v && live) ? forwardBuffer(v) : null,
+    bitrate: (v && live) ? streamBitrate(v) : null,
     target: liveSyncTarget,
     live,
     hasVideo: !!v,
