@@ -397,7 +397,15 @@ setInterval(() => {
   const bufHist = [];                              // {t, v} smoothed buffer history
   let bufSmooth = null;                            // EMA state for buffer samples
   let bufLive = false;                             // only graph the buffer on live streams
+  let bufBitrate = null;                           // latest download bitrate (bits/s) or null
+  let bufBitrateShown = null;                      // value actually drawn (refreshed ~1×/s)
+  let bufBitrateAt = 0;                            // when bufBitrateShown was last refreshed
   let yMax = 8;                                    // buffer graph eased Y scale
+
+  function fmtBitrate(bps) {
+    if (bps == null || !isFinite(bps) || bps <= 0) return null;
+    return bps >= 1e6 ? (bps / 1e6).toFixed(1) + " Mbps" : Math.round(bps / 1e3) + " kbps";
+  }
 
   // Smooth polyline through points using midpoint quadratic curves (rounds corners).
   function smoothLine(cx, pts) {
@@ -510,6 +518,14 @@ setInterval(() => {
       bcx.fillText(label, w / 2, h / 2);
       bcx.textBaseline = "alphabetic";
     }
+    // download bitrate, as plain text in the bottom-left corner
+    const br = fmtBitrate(bufBitrateShown);
+    if (br) {
+      bcx.font = "10px -apple-system, sans-serif";
+      bcx.textAlign = "left"; bcx.textBaseline = "alphabetic";
+      bcx.fillStyle = col("--muted", "#888");
+      bcx.fillText("≈ " + br, 3, h - 2);
+    }
   }
 
   function frame() {
@@ -547,9 +563,15 @@ setInterval(() => {
         bufSmooth = bufSmooth == null ? resp.buffer : bufSmooth + (resp.buffer - bufSmooth) * 0.18;
         bufHist.push({ t, v: bufSmooth });
         while (bufHist.length && t - bufHist[0].t > BUF_WINDOW + 1000) bufHist.shift();
+        bufBitrate = typeof resp.bitrate === "number" ? resp.bitrate : null;
+        // Refresh the displayed value at most once a second so the digits sit still.
+        if (bufBitrateShown == null || t - bufBitrateAt > 1000) {
+          bufBitrateShown = bufBitrate; bufBitrateAt = t;
+        }
       } else {
         // Not a live stream — the buffer graph is meaningless, so keep it empty.
         bufHist.length = 0; bufSmooth = null;
+        bufBitrate = bufBitrateShown = null;
       }
     });
   }, 75);
