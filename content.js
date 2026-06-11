@@ -21,6 +21,10 @@ const CATCHUP_START = 2.0;         // begin catching up once this many seconds b
 const CATCHUP_STOP = 0.3;          // stop once back within this of the target
 
 let currentSpeed = 1.0;
+// The user's intended speed for NON-live playback. On a live stream we force
+// currentSpeed to 1.0, so we keep the desired value here to restore it when the
+// page turns out not to be (or stops being) a live stream.
+let userSpeed = 1.0;
 // Live-sync mode keeps live streams near the live edge automatically.
 let liveSyncEnabled = false;
 let liveSyncTarget = 3;            // seconds of allowed lag behind the live edge (0–15)
@@ -142,14 +146,17 @@ function probeLive(v) {
   if (v.duration === Infinity) { liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, live: true }); return; }
   const end = streamEnd(v);
   let s = liveProbe.get(v);
-  if (!s) { liveProbe.set(v, { lastEnd: end, lastT: t, lastGrow: 0, live: false }); return; }
+  if (!s) { liveProbe.set(v, { lastEnd: end, lastT: t, lastGrow: 0, hits: 0, live: false }); return; }
   const dT = (t - s.lastT) / 1000;
   if (dT < 0.4) return; // need spacing between samples for a stable rate
   const rate = (end - s.lastEnd) / dT;
   s.lastEnd = end; s.lastT = t;
   // Real-time growth (~1x) = a live edge; VOD is either flat (~0) or bursty (>>1).
-  if (rate > 0.3 && rate < 1.7) s.lastGrow = t;
-  s.live = (t - s.lastGrow) < 12000; // sticky, survives brief stalls/quality switches
+  // Require several consecutive ~1x samples so a brief transient (e.g. a slow VOD
+  // start) can't briefly masquerade as live.
+  if (rate > 0.3 && rate < 1.7) { s.hits++; if (s.hits >= 3) s.lastGrow = t; }
+  else { s.hits = 0; }
+  s.live = s.lastGrow > 0 && (t - s.lastGrow) < 8000; // sticky through brief stalls
 }
 
 // Seconds of media buffered ahead of the current position. On a live stream the
@@ -226,11 +233,19 @@ function controlLive() {
   if (now - lastControlAt < 250) return;
   lastControlAt = now;
   const live = liveVideo();
-  if (!live) return;
-  if (liveSyncEnabled) {
-    runLiveSync(live);
-  } else {
-    forceLiveNormal();
+  if (live) {
+    if (liveSyncEnabled) runLiveSync(live);
+    else forceLiveNormal();
+    return;
+  }
+  // Not a live stream. Wait out the sticky window (avoids flicker on a brief
+  // detection drop), then restore the user's intended non-live speed — otherwise
+  // a live detection (even a mistaken one) would leave playback stuck at 100%.
+  if (onStreamPage()) return;
+  if (Math.abs(currentSpeed - userSpeed) > 0.001) {
+    currentSpeed = userSpeed;
+    applyAll();
+    showIndicator();
   }
 }
 
@@ -471,7 +486,8 @@ function loadSpeed() {
       audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 0.25);
       audioCompGain = clampNum(result.audioCompGain, 0, 24, 0);
       // Only sites the user explicitly remembered get a saved speed; the rest are 100%.
-      currentSpeed = clamp(domains[getDomain()] || 1.0);
+      userSpeed = clamp(domains[getDomain()] || 1.0);
+      currentSpeed = userSpeed;
       applyAll();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
@@ -572,6 +588,7 @@ function setSpeed(speed, persist, manual) {
   // Streams ignore manual speed entirely — they're governed by Live-sync.
   if (manual && onStreamPage()) return;
   currentSpeed = clamp(speed);
+  userSpeed = currentSpeed; // remember it as the intended non-live speed
   applyAll();
   if (persist) persistDomainSpeed(currentSpeed);
   showIndicator();
