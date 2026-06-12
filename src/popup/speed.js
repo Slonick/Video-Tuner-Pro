@@ -23,9 +23,8 @@ function setLive(flag) {
 }
 
 // Send the speed to the content script (it persists per-domain) and reflect in UI.
-function setSpeed(speed) {
-  const clamped = clamp(speed);
-  updateUI(clamped);
+// Push a speed to the content script (it applies + persists per-domain).
+function sendSpeed(clamped) {
   if (ctx.activeTabId == null) return;
   api.tabs.sendMessage(ctx.activeTabId, { action: "setSpeed", speed: clamped }, (resp) => {
     if (api.runtime.lastError) {
@@ -34,10 +33,21 @@ function setSpeed(speed) {
     }
     if (resp) {
       setLive(!!resp.live);
-      // On a live stream the content script may clamp our speed back to 1x.
-      if (typeof resp.speed === "number") updateUI(resp.speed);
+      // Only re-sync the slider from the reply when the content script actually
+      // CLAMPED our speed (e.g. a live stream forced it back to 1×) — re-applying
+      // our own echoed value would snap the thumb around.
+      if (typeof resp.speed === "number" && Math.round(resp.speed * 100) !== Math.round(clamped * 100)) {
+        updateUI(resp.speed);
+      }
     }
   });
+}
+
+// Immediate apply (preset buttons, Reset).
+function setSpeed(speed) {
+  const clamped = clamp(speed);
+  updateUI(clamped);
+  sendSpeed(clamped);
 }
 
 function resetSpeed() {
@@ -109,8 +119,20 @@ export async function init() {
 }
 
 // --- Event wiring ---
-document.getElementById("speedSlider").addEventListener("input", (e) => {
-  setSpeed(parseFloat(e.target.value) / 100);
+// Dragging the slider updates the readout instantly but applies to the video only
+// once you stop (debounced) or release (change) — so the thumb stays smooth and we
+// don't thrash playbackRate (which glitches audio) on every step while dragging.
+const speedSlider = document.getElementById("speedSlider");
+let sliderSendTimer = null;
+speedSlider.addEventListener("input", (e) => {
+  const clamped = clamp(parseFloat(e.target.value) / 100);
+  updateUI(clamped);                                           // instant, local
+  clearTimeout(sliderSendTimer);
+  sliderSendTimer = setTimeout(() => sendSpeed(clamped), 160); // apply after you pause
+});
+speedSlider.addEventListener("change", (e) => {               // released — apply the final value now
+  clearTimeout(sliderSendTimer);
+  sendSpeed(clamp(parseFloat(e.target.value) / 100));
 });
 document.querySelectorAll(".btn-speed").forEach((btn) => {
   btn.addEventListener("click", () => setSpeed(Number(btn.dataset.percent) / 100));
