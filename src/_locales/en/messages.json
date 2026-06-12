@@ -26,6 +26,7 @@
   "audioSubtitle": { "message": "Even out loud and quiet sounds" },
   "audioGain": { "message": "Make-up gain" },
   "audioHint": { "message": "Boosts quiet parts and tames loud ones; make-up gain lifts the overall level. Won't work on sites that serve video cross-origin without CORS — the browser mutes Web Audio there." },
+  "audioVotNote": { "message": "A voice-over translation is active — compression is paused so it doesn't interfere." },
   "audioThreshold": { "message": "Threshold" },
   "audioThresholdDesc": { "message": "Level above which compression starts." },
   "audioKnee": { "message": "Knee" },

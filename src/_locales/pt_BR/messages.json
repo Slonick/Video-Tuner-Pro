@@ -25,6 +25,7 @@
   "audioTitle": { "message": "Compressão de áudio" },
   "audioSubtitle": { "message": "Equilibrar sons altos e baixos" },
   "audioHint": { "message": "Realça as partes baixas e contém as altas; o ganho de compensação eleva o nível geral. Não funciona em sites que servem o vídeo de outro domínio sem CORS — ali o navegador silencia o Web Audio." },
+  "audioVotNote": { "message": "Uma tradução por voz está ativa — a compressão foi pausada para não interferir." },
   "audioThreshold": { "message": "Limiar" },
   "audioThresholdDesc": { "message": "Nível acima do qual a compressão começa." },
   "audioKnee": { "message": "Joelho (Knee)" },

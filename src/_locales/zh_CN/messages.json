@@ -25,6 +25,7 @@
   "audioTitle": { "message": "音频压缩" },
   "audioSubtitle": { "message": "平衡大声与轻声" },
   "audioHint": { "message": "提升轻声部分、抑制大声部分；补偿增益整体提高音量。在以跨域且无 CORS 方式提供视频的网站上无法使用——浏览器会静音 Web Audio。" },
+  "audioVotNote": { "message": "正在进行配音翻译——已暂停压缩以避免干扰。" },
   "audioThreshold": { "message": "阈值" },
   "audioThresholdDesc": { "message": "超过该电平即开始压缩。" },
   "audioKnee": { "message": "拐点" },
