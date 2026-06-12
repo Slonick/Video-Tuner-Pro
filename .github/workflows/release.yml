@@ -1,8 +1,12 @@
 name: Build release packages
 
-# When a GitHub Release is published, build the Chrome and Firefox packages and
-# attach them to that release. No store credentials are used or stored anywhere —
-# you download the zips from the release and upload them to the stores yourself.
+# When a GitHub Release is published, build the Chrome and Firefox packages,
+# attach them to that release, and publish them to both stores.
+# Store credentials live in repo secrets (one-time setup):
+#   Chrome:  CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
+#            (generate all three with `npx chrome-webstore-upload-keys`)
+#   Firefox: AMO_JWT_ISSUER, AMO_JWT_SECRET
+#            (addons.mozilla.org → Tools → Manage API Keys)
 on:
   release:
     types: [published]
@@ -70,3 +74,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" video-tuner-pro-*.zip --clobber
+
+      - name: Publish to Chrome Web Store
+        if: github.event_name == 'release'
+        env:
+          EXTENSION_ID: ichlipldofdemkhlhnoekfkpfejfanno
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: npx chrome-webstore-upload-cli@3 upload --source "video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" --auto-publish
+
+      - name: Publish to Firefox Add-ons
+        if: github.event_name == 'release'
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          # AMO requires source code for review because the build is minified.
+          git archive HEAD -o source.zip
+          # --approval-timeout 0: submit and exit — listed reviews take hours/days.
+          npx web-ext@8 sign --channel listed --source-dir dist/firefox \
+            --upload-source-code source.zip --approval-timeout 0
