@@ -1,4 +1,5 @@
 // Each imported module registers its own DOM listeners as a load-time side effect.
+import { api } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { byId } from "./dom.js";
 import { localize } from "./i18n.js";
@@ -12,6 +13,8 @@ localize();
 init();
 loadSyncSettings();
 loadAudioSettings();
+
+byId("extVersion").textContent = "v" + api.runtime.getManifest().version;
 
 // On-video badge toggles default to on (hence the !== false checks).
 STORE.get(["showRemaining", "streamBadge"], (r) => {

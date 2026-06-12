@@ -11,10 +11,11 @@ describe("clamp", () => {
     expect(clamp(99)).toBe(16);
     expect(clamp(1.2345)).toBe(1.23);
   });
-  it("clampTarget → [0,15] integer, default 5 on NaN", () => {
+  it("clampTarget → [1,30] integer, default 5 on NaN", () => {
     expect(clampTarget(7.4)).toBe(7);
-    expect(clampTarget(99)).toBe(15);
-    expect(clampTarget(-3)).toBe(0);
+    expect(clampTarget(99)).toBe(30);
+    expect(clampTarget(0)).toBe(1);
+    expect(clampTarget(-3)).toBe(1);
     expect(clampTarget("nope")).toBe(5);
   });
   it("clampMax → [1.25,3], default 1.5 on NaN", () => {

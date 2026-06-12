@@ -22,6 +22,19 @@ describe("isLive", () => {
   });
 });
 
+describe("isLive (player-published data-vtp-live flag)", () => {
+  afterEach(() => { document.documentElement.removeAttribute("data-vtp-live"); });
+
+  it("flag '1' → live, even with a finite duration", () => {
+    document.documentElement.setAttribute("data-vtp-live", "1");
+    expect(isLive(vid({ duration: 600 }))).toBe(true);
+  });
+  it("flag '0' overrides the duration heuristic", () => {
+    document.documentElement.setAttribute("data-vtp-live", "0");
+    expect(isLive(vid({ duration: Infinity }))).toBe(false);
+  });
+});
+
 describe("probeLive (generic real-time-edge detection)", () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0); });
   afterEach(() => { vi.useRealTimers(); });

@@ -35,6 +35,10 @@ describe("popup integration", () => {
     expect(byId("speedValue").textContent).toBe("100%");
   });
 
+  it("shows the extension version in the header", () => {
+    expect(byId("extVersion").textContent).toBe("v0.0.0");
+  });
+
   it("reflects stored settings in the toggles", () => {
     expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
     expect((byId("liveSyncToggle") as HTMLInputElement).checked).toBe(true);

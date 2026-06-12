@@ -62,6 +62,18 @@ loadSpeed();
 // roots, where document mutations don't fire) and drive live-sync.
 liveTick = setInterval(() => { applyAll(); controlLive(); updateTimeBadge(); }, 1000);
 
+// Apply the speed the moment ANY video starts up — a second player added to the
+// page would otherwise wait for the next tick/mutation pass and could begin at
+// 1×. Media events don't bubble, but a capture-phase listener still sees them.
+for (const ev of ["play", "loadedmetadata"]) {
+  document.addEventListener(ev, (e) => {
+    if (!(e.target instanceof HTMLVideoElement)) return;
+    if (!ctxValid()) return;
+    applyAll();
+    controlLive();
+  }, true);
+}
+
 // Watch for videos added later (SPA navigation, lazy players). Chat-heavy pages
 // mutate constantly, so coalesce a burst into a single rAF pass — and never re-run
 // for our own indicator writes.

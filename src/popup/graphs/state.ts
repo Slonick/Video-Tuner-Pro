@@ -28,6 +28,10 @@ export interface GraphState {
   bufHist: BufSample[];                   // {t, v} smoothed latency/buffer history
   bufSmooth: number | null;               // EMA state
   bufLive: boolean;                       // only graph on live streams
+  bufAhead: number | null;                // buffered-ahead s when latency is plotted
+  bufAheadShown: number | null;           // value actually drawn (refreshed ~1×/s)
+  bufAheadAt: number;
+  bufLimited: boolean;                    // buffer too thin to catch up — warn
   bufBitrate: number | null;              // latest download bitrate (bits/s) or null
   bufBitrateShown: number | null;         // value actually drawn (refreshed ~1×/s)
   bufBitrateAt: number;
@@ -45,6 +49,7 @@ export function createGraphState(
     audioActive: false, audioEnabled: false, compAnim: 0, histSeeded: false,
     audioHist: [], audioDiffShown: null, audioDiffAt: 0, audioInShown: null, audioOutShown: null,
     bufHist: [], bufSmooth: null, bufLive: false,
+    bufAhead: null, bufAheadShown: null, bufAheadAt: 0, bufLimited: false,
     bufBitrate: null, bufBitrateShown: null, bufBitrateAt: 0, yMax: 8,
   };
 }

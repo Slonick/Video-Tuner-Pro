@@ -50,6 +50,7 @@
   "meterLatency": { "message": "延迟" },
   "meterTargetMark": { "message": "目标" },
   "bufferLiveOnly": { "message": "仅限直播" },
+  "bufferLowWarn": { "message": "缓冲不足 — 追赶受限" },
   "onVideoLabel": { "message": "在视频上显示速度和时间" },
   "onStreamLabel": { "message": "在视频上显示速度和缓冲" }
 }
