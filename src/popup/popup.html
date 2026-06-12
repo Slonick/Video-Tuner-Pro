@@ -70,7 +70,7 @@
 
         <div class="meter buffer always">
             <div class="meter-legend">
-                <span><i class="dot dot-buf"></i><span data-i18n="meterBuffer">Buffer</span></span>
+                <span><i class="dot dot-buf"></i><span data-i18n="meterLatency">Latency</span></span>
                 <span class="meter-thr"><i class="dot dot-thr"></i><span data-i18n="meterTargetMark">Target</span></span>
             </div>
             <canvas id="bufferMeter"></canvas>
@@ -82,6 +82,14 @@
 
             <div class="sync-label" style="margin-top:12px;"><span data-i18n="maxCatchupSpeed">Max catch-up speed</span>: <b id="syncMaxVal">150</b>%</div>
             <input type="range" class="speed-slider" id="syncMax" min="125" max="300" step="5" value="150">
+
+            <div class="extra-row">
+                <span data-i18n="onStreamLabel">Show speed &amp; buffer on video</span>
+                <label class="switch" for="onStreamToggle">
+                    <input type="checkbox" id="onStreamToggle" class="switch-input">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                </label>
+            </div>
         </div>
 
         <div class="expand-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>

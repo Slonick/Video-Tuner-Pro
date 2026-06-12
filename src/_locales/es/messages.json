@@ -47,7 +47,9 @@
   "meterOut": { "message": "Salida" },
   "meterThr": { "message": "Umbral" },
   "meterBuffer": { "message": "Búfer" },
+  "meterLatency": { "message": "Latencia" },
   "meterTargetMark": { "message": "Objetivo" },
   "bufferLiveOnly": { "message": "Solo en directos" },
-  "onVideoLabel": { "message": "Mostrar velocidad y tiempo en el vídeo" }
+  "onVideoLabel": { "message": "Mostrar velocidad y tiempo en el vídeo" },
+  "onStreamLabel": { "message": "Mostrar velocidad y búfer en el vídeo" }
 }

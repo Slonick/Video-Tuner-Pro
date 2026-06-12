@@ -47,7 +47,9 @@
   "meterOut": { "message": "Sortie" },
   "meterThr": { "message": "Seuil" },
   "meterBuffer": { "message": "Tampon" },
+  "meterLatency": { "message": "Latence" },
   "meterTargetMark": { "message": "Cible" },
   "bufferLiveOnly": { "message": "Streams en direct uniquement" },
-  "onVideoLabel": { "message": "Afficher la vitesse et le temps sur la vidéo" }
+  "onVideoLabel": { "message": "Afficher la vitesse et le temps sur la vidéo" },
+  "onStreamLabel": { "message": "Afficher la vitesse et le tampon sur la vidéo" }
 }
