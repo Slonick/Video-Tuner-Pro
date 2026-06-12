@@ -216,8 +216,10 @@
 
         /* Audio: compressor parameter rows + reset button. */
         /* Live graphs (audio levels + buffer) */
-        .meter { margin-bottom: 12px; }
-        .meter:last-child { margin-bottom: 0; }
+        /* No bottom margin: when the body is collapsed the meter is the last
+           element, so its margin would double the section's bottom padding.
+           Separation from the body when expanded comes from .sync-body.open. */
+        .meter { margin-bottom: 0; }
         /* Always-visible graphs sit between the header and the collapsible body. */
         .meter.always { margin-top: 12px; }
         .meter-legend {
