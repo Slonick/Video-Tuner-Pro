@@ -4,6 +4,9 @@
   "description": "Build tooling for the Video Tuner Pro browser extension",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --watch",
