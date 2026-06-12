@@ -50,6 +50,7 @@
   "meterLatency": { "message": "Затримка" },
   "meterTargetMark": { "message": "Ціль" },
   "bufferLiveOnly": { "message": "Лише для прямих трансляцій" },
+  "bufferLowWarn": { "message": "Буфер замалий — наздоганяння обмежено" },
   "onVideoLabel": { "message": "Показувати швидкість і час на відео" },
   "onStreamLabel": { "message": "Показувати швидкість і буфер на відео" }
 }

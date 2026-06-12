@@ -6,7 +6,8 @@ import { autoExpandOnFirstEnable } from "./sections.js";
 function clampTarget(n: unknown): number {
   const v = Number(n);
   if (Number.isNaN(v)) return 5;
-  return Math.min(15, Math.max(0, Math.round(v)));
+  // Floor of 1s, matching the content script — 0 would mean perpetual catch-up.
+  return Math.min(30, Math.max(1, Math.round(v)));
 }
 
 function clampMaxPercent(n: unknown): number {

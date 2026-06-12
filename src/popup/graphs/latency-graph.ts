@@ -64,8 +64,11 @@ export function drawBuffer(g: GraphState, t: number): void {
   }
   // background-colored halo so the value stays readable over the line, grid and target dash
   if (g.bufHist.length) {
+    const fmtS = (v: number) => (v < 10 ? v.toFixed(1) : Math.round(v)) + "s";
     const v = g.bufHist[g.bufHist.length - 1].v;
-    const label = (v < 10 ? v.toFixed(1) : Math.round(v)) + "s";
+    // "latency (buffer)" when the plotted value is the site latency; without it
+    // the plotted value already IS the buffer, so there's nothing to append.
+    const label = fmtS(v) + (g.bufAheadShown != null ? ` (${fmtS(g.bufAheadShown)})` : "");
     bcx.font = "700 17px -apple-system, sans-serif";
     bcx.textAlign = "center"; bcx.textBaseline = "middle";
     bcx.lineWidth = 4; bcx.lineJoin = "round";
@@ -81,5 +84,13 @@ export function drawBuffer(g: GraphState, t: number): void {
     bcx.textAlign = "left"; bcx.textBaseline = "alphabetic";
     bcx.fillStyle = col("--muted", "#888");
     bcx.fillText("≈ " + br, 3, h - 2);
+  }
+  // Far behind but the buffer is too thin to catch up — same signal as the
+  // badge's "⚠"; without it a stuck-high latency looks like sync not working.
+  if (g.bufLimited) {
+    bcx.font = "600 10px -apple-system, sans-serif";
+    bcx.textAlign = "right"; bcx.textBaseline = "alphabetic";
+    bcx.fillStyle = "#ff9f0a";
+    bcx.fillText("⚠ " + (msg("bufferLowWarn") || "Low buffer — catch-up limited"), w - 3, h - 2);
   }
 }
