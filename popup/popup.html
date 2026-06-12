@@ -247,6 +247,11 @@
         .param-row input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none; margin: 0;
         }
+        /* Draw the focus ring INSIDE the box so it isn't clipped by the
+           collapsible body's overflow:hidden at the right edge. */
+        .param-row input[type="number"]:focus {
+            outline: 2px solid var(--accent); outline-offset: -2px;
+        }
         .param-desc { font-size: 11px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
         .param-desc .range { color: var(--text); font-weight: 600; }
         .audio-reset { width: 100%; margin-top: 4px; }
