@@ -1,0 +1,15 @@
+{
+  "name": "video-tuner-pro",
+  "version": "2.0.0",
+  "description": "Build tooling for the Video Tuner Pro browser extension",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "check": "node --check src/content/index.js && node --check src/popup/index.js && node --check src/background/index.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}
