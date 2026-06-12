@@ -25,6 +25,7 @@
   "audioTitle": { "message": "Compression audio" },
   "audioSubtitle": { "message": "Égaliser les sons forts et faibles" },
   "audioHint": { "message": "Renforce les passages faibles et atténue les forts ; le gain de compensation relève le niveau global. Ne fonctionne pas sur les sites diffusant la vidéo en cross-origin sans CORS — le navigateur y coupe le Web Audio." },
+  "audioVotNote": { "message": "Une traduction vocale est active — la compression est en pause pour ne pas interférer." },
   "audioThreshold": { "message": "Seuil" },
   "audioThresholdDesc": { "message": "Niveau au-dessus duquel la compression démarre." },
   "audioKnee": { "message": "Coude (Knee)" },

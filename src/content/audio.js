@@ -18,10 +18,37 @@ let audioGestureHooked = false;
 let lastAudioSkip = null;          // why the most recent setupGraph() bailed
 let lastNotRoutableLog = null;     // throttles the "not routable yet" diagnostic log
 
+// A voice-over translator (e.g. VOT) needs the video's audio source for ducking,
+// and createMediaElementSource is exclusive — if we capture and re-amplify the
+// original with make-up gain, it fights the translation. So: while a translation
+// is ACTIVELY playing we go silent and don't grab new sources, but when it's idle
+// the compressor works normally (the translator's UI is always mounted, so we key
+// off the *active* state, not mere presence).
+//
+// VOT marks its translate button with data-status="success" while a translation
+// plays. The button lives in VOT's OPEN shadow root under <vot-shadow-host>, so we
+// reach in. If VOT ever changes this, detection simply fails open (no muting).
+function translationActive() {
+  try {
+    const host = document.querySelector("vot-shadow-host");
+    const sr = host && host.shadowRoot;
+    return !!(sr && sr.querySelector('[data-status="success"]'));
+  } catch (e) { return false; }
+}
+
+// Effectively-on params: enabled AND not yielding to an active translation. While
+// a translation plays we force the graph TRANSPARENT (ratio 1, unity gain, no
+// make-up) but keep it connected — so the original still passes through at the
+// element's own (translator-ducked) volume; we just stop compressing/boosting it.
+function compOn() {
+  return S.audioCompEnabled && !translationActive();
+}
+
 // Routing a media element through Web Audio SILENCES it if the underlying media
 // is cross-origin without CORS. Only route media that's safe: a MediaStream
 // (srcObject), MSE/blob, data:, same-origin, or an element that opted into CORS.
 function canRouteAudio(video) {
+  if (translationActive()) return false;            // don't grab a new source mid-translation
   if (video.srcObject) return true;                 // MediaStream (Twitch) — local, routable
   const src = video.currentSrc || video.src || "";
   if (!src) return false;
@@ -118,7 +145,7 @@ function rampParam(param, value) {
 // Off = transparent graph (ratio 1:1, unity gain) rather than disconnecting.
 // Skipped when nothing changed, so we don't re-poke params every tick (clicks).
 function applyGraphParams(g) {
-  const on = S.audioCompEnabled;
+  const on = compOn();
   const key = on
     ? `${S.audioCompThreshold}|${S.audioCompKnee}|${S.audioCompRatio}|${S.audioCompAttack}|${S.audioCompRelease}|${S.audioCompGain}`
     : "off";
@@ -184,7 +211,7 @@ function analyserDb(an) {
 function audioOutDb(g, inDb) {
   if (inDb <= -100) return inDb; // silence floor — amplifying nothing is still nothing
   const reduction = (g.comp && typeof g.comp.reduction === "number") ? g.comp.reduction : 0;
-  return inDb + reduction + (S.audioCompEnabled ? S.audioCompGain : 0);
+  return inDb + reduction + (compOn() ? S.audioCompGain : 0);
 }
 
 // Before/after levels of the primary video's compressor, for the popup meters.
@@ -194,7 +221,7 @@ export function audioLevels() {
   // Report levels whenever the graph exists — even with compression off (it runs
   // transparent), so the meter and threshold preview stay live.
   if (!g || !g.analyserIn) {
-    return { active: false, enabled: S.audioCompEnabled };
+    return { active: false, enabled: S.audioCompEnabled, translation: translationActive() };
   }
   const inDb = analyserDb(g.analyserIn);
   return {
@@ -203,6 +230,7 @@ export function audioLevels() {
     in: inDb,
     out: audioOutDb(g, inDb),
     threshold: S.audioCompThreshold,
+    translation: translationActive(),  // a voice-over translator is playing → compression is paused
   };
 }
 

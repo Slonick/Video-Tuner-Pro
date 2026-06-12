@@ -41,6 +41,19 @@ export function setupGraphs() {
   let audioDiffShown = null, audioDiffAt = 0;      // centered "out − in" dB readout
   let audioInShown = null, audioOutShown = null;   // corner in/out level readouts
 
+  // While a voice-over translator (VOT) is playing, the compressor yields — show a
+  // warning and dim/lock the audio section (like manual speed on a live stream).
+  const votWarnEl = document.getElementById("audioVotWarn");
+  const audioBodyEl = document.getElementById("audioBody");
+  const audioSectionEl = audioBodyEl && audioBodyEl.closest(".sync-section");
+  let audioTranslating = false;
+  function setAudioTranslating(on) {
+    if (on === audioTranslating) return;
+    audioTranslating = on;
+    if (votWarnEl) votWarnEl.style.display = on ? "inline-flex" : "none";
+    if (audioSectionEl) audioSectionEl.classList.toggle("audio-locked", on);
+  }
+
   function fmtMag(d) {                               // magnitude only; direction shown by the arrow
     const v = Math.abs(d);
     return (v < 10 ? v.toFixed(1) : Math.round(v)) + " dB";
@@ -323,11 +336,12 @@ export function setupGraphs() {
   setInterval(() => {
     if (ctx.activeTabId == null) return;
     api.tabs.sendMessage(ctx.activeTabId, { action: "getMonitor" }, (resp) => {
-      if (api.runtime.lastError || !resp) { audioActive = false; return; }
+      if (api.runtime.lastError || !resp) { audioActive = false; setAudioTranslating(false); return; }
       const a = resp.audio || {};
       const wasActive = audioActive;
       audioActive = !!a.active;
       audioEnabled = !!a.enabled;
+      setAudioTranslating(!!a.translation);  // VOT etc. playing → warn + lock the section
       if (audioActive) {
         tgt.in = a.in; tgt.out = a.out;
         // Snap on (re)activation instead of easing up from the −100 floor, so the

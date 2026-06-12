@@ -75,6 +75,16 @@ body {
     filter: grayscale(0.3);
 }
 
+/* Audio section is dimmed/locked while a voice-over translation is playing — the
+   compressor yields to it, like manual speed yields to Live-sync on streams. */
+.sync-section.audio-locked .meter,
+.sync-section.audio-locked .sync-body,
+.sync-section.audio-locked .switch {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(0.3);
+}
+
 .speed-display {
     position: relative;
     display: flex; align-items: baseline; justify-content: center; gap: 6px;

@@ -25,6 +25,7 @@
   "audioTitle": { "message": "音声コンプレッション" },
   "audioSubtitle": { "message": "大きい音と小さい音を均一化" },
   "audioHint": { "message": "小さい音を持ち上げ、大きい音を抑えます。メイクアップゲインで全体の音量を上げます。CORSなしで別ドメインから配信される動画では、ブラウザがWeb Audioをミュートするため動作しません。" },
+  "audioVotNote": { "message": "音声翻訳が再生中です。干渉を避けるため圧縮を一時停止しています。" },
   "audioThreshold": { "message": "スレッショルド" },
   "audioThresholdDesc": { "message": "圧縮が始まるレベル。" },
   "audioKnee": { "message": "ニー" },

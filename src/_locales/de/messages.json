@@ -25,6 +25,7 @@
   "audioTitle": { "message": "Audiokompression" },
   "audioSubtitle": { "message": "Laute und leise Töne angleichen" },
   "audioHint": { "message": "Hebt leise Stellen an und dämpft laute; der Make-up-Gain hebt den Gesamtpegel. Funktioniert nicht auf Seiten, die Video cross-origin ohne CORS ausliefern — dort schaltet der Browser Web Audio stumm." },
+  "audioVotNote": { "message": "Eine Voiceover-Übersetzung läuft — die Kompression ist pausiert, um nicht zu stören." },
   "audioThreshold": { "message": "Schwellenwert" },
   "audioThresholdDesc": { "message": "Pegel, ab dem die Kompression einsetzt." },
   "audioKnee": { "message": "Knie (Knee)" },
