@@ -1,21 +1,25 @@
 # Building Video Tuner Pro from source
 
 The published packages are built from the human-written source in `src/` with
-[esbuild](https://esbuild.github.io/), which bundles each script into a single
-file and minifies the JavaScript and CSS. This document explains how to reproduce
-the exact extension package from source (e.g. for add-on store review).
+two tools: [esbuild](https://esbuild.github.io/) bundles and minifies each
+JavaScript entry point, and [Lightning CSS](https://lightningcss.dev/) bundles
+the popup stylesheet (inlining the `src/popup/styles/*.css` partials), lowers its
+nested CSS to flat selectors, autoprefixes, and minifies it. This document
+explains how to reproduce the exact extension package from source (e.g. for
+add-on store review).
 
 ## Build environment
 
 - **Operating system:** any OS that runs Node.js — Linux, macOS, or Windows.
   (Built and tested on macOS; the CI builds on Ubuntu Linux.)
 - **Node.js:** version 18 or newer. Built and tested with **Node.js 22.22.2**;
-  CI uses Node.js 24. Any 18+ release reproduces identical output, because the
-  only build tool (esbuild) is a self-contained binary pinned to an exact version.
+  CI uses Node.js 24. Any 18+ release reproduces identical output, because both
+  build tools (esbuild, Lightning CSS) are self-contained native binaries pinned
+  to exact versions.
 - **npm:** the version bundled with Node.js (e.g. 10.x with Node 22). Used only to
-  install the one build dependency.
+  install the build dependencies.
 - **No other tools or global installs are required**, and no network access is
-  needed during the build itself (only `npm ci` downloads the pinned esbuild).
+  needed during the build itself (only `npm ci` downloads the pinned tools).
 
 Install Node.js + npm from <https://nodejs.org/> (the LTS installer includes npm),
 or via a version manager such as [nvm](https://github.com/nvm-sh/nvm):
@@ -23,17 +27,19 @@ or via a version manager such as [nvm](https://github.com/nvm-sh/nvm):
 
 ## Build dependencies
 
-Exactly one, declared in `package.json` and locked to an exact version in
-`package-lock.json`:
+Declared in `package.json` and locked to exact versions in `package-lock.json`:
 
-- **esbuild 0.24.2** — bundler/minifier.
+- **esbuild 0.24.2** — JavaScript bundler/minifier.
+- **Lightning CSS 1.32.0** — CSS bundler: nesting → flat selectors, autoprefix,
+  minify. (npm installs the matching prebuilt native binary for your platform,
+  e.g. `lightningcss-linux-x64-gnu` on CI — all locked in `package-lock.json`.)
 
 ## Steps to reproduce the exact add-on
 
 From the root of the source tree (the folder containing `package.json`):
 
 ```sh
-npm ci          # install the exact, locked build tool (esbuild) from package-lock.json
+npm ci          # install the exact, locked build tools from package-lock.json
 npm run build   # run the build script (build.mjs)
 ```
 
@@ -54,7 +60,9 @@ build and diff `dist/firefox/` against the package under review.
 1. Bundles `src/content/index.js`, `src/background/index.js`, and
    `src/popup/index.js` — each into a single classic IIFE file (content scripts
    can't use ES modules at runtime), and **minifies** them.
-2. **Minifies** `src/popup/popup.css`.
+2. Bundles `src/popup/popup.css` (inlining the `src/popup/styles/*.css` partials
+   it `@import`s), **lowers** its nested CSS to flat selectors, autoprefixes, and
+   **minifies** it — via Lightning CSS.
 3. Copies the static assets unchanged: `src/_locales/` and `src/icons/`.
 4. Lightly minifies `src/popup/popup.html` and copies it.
 5. Writes the per-browser `manifest.json` from `src/manifest.json`.
@@ -72,7 +80,8 @@ build and diff `dist/firefox/` against the package under review.
 ```
 src/
   manifest.json
-  background/index.js     content/*.js     popup/*.js  popup.html  popup.css
+  background/index.js     content/*.js     popup/*.js  popup.html
+  popup/popup.css         popup/styles/*.css   (CSS entry + partials)
   _locales/               icons/
 build.mjs                 package.json     package-lock.json
 ```
