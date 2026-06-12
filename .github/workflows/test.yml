@@ -1,0 +1,32 @@
+name: Tests
+
+# Runs on every push to main and on every pull request. Enable branch protection
+# (Settings → Branches → require the "test" status check) to block merging a PR
+# whose tests fail.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check (tsc, strict)
+        run: npm run check
+
+      - name: Unit tests (Vitest)
+        run: npm test

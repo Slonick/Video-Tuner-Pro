@@ -11,8 +11,10 @@
     padding: 12px;
     margin-bottom: 10px;
 
+    /* Last card: no extra margin so the bottom edge gap equals the body's
+       12px padding — uniform with the top and sides. */
     &:last-of-type {
-        margin-bottom: 2px;
+        margin-bottom: 0;
     }
 
     /* Dimmed/locked while a voice-over translation is playing — the compressor

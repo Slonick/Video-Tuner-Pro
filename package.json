@@ -1,6 +1,6 @@
 {
   "name": "video-tuner-pro",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Build tooling for the Video Tuner Pro browser extension",
   "private": true,
   "type": "module",
@@ -10,10 +10,18 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --watch",
-    "check": "node --check src/content/index.js && node --check src/popup/index.js && node --check src/background/index.js"
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "screenshot": "node tools/screenshot.mjs",
+    "promo": "node tools/promo.mjs"
   },
   "devDependencies": {
+    "@types/chrome": "^0.1.43",
     "esbuild": "^0.24.2",
-    "lightningcss": "^1.32.0"
+    "jsdom": "^29.1.1",
+    "lightningcss": "^1.32.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   }
 }

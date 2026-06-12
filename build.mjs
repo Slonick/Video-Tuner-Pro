@@ -32,10 +32,10 @@ function manifestFor(target) {
 // Entry name → output path (relative to the target dir). content scripts and the
 // popup script become single bundled IIFE files; the manifest references these.
 const jsEntries = {
-  content: join(SRC, "content/index.js"),
-  background: join(SRC, "background/index.js"),
-  "popup/popup": join(SRC, "popup/index.js"),
-  inject: join(SRC, "content/inject.js"),   // MAIN-world Twitch latency probe
+  content: join(SRC, "content/index.ts"),
+  background: join(SRC, "background/index.ts"),
+  "popup/popup": join(SRC, "popup/index.ts"),
+  inject: join(SRC, "content/inject.ts"),   // MAIN-world Twitch/YouTube latency probe
 };
 
 function copyStatics(out, target) {

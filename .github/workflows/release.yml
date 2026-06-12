@@ -22,11 +22,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate JSON and JS
+      - name: Validate JSON and locales
         run: |
-          node --check src/content/index.js
-          node --check src/popup/index.js
-          node --check src/background/index.js
           for f in src/manifest.json src/_locales/*/messages.json; do
             node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || { echo "Invalid JSON: $f"; exit 1; }
           done
@@ -48,6 +45,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Type-check and test
+        run: |
+          npm run check
+          npm test
 
       - name: Build (bundled + minified, per target)
         run: npm run build
