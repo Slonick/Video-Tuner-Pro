@@ -35,6 +35,7 @@ const jsEntries = {
   content: join(SRC, "content/index.js"),
   background: join(SRC, "background/index.js"),
   "popup/popup": join(SRC, "popup/index.js"),
+  inject: join(SRC, "content/inject.js"),   // MAIN-world Twitch latency probe
 };
 
 function copyStatics(out, target) {

@@ -1,7 +1,8 @@
 // Live graphs, drawn on the popup's two canvases:
 //   Audio  — a scrolling level "waveform" over time (input grey, output accent),
 //            with the over-threshold highlight, ghost-of-input, and the readout.
-//   Buffer — a scrolling time graph of seconds buffered ahead, with the target.
+//   Latency — a scrolling time graph of latency-to-broadcaster (or buffered-ahead
+//            seconds where latency isn't exposed), with the allowed-delay target.
 // Polled ~13×/s; rendered with requestAnimationFrame (~60fps) for smooth motion.
 import { api, msg, ctx } from "./env.js";
 

@@ -12,8 +12,10 @@ export const S = {
   liveSyncEnabled: false,
   liveSyncTarget: 5,        // seconds of allowed lag behind the live edge (0–15)
   liveSyncMax: 1.5,         // max catch-up rate (multiplier), never below 1.25
-  // On-video badge: speed + real remaining time
+  // On-video badge: speed + real remaining time (VODs)
   showRemaining: false,
+  // On-video badge on live streams: speed + buffered-ahead seconds
+  streamBadge: false,
   // Audio compression (raw DynamicsCompressor parameters)
   audioCompEnabled: false,
   audioCompThreshold: -60,  // dB, -100…0

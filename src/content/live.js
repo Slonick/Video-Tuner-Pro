@@ -87,6 +87,19 @@ export function forwardBuffer(video) {
   return 0;
 }
 
+// Latency to the broadcaster (seconds), when a site exposes it. Twitch's value
+// is published to data-vtp-latency by the MAIN-world probe (inject.js); standard
+// video APIs can't compute it. Null when unavailable — callers fall back to the
+// buffered-ahead value.
+export function streamLatency() {
+  try {
+    const a = document.documentElement.getAttribute("data-vtp-latency");
+    if (a == null) return null;
+    const n = parseFloat(a);
+    return isFinite(n) && n > 0 ? n : null;
+  } catch (e) { return null; }
+}
+
 // Net video frames dropped since the previous call (decoder/network can't keep up).
 function droppedFramesDelta(video) {
   try {
@@ -160,18 +173,28 @@ function forceLiveNormal() {
 function runLiveSync(video) {
   if (video.paused) return;
 
-  const lag = forwardBuffer(video);
+  const buffer = forwardBuffer(video);
+  // Measure how far behind we are by latency-to-broadcaster where the site
+  // exposes it (Twitch/YouTube — more accurate than buffered-ahead); otherwise
+  // fall back to the buffer. Catching up by latency physically drains the buffer
+  // (we play faster than real-time toward the live edge), so the buffer still
+  // gates the catch-up as an anti-stall guard.
+  const lat = streamLatency();
+  const lag = lat != null ? lat : buffer;
   const dropped = droppedFramesDelta(video);
   const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
   const rate = clamp(Math.max(LIVE_MAX_FLOOR, S.liveSyncMax)); // fixed catch-up speed
 
   let desired = S.currentSpeed;
   if (S.currentSpeed > 1.0) {
-    // Already catching up — hold until back near the target, or bail if frames drop.
-    if (lag <= target + CATCHUP_STOP || dropped > 0) desired = 1.0;
+    // Already catching up — hold until back near the target, or bail if frames
+    // drop or the buffer runs low (would stall). In the buffer-only fallback the
+    // low-buffer check is redundant (lag IS the buffer), so behaviour is unchanged.
+    if (lag <= target + CATCHUP_STOP || dropped > 0 || buffer <= MIN_FORWARD_BUFFER) desired = 1.0;
   } else {
-    // Normal — start catching up only once we've fallen clearly behind.
-    if (lag > target + CATCHUP_START && dropped === 0) desired = rate;
+    // Normal — start catching up only once clearly behind AND with enough
+    // buffered ahead to do it without risking a stall.
+    if (lag > target + CATCHUP_START && dropped === 0 && buffer > MIN_FORWARD_BUFFER + CATCHUP_STOP) desired = rate;
   }
 
   if (Math.abs(desired - S.currentSpeed) > 0.001) {

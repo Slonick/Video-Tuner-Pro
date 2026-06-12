@@ -47,7 +47,9 @@
   "meterOut": { "message": "Ausgang" },
   "meterThr": { "message": "Schwelle" },
   "meterBuffer": { "message": "Puffer" },
+  "meterLatency": { "message": "Latenz" },
   "meterTargetMark": { "message": "Ziel" },
   "bufferLiveOnly": { "message": "Nur bei Livestreams" },
-  "onVideoLabel": { "message": "Tempo & Zeit im Video anzeigen" }
+  "onVideoLabel": { "message": "Tempo & Zeit im Video anzeigen" },
+  "onStreamLabel": { "message": "Tempo & Puffer im Video anzeigen" }
 }

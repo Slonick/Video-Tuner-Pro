@@ -47,7 +47,9 @@
   "meterOut": { "message": "После" },
   "meterThr": { "message": "Порог" },
   "meterBuffer": { "message": "Буфер" },
+  "meterLatency": { "message": "Задержка" },
   "meterTargetMark": { "message": "Цель" },
   "bufferLiveOnly": { "message": "Только для прямых эфиров" },
-  "onVideoLabel": { "message": "Показывать скорость и время на видео" }
+  "onVideoLabel": { "message": "Показывать скорость и время на видео" },
+  "onStreamLabel": { "message": "Показывать скорость и буфер на видео" }
 }

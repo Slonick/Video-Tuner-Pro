@@ -3,7 +3,7 @@
 import { api, getDomain, clamp } from "./env.js";
 import { S } from "./state.js";
 import { collectVideos, primaryVideo } from "./videos.js";
-import { onStreamPage, forwardBuffer } from "./live.js";
+import { onStreamPage, forwardBuffer, streamLatency } from "./live.js";
 import { applyAudioComp, audioLevels, audioLevelHist, A_HIST_MS } from "./audio.js";
 import { streamBitrate, bufferLevelHist } from "./bitrate.js";
 import { setSpeed, persistDomainSpeed } from "./speed.js";
@@ -21,10 +21,13 @@ function monitorData() {
   applyAudioComp();                 // make sure the meter graph is engaged
   const v = primaryVideo();
   const live = onStreamPage();
+  // The live graph plots latency-to-broadcaster where the site exposes it
+  // (Twitch/YouTube), else the buffered-ahead seconds. Only meaningful on streams.
+  let lag = null;
+  if (v && live) { const l = streamLatency(); lag = l != null ? l : forwardBuffer(v); }
   return {
     audio: audioLevels(),
-    // The buffer graph only makes sense on live streams; on a VOD it's irrelevant.
-    buffer: (v && live) ? forwardBuffer(v) : null,
+    buffer: lag,
     bitrate: (v && live) ? streamBitrate(v) : null,
     target: S.liveSyncTarget,
     live,

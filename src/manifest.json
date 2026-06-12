@@ -34,6 +34,13 @@
       "all_frames": true,
       "js": ["content.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.twitch.tv/*", "*://*.youtube.com/*"],
+      "all_frames": true,
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "background": {

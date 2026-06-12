@@ -47,7 +47,9 @@
   "meterOut": { "message": "Output" },
   "meterThr": { "message": "Threshold" },
   "meterBuffer": { "message": "Buffer" },
+  "meterLatency": { "message": "Latency" },
   "meterTargetMark": { "message": "Target" },
   "bufferLiveOnly": { "message": "Live streams only" },
-  "onVideoLabel": { "message": "Show speed & time on video" }
+  "onVideoLabel": { "message": "Show speed & time on video" },
+  "onStreamLabel": { "message": "Show speed & buffer on video" }
 }
