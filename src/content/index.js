@@ -25,12 +25,13 @@ function loadSpeed() {
   STORE.get(
     ["domains", "liveSync", "liveSyncTarget", "liveSyncMax",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
-     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining"],
+     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge"],
     (result) => {
       const domains = result.domains || {};
       // Defaults-on: features ship enabled; an explicit `false` in storage (the
       // user turned it off) is still respected.
       S.showRemaining = result.showRemaining !== false;
+      S.streamBadge = result.streamBadge !== false;
       S.liveSyncEnabled = result.liveSync !== false;
       S.liveSyncTarget = clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 5);
       S.liveSyncMax = clampMax(result.liveSyncMax != null ? result.liveSyncMax : 1.5);
@@ -93,6 +94,7 @@ api.storage.onChanged.addListener((changes, area) => {
     controlLive();
   }
   if (changes.showRemaining) { S.showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }
+  if (changes.streamBadge) { S.streamBadge = !!changes.streamBadge.newValue; updateTimeBadge(); flashBadge(); }
   let audioChanged = false;
   if (changes.audioComp) { S.audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
   if (changes.audioCompThreshold) { S.audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60); audioChanged = true; }

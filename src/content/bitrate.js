@@ -1,8 +1,8 @@
 // Download-bitrate estimate and the forward-buffer history sampler (live only).
 import { ctxValid } from "./env.js";
-import { onStreamPage, liveVideo, forwardBuffer } from "./live.js";
+import { onStreamPage, liveVideo, forwardBuffer, streamLatency } from "./live.js";
 
-// Recent forward-buffer samples on live streams, to pre-fill the buffer graph.
+// Recent latency/buffer samples on live streams, to pre-fill the live graph.
 export const bufferLevelHist = [];
 const BUF_HIST_MS = 500, BUF_HIST_MAX = 64;
 
@@ -26,12 +26,14 @@ export function streamBitrate(v) {
   return ((s[s.length - 1].b - s[0].b) * 8) / dt;
 }
 
-// Sample forward-buffer on live streams, to pre-fill the buffer graph.
+// Sample latency-to-broadcaster (or buffered-ahead, where latency isn't exposed)
+// on live streams, to pre-fill the live graph.
 setInterval(() => {
   if (!ctxValid()) return;
   if (!onStreamPage()) { if (bufferLevelHist.length) bufferLevelHist.length = 0; return; }
   const lv = liveVideo();
   if (!lv) return;
-  bufferLevelHist.push({ at: Date.now(), v: forwardBuffer(lv) });
+  const l = streamLatency();
+  bufferLevelHist.push({ at: Date.now(), v: l != null ? l : forwardBuffer(lv) });
   while (bufferLevelHist.length > BUF_HIST_MAX) bufferLevelHist.shift();
 }, BUF_HIST_MS);

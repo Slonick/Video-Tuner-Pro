@@ -1,9 +1,10 @@
 // On-screen feedback: the toolbar icon badge, the transient speed pill, and the
-// optional on-video "speed × remaining time" badge.
+// optional on-video badge — "speed × remaining time" on VODs, "speed × buffer"
+// on live streams.
 import { api, ctxValid } from "./env.js";
 import { S } from "./state.js";
 import { collectVideos, primaryVideo } from "./videos.js";
-import { onStreamPage } from "./live.js";
+import { onStreamPage, forwardBuffer, streamLatency } from "./live.js";
 
 // --- Toolbar icon ----------------------------------------------------------
 // Tell the background what to draw on the toolbar icon for this tab. The frame
@@ -127,12 +128,21 @@ function renderBadge(v) {
   timeBadgeEl.style.left = Math.round(r.left + Math.max(10, r.width * 0.012)) + "px";
   timeBadgeEl.style.top = Math.round(r.top + Math.max(10, r.height * 0.04)) + "px";
   const speed = v.playbackRate || S.currentSpeed || 1;
-  const dur = v.duration;
-  const eff = effectiveDuration(v); // SponsorBlock real length, or full length
-  const frac = dur > 0 ? Math.min(1, v.currentTime / dur) : 0;
-  const remain = Math.max(0, eff * (1 - frac)) / speed;
   const sp = Math.round(speed * 100) / 100;
-  timeBadgeEl.textContent = `${sp}× · ${fmtTime(remain)}`;
+  if (onStreamPage()) {
+    // Live: remaining time is meaningless (no end). Prefer the latency to the
+    // broadcaster where the site exposes it (Twitch), else fall back to seconds
+    // buffered ahead. Both shown with one decimal.
+    const lat = streamLatency();
+    const val = lat != null ? lat : forwardBuffer(v);
+    timeBadgeEl.textContent = `${sp}× · ${val.toFixed(2)}s`;
+  } else {
+    const dur = v.duration;
+    const eff = effectiveDuration(v); // SponsorBlock real length, or full length
+    const frac = dur > 0 ? Math.min(1, v.currentTime / dur) : 0;
+    const remain = Math.max(0, eff * (1 - frac)) / speed;
+    timeBadgeEl.textContent = `${sp}× · ${fmtTime(remain)}`;
+  }
 }
 
 // Show the badge briefly, then fade it out — like player controls.
@@ -147,7 +157,8 @@ function hookBadgeMouse() {
   if (badgeMoveHooked) return;
   badgeMoveHooked = true;
   document.addEventListener("mousemove", (e) => {
-    if (!S.showRemaining || !timeBadgeEl || !badgeVideo) return;
+    const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
+    if (!enabled || !timeBadgeEl || !badgeVideo) return;
     const r = badgeVideo.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
     renderBadge(badgeVideo);
@@ -159,9 +170,13 @@ function hookBadgeMouse() {
 // driven by mouse movement (flashBadge), so it only appears when you move over the
 // video and auto-hides after a moment.
 export function updateTimeBadge() {
-  if (!S.showRemaining) { if (timeBadgeEl) timeBadgeEl.style.display = "none"; badgeVideo = null; return; }
   const v = primaryVideo();
-  if (!v || !isFinite(v.duration) || v.duration <= 0 || onStreamPage()) {
+  const stream = onStreamPage();
+  // Two independent toggles: streamBadge for live, showRemaining for VODs. VODs
+  // also need a real finite duration (to compute remaining); streams don't —
+  // they show buffered-ahead seconds, so skip the duration check there.
+  const enabled = stream ? S.streamBadge : S.showRemaining;
+  if (!enabled || !v || (!stream && (!isFinite(v.duration) || v.duration <= 0))) {
     if (timeBadgeEl) timeBadgeEl.style.display = "none";
     badgeVideo = null;
     return;

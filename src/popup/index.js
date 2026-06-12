@@ -14,12 +14,17 @@ init();
 loadSyncSettings();
 loadAudioSettings();
 
-// Show speed + remaining time on the video (default on).
-STORE.get(["showRemaining"], (r) => {
+// On-video badge toggles (default on): speed + remaining time on VODs,
+// speed + buffer on live streams (the latter lives in the stream section).
+STORE.get(["showRemaining", "streamBadge"], (r) => {
   document.getElementById("onVideoToggle").checked = r.showRemaining !== false;
+  document.getElementById("onStreamToggle").checked = r.streamBadge !== false;
 });
 document.getElementById("onVideoToggle").addEventListener("change", (e) => {
   STORE.set({ showRemaining: e.target.checked });
+});
+document.getElementById("onStreamToggle").addEventListener("change", (e) => {
+  STORE.set({ streamBadge: e.target.checked });
 });
 
 setupGraphs();
