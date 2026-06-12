@@ -1,13 +1,15 @@
 // Build the extension from src/ into dist/<target>/ for Chrome and Firefox.
 // JS is bundled (content scripts can't use ES modules at runtime) and, for a
-// production build, minified; CSS is minified; static assets are copied; and the
+// production build, minified; CSS is bundled + lowered + minified by Lightning
+// CSS (nesting → flat selectors, autoprefix); static assets are copied; and the
 // manifest is emitted per-target (Chrome: service worker, Firefox: event-page
 // scripts + gecko keys).
 //
 //   node build.mjs            production build → dist/chrome + dist/firefox
 //   node build.mjs --watch    dev build of dist/chrome only, rebuilt on change
 import { build, context } from "esbuild";
-import { rmSync, mkdirSync, cpSync, readFileSync, writeFileSync } from "node:fs";
+import { bundle as bundleCss } from "lightningcss";
+import { rmSync, mkdirSync, cpSync, readFileSync, writeFileSync, watch } from "node:fs";
 import { join } from "node:path";
 
 const SRC = "src";
@@ -46,6 +48,27 @@ function copyStatics(out, target) {
   writeFileSync(join(out, "popup/popup.html"), html);
 }
 
+// Lightning CSS bundles the ./styles/*.css partials @import-ed by popup.css,
+// lowers nested CSS to flat selectors for the targets below, autoprefixes, and
+// minifies for production. The chrome floor predates native nesting on purpose,
+// so the authored nested CSS compiles to plain selectors that work everywhere.
+const CSS_TARGETS = { chrome: 100 << 16, firefox: 140 << 16 };
+
+function buildCss(out) {
+  const { code, map } = bundleCss({
+    filename: join(SRC, "popup/popup.css"),
+    minify: !DEV,
+    sourceMap: DEV,
+    targets: CSS_TARGETS,
+  });
+  let css = code;
+  if (DEV && map) {
+    const inline = Buffer.from(map).toString("base64");
+    css = Buffer.concat([code, Buffer.from(`\n/*# sourceMappingURL=data:application/json;base64,${inline} */\n`)]);
+  }
+  writeFileSync(join(out, "popup/popup.css"), css);
+}
+
 async function buildTarget(target) {
   const out = join("dist", target);
   rmSync(out, { recursive: true, force: true });
@@ -63,20 +86,26 @@ async function buildTarget(target) {
     legalComments: "none",
     logLevel: "warning",
   };
-  const css = {
-    entryPoints: [join(SRC, "popup/popup.css")],
-    outfile: join(out, "popup/popup.css"),
-    minify: !DEV,
-    sourcemap: DEV ? "inline" : false,
-    logLevel: "warning",
-  };
 
   if (DEV) {
-    const [cJs, cCss] = await Promise.all([context(js), context(css)]);
-    await Promise.all([cJs.watch(), cCss.watch()]);
+    const cJs = await context(js);
+    await cJs.watch();
+    buildCss(out);
+    // Lightning CSS has no watcher of its own — rebuild on any change under
+    // src/popup (popup.css or styles/*.css), debounced.
+    let t = null;
+    watch(join(SRC, "popup"), { recursive: true }, (_ev, file) => {
+      if (!file || !file.endsWith(".css")) return;
+      clearTimeout(t);
+      t = setTimeout(() => {
+        try { buildCss(out); console.log("rebuilt CSS"); }
+        catch (e) { console.error("CSS error:", e.message); }
+      }, 60);
+    });
     console.log(`watching → ${out} (rebuilds JS/CSS; re-run for html/asset changes)`);
   } else {
-    await Promise.all([build(js), build(css)]);
+    await build(js);
+    buildCss(out);
     console.log(`built → ${out}`);
   }
 }

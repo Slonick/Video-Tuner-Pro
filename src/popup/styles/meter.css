@@ -1,0 +1,145 @@
+/* ============================================================
+   Live graphs (audio levels + download buffer) and the
+   compressor parameter rows.
+   ============================================================ */
+
+.meter {
+    /* No bottom margin: when the body is collapsed the meter is the last
+       element, so its margin would double the section's bottom padding.
+       Separation when expanded comes from .sync-body.open. */
+    margin-bottom: 0;
+
+    /* Always-visible graphs sit between the header and the collapsible body. */
+    &.always {
+        margin-top: 12px;
+    }
+
+    canvas {
+        display: block;
+        width: 100%;
+        height: 50px;
+        border-radius: 8px;
+        background: var(--seg);
+    }
+
+    &.buffer canvas {
+        height: 56px;
+    }
+}
+
+.meter-legend {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 5px;
+    font-size: 10px;
+    color: var(--muted);
+
+    span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .meter-thr {
+        margin-left: auto;
+    }
+}
+
+.dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.dot-in {
+    background: var(--muted);
+}
+
+.dot-out {
+    background: var(--accent);
+}
+
+.dot-buf {
+    background: var(--accent);
+}
+
+.dot-thr {
+    width: 2px;
+    height: 9px;
+    border-radius: 1px;
+    background: #ff9f0a;
+}
+
+/* --- Compressor parameter rows ------------------------------------------- */
+.param {
+    margin-bottom: 12px;
+
+    input[type="range"] {
+        margin: 5px 0 2px;
+    }
+}
+
+.param-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+
+    label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text);
+    }
+
+    input[type="number"] {
+        width: 78px;
+        padding: 5px 8px;
+        border: 1px solid var(--track);
+        border-radius: 7px;
+        background: var(--seg);
+        color: var(--text);
+        font: inherit;
+        font-size: 12px;
+        text-align: center;
+        -moz-appearance: textfield;
+        appearance: textfield;
+
+        &::-webkit-outer-spin-button,
+        &::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Draw the focus ring INSIDE the box so it isn't clipped by the
+           collapsible body's overflow:hidden at the right edge. */
+        &:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: -2px;
+        }
+    }
+}
+
+.param-val {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.param-desc {
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--muted);
+
+    .range {
+        font-weight: 600;
+        color: var(--text);
+    }
+}
+
+.audio-reset {
+    width: 100%;
+    margin-top: 4px;
+}
