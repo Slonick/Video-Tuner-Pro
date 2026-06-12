@@ -211,13 +211,15 @@ export function setupGraphs() {
       if (onA > 0.01) {
         acx.globalAlpha = onA;
         const d = audioDiffShown, up = d >= 0, dc = col("--text", "#fff"), cxn = w / 2;
-        // output (top) / input (bottom)
+        // output (top) / input (bottom) — lighter, theme-aware tints so the values
+        // read over their own (busy) waveform without an outline scrim.
+        const outC = col("--meter-out", "#7fb8ff"), inC = col("--meter-in", "#cfcfd4");
         acx.font = "700 12px -apple-system, sans-serif"; acx.textBaseline = "middle"; acx.textAlign = "center"; acx.lineWidth = 3;
         const outL = fmtLevel(audioOutShown), inL = fmtLevel(audioInShown);
         acx.strokeStyle = seg; acx.strokeText(outL, cxn, mid - 13);
-        acx.fillStyle = accent; acx.fillText(outL, cxn, mid - 13);
+        acx.fillStyle = outC; acx.fillText(outL, cxn, mid - 13);
         acx.strokeStyle = seg; acx.strokeText(inL, cxn, mid + 13);
-        acx.fillStyle = muted; acx.fillText(inL, cxn, mid + 13);
+        acx.fillStyle = inC; acx.fillText(inL, cxn, mid + 13);
         // middle: direction triangle + magnitude (the arrow replaces the +/− sign)
         const mag = fmtMag(d);
         acx.font = "700 11px -apple-system, sans-serif";

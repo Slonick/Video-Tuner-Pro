@@ -8,6 +8,8 @@
     --muted: #86868b;
     --accent: #0a84ff;
     --seg: #f0f0f2;
+    --meter-out: #0a5fc4;
+    --meter-in: #5b5b60;
     --track: #d8d8dc;
     --shadow: rgba(0,0,0,0.18);
     --tip-bg: #1d1d1f;
@@ -25,6 +27,8 @@
         --muted: #8e8e93;
         --accent: #0a84ff;
         --seg: #3a3a3c;
+        --meter-out: #7fb8ff;
+        --meter-in: #cfcfd4;
         --track: #48484a;
         --shadow: rgba(0,0,0,0.4);
         --tip-bg: #f5f5f7;
