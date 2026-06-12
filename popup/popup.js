@@ -113,24 +113,41 @@ function clampNum(v, lo, hi, def) {
   return Math.min(hi, Math.max(lo, n));
 }
 
-// FrankerFaceZ-style defaults, used for the initial state and the Reset button.
+// Default compressor settings, used for the initial state and the Reset button.
 const AUDIO_DEFAULTS = {
-  audioCompThreshold: -50,
-  audioCompKnee: 40,
-  audioCompRatio: 12,
+  audioCompThreshold: -60,
+  audioCompKnee: 30,
+  audioCompRatio: 10,
   audioCompAttack: 0,
-  audioCompRelease: 0.25,
+  audioCompRelease: 1,
   audioCompGain: 0,
 };
 
+// Format a compressor param for its slider readout.
+function fmtParam(key, v) {
+  v = Number(v);
+  switch (key) {
+    case "audioCompRatio": return v + ":1";
+    case "audioCompAttack":
+    case "audioCompRelease": return Math.round(v * 1000) + " ms";
+    default: return v + " dB"; // threshold, knee, gain
+  }
+}
+
+function setParam(id, key, value) {
+  document.getElementById(id).value = value;
+  const out = document.getElementById(id + "Val");
+  if (out) out.textContent = fmtParam(key, value);
+}
+
 function reflectAudioUI(s) {
   document.getElementById("audioCompToggle").checked = s.enabled;
-  document.getElementById("acThreshold").value = s.threshold;
-  document.getElementById("acKnee").value = s.knee;
-  document.getElementById("acRatio").value = s.ratio;
-  document.getElementById("acAttack").value = s.attack;
-  document.getElementById("acRelease").value = s.release;
-  document.getElementById("acGain").value = s.gain;
+  setParam("acThreshold", "audioCompThreshold", s.threshold);
+  setParam("acKnee", "audioCompKnee", s.knee);
+  setParam("acRatio", "audioCompRatio", s.ratio);
+  setParam("acAttack", "audioCompAttack", s.attack);
+  setParam("acRelease", "audioCompRelease", s.release);
+  setParam("acGain", "audioCompGain", s.gain);
 }
 
 function loadAudioSettings() {
@@ -141,11 +158,11 @@ function loadAudioSettings() {
       reflectAudioUI({
         enabled: !!r.audioComp,
         gain: clampNum(r.audioCompGain, 0, 24, 0),
-        threshold: clampNum(r.audioCompThreshold, -100, 0, -50),
-        knee: clampNum(r.audioCompKnee, 0, 40, 40),
-        ratio: clampNum(r.audioCompRatio, 1, 20, 12),
+        threshold: clampNum(r.audioCompThreshold, -100, 0, -60),
+        knee: clampNum(r.audioCompKnee, 0, 40, 30),
+        ratio: clampNum(r.audioCompRatio, 1, 20, 10),
         attack: clampNum(r.audioCompAttack, 0, 1, 0),
-        release: clampNum(r.audioCompRelease, 0, 1, 0.25),
+        release: clampNum(r.audioCompRelease, 0, 1, 1),
       });
     }
   );
@@ -248,12 +265,60 @@ document.getElementById("resetBtn").addEventListener("click", resetSpeed);
 document.getElementById("setDefaultBtn").addEventListener("click", setAsDefault);
 
 // Section headers expand/collapse their body (independent of the on/off switch).
+// Smoothly bring an expanding section's body fully into view, in sync with the
+// CSS max-height transition. We aim at a FIXED target — where the body's bottom
+// will sit once expanded (el.scrollHeight gives the full content height even
+// while it's still collapsed) — and ease there with easeOutCubic over DUR, so it
+// lands exactly flush at the end (no residual) instead of asymptotically.
+function revealOnExpand(el) {
+  const root = document.scrollingElement || document.documentElement;
+  const sec = el.closest(".sync-section") || el;
+  const DUR = 480, MARGIN = 12, vh = window.innerHeight;
+  let start = null;
+  function step(now) {
+    if (start === null) start = now;
+    const last = now - start >= DUR;
+    // Live target: keep the SECTION's bottom (which includes the bottom chevron)
+    // just inside the fold. Reading it each frame self-corrects for the growing
+    // body + margin/padding, so it lands exactly — on the last frame, close the
+    // full remaining gap so it never stops short.
+    const below = sec.getBoundingClientRect().bottom - vh + MARGIN;
+    const room = (root.scrollHeight - vh) - root.scrollTop;
+    if (below > 0 && room > 0) root.scrollTop += Math.min(below, room) * (last ? 1 : 0.25);
+    if (!last) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function toggleSection(btn) {
+  const body = document.getElementById(btn.dataset.target);
+  const open = body.classList.toggle("open");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) revealOnExpand(body);   // scroll the revealed sliders into view, in sync with the expand
+}
 document.querySelectorAll(".sec-main").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const body = document.getElementById(btn.dataset.target);
-    const open = body.classList.toggle("open");
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  btn.addEventListener("click", () => toggleSection(btn));
+});
+// The bottom chevron toggles the same section it belongs to.
+document.querySelectorAll(".expand-hint").forEach((hint) => {
+  hint.addEventListener("click", () => {
+    const btn = hint.closest(".sync-section")?.querySelector(".sec-main");
+    if (btn) toggleSection(btn);
   });
+});
+
+// Info tooltips open upward (above the section) by default; if the section is
+// near the top of the popup there's no room, so flip them below instead.
+document.querySelectorAll(".info").forEach((info) => {
+  const tip = info.querySelector(".tip");
+  if (!tip) return;
+  const place = () => {
+    const head = info.closest(".sec-head") || info;
+    const need = tip.offsetHeight + 16; // tip height + gap above the header
+    info.classList.toggle("tip-below", head.getBoundingClientRect().top < need);
+  };
+  info.addEventListener("mouseenter", place);
+  info.addEventListener("focusin", place);
 });
 
 // The first time a section is switched on, auto-expand it so the user sees its
@@ -297,20 +362,23 @@ document.getElementById("onVideoToggle").addEventListener("change", (e) => {
 
 // Each compressor param input writes its own storage key directly.
 const ADV = [
-  ["acThreshold", "audioCompThreshold", -100, 0, -50],
-  ["acKnee", "audioCompKnee", 0, 40, 40],
-  ["acRatio", "audioCompRatio", 1, 20, 12],
+  ["acThreshold", "audioCompThreshold", -100, 0, -60],
+  ["acKnee", "audioCompKnee", 0, 40, 30],
+  ["acRatio", "audioCompRatio", 1, 20, 10],
   ["acAttack", "audioCompAttack", 0, 1, 0],
-  ["acRelease", "audioCompRelease", 0, 1, 0.25],
+  ["acRelease", "audioCompRelease", 0, 1, 1],
   ["acGain", "audioCompGain", 0, 24, 0],
 ];
 ADV.forEach(([id, key, lo, hi, def]) => {
   document.getElementById(id).addEventListener("input", (e) => {
-    saveAudio({ [key]: clampNum(e.target.value, lo, hi, def) });
+    const v = clampNum(e.target.value, lo, hi, def);
+    const out = document.getElementById(id + "Val");
+    if (out) out.textContent = fmtParam(key, v);
+    saveAudio({ [key]: v });
   });
 });
 
-// Reset all compressor parameters to the FrankerFaceZ-style defaults.
+// Reset all compressor parameters to the defaults.
 document.getElementById("audioReset").addEventListener("click", () => {
   reflectAudioUI({
     enabled: document.getElementById("audioCompToggle").checked,
@@ -347,7 +415,7 @@ setInterval(() => {
 }, 1000);
 
 // --- Live graphs ---
-// Audio: before/after level bars with peak-hold (held ~3s, then released).
+// Audio: a scrolling level "waveform" over time (input grey, output accent).
 // Buffer: a scrolling time graph of seconds buffered ahead, with the target line.
 // Polled ~13×/s; rendered with requestAnimationFrame (~60fps) for smooth motion.
 (function setupGraphs() {
@@ -356,8 +424,7 @@ setInterval(() => {
   if ((!aCanvas || !aCanvas.getContext) && (!bCanvas || !bCanvas.getContext)) return;
   const acx = aCanvas && aCanvas.getContext("2d");
   const bcx = bCanvas && bCanvas.getContext("2d");
-  const A_MIN = -60, A_MAX = 0;          // audio dB range
-  const PEAK_HOLD = 3000;                // ms to hold an audio peak before release
+  const A_MIN = -100, A_MAX = 0;         // audio dB range (centre = A_MIN)
   const BUF_WINDOW = 30000;              // buffer graph time window (ms)
 
   function col(name, fb) {
@@ -375,23 +442,26 @@ setInterval(() => {
     }
     return { w, h };
   }
-  function roundBar(cx, x, y, w, h) {
-    if (w <= 0) return;
-    const r = Math.min(3, h / 2);
-    cx.beginPath();
-    cx.moveTo(x + r, y);
-    cx.arcTo(x + w, y, x + w, y + h, r);
-    cx.arcTo(x + w, y + h, x, y + h, r);
-    cx.arcTo(x, y + h, x, y, r);
-    cx.arcTo(x, y, x + w, y, r);
-    cx.closePath();
-    cx.fill();
-  }
 
   const cur = { in: A_MIN, out: A_MIN };           // eased displayed levels
   const tgt = { in: A_MIN, out: A_MIN };           // latest polled levels
-  const peak = { in: A_MIN, inAt: 0, out: A_MIN, outAt: 0 };
   let audioActive = false;
+  let audioEnabled = false;                         // compressor actually processing on the page
+  let compAnim = 0;                                 // eased 0(off)…1(on) for readout/ghost morph
+  let histSeeded = false;                           // graphs pre-filled from history yet?
+  const A_WINDOW = 6000;                            // audio waveform time window (ms)
+  const audioHist = [];                            // {t, in, out} dB level history
+  let audioDiffShown = null, audioDiffAt = 0;      // centered "out − in" dB readout
+  let audioInShown = null, audioOutShown = null;   // corner in/out level readouts
+
+  function fmtMag(d) {                               // magnitude only; direction shown by the arrow
+    const v = Math.abs(d);
+    return (v < 10 ? v.toFixed(1) : Math.round(v)) + " dB";
+  }
+  function fmtLevel(db) {
+    const v = Math.max(A_MIN, Math.round(db));
+    return (v < 0 ? "−" + (-v) : String(v)) + " dB";
+  }
   const bufHist = [];                              // {t, v} smoothed buffer history
   let bufSmooth = null;                            // EMA state for buffer samples
   let bufLive = false;                             // only graph the buffer on live streams
@@ -418,35 +488,154 @@ setInterval(() => {
     cx.quadraticCurveTo(pts[n].x, pts[n].y, pts[n].x, pts[n].y);
   }
 
+  // A scrolling level "waveform" (like a DAW track): output on top (accent),
+  // input on the bottom (grey). The input peaks that poke past the threshold get
+  // an orange edge (that's what the compressor acts on). The live output−input
+  // change shows centred, like the buffer graph.
+  const A_OVER = "#ff9f0a";                          // over-threshold highlight (== threshold colour)
   function drawAudio() {
     const { w, h } = fitCanvas(aCanvas, acx);
     if (!w) return;
-    const muted = col("--muted", "#888"), accent = col("--accent", "#0a84ff"), text = col("--text", "#111");
-    const xFor = (db) => (Math.max(A_MIN, Math.min(A_MAX, db)) - A_MIN) / (A_MAX - A_MIN) * w;
-    const barH = 12, gap = 5, y1 = 5, y2 = y1 + barH + gap;
+    const muted = col("--muted", "#888"), accent = col("--accent", "#0a84ff");
     acx.clearRect(0, 0, w, h);
-    acx.strokeStyle = "rgba(127,127,127,0.16)"; acx.lineWidth = 1;
-    acx.fillStyle = muted; acx.font = "9px -apple-system, sans-serif"; acx.textAlign = "center";
-    for (let db = A_MIN; db <= A_MAX; db += 12) {
-      const x = Math.round(xFor(db)) + 0.5;
-      acx.beginPath(); acx.moveTo(x, 2); acx.lineTo(x, y2 + barH + 2); acx.stroke();
-      if (db > A_MIN && db < A_MAX) acx.fillText(String(db), x, h - 1);
-    }
-    acx.fillStyle = "rgba(127,127,127,0.18)";
-    roundBar(acx, 0, y1, w, barH); roundBar(acx, 0, y2, w, barH);
-    if (audioActive) {
-      acx.fillStyle = muted; roundBar(acx, 0, y1, xFor(cur.in), barH);
-      acx.fillStyle = accent; roundBar(acx, 0, y2, xFor(cur.out), barH);
-      // peak-hold ticks
-      acx.fillStyle = text;
-      if (peak.in > A_MIN) acx.fillRect(Math.round(xFor(peak.in)) - 1, y1 - 1, 2, barH + 2);
-      if (peak.out > A_MIN) acx.fillRect(Math.round(xFor(peak.out)) - 1, y2 - 1, 2, barH + 2);
-    }
+    const waveW = w;
+    const mid = h / 2, maxAmp = h / 2 - 1;
+    const ampFor = (db) => ((Math.max(A_MIN, Math.min(A_MAX, db)) - A_MIN) / (A_MAX - A_MIN)) * maxAmp;
+    const t = now();
+    const xFor = (ts) => waveW * (1 - (t - ts) / A_WINDOW);
     const thr = Number(document.getElementById("acThreshold").value);
-    if (!Number.isNaN(thr)) {
-      const x = Math.round(xFor(thr)) + 0.5;
-      acx.strokeStyle = "#ff9f0a"; acx.lineWidth = 2;
-      acx.beginPath(); acx.moveTo(x, 2); acx.lineTo(x, y2 + barH + 2); acx.stroke();
+    const thrAmp = Number.isNaN(thr) ? null : ampFor(thr);
+
+    // centre line
+    acx.strokeStyle = "rgba(127,127,127,0.18)"; acx.lineWidth = 1;
+    acx.beginPath(); acx.moveTo(0, Math.round(mid) + 0.5); acx.lineTo(waveW, Math.round(mid) + 0.5); acx.stroke();
+    // threshold guide — only on the input (bottom) half; that's what's compressed
+    if (thrAmp != null) {
+      acx.strokeStyle = "rgba(255,159,10,0.55)"; acx.setLineDash([3, 3]);
+      acx.beginPath();
+      acx.moveTo(0, Math.round(mid + thrAmp) + 0.5); acx.lineTo(waveW, Math.round(mid + thrAmp) + 0.5);
+      acx.stroke(); acx.setLineDash([]);
+    }
+
+    // one half of the waveform: dir -1 = upward (output), +1 = downward (input)
+    const half = (getDb, dir, color, fillAlpha) => {
+      const pts = audioHist.map((p) => ({ x: xFor(p.t), a: ampFor(getDb(p)) }));
+      acx.beginPath();
+      acx.moveTo(pts[0].x, mid);
+      for (let i = 0; i < pts.length; i++) acx.lineTo(pts[i].x, mid + dir * pts[i].a);
+      acx.lineTo(pts[pts.length - 1].x, mid); acx.closePath();
+      acx.globalAlpha = fillAlpha; acx.fillStyle = color; acx.fill(); acx.globalAlpha = 1;
+      acx.strokeStyle = color; acx.lineWidth = 1;
+      acx.beginPath();
+      acx.moveTo(pts[0].x, mid + dir * pts[0].a);
+      for (let i = 1; i < pts.length; i++) acx.lineTo(pts[i].x, mid + dir * pts[i].a);
+      acx.stroke();
+    };
+
+    if (audioHist.length >= 2) {
+      half((p) => p.out, -1, accent, 0.55);   // output on top
+      half((p) => p.in, 1, muted, 0.45);       // input on bottom
+      // Fill the input above the threshold, clipped to below the line. Opacity
+      // grows with level so it only goes solid on loud peaks: faint at the
+      // threshold, ramping through the knee (the soft transition, threshold →
+      // threshold+knee), and reaching full opacity only near 0 dB.
+      if (thrAmp != null) {
+        const knee = Number(document.getElementById("acKnee").value) || 0;
+        const yThr = mid + thrAmp;
+        const yLoud = mid + maxAmp;               // 0 dB — the loudest
+        const kneeFrac = Math.min(0.8, Math.max(0.05, knee / Math.max(1, -thr)));
+        const grad = acx.createLinearGradient(0, yThr, 0, yLoud);
+        grad.addColorStop(0, "rgba(255,159,10,0.10)");          // just over threshold
+        grad.addColorStop(kneeFrac, "rgba(255,159,10,0.34)");   // through the knee
+        grad.addColorStop(1, "rgba(255,159,10,1)");             // solid only when loud
+        const pts = audioHist.map((p) => ({ x: xFor(p.t), a: ampFor(p.in) }));
+        acx.save();
+        acx.beginPath(); acx.rect(0, yThr, waveW, h - yThr); acx.clip();
+        acx.fillStyle = grad;
+        acx.beginPath();
+        acx.moveTo(pts[0].x, mid);
+        for (let i = 0; i < pts.length; i++) acx.lineTo(pts[i].x, mid + pts[i].a);
+        acx.lineTo(pts[pts.length - 1].x, mid); acx.closePath();
+        acx.fill();
+        acx.restore();
+      }
+
+      // Ghost of the input level mirrored onto the output (top) half: the gap down
+      // to the actual output is how much the compressor pulled the level off. Fades
+      // in with the compressor (compAnim); when off, output == input so it vanishes.
+      if (compAnim > 0.01) {
+        const gp = audioHist.map((p) => ({ x: xFor(p.t), gi: mid - ampFor(p.in), go: mid - ampFor(p.out) }));
+        acx.save();
+        acx.globalAlpha = 0.18 * compAnim;          // "removed" band
+        acx.fillStyle = A_OVER;
+        acx.beginPath();
+        acx.moveTo(gp[0].x, gp[0].gi);
+        for (let i = 0; i < gp.length; i++) acx.lineTo(gp[i].x, gp[i].gi);
+        for (let i = gp.length - 1; i >= 0; i--) acx.lineTo(gp[i].x, gp[i].go);
+        acx.closePath(); acx.fill();
+        acx.globalAlpha = 0.5 * compAnim;           // dashed "would-be" input level
+        acx.strokeStyle = "rgb(214,218,226)"; acx.lineWidth = 1; acx.setLineDash([2, 2]);
+        acx.beginPath(); acx.moveTo(gp[0].x, gp[0].gi);
+        for (let i = 1; i < gp.length; i++) acx.lineTo(gp[i].x, gp[i].gi);
+        acx.stroke(); acx.setLineDash([]);
+        acx.restore();
+      }
+    }
+
+    // Readout (throttled so digits sit still). OFF → just the current level; ON →
+    // before → after with the change. compAnim morphs between the two on toggle.
+    if (audioActive && audioHist.length) {
+      const last = audioHist[audioHist.length - 1];
+      if (audioDiffShown == null || t - audioDiffAt > 600) {  // refresh slowly so digits sit still
+        audioDiffShown = last.out - last.in;
+        audioOutShown = last.out; audioInShown = last.in;
+        audioDiffAt = t;
+      }
+      const seg = col("--seg", "#2c2c2e");
+      acx.lineJoin = "round";
+      // OFF: single current level, fades out as the compressor turns on
+      const offA = Math.max(0, Math.min(1, 1 - compAnim * 2.4));
+      if (offA > 0.01) {
+        acx.globalAlpha = offA;
+        acx.font = "700 13px -apple-system, sans-serif";
+        acx.textAlign = "center"; acx.textBaseline = "middle"; acx.lineWidth = 3.5;
+        const lvl = fmtLevel(audioInShown);
+        acx.strokeStyle = seg; acx.strokeText(lvl, w / 2, mid);
+        acx.fillStyle = "#c7c7cc"; acx.fillText(lvl, w / 2, mid);
+        acx.globalAlpha = 1;
+      }
+      // ON: a single column — output (после) on top, input (до) on the bottom,
+      // and in the middle the change magnitude with a triangle for direction
+      // (up = louder/boost, down = the compressor cut). Fades in after OFF clears.
+      const onA = Math.max(0, Math.min(1, (compAnim - 0.45) * 2.2));
+      if (onA > 0.01) {
+        acx.globalAlpha = onA;
+        const d = audioDiffShown, up = d >= 0, dc = up ? "#5aa8ff" : "#ffb340", cxn = w / 2;
+        // output (top) / input (bottom)
+        acx.font = "700 12px -apple-system, sans-serif"; acx.textBaseline = "middle"; acx.textAlign = "center"; acx.lineWidth = 3;
+        const outL = fmtLevel(audioOutShown), inL = fmtLevel(audioInShown);
+        acx.strokeStyle = seg; acx.strokeText(outL, cxn, mid - 13);
+        acx.fillStyle = accent; acx.fillText(outL, cxn, mid - 13);
+        acx.strokeStyle = seg; acx.strokeText(inL, cxn, mid + 13);
+        acx.fillStyle = muted; acx.fillText(inL, cxn, mid + 13);
+        // middle: direction triangle + magnitude (the arrow replaces the +/− sign)
+        const mag = fmtMag(d);
+        acx.font = "700 11px -apple-system, sans-serif";
+        const tw = acx.measureText(mag).width, triW = 8, gap = 3, sx = cxn - (triW + gap + tw) / 2, ty = mid;
+        const tri = () => {
+          acx.beginPath();
+          if (up) { acx.moveTo(sx + triW / 2, ty - 4); acx.lineTo(sx, ty + 3); acx.lineTo(sx + triW, ty + 3); }
+          else { acx.moveTo(sx + triW / 2, ty + 4); acx.lineTo(sx, ty - 3); acx.lineTo(sx + triW, ty - 3); }
+          acx.closePath();
+        };
+        tri(); acx.lineWidth = 3; acx.strokeStyle = seg; acx.stroke();    // halo
+        tri(); acx.fillStyle = dc; acx.fill();
+        acx.textAlign = "left";
+        acx.lineWidth = 3; acx.strokeStyle = seg; acx.strokeText(mag, sx + triW + gap, ty);
+        acx.fillStyle = dc; acx.fillText(mag, sx + triW + gap, ty);
+        acx.globalAlpha = 1;
+      }
+      acx.textBaseline = "alphabetic";
     }
   }
 
@@ -489,9 +678,9 @@ setInterval(() => {
       bcx.beginPath();
       smoothLine(bcx, pts);
       bcx.lineTo(pts[pts.length - 1].x, baseY); bcx.lineTo(pts[0].x, baseY); bcx.closePath();
-      bcx.fillStyle = "rgba(48,192,160,0.16)"; bcx.fill();
+      bcx.fillStyle = "rgba(10,132,255,0.16)"; bcx.fill();
       bcx.beginPath(); smoothLine(bcx, pts);
-      bcx.strokeStyle = "#30c0a0"; bcx.lineWidth = 2; bcx.lineJoin = "round"; bcx.lineCap = "round"; bcx.stroke();
+      bcx.strokeStyle = col("--accent", "#0a84ff"); bcx.lineWidth = 2; bcx.lineJoin = "round"; bcx.lineCap = "round"; bcx.stroke();
     }
     // target line
     if (!Number.isNaN(target)) {
@@ -530,12 +719,14 @@ setInterval(() => {
     const t = now();
     cur.in += (tgt.in - cur.in) * 0.3;
     cur.out += (tgt.out - cur.out) * 0.3;
-    // peak hold: keep the max; after PEAK_HOLD decay toward the current level.
-    if (cur.in > peak.in) { peak.in = cur.in; peak.inAt = t; }
-    else if (t - peak.inAt > PEAK_HOLD) peak.in += (cur.in - peak.in) * 0.06;
-    if (cur.out > peak.out) { peak.out = cur.out; peak.outAt = t; }
-    else if (t - peak.outAt > PEAK_HOLD) peak.out += (cur.out - peak.out) * 0.06;
-
+    compAnim += ((audioEnabled ? 1 : 0) - compAnim) * 0.12; // morph readout/ghost on toggle
+    // Record the eased level each frame so the waveform scrolls smoothly.
+    if (audioActive) {
+      audioHist.push({ t, in: cur.in, out: cur.out });
+      while (audioHist.length && t - audioHist[0].t > A_WINDOW + 200) audioHist.shift();
+    } else if (audioHist.length) {
+      audioHist.length = 0; audioDiffShown = null; // stopped — empty the graph
+    }
     if (acx) drawAudio();
     if (bcx) drawBuffer();
     requestAnimationFrame(frame); // graphs are always visible while the popup is open
@@ -547,14 +738,38 @@ setInterval(() => {
     api.tabs.sendMessage(activeTabId, { action: "getMonitor" }, (resp) => {
       if (api.runtime.lastError || !resp) { audioActive = false; return; }
       const a = resp.audio || {};
+      const wasActive = audioActive;
       audioActive = !!a.active;
+      audioEnabled = !!a.enabled;
       if (audioActive) {
         tgt.in = a.in; tgt.out = a.out;
-        const t = now(); // capture raw peaks too (eased cur can miss fast transients)
-        if (a.in > peak.in) { peak.in = a.in; peak.inAt = t; }
-        if (a.out > peak.out) { peak.out = a.out; peak.outAt = t; }
+        // Snap on (re)activation instead of easing up from the −100 floor, so the
+        // very first readout shows the real level rather than a low ramp.
+        if (!wasActive) { cur.in = a.in; cur.out = a.out; }
       }
       bufLive = !!resp.live;
+
+      // Pre-fill both graphs once from the background-collected history so they
+      // don't start empty (when there's any history to fill them with).
+      if (!histSeeded && (audioActive || bufLive)) {
+        histSeeded = true;
+        api.tabs.sendMessage(activeTabId, { action: "getHistory" }, (r) => {
+          if (api.runtime.lastError || !r) return;
+          const t0 = now();
+          if (r.audio && r.audio.length) {
+            const step = r.audioStep || 150, n = r.audio.length;
+            const seed = r.audio.map((p, i) => ({ t: t0 - (n - 1 - i) * step, in: p[0], out: p[1] }));
+            audioHist.unshift(...seed);
+            while (audioHist.length && t0 - audioHist[0].t > A_WINDOW + 200) audioHist.shift();
+          }
+          if (r.buffer && r.buffer.length) {
+            const seedB = r.buffer.map((p) => ({ t: t0 - p[0], v: p[1] })).sort((x, y) => x.t - y.t);
+            bufHist.unshift(...seedB);
+            if (bufSmooth == null && seedB.length) bufSmooth = seedB[seedB.length - 1].v;
+            while (bufHist.length && t0 - bufHist[0].t > BUF_WINDOW + 1000) bufHist.shift();
+          }
+        });
+      }
       if (bufLive && typeof resp.buffer === "number") {
         const t = now();
         // Smooth the raw buffer reading (it sawtooths per segment) before plotting.

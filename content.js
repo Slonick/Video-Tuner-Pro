@@ -42,12 +42,19 @@ const seenVideos = new WeakSet();
 let audioCompEnabled = false;
 // Raw DynamicsCompressor parameters (the popup's "simple" strength slider just
 // writes these too, so the content script only ever applies raw values).
-let audioCompThreshold = -50;    // dB, -100…0  (FrankerFaceZ defaults)
-let audioCompKnee = 40;          // dB, 0…40
-let audioCompRatio = 12;         // x:1, 1…20
+let audioCompThreshold = -60;    // dB, -100…0
+let audioCompKnee = 30;          // dB, 0…40
+let audioCompRatio = 10;         // x:1, 1…20
 let audioCompAttack = 0;         // s, 0…1
-let audioCompRelease = 0.25;     // s, 0…1
+let audioCompRelease = 1;        // s, 0…1
 let audioCompGain = 0;           // make-up gain in dB, 0…24
+// Recent {in,out} dB samples kept while a graph exists, so a re-opened popup can
+// pre-fill its audio graph instead of starting empty. Minimal: ~7s at 150ms.
+const audioLevelHist = [];
+const A_HIST_MS = 150, A_HIST_MAX = 48;
+// Recent forward-buffer samples on live streams, to pre-fill the buffer graph.
+const bufferLevelHist = [];
+const BUF_HIST_MS = 500, BUF_HIST_MAX = 64;
 let audioCtx = null;
 const audioGraphs = new WeakMap(); // video -> { source, comp, gain }
 const audioSkipped = new WeakSet(); // videos we must not route (CORS-risk / already wired)
@@ -387,13 +394,15 @@ function setupGraph(video) {
   gain.connect(ctx.destination);
   // Taps for the popup's before/after level meters. Analysers analyze whatever is
   // fed to them even with no onward connection, so they don't alter the audio.
+  // We meter only the INPUT level; the output level is derived as input + the
+  // compressor's exact gain reduction (comp.reduction) + make-up gain. That keeps
+  // the before/after difference exact and avoids the ~6 ms input↔output latency of
+  // comparing two separate analysers.
   const analyserIn = ctx.createAnalyser();
-  const analyserOut = ctx.createAnalyser();
-  analyserIn.fftSize = analyserOut.fftSize = 1024;
-  analyserIn.smoothingTimeConstant = analyserOut.smoothingTimeConstant = 0.5;
+  analyserIn.fftSize = 1024;
+  analyserIn.smoothingTimeConstant = 0.5;
   source.connect(analyserIn);
-  gain.connect(analyserOut);
-  const g = { source, comp, gain, analyserIn, analyserOut };
+  const g = { source, comp, gain, analyserIn };
   audioGraphs.set(video, g);
   // Once audio is routed through a suspended context it goes silent, so resume
   // whenever this element starts playing.
@@ -444,11 +453,14 @@ function hookAudioGesture() {
 
 function applyAudioComp(videos) {
   const list = videos || collectVideos();
+  const primary = primaryVideo();
   let engaged = 0, skipped = 0, reason = null;
   for (const v of list) {
     let g = audioGraphs.get(v);
     if (!g) {
-      if (!audioCompEnabled) continue; // don't capture audio until the user enables it
+      // Compression on → route every video. Off → still route the PRIMARY video
+      // so the meter/graph always work (it runs transparent, output == input).
+      if (!audioCompEnabled && v !== primary) continue;
       g = setupGraph(v);
       if (!g) {
         skipped++;
@@ -461,7 +473,9 @@ function applyAudioComp(videos) {
     applyGraphParams(g);
     engaged++;
   }
-  if (audioCompEnabled) { hookAudioGesture(); resumeAudioCtx(); }
+  // Always allow the context to resume on a user gesture, so metering works even
+  // with compression off.
+  if (primary) { hookAudioGesture(); resumeAudioCtx(); }
   return { engaged, skipped, reason };
 }
 
@@ -479,11 +493,11 @@ function loadSpeed() {
       liveSyncTarget = clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 3);
       liveSyncMax = clampMax(result.liveSyncMax != null ? result.liveSyncMax : 1.5);
       audioCompEnabled = !!result.audioComp;
-      audioCompThreshold = clampNum(result.audioCompThreshold, -100, 0, -50);
-      audioCompKnee = clampNum(result.audioCompKnee, 0, 40, 40);
-      audioCompRatio = clampNum(result.audioCompRatio, 1, 20, 12);
+      audioCompThreshold = clampNum(result.audioCompThreshold, -100, 0, -60);
+      audioCompKnee = clampNum(result.audioCompKnee, 0, 40, 30);
+      audioCompRatio = clampNum(result.audioCompRatio, 1, 20, 10);
       audioCompAttack = clampNum(result.audioCompAttack, 0, 1, 0);
-      audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 0.25);
+      audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 1);
       audioCompGain = clampNum(result.audioCompGain, 0, 24, 0);
       // Only sites the user explicitly remembered get a saved speed; the rest are 100%.
       userSpeed = clamp(domains[getDomain()] || 1.0);
@@ -771,6 +785,28 @@ loadSpeed();
 // roots, where document mutations don't fire) and drive live-sync.
 liveTick = setInterval(() => { applyAll(); controlLive(); updateTimeBadge(); }, 1000);
 
+// Accumulate a small audio-level history whenever a graph already exists (no new
+// audio routing), so re-opening the popup shows a pre-filled graph.
+setInterval(() => {
+  if (!ctxValid()) return;
+  const v = primaryVideo();
+  const g = v && audioGraphs.get(v);
+  if (!g || !g.analyserIn || !audioCtx || audioCtx.state !== "running") return;
+  const inDb = analyserDb(g.analyserIn);
+  audioLevelHist.push({ in: inDb, out: audioOutDb(g, inDb) });
+  while (audioLevelHist.length > A_HIST_MAX) audioLevelHist.shift();
+}, A_HIST_MS);
+
+// Same idea for the buffer graph: sample forward-buffer on live streams.
+setInterval(() => {
+  if (!ctxValid()) return;
+  if (!onStreamPage()) { if (bufferLevelHist.length) bufferLevelHist.length = 0; return; }
+  const lv = liveVideo();
+  if (!lv) return;
+  bufferLevelHist.push({ at: Date.now(), v: forwardBuffer(lv) });
+  while (bufferLevelHist.length > BUF_HIST_MAX) bufferLevelHist.shift();
+}, BUF_HIST_MS);
+
 // Watch for videos added later (SPA navigation, lazy players). Chat-heavy pages
 // (Twitch) mutate constantly, so coalesce a burst into a single rAF pass rather
 // than reacting to every node — and never re-run for our own indicator writes.
@@ -808,11 +844,11 @@ api.storage.onChanged.addListener((changes, area) => {
   if (changes.showRemaining) { showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }
   let audioChanged = false;
   if (changes.audioComp) { audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
-  if (changes.audioCompThreshold) { audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -50); audioChanged = true; }
-  if (changes.audioCompKnee) { audioCompKnee = clampNum(changes.audioCompKnee.newValue, 0, 40, 40); audioChanged = true; }
-  if (changes.audioCompRatio) { audioCompRatio = clampNum(changes.audioCompRatio.newValue, 1, 20, 12); audioChanged = true; }
+  if (changes.audioCompThreshold) { audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60); audioChanged = true; }
+  if (changes.audioCompKnee) { audioCompKnee = clampNum(changes.audioCompKnee.newValue, 0, 40, 30); audioChanged = true; }
+  if (changes.audioCompRatio) { audioCompRatio = clampNum(changes.audioCompRatio.newValue, 1, 20, 10); audioChanged = true; }
   if (changes.audioCompAttack) { audioCompAttack = clampNum(changes.audioCompAttack.newValue, 0, 1, 0); audioChanged = true; }
-  if (changes.audioCompRelease) { audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 0.25); audioChanged = true; }
+  if (changes.audioCompRelease) { audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 1); audioChanged = true; }
   if (changes.audioCompGain) { audioCompGain = clampNum(changes.audioCompGain.newValue, 0, 24, 0); audioChanged = true; }
   if (audioChanged) {
     // Apply immediately; when the user flipped the toggle, also poll briefly and
@@ -855,6 +891,14 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getMonitor") {
     return replyFromVideoFrame(sendResponse, () => monitorData());
   }
+  if (request.action === "getHistory") {
+    const nowT = Date.now();
+    return replyFromVideoFrame(sendResponse, () => ({
+      audio: audioLevelHist.map((p) => [Math.round(p.in * 10) / 10, Math.round(p.out * 10) / 10]),
+      audioStep: A_HIST_MS,
+      buffer: bufferLevelHist.map((p) => [nowT - p.at, Math.round(p.v * 100) / 100]),
+    }));
+  }
   return false;
 });
 
@@ -882,6 +926,7 @@ function streamBitrate(v) {
 
 // Everything the popup graphs need, in one round-trip.
 function monitorData() {
+  applyAudioComp();                 // make sure the meter graph is engaged
   const v = primaryVideo();
   const live = onStreamPage();
   return {
@@ -906,18 +951,30 @@ function analyserDb(an) {
   return rms > 0.0000158 ? 20 * Math.log10(rms) : -100; // floor ~ -96 dB
 }
 
+// Output level derived from the input plus the compressor's exact gain reduction
+// (≤ 0 dB) and the make-up gain. Off → reduction is 0 and we add no make-up, so
+// output == input exactly.
+function audioOutDb(g, inDb) {
+  if (inDb <= -100) return inDb; // silence floor — amplifying nothing is still nothing
+  const reduction = (g.comp && typeof g.comp.reduction === "number") ? g.comp.reduction : 0;
+  return inDb + reduction + (audioCompEnabled ? audioCompGain : 0);
+}
+
 // Before/after levels of the primary video's compressor, for the popup meters.
 function audioLevels() {
   const v = primaryVideo();
   const g = v && audioGraphs.get(v);
-  if (!audioCompEnabled || !g || !g.analyserIn) {
+  // Report levels whenever the graph exists — even with compression off (it runs
+  // transparent), so the meter and threshold preview stay live.
+  if (!g || !g.analyserIn) {
     return { active: false, enabled: audioCompEnabled };
   }
+  const inDb = analyserDb(g.analyserIn);
   return {
     active: true,
-    enabled: true,
-    in: analyserDb(g.analyserIn),
-    out: analyserDb(g.analyserOut),
+    enabled: audioCompEnabled,
+    in: inDb,
+    out: audioOutDb(g, inDb),
     threshold: audioCompThreshold,
   };
 }
