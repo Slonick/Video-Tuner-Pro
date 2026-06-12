@@ -1,0 +1,54 @@
+name: Generate promo images
+
+# Run on demand (Actions tab → "Generate promo images" → Run workflow), separate
+# from the release build so it can churn in parallel. Renders the localized store
+# promo images for every locale × state and commits them to the default branch.
+#
+# Branch-protection note: this pushes directly to the default branch. If you
+# enable "Require a pull request before merging", add github-actions[bot] to the
+# bypass list (Settings → Branches), or this push will be rejected.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  promo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+
+      - run: npm ci
+
+      - name: Build (the popup the promos render)
+        run: npm run build
+
+      - name: Render promos (all locales × states)
+        env:
+          CHROME: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm run promo
+
+      - name: Commit and push promo images
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .promo/store
+          if git diff --staged --quiet; then
+            echo "No promo changes to commit."
+          else
+            git commit -m "chore(promo): regenerate store images [skip ci]"
+            git push
+          fi
