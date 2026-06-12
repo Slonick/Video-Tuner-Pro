@@ -3,6 +3,13 @@ import { collectVideos } from "../videos.js";
 let liveSeenAt = 0;     // timestamp of the last live <video> we saw (sticky detection)
 
 export function isLive(video: HTMLVideoElement): boolean {
+  // The MAIN-world probe (inject.ts) publishes the player's own live flag
+  // (YouTube's getVideoData().isLive) to data-vtp-live — authoritative when
+  // present, so it wins over the duration/DOM heuristics below.
+  const flag = document.documentElement.getAttribute("data-vtp-live");
+  if (flag === "1") return true;
+  if (flag === "0") return false;
+
   // Most live MSE streams report an infinite duration (Twitch, many players).
   if (video.duration === Infinity) return true;
 

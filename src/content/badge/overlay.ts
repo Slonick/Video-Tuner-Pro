@@ -1,6 +1,8 @@
+import { MIN_FORWARD_BUFFER } from "../core/constants.js";
 import { S } from "../state.js";
 import { primaryVideo } from "../videos.js";
 import { onStreamPage } from "../live/detection.js";
+import { catchupBufferLimited } from "../live/catchup.js";
 import { forwardBuffer, streamLatency } from "../live/metrics.js";
 
 type Timer = ReturnType<typeof setTimeout>;
@@ -45,11 +47,17 @@ function renderBadge(v: HTMLVideoElement): void {
   const sp = Math.round(speed * 100) / 100;
   if (onStreamPage()) {
     // Live: remaining time is meaningless (no end). Prefer the latency to the
-    // broadcaster where the site exposes it (Twitch/YouTube), else fall back to
-    // seconds buffered ahead. Both shown with two decimals.
+    // broadcaster where the site exposes it (Twitch/YouTube) — then the buffered
+    // ahead seconds follow in parentheses: "speed × · latency (buffer)". Without
+    // site latency the buffer IS the shown value, so no parenthetical.
     const lat = streamLatency();
-    const val = lat != null ? lat : forwardBuffer(v);
-    el.textContent = `${sp}× · ${val.toFixed(2)}s`;
+    const buf = forwardBuffer(v);
+    // "⚠" when we're far behind but the buffer is too thin to catch up safely.
+    const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
+    const warn = S.liveSyncEnabled && catchupBufferLimited(lat != null ? lat : buf, buf, target) ? " ⚠" : "";
+    el.textContent = (lat != null
+      ? `${sp}× · ${lat.toFixed(2)}s (${buf.toFixed(2)}s)`
+      : `${sp}× · ${buf.toFixed(2)}s`) + warn;
   } else {
     const dur = v.duration;
     const eff = effectiveDuration(v);

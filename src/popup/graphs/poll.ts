@@ -57,14 +57,21 @@ export function startPoll(g: GraphState): void {
         g.bufHist.push({ t, v: bs });
         while (g.bufHist.length && t - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
         g.bufBitrate = typeof resp.bitrate === "number" ? resp.bitrate : null;
-        // Refresh the displayed value at most once a second so the digits sit still.
+        g.bufAhead = typeof resp.bufferAhead === "number" ? resp.bufferAhead : null;
+        g.bufLimited = !!resp.bufLimited;
+        // Refresh the displayed values at most once a second so the digits sit still.
         if (g.bufBitrateShown == null || t - g.bufBitrateAt > 1000) {
           g.bufBitrateShown = g.bufBitrate; g.bufBitrateAt = t;
+        }
+        if (g.bufAheadAt === 0 || t - g.bufAheadAt > 1000) {
+          g.bufAheadShown = g.bufAhead; g.bufAheadAt = t;
         }
       } else {
         // Not a live stream — the graph is meaningless, so keep it empty.
         g.bufHist.length = 0; g.bufSmooth = null;
         g.bufBitrate = g.bufBitrateShown = null;
+        g.bufAhead = g.bufAheadShown = null; g.bufAheadAt = 0;
+        g.bufLimited = false;
       }
     });
   }, 75);

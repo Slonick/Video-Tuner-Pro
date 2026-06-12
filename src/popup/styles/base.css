@@ -26,6 +26,12 @@ body {
     }
 }
 
+.version {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--muted);
+}
+
 .pro-badge {
     color: #fff;
     background: var(--accent);

@@ -11,6 +11,7 @@
 (function () {
   "use strict";
   const ATTR = "data-vtp-latency";
+  const LIVE_ATTR = "data-vtp-live";
 
   // Live latency (seconds) from a Twitch player instance, exposed two ways across
   // versions: getLiveLatency() and the statistics object's hlsLatencyBroadcaster
@@ -66,30 +67,57 @@
     return lat;
   }
 
+  function youtubePlayer(): any {
+    return document.getElementById("movie_player") || document.querySelector(".html5-video-player");
+  }
+
+  // The player's own live flag (getVideoData().isLive) — authoritative when
+  // present, null when the player/API isn't there yet. Published to LIVE_ATTR so
+  // the isolated script's detection doesn't have to rely on CSS-class heuristics.
+  function youtubeIsLive(): boolean | null {
+    try {
+      const yp: any = youtubePlayer();
+      const vd = yp && typeof yp.getVideoData === "function" ? yp.getVideoData() : null;
+      if (!vd || typeof vd.isLive !== "boolean") return null;
+      return vd.isLive;
+    } catch (e) { return null; }
+  }
+
   // YouTube's #movie_player exposes "Live Latency" via getStatsForNerds(); a live
   // stream's distance behind the seekable edge is the same thing as a fallback
   // (guarded so it never fires on VODs).
+  let statsLatRaw = "";       // last raw stats value, to spot a frozen readout
+  let statsLatChangedAt = 0;
   function youtubeLatency(): number | null {
     try {
       // YouTube's #movie_player API is private and untyped — `any` is unavoidable.
-      const yp: any = document.getElementById("movie_player") || document.querySelector(".html5-video-player");
+      const yp: any = youtubePlayer();
       if (!yp) return null;
+      let statsLat: number | null = null;
       if (typeof yp.getStatsForNerds === "function") {
         const s = yp.getStatsForNerds() || {};
         for (const k in s) {
           if (/latency/i.test(k)) {
-            const n = parseFloat(String(s[k]).replace(",", "."));
-            if (isFinite(n) && n > 0) return n;
+            const raw = String(s[k]);
+            const n = parseFloat(raw.replace(",", "."));
+            if (isFinite(n) && n > 0) {
+              if (raw !== statsLatRaw) { statsLatRaw = raw; statsLatChangedAt = Date.now(); }
+              statsLat = n;
+            }
+            break;
           }
         }
       }
-      const vd = typeof yp.getVideoData === "function" ? yp.getVideoData() : null;
-      const live = vd && (vd.isLive || vd.isLiveContent || vd.livestream);
-      if (live && typeof yp.getProgressState === "function") {
+      // YouTube stops refreshing stats-for-nerds while the player UI is idle (no
+      // mouse movement), freezing the readout. A value stuck for a few seconds is
+      // stale — fall through to the progress-state distance behind the live edge.
+      if (statsLat != null && Date.now() - statsLatChangedAt < 3000) return statsLat;
+      if (youtubeIsLive() && typeof yp.getProgressState === "function") {
         const p = yp.getProgressState() || {};
         const d = p.seekableEnd - p.current;
         if (isFinite(d) && d > 0) return d;
       }
+      return statsLat; // a stale reading still beats nothing
     } catch (e) { /* ignore */ }
     return null;
   }
@@ -102,6 +130,9 @@
       if (!root) return;
       if (lat != null) root.setAttribute(ATTR, lat.toFixed(2));
       else if (root.hasAttribute(ATTR)) root.removeAttribute(ATTR);
+      const live = youtubeIsLive();
+      if (live != null) root.setAttribute(LIVE_ATTR, live ? "1" : "0");
+      else if (root.hasAttribute(LIVE_ATTR)) root.removeAttribute(LIVE_ATTR);
     } catch (e) { /* ignore */ }
   }
 
