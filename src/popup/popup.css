@@ -106,6 +106,20 @@ body {
     width: 18px; height: 18px; border-radius: 50%; background: #fff;
     cursor: pointer; border: none; box-shadow: 0 1px 3px var(--shadow);
 }
+/* Tick marks on the SPEED slider only (25–300%, range 275): every 50% →
+   50/100/150/200/250/300. Drawn as the track's background so the thumb covers the
+   ones it sits on. Sized to the thumb's travel (track − 18px thumb, centered) so
+   the marks line up with the thumb at each value. A tick every 50/275 = 18.1818%
+   of that inner width, centred at 9.0909% (the 50% position). */
+#speedSlider {
+    background-image: repeating-linear-gradient(to right,
+        transparent 0, transparent calc(9.0909% - 0.75px),
+        var(--muted) calc(9.0909% - 0.75px), var(--muted) calc(9.0909% + 0.75px),
+        transparent calc(9.0909% + 0.75px), transparent 18.1818%);
+    background-size: calc(100% - 18px) 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
 
 /* Preset speeds — pill buttons, active one filled with the accent. */
 .buttons-grid {
