@@ -50,6 +50,7 @@
   "meterLatency": { "message": "遅延" },
   "meterTargetMark": { "message": "目標" },
   "bufferLiveOnly": { "message": "ライブ配信のみ" },
+  "bufferLowWarn": { "message": "バッファ不足 — 追いつき制限中" },
   "onVideoLabel": { "message": "速度と残り時間を動画に表示" },
   "onStreamLabel": { "message": "速度とバッファを動画に表示" }
 }

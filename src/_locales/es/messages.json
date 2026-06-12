@@ -50,6 +50,7 @@
   "meterLatency": { "message": "Latencia" },
   "meterTargetMark": { "message": "Objetivo" },
   "bufferLiveOnly": { "message": "Solo en directos" },
+  "bufferLowWarn": { "message": "Búfer bajo — alcance limitado" },
   "onVideoLabel": { "message": "Mostrar velocidad y tiempo en el vídeo" },
   "onStreamLabel": { "message": "Mostrar velocidad y búfer en el vídeo" }
 }

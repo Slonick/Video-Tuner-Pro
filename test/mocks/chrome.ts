@@ -41,7 +41,10 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
   const chromeMock = {
     i18n: { getMessage: (key: string, subs?: string | string[]) => substitute(data.messages?.[key]?.message ?? "", subs) },
     storage: { sync: area(), local: area(), onChanged: { addListener() {} } },
-    runtime: { id: "mock", lastError: null as unknown, onMessage: { addListener() {} }, sendMessage() {} },
+    runtime: {
+      id: "mock", lastError: null as unknown, onMessage: { addListener() {} }, sendMessage() {},
+      getManifest: () => ({ version: "0.0.0" }),
+    },
     action: {
       setBadgeText() {}, setBadgeBackgroundColor() {}, setBadgeTextColor() {}, setIcon() {},
     },

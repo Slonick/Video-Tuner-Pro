@@ -21,3 +21,10 @@ export function decideCatchupSpeed(o: CatchupInput): number {
   if (lag > o.target + CATCHUP_START && o.dropped === 0 && o.buffer > MIN_FORWARD_BUFFER + CATCHUP_STOP) return o.rate;
   return o.currentSpeed;
 }
+
+// True when we're clearly behind the live edge but the buffer is too thin to
+// catch up safely (same gate decideCatchupSpeed uses) — latency will stay high
+// until the buffer refills, which the UI warns about.
+export function catchupBufferLimited(lag: number, buffer: number, target: number): boolean {
+  return lag > target + CATCHUP_START && buffer <= MIN_FORWARD_BUFFER + CATCHUP_STOP;
+}

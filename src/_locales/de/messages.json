@@ -50,6 +50,7 @@
   "meterLatency": { "message": "Latenz" },
   "meterTargetMark": { "message": "Ziel" },
   "bufferLiveOnly": { "message": "Nur bei Livestreams" },
+  "bufferLowWarn": { "message": "Puffer zu klein — Aufholen begrenzt" },
   "onVideoLabel": { "message": "Tempo & Zeit im Video anzeigen" },
   "onStreamLabel": { "message": "Tempo & Puffer im Video anzeigen" }
 }

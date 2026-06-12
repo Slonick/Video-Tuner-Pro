@@ -7,7 +7,8 @@ export function clamp(speed: number): number {
 export function clampTarget(n: unknown): number {
   const v = Number(n);
   if (Number.isNaN(v)) return 5;
-  return Math.min(15, Math.max(0, Math.round(v)));
+  // Floor of 1s: a 0s target means perpetual catch-up that just drains the buffer.
+  return Math.min(30, Math.max(1, Math.round(v)));
 }
 
 export function clampMax(n: unknown): number {
