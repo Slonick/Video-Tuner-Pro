@@ -33,6 +33,12 @@ jobs:
             If there are none, reply with exactly one line: "No critical issues."
             Do not comment on anything non-critical.
 
+            Work from the diff, not the whole tree: start with
+            `git diff origin/main...HEAD` and judge the changed hunks. Open a
+            full file only when a hunk genuinely can't be judged without its
+            surrounding context, and don't re-read content the diff already
+            shows — this keeps the review fast and cheap.
+
             CRITICAL means: a real bug or regression that changes/breaks behaviour;
             a crash, hang, data loss, or security vulnerability; a broken build or
             failing test; or incorrect logic in the fragile areas of this MV3
