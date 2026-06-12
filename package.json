@@ -1,6 +1,6 @@
 {
   "name": "video-tuner-pro",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Build tooling for the Video Tuner Pro browser extension",
   "private": true,
   "type": "module",
