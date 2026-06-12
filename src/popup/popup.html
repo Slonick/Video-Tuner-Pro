@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="pageTitle">Video Tuner</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="header">
+        <h1><span data-i18n="appHeader">Video Tuner</span><span class="pro-badge">PRO</span></h1>
+        <div class="current-domain"><span id="currentDomain" data-i18n="loading">Loading…</span> · <span id="currentSpeedPct">100%</span></div>
+    </div>
+
+    <div class="speed-section">
+        <div class="speed-display">
+            <div class="speed-value" id="speedValue">100%</div>
+            <span class="info warn" id="liveWarn" tabindex="0" role="button" aria-label="Live" style="display:none;">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                <span class="tip" data-i18n="liveNote">Live stream: manual speed isn't applied — the stream stays at 100% until it needs to catch up. Speed is managed by Live-sync.</span>
+            </span>
+        </div>
+
+        <input type="range" class="speed-slider" id="speedSlider" min="25" max="300" step="5" value="100">
+
+        <div class="buttons-grid">
+            <button class="btn-speed" data-percent="50">50%</button>
+            <button class="btn-speed" data-percent="75">75%</button>
+            <button class="btn-speed" data-percent="100">100%</button>
+            <button class="btn-speed" data-percent="125">125%</button>
+            <button class="btn-speed" data-percent="150">150%</button>
+            <button class="btn-speed" data-percent="175">175%</button>
+            <button class="btn-speed" data-percent="200">200%</button>
+            <button class="btn-speed" data-percent="250">250%</button>
+        </div>
+
+        <div class="quick-actions">
+            <button class="btn-action btn-reset" id="resetBtn" data-i18n="resetButton">Reset (100%)</button>
+            <button class="btn-action btn-default" id="setDefaultBtn" data-i18n="rememberButton">Remember site</button>
+        </div>
+
+        <div class="extra-row">
+            <span data-i18n="onVideoLabel">Show speed &amp; time on video</span>
+            <label class="switch" for="onVideoToggle">
+                <input type="checkbox" id="onVideoToggle" class="switch-input">
+                <span class="switch-track"><span class="switch-knob"></span></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="sync-section">
+        <div class="sec-head">
+            <button type="button" class="sec-main" data-target="syncBody" aria-expanded="false">
+                <span class="sec-text">
+                    <span class="sec-title-row">
+                        <strong data-i18n="syncTitle">Keep stream live</strong>
+                        <span class="info" tabindex="0" role="button" aria-label="Info">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-1-3h2v-6h-2v6Zm0-8h2V7h-2v2Z"/></svg>
+                            <span class="tip" data-i18n="syncHint">If the stream falls behind by more than the value above, the speed rises smoothly (up to the max) and returns to 100% once caught up. The buffer is respected — it won't speed up when little is buffered ahead.</span>
+                        </span>
+                    </span>
+                    <span class="switch-sub" data-i18n="syncSubtitle">Automatically catch up to the live broadcast</span>
+                </span>
+            </button>
+            <label class="switch" for="liveSyncToggle">
+                <input type="checkbox" id="liveSyncToggle" class="switch-input">
+                <span class="switch-track"><span class="switch-knob"></span></span>
+            </label>
+        </div>
+
+        <div class="meter buffer always">
+            <div class="meter-legend">
+                <span><i class="dot dot-buf"></i><span data-i18n="meterBuffer">Buffer</span></span>
+                <span class="meter-thr"><i class="dot dot-thr"></i><span data-i18n="meterTargetMark">Target</span></span>
+            </div>
+            <canvas id="bufferMeter"></canvas>
+        </div>
+
+        <div class="sync-body" id="syncBody">
+            <div class="sync-label"><span data-i18n="allowedDelay">Allowed delay</span>: <b id="syncTargetVal">3</b> <span data-i18n="secondsShort">s</span></div>
+            <input type="range" class="speed-slider" id="syncTarget" min="0" max="15" step="1" value="3">
+
+            <div class="sync-label" style="margin-top:12px;"><span data-i18n="maxCatchupSpeed">Max catch-up speed</span>: <b id="syncMaxVal">150</b>%</div>
+            <input type="range" class="speed-slider" id="syncMax" min="125" max="300" step="5" value="150">
+        </div>
+
+        <div class="expand-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <div class="sync-section">
+        <div class="sec-head">
+            <button type="button" class="sec-main" data-target="audioBody" aria-expanded="false">
+                <span class="sec-text">
+                    <span class="sec-title-row">
+                        <strong data-i18n="audioTitle">Audio compression</strong>
+                        <span class="info" tabindex="0" role="button" aria-label="Info">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-1-3h2v-6h-2v6Zm0-8h2V7h-2v2Z"/></svg>
+                            <span class="tip" data-i18n="audioHint">Boosts quiet parts and tames loud ones; make-up gain lifts the overall level. Won't work on sites that serve video cross-origin without CORS — the browser mutes Web Audio there.</span>
+                        </span>
+                    </span>
+                    <span class="switch-sub" data-i18n="audioSubtitle">Even out loud and quiet sounds</span>
+                </span>
+            </button>
+            <label class="switch" for="audioCompToggle">
+                <input type="checkbox" id="audioCompToggle" class="switch-input">
+                <span class="switch-track"><span class="switch-knob"></span></span>
+            </label>
+        </div>
+
+        <div class="meter audio always">
+            <div class="meter-legend">
+                <span><i class="dot dot-in"></i><span data-i18n="meterIn">Input</span></span>
+                <span><i class="dot dot-out"></i><span data-i18n="meterOut">Output</span></span>
+                <span class="meter-thr"><i class="dot dot-thr"></i><span data-i18n="meterThr">Threshold</span></span>
+            </div>
+            <canvas id="audioMeter"></canvas>
+        </div>
+
+        <div class="sync-body" id="audioBody">
+            <div class="param">
+                <div class="param-row"><label data-i18n="audioThreshold">Threshold</label><b class="param-val" id="acThresholdVal">−60 dB</b></div>
+                <input type="range" class="speed-slider" id="acThreshold" min="-100" max="0" step="1">
+                <div class="param-desc" data-i18n="audioThresholdDesc">Level above which compression starts.</div>
+            </div>
+            <div class="param">
+                <div class="param-row"><label data-i18n="audioKnee">Knee</label><b class="param-val" id="acKneeVal">30 dB</b></div>
+                <input type="range" class="speed-slider" id="acKnee" min="0" max="40" step="1">
+                <div class="param-desc" data-i18n="audioKneeDesc">Range around the threshold where the curve bends smoothly.</div>
+            </div>
+            <div class="param">
+                <div class="param-row"><label data-i18n="audioRatio">Ratio</label><b class="param-val" id="acRatioVal">10:1</b></div>
+                <input type="range" class="speed-slider" id="acRatio" min="1" max="20" step="0.5">
+                <div class="param-desc" data-i18n="audioRatioDesc">Input dB needed for a 1 dB rise in output.</div>
+            </div>
+            <div class="param">
+                <div class="param-row"><label data-i18n="audioAttack">Attack</label><b class="param-val" id="acAttackVal">0 ms</b></div>
+                <input type="range" class="speed-slider" id="acAttack" min="0" max="1" step="0.001">
+                <div class="param-desc" data-i18n="audioAttackDesc">Time to clamp down by 10 dB.</div>
+            </div>
+            <div class="param">
+                <div class="param-row"><label data-i18n="audioRelease">Release</label><b class="param-val" id="acReleaseVal">1000 ms</b></div>
+                <input type="range" class="speed-slider" id="acRelease" min="0" max="1" step="0.001">
+                <div class="param-desc" data-i18n="audioReleaseDesc">Time to release by 10 dB.</div>
+            </div>
+            <div class="param">
+                <div class="param-row"><label data-i18n="audioGain">Make-up gain</label><b class="param-val" id="acGainVal">0 dB</b></div>
+                <input type="range" class="speed-slider" id="acGain" min="0" max="24" step="1">
+                <div class="param-desc" data-i18n="audioGainDesc">Overall level lift after compression.</div>
+            </div>
+
+            <button type="button" class="btn-action btn-reset audio-reset" id="audioReset" data-i18n="audioReset">Reset to defaults</button>
+        </div>
+
+        <div class="expand-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

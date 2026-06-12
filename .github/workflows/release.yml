@@ -24,17 +24,18 @@ jobs:
 
       - name: Validate JSON and JS
         run: |
-          node --check content.js
-          node --check popup/popup.js
-          for f in manifest.json _locales/*/messages.json; do
+          node --check src/content/index.js
+          node --check src/popup/index.js
+          node --check src/background/index.js
+          for f in src/manifest.json src/_locales/*/messages.json; do
             node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || { echo "Invalid JSON: $f"; exit 1; }
           done
           # Every locale must define the same keys as the English base.
           node -e '
             const fs = require("fs");
-            const base = Object.keys(JSON.parse(fs.readFileSync("_locales/en/messages.json"))).sort();
-            for (const d of fs.readdirSync("_locales")) {
-              const k = Object.keys(JSON.parse(fs.readFileSync("_locales/" + d + "/messages.json"))).sort();
+            const base = Object.keys(JSON.parse(fs.readFileSync("src/_locales/en/messages.json"))).sort();
+            for (const d of fs.readdirSync("src/_locales")) {
+              const k = Object.keys(JSON.parse(fs.readFileSync("src/_locales/" + d + "/messages.json"))).sort();
               const miss = base.filter((x) => !k.includes(x));
               if (miss.length) { console.error(d + " missing keys: " + miss.join(", ")); process.exit(1); }
             }
@@ -43,23 +44,18 @@ jobs:
 
       - name: Read version from manifest
         id: meta
-        run: echo "version=$(node -p "require('./manifest.json').version")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p "require('./src/manifest.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: Assemble shippable files
-        run: |
-          mkdir -p dist
-          cp manifest.json content.js background.js dist/
-          cp -r popup icons _locales dist/
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build Firefox package (gecko keys; background as event-page scripts)
-        run: |
-          jq '.background = {"scripts":["background.js"]}' manifest.json > dist/manifest.json
-          cd dist && zip -rq "../video-tuner-pro-firefox-v${{ steps.meta.outputs.version }}.zip" . && cd ..
+      - name: Build (bundled + minified, per target)
+        run: npm run build
 
-      - name: Build Chrome package (Firefox-only keys stripped; background as service worker)
+      - name: Package Chrome and Firefox zips
         run: |
-          jq 'del(.browser_specific_settings) | .background = {"service_worker":"background.js"}' manifest.json > dist/manifest.json
-          cd dist && zip -rq "../video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" . && cd ..
+          cd dist/chrome && zip -rq "../../video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" . && cd ../..
+          cd dist/firefox && zip -rq "../../video-tuner-pro-firefox-v${{ steps.meta.outputs.version }}.zip" . && cd ../..
 
       - name: Upload packages as workflow artifacts
         uses: actions/upload-artifact@v7
