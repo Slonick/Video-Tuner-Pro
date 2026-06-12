@@ -16,8 +16,16 @@ export const LIVE_MAX_FLOOR = 1.25;       // catch-up rate can never be set belo
 export const CATCHUP_START = 2.0;         // begin catching up once this many seconds beyond the target
 export const CATCHUP_STOP = 0.3;          // stop once back within this of the target
 
+// Per-site settings key. Strip a leading "www." / "m." so a site shares one
+// setting across its bare/www/mobile hosts (www.twitch.tv → twitch.tv). We do
+// NOT collapse to the registrable domain (that would wrongly merge genuinely
+// distinct subdomains like docs./mail.google.com or *.github.io tenants).
+export function normalizeHost(host) {
+  return (host || "").replace(/^(?:www|m)\./i, "");
+}
+
 export function getDomain() {
-  return window.location.hostname;
+  return normalizeHost(window.location.hostname);
 }
 
 // The extension context dies when the extension is reloaded/updated; any api.*

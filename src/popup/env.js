@@ -17,6 +17,12 @@ export function clamp(speed) {
   return Math.min(MAX_SPEED, Math.max(MIN_SPEED, Math.round(speed * 100) / 100));
 }
 
+// Must match the content script's getDomain(): strip a leading "www." / "m." so
+// the popup reads/writes the same per-site key the page does.
+export function normalizeHost(host) {
+  return (host || "").replace(/^(?:www|m)\./i, "");
+}
+
 export function clampNum(v, lo, hi, def) {
   const n = Number(v);
   if (Number.isNaN(n)) return def;

@@ -1,6 +1,6 @@
 // Speed controls: the readout, slider, preset buttons, Reset, Remember-site, and
 // the periodic poll that keeps the readout in sync with live-sync on the page.
-import { api, STORE, msg, ctx, clamp, getActiveTab } from "./env.js";
+import { api, STORE, msg, ctx, clamp, getActiveTab, normalizeHost } from "./env.js";
 
 function updateUI(speed) {
   const percent = Math.round(speed * 100);
@@ -92,7 +92,7 @@ export async function init() {
   ctx.activeTabId = tab ? tab.id : null;
 
   try {
-    ctx.currentDomain = tab && tab.url ? new URL(tab.url).hostname : "";
+    ctx.currentDomain = tab && tab.url ? normalizeHost(new URL(tab.url).hostname) : "";
   } catch (e) {
     ctx.currentDomain = "";
   }
