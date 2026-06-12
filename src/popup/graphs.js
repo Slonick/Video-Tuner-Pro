@@ -197,7 +197,7 @@ export function setupGraphs() {
       const onA = Math.max(0, Math.min(1, (compAnim - 0.45) * 2.2));
       if (onA > 0.01) {
         acx.globalAlpha = onA;
-        const d = audioDiffShown, up = d >= 0, dc = up ? "#5aa8ff" : "#ffb340", cxn = w / 2;
+        const d = audioDiffShown, up = d >= 0, dc = col("--text", "#fff"), cxn = w / 2;
         // output (top) / input (bottom)
         acx.font = "700 12px -apple-system, sans-serif"; acx.textBaseline = "middle"; acx.textAlign = "center"; acx.lineWidth = 3;
         const outL = fmtLevel(audioOutShown), inL = fmtLevel(audioInShown);
