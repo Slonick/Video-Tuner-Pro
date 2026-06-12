@@ -59,7 +59,6 @@ function setSpeed(speed) {
   api.tabs.sendMessage(activeTabId, { action: "setSpeed", speed: clamped }, (resp) => {
     if (api.runtime.lastError) {
       // No content script on this page (e.g. chrome://, PDF, store pages).
-      document.getElementById("noVideo").style.display = "block";
       return;
     }
     if (resp) {
@@ -198,7 +197,6 @@ async function init() {
         updateUI(resp.speed);
         setLive(!!resp.live);
       } else {
-        document.getElementById("noVideo").style.display = "block";
         fallbackFromStorage();
       }
     });
