@@ -18,36 +18,16 @@
     }
 }
 
-/* --- Header: where (domain · channel) on the left ------------------------- */
-.speed-where {
-    display: flex;
-    align-items: baseline;
-    min-width: 0;
-    font-size: 12px;
-}
-
-.current-domain {
-    flex: 0 1 auto;
-    min-width: 0;
-    font-weight: 600;
-    color: var(--text);
+/* --- Header: domain title + a gray scope subtitle (just "Site", or — on a
+   YouTube watch page — the channel name, written by the popup). Both clip with
+   an ellipsis so a long host/channel never reflows the header. ------------- */
+.current-domain,
+#speedScope {
+    display: block;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-/* The YouTube channel the "for channel" actions apply to — shown only when set;
-   the popup writes it with its " · " separator, so :empty hides cleanly. */
-.current-channel {
-    flex: 0 1 auto;
-    min-width: 0;
-    color: var(--accent);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.current-channel:empty {
-    display: none;
 }
 
 /* --- Header: the quick −/value/+ cluster on the right -------------------- */
@@ -147,6 +127,24 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     margin-bottom: 10px;
+}
+
+/* The always-visible single row shown while the card is collapsed; once it's
+   expanded the full grid (with more values) takes over, so hide the quick row. */
+.buttons-grid.quickrow {
+    margin: 10px 0 0;
+}
+.speed-section:has(.sync-body.open) .quickrow {
+    display: none;
+}
+
+/* The slider and the Reset / Remember actions live outside the collapsible body
+   (always reachable). Space them off the header / preset row above. */
+.speed-section > .speed-slider {
+    margin: 12px 0 0;
+}
+.speed-section > .quick-actions {
+    margin-top: 10px;
 }
 
 .btn-speed {
@@ -298,4 +296,15 @@
     margin-top: 12px;
     font-size: 12px;
     color: var(--text);
+}
+
+/* The speed body is open by default, so trim its vertical chrome (the section's
+   12px top margin / 16px bottom padding) to keep the popup from scrolling on
+   open — Chrome caps popup height at ~600px. */
+.speed-body.sync-body.open {
+    margin-top: 8px;
+    padding-bottom: 8px;
+}
+.speed-body .extra-row {
+    margin-top: 8px;
 }

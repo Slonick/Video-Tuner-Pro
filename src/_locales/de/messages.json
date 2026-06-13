@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x Geschwindigkeit" },
   "resetButton": { "message": "Zurücksetzen (100%)" },
   "rememberButton": { "message": "Seite merken" },
+  "speedScopeSite": { "message": "Aktuelle Website" },
   "savedFeedback": { "message": "✓ Gespeichert" },
   "noVideo": { "message": "Kein Video auf der Seite gefunden — öffne ein Video und aktualisiere." },
   "liveNote": { "message": "Livestream: Manuelle Geschwindigkeit wird nicht angewendet — der Stream bleibt bei 100%, bis er aufholen muss. Die Geschwindigkeit steuert Live-sync." },

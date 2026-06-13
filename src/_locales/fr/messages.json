@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x vitesse" },
   "resetButton": { "message": "Réinitialiser (100%)" },
   "rememberButton": { "message": "Mémoriser le site" },
+  "speedScopeSite": { "message": "Site actuel" },
   "savedFeedback": { "message": "✓ Enregistré" },
   "noVideo": { "message": "Aucune vidéo trouvée sur la page — ouvrez une vidéo et actualisez." },
   "liveNote": { "message": "Direct : la vitesse manuelle n'est pas appliquée — le flux reste à 100% jusqu'à ce qu'il doive rattraper. La vitesse est gérée par Live-sync." },

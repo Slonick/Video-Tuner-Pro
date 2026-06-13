@@ -22,9 +22,8 @@
         <div class="sec-head">
             <button type="button" class="sec-main" data-target="speedBody" aria-expanded="false">
                 <span class="sec-text">
-                    <span class="speed-where">
-                        <span class="current-domain" id="currentDomain" data-i18n="loading">Loading…</span><span class="current-channel" id="currentChannel"></span>
-                    </span>
+                    <strong class="current-domain" id="currentDomain" data-i18n="loading">Loading…</strong>
+                    <span class="switch-sub" id="speedScope" data-i18n="speedScopeSite">Current site</span>
                 </span>
             </button>
             <div class="speed-quick">
@@ -42,9 +41,21 @@
             </div>
         </div>
 
-        <div class="sync-body speed-body" id="speedBody">
-            <input type="range" class="speed-slider" id="speedSlider" min="25" max="300" step="5" value="100">
+        <!-- Always visible: the slider, a one-row set of quick presets, and the
+             Reset / Remember actions — so you never have to expand the card just
+             to change or save a speed. -->
+        <input type="range" class="speed-slider" id="speedSlider" min="25" max="300" step="5" value="100">
 
+        <div class="buttons-grid quickrow">
+            <button class="btn-speed" data-percent="75">75%</button>
+            <button class="btn-speed" data-percent="100">100%</button>
+            <button class="btn-speed" data-percent="175">175%</button>
+            <button class="btn-speed" data-percent="200">200%</button>
+        </div>
+
+        <!-- Expanding swaps the quick row for the full set of preset values and
+             reveals the on-video toggle. -->
+        <div class="sync-body speed-body" id="speedBody">
             <div class="buttons-grid">
                 <button class="btn-speed" data-percent="50">50%</button>
                 <button class="btn-speed" data-percent="75">75%</button>
@@ -56,33 +67,33 @@
                 <button class="btn-speed" data-percent="250">250%</button>
             </div>
 
-            <div class="quick-actions">
-                <div class="split" id="resetSplit">
-                    <button class="btn-action btn-reset" id="resetBtn" data-i18n="resetButton">Reset (100%)</button>
-                    <button type="button" class="split-caret" id="resetCaret" aria-label="More" aria-haspopup="true">
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <div class="split-menu" id="resetMenu">
-                        <button type="button" id="resetChannelBtn" data-i18n="resetChannel">Reset for channel</button>
-                    </div>
-                </div>
-                <div class="split" id="rememberSplit">
-                    <button class="btn-action btn-default" id="setDefaultBtn" data-i18n="rememberButton">Remember site</button>
-                    <button type="button" class="split-caret" id="rememberCaret" aria-label="More" aria-haspopup="true">
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <div class="split-menu" id="rememberMenu">
-                        <button type="button" id="rememberChannelBtn" data-i18n="rememberChannel">Remember for channel</button>
-                    </div>
-                </div>
-            </div>
-
             <div class="extra-row">
                 <span data-i18n="onVideoLabel">Show speed &amp; time on video</span>
                 <label class="switch" for="onVideoToggle">
                     <input type="checkbox" id="onVideoToggle" class="switch-input">
                     <span class="switch-track"><span class="switch-knob"></span></span>
                 </label>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <div class="split" id="resetSplit">
+                <button class="btn-action btn-reset" id="resetBtn" data-i18n="resetButton">Reset (100%)</button>
+                <button type="button" class="split-caret" id="resetCaret" aria-label="More" aria-haspopup="true">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="split-menu" id="resetMenu">
+                    <button type="button" id="resetChannelBtn" data-i18n="resetChannel">Reset for channel</button>
+                </div>
+            </div>
+            <div class="split" id="rememberSplit">
+                <button class="btn-action btn-default" id="setDefaultBtn" data-i18n="rememberButton">Remember site</button>
+                <button type="button" class="split-caret" id="rememberCaret" aria-label="More" aria-haspopup="true">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="split-menu" id="rememberMenu">
+                    <button type="button" id="rememberChannelBtn" data-i18n="rememberChannel">Remember for channel</button>
+                </div>
             </div>
         </div>
 

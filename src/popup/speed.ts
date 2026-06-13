@@ -32,7 +32,9 @@ function setChannel(channel: string | null | undefined, name?: string | null): v
   byId("resetSplit").classList.toggle("has-channel", on);
   byId("rememberSplit").classList.toggle("has-channel", on);
   const label = name || channel || "";
-  byId("currentChannel").textContent = on && label ? " · " + label : "";
+  // Scope subtitle under the domain: the channel on a YouTube watch page, else
+  // just the static "Site" label.
+  byId("speedScope").textContent = on && label ? label : msg("speedScopeSite");
 }
 
 // The current speed (as a fraction) read back from the header readout — the one
