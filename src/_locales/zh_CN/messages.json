@@ -14,8 +14,7 @@
   "syncSubtitle": { "message": "自动追赶直播进度" },
   "allowedDelay": { "message": "允许的延迟" },
   "secondsShort": { "message": "秒" },
-  "maxCatchupSpeed": { "message": "追赶速度" },
-  "syncHint": { "message": "当直播落后超过允许的延迟时，会以追赶速度播放直到追上直播边缘，然后恢复到 100%。如果开始丢帧则停止。" },
+  "syncHint": { "message": "当直播落后超过允许延迟时，播放会平滑加速 — 落后越多速度越快，最高 125% — 到达直播边缘后恢复 100%。出现掉帧或缓冲不足时会停止加速。" },
   "indicatorLive": { "message": "直播 — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$%（追赶中）",

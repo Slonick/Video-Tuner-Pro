@@ -33,7 +33,7 @@ function latencyHistory(n = 60, base = 7) {
 const SETTINGS = {
   domains: {},
   showRemaining: true, streamBadge: true,
-  liveSync: true, liveSyncTarget: 5, liveSyncMax: 1.5,
+  liveSync: true, liveSyncTarget: 5,
   audioComp: true, audioCompThreshold: THRESHOLD, audioCompKnee: 30,
   audioCompRatio: 10, audioCompAttack: 0, audioCompRelease: 1, audioCompGain: 10,
 };

@@ -21,7 +21,7 @@ const STATES = {
   video:  { scenario: "audio",  expand: null,        headline: "appHeader",  sub: "extDescription",
             bullets: ["onVideoLabel", "syncSubtitle", "audioSubtitle"] },
   stream: { scenario: "live",   expand: null,        headline: "syncTitle",  sub: "syncSubtitle",
-            bullets: ["allowedDelay", "maxCatchupSpeed", "meterLatency"] },
+            bullets: ["allowedDelay", "meterLatency", "onStreamLabel"] },
   audio:  { scenario: "audio",  expand: "audioBody", headline: "audioTitle", sub: "audioSubtitle",
             // Scroll-to-compressor: hide the speed + stream cards so the shot is
             // just the (expanded) compressor — the rest is noise in this context.
