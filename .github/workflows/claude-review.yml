@@ -28,6 +28,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The promo-regeneration PR is opened by github-actions[bot]; the action
+          # blocks bot-initiated runs unless they're allow-listed.
+          allowed_bots: "github-actions[bot]"
           prompt: |
             Review this pull request and report ONLY genuinely critical issues.
             If there are none, reply with exactly one line: "No critical issues."
