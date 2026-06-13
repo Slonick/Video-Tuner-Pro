@@ -55,8 +55,10 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   await copyFile(join(DIST, "popup.js"), join(TMP, "popup.js"));
 
   const messages = JSON.parse(await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"));
+  // The popup header shows the manifest version; feed the real one to the mock.
+  const { version } = JSON.parse(await readFile(join(ROOT, "src/manifest.json"), "utf8"));
   const inject =
-    `<script>window.__SCENARIO__=${JSON.stringify(scenario)};window.__MESSAGES__=${JSON.stringify(messages)};</script>\n` +
+    `<script>window.__SCENARIO__=${JSON.stringify(scenario)};window.__MESSAGES__=${JSON.stringify(messages)};window.__VERSION__=${JSON.stringify(version)};</script>\n` +
     `<script src="mock.js"></script>\n`;
   // Optionally open a collapsible section (e.g. the compressor) for the shot:
   // disable the transition + max-height none so it expands fully and instantly.

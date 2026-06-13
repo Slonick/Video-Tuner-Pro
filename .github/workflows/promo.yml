@@ -31,6 +31,11 @@ jobs:
         with:
           chrome-version: stable
 
+      # The runner has no CJK/Devanagari fonts — ja/zh_CN/hi promos render as
+      # tofu boxes without these.
+      - name: Install fonts for non-Latin locales
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-core
+
       - run: npm ci
 
       - name: Build (the popup the promos render)
