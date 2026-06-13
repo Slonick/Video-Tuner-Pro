@@ -2,11 +2,47 @@ import { collectVideos } from "../videos.js";
 
 let liveSeenAt = 0;     // timestamp of the last live <video> we saw (sticky detection)
 
+function isYouTube(): boolean {
+  return /(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname);
+}
+
+// YouTube DVR (scrubbed-back) state. On a live broadcast you can seek back into
+// the buffer to watch the recording while the stream is still going, and the
+// player keeps reporting getVideoData().isLive === true. We don't want that to
+// count as a live stream — there, manual speed should work and Live-sync should
+// pause, exactly like a VOD. So we track whether the user has scrubbed away from
+// the live edge (see trackDvr) and treat the page as a recording until they're
+// back at the live head.
+let dvrMode = false;
+let lastMediaTime = 0;
+
+// Drive DVR detection from a live <video>'s timeupdate/seeking events. A backward
+// jump in playback position is the user scrubbing into the recording — Live-sync
+// only ever changes the rate, so playback time never moves backward on its own.
+// Returning to the live head clears it, detected via YouTube's own LIVE badge
+// (it carries `ytp-live-badge-is-livehead` only when playback sits at the edge).
+export function trackDvr(video: HTMLVideoElement): void {
+  if (!isYouTube() || document.documentElement.getAttribute("data-vtp-live") !== "1") {
+    dvrMode = false; lastMediaTime = 0; return;
+  }
+  const t = video.currentTime;
+  const badge = document.querySelector<HTMLElement>(".ytp-live-badge");
+  if (badge && badge.classList.contains("ytp-live-badge-is-livehead")) dvrMode = false;
+  else if (lastMediaTime && t < lastMediaTime - 3) dvrMode = true;
+  lastMediaTime = t;
+}
+
+// New content (SPA navigation, quality reload) starts at the live edge.
+export function resetDvr(): void { dvrMode = false; lastMediaTime = 0; }
+
 export function isLive(video: HTMLVideoElement): boolean {
   // The MAIN-world probe (inject.ts) publishes the player's own live flag
   // (YouTube's getVideoData().isLive) to data-vtp-live — authoritative when
   // present, so it wins over the duration/DOM heuristics below.
   const flag = document.documentElement.getAttribute("data-vtp-live");
+  // YouTube DVR: a live broadcast you've scrubbed back from is a recording, not a
+  // stream, until you return to the live edge (see trackDvr/dvrMode).
+  if (isYouTube() && flag === "1") return !dvrMode;
   if (flag === "1") return true;
   if (flag === "0") return false;
 
@@ -17,7 +53,7 @@ export function isLive(video: HTMLVideoElement): boolean {
   // the duration check alone misses it. YouTube adds the "ytp-live" class to the
   // player and time-display, and shows a live badge — only while a live stream is
   // playing, never on regular VOD. Use those as the signal.
-  if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
+  if (isYouTube()) {
     const player = (video.closest && video.closest(".html5-video-player")) ||
                    document.querySelector(".html5-video-player");
     if (player && player.classList.contains("ytp-live")) return true;
@@ -86,5 +122,6 @@ export function liveVideo(): HTMLVideoElement | null {
 // True if this page is a live stream, staying sticky through brief detection
 // flickers (quality switches momentarily report a finite duration on Twitch).
 export function onStreamPage(): boolean {
+  if (dvrMode) return false; // scrubbed back into the DVR buffer — treat as a recording
   return !!liveVideo() || (Date.now() - liveSeenAt < 6000);
 }

@@ -4,7 +4,7 @@ import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
 import { collectVideos, seenVideos } from "./videos.js";
-import { isLive, probeLive, onStreamPage } from "./live/detection.js";
+import { isLive, probeLive, onStreamPage, trackDvr, resetDvr } from "./live/detection.js";
 import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { updateBadge } from "./badge/icon.js";
@@ -48,6 +48,12 @@ function applyToVideo(video: HTMLVideoElement): void {
   video.addEventListener("play", reapply);
   video.addEventListener("loadeddata", reapply);
   video.addEventListener("ratechange", reapply);
+
+  // Track DVR (scrubbed-back) state first, so the live re-evaluation below sees
+  // the fresh value; reset it when new content loads.
+  video.addEventListener("seeking", () => trackDvr(video));
+  video.addEventListener("timeupdate", () => trackDvr(video));
+  video.addEventListener("loadedmetadata", resetDvr);
 
   // Re-evaluate live state as the stream loads and as playback progresses.
   video.addEventListener("durationchange", controlLive);
