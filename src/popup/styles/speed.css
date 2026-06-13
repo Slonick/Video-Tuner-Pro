@@ -27,18 +27,20 @@
    Muted and faint so it doesn't compete with the readout; full strength on hover. */
 .kofi {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 16px;
-    height: 16px;
+    top: 5px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
     color: var(--muted);
-    opacity: 0.4;
-    transition: opacity 0.12s, color 0.12s;
+    opacity: 0.45;
+    z-index: 1;                /* above .speed-display (also positioned) so hover/click reach it */
+    transition: opacity 0.12s;
 
     & svg {
         display: block;
         width: 100%;
         height: 100%;
+        pointer-events: none;  /* the whole anchor box is the hit target, not just the thin strokes */
     }
 
     &:hover,
