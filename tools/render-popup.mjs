@@ -4,8 +4,11 @@
 import { build } from "esbuild";
 import { readFile, writeFile, mkdir, copyFile, access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { join, basename } from "node:path";
+import { execFile as execFileCb, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFile = promisify(execFileCb);
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -18,6 +21,20 @@ async function ensureDist() {
   if (!(await exists(join(DIST, "popup.html")))) {
     execFileSync("node", [join(ROOT, "build.mjs")], { cwd: ROOT, stdio: "inherit" });
   }
+}
+
+// One-time setup (dist build, mock bundle, shared static copies), memoized so
+// concurrent renderPopup calls share it instead of redoing esbuild per call.
+let prepared = null;
+function prepare() {
+  prepared ??= (async () => {
+    await ensureDist();
+    await mkdir(TMP, { recursive: true });
+    await buildMock();
+    await copyFile(join(DIST, "popup.css"), join(TMP, "popup.css"));
+    await copyFile(join(DIST, "popup.js"), join(TMP, "popup.js"));
+  })();
+  return prepared;
 }
 
 // Force a theme by re-declaring the :root tokens (read straight from source, so
@@ -38,22 +55,36 @@ async function buildMock() {
   });
 }
 
-function measureHeight(file) {
-  // stderr ignored: headless Chrome on CI spams harmless dbus connection errors.
-  const dom = execFileSync(CHROME, [
+// One-shot headless Chrome run with a hard timeout and a single retry:
+// concurrent headless instances occasionally hang at exit instead of
+// terminating, which would otherwise stall the whole render pool forever.
+// stderr is captured and discarded (harmless dbus spam on CI).
+export async function runChrome(args) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await execFile(CHROME, args, {
+        encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
+        timeout: 30_000, killSignal: "SIGKILL",
+      });
+    } catch (e) {
+      if (attempt >= 1) throw e;
+    }
+  }
+}
+
+async function measureHeight(file) {
+  const { stdout } = await runChrome([
     "--headless=new", "--disable-gpu", "--no-sandbox",
     "--virtual-time-budget=1200", "--dump-dom", `file://${file}`,
-  ], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  const m = dom.match(/VH(\d+)/);
+  ]);
+  const m = stdout.match(/VH(\d+)/);
   return m ? Number(m[1]) : 600;
 }
 
-export async function renderPopup({ scenario = "audio", locale = "en", out, theme = "light", dpr = 2, width = 340, expand = null, extraCss = "" }) {
-  await ensureDist();
-  await mkdir(TMP, { recursive: true });
-  await buildMock();
-  await copyFile(join(DIST, "popup.css"), join(TMP, "popup.css"));
-  await copyFile(join(DIST, "popup.js"), join(TMP, "popup.js"));
+// `height`: skip the measure pass and capture at this height — themes don't
+// change layout, so a re-render of the same scenario can reuse the first one.
+export async function renderPopup({ scenario = "audio", locale = "en", out, theme = "light", dpr = 2, width = 340, expand = null, extraCss = "", height = null }) {
+  await prepare();
 
   const messages = JSON.parse(await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"));
   // The popup header shows the manifest version; feed the real one to the mock.
@@ -71,21 +102,28 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   let html = await readFile(join(DIST, "popup.html"), "utf8");
   html = html.replace('<link rel="stylesheet" href="popup.css">', '<link rel="stylesheet" href="popup.css">' + (await themeStyle(theme)) + extra);
   html = html.replace('<script src="popup.js"></script>', inject + '<script src="popup.js"></script>\n' + expandJs);
-  await writeFile(join(TMP, "popup.html"), html);
+  // Per-render file names so concurrent renders don't clobber each other; the
+  // shared popup.css/js/mock.js copies are identical for every render.
+  const tag = basename(out).replace(/\.png$/, "");
+  const pageFile = join(TMP, `popup-${tag}.html`);
+  await writeFile(pageFile, html);
 
-  // Measure pass → tight capture (uniform padding, no empty tail). Wait past the
-  // section open transition (0.28s) before measuring.
-  const meas = html.replace("</body>",
-    '<script>addEventListener("load",()=>setTimeout(()=>document.title="VH"+Math.ceil(document.body.getBoundingClientRect().height),450))</script></body>');
-  await writeFile(join(TMP, "measure.html"), meas);
-  const height = measureHeight(join(TMP, "measure.html"));
+  if (height == null) {
+    // Measure pass → tight capture (uniform padding, no empty tail). Wait past
+    // the section open transition (0.28s) before measuring.
+    const meas = html.replace("</body>",
+      '<script>addEventListener("load",()=>setTimeout(()=>document.title="VH"+Math.ceil(document.body.getBoundingClientRect().height),450))</script></body>');
+    const measFile = join(TMP, `measure-${tag}.html`);
+    await writeFile(measFile, meas);
+    height = await measureHeight(measFile);
+  }
 
-  execFileSync(CHROME, [
+  await runChrome([
     "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
     `--force-device-scale-factor=${dpr}`, `--window-size=${width},${height}`,
     "--virtual-time-budget=2500", `--screenshot=${out}`,
-    `file://${join(TMP, "popup.html")}`,
-  ], { stdio: "ignore" });
+    `file://${pageFile}`,
+  ]);
 
   return { out, width, height };
 }
