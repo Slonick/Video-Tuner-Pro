@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "バッファ不足 — 追いつき制限中" },
   "onVideoLabel": { "message": "速度と残り時間を動画に表示" },
   "onStreamLabel": { "message": "速度とバッファを動画に表示" },
+  "superTheaterLabel": { "message": "スーパーシアター (YouTube)" },
+  "superTheaterHint": { "message": "YouTubeでシアターモードがウィンドウ全体に広がり、ヘッダーは自動的に隠れます。" },
   "kbdLabel": { "message": "キーボードショートカット" },
   "kbdSlowerFaster": { "message": "遅く / 速く" },
   "kbdReset": { "message": "リセット" },
-  "kbdSaveSite": { "message": "サイトを保存" },
-  "kbdSaveChannel": { "message": "チャンネルを保存" },
+  "kbdSaveSite": { "message": "サイトを記憶" },
+  "kbdSaveChannel": { "message": "チャンネルを記憶" },
   "rememberChannel": { "message": "チャンネルに記憶" },
   "resetChannel": { "message": "チャンネルをリセット" }
 }

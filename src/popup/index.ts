@@ -16,11 +16,12 @@ loadAudioSettings();
 
 byId("extVersion").textContent = "v" + api.runtime.getManifest().version;
 
-// On-video badge toggles default to on (hence the !== false checks).
-STORE.get(["showRemaining", "streamBadge", "keyboard"], (r) => {
+// Badge/keyboard toggles default to on; Super theater (YouTube) defaults off.
+STORE.get(["showRemaining", "streamBadge", "keyboard", "superTheater"], (r) => {
   byId<HTMLInputElement>("onVideoToggle").checked = r.showRemaining !== false;
   byId<HTMLInputElement>("onStreamToggle").checked = r.streamBadge !== false;
   byId<HTMLInputElement>("kbdToggle").checked = r.keyboard !== false;
+  byId<HTMLInputElement>("superTheaterToggle").checked = r.superTheater === true;
 });
 byId<HTMLInputElement>("onVideoToggle").addEventListener("change", (e) => {
   STORE.set({ showRemaining: (e.target as HTMLInputElement).checked });
@@ -30,6 +31,9 @@ byId<HTMLInputElement>("onStreamToggle").addEventListener("change", (e) => {
 });
 byId<HTMLInputElement>("kbdToggle").addEventListener("change", (e) => {
   STORE.set({ keyboard: (e.target as HTMLInputElement).checked });
+});
+byId<HTMLInputElement>("superTheaterToggle").addEventListener("change", (e) => {
+  STORE.set({ superTheater: (e.target as HTMLInputElement).checked });
 });
 
 setupGraphs();

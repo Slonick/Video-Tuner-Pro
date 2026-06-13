@@ -12,6 +12,7 @@ import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import "./messaging.js"; // registers the popup message handler (pulls in the bitrate sampler)
 import "./keyboard.js";  // registers the keyboard-shortcut listener
+import "./theater.js";   // applies the YouTube "super theater" layout when enabled
 import { currentChannel } from "./channel.js";
 
 let liveTick: ReturnType<typeof setInterval> | null = null;

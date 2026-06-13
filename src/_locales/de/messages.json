@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "Puffer zu klein — Aufholen begrenzt" },
   "onVideoLabel": { "message": "Tempo & Zeit im Video anzeigen" },
   "onStreamLabel": { "message": "Tempo & Puffer im Video anzeigen" },
+  "superTheaterLabel": { "message": "Super-Theater (YouTube)" },
+  "superTheaterHint": { "message": "Auf YouTube füllt der Theatermodus das ganze Fenster; die Kopfzeile blendet sich automatisch aus." },
   "kbdLabel": { "message": "Tastenkürzel" },
   "kbdSlowerFaster": { "message": "langsamer / schneller" },
   "kbdReset": { "message": "zurücksetzen" },
-  "kbdSaveSite": { "message": "Seite speichern" },
-  "kbdSaveChannel": { "message": "Kanal speichern" },
+  "kbdSaveSite": { "message": "Seite merken" },
+  "kbdSaveChannel": { "message": "Kanal merken" },
   "rememberChannel": { "message": "Für Kanal merken" },
   "resetChannel": { "message": "Für Kanal zurücksetzen" }
 }

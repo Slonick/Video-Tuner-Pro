@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "बफ़र कम — कैच-अप सीमित" },
   "onVideoLabel": { "message": "वीडियो पर गति और समय दिखाएँ" },
   "onStreamLabel": { "message": "वीडियो पर गति और बफ़र दिखाएँ" },
+  "superTheaterLabel": { "message": "सुपर थिएटर (YouTube)" },
+  "superTheaterHint": { "message": "YouTube पर थिएटर मोड पूरी विंडो भर देता है; हेडर अपने आप छिप जाता है।" },
   "kbdLabel": { "message": "कीबोर्ड शॉर्टकट" },
   "kbdSlowerFaster": { "message": "धीमा / तेज़" },
   "kbdReset": { "message": "रीसेट" },
-  "kbdSaveSite": { "message": "साइट सहेजें" },
-  "kbdSaveChannel": { "message": "चैनल सहेजें" },
+  "kbdSaveSite": { "message": "साइट याद रखें" },
+  "kbdSaveChannel": { "message": "चैनल याद रखें" },
   "rememberChannel": { "message": "चैनल के लिए याद रखें" },
   "resetChannel": { "message": "चैनल के लिए रीसेट करें" }
 }

@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "Tampon faible — rattrapage limité" },
   "onVideoLabel": { "message": "Afficher la vitesse et le temps sur la vidéo" },
   "onStreamLabel": { "message": "Afficher la vitesse et le tampon sur la vidéo" },
+  "superTheaterLabel": { "message": "Super cinéma (YouTube)" },
+  "superTheaterHint": { "message": "Sur YouTube, le mode cinéma remplit toute la fenêtre ; l’en-tête se masque automatiquement." },
   "kbdLabel": { "message": "Raccourcis clavier" },
   "kbdSlowerFaster": { "message": "ralentir / accélérer" },
   "kbdReset": { "message": "réinitialiser" },
-  "kbdSaveSite": { "message": "enregistrer le site" },
-  "kbdSaveChannel": { "message": "enregistrer la chaîne" },
+  "kbdSaveSite": { "message": "mémoriser le site" },
+  "kbdSaveChannel": { "message": "mémoriser la chaîne" },
   "rememberChannel": { "message": "Mémoriser pour la chaîne" },
   "resetChannel": { "message": "Réinitialiser pour la chaîne" }
 }

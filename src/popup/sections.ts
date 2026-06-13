@@ -19,12 +19,54 @@ function revealOnExpand(el: Element): void {
   requestAnimationFrame(step);
 }
 
+// FLIP-animate the preset grid as it gains/loses the extra buttons: the shared
+// four glide from their old slots to the new ones, the extras ease in/out. The
+// layout change itself is done by `apply()` (toggling .open → the :has CSS shows
+// the extras); we just measure positions around it and animate the delta.
+function flipPresetGrid(apply: () => void): void {
+  const grid = document.querySelector<HTMLElement>(".presetgrid");
+  if (!grid) { apply(); return; }
+  const buttons = Array.from(grid.querySelectorAll<HTMLElement>(".btn-speed"));
+  const DUR = 300;
+  const first = new Map<HTMLElement, DOMRect>();
+  for (const b of buttons) if (b.offsetParent !== null) first.set(b, b.getBoundingClientRect());
+
+  apply(); // layout changes here
+
+  for (const b of buttons) {
+    if (b.offsetParent === null) continue; // hidden extra (closing) — nothing to animate
+    b.style.transition = "none";
+    const fr = first.get(b);
+    if (fr) {
+      const lr = b.getBoundingClientRect();
+      b.style.transform = `translate(${Math.round(fr.left - lr.left)}px, ${Math.round(fr.top - lr.top)}px)`;
+    } else {
+      b.style.transform = "scale(0.8)";  // newly-shown extra
+      b.style.opacity = "0";
+    }
+  }
+  void grid.offsetWidth; // commit the inverted state
+  for (const b of buttons) {
+    if (b.offsetParent === null) continue;
+    b.style.transition = `transform ${DUR}ms ease, opacity ${DUR}ms ease`;
+    b.style.transform = "";
+    b.style.opacity = "";
+  }
+  window.setTimeout(() => {
+    for (const b of buttons) { b.style.transition = ""; b.style.transform = ""; b.style.opacity = ""; }
+  }, DUR + 60);
+}
+
 function toggleSection(btn: HTMLElement): void {
   const body = btn.dataset.target ? document.getElementById(btn.dataset.target) : null;
   if (!body) return;
-  const open = body.classList.toggle("open");
-  btn.setAttribute("aria-expanded", open ? "true" : "false");
-  if (open) revealOnExpand(body);
+  const apply = () => {
+    const open = body.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) revealOnExpand(body);
+  };
+  if (body.id === "speedBody") flipPresetGrid(apply);
+  else apply();
 }
 
 // Auto-expand a section the first time it's switched on so the user sees its
@@ -57,6 +99,9 @@ document.querySelectorAll(".expand-hint").forEach((hint) => {
 document.querySelectorAll(".info").forEach((info) => {
   const tip = info.querySelector<HTMLElement>(".tip");
   if (!tip) return;
+  // Toggle-row tooltips are pinned below (their row has content above), so don't
+  // auto-flip them back up.
+  if (info.closest(".extra-row")) return;
   const place = () => {
     const head = info.closest(".sec-head") || info;
     const need = tip.offsetHeight + 16;

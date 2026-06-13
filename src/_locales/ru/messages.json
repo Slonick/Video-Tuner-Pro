@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "Буфер мал — догон ограничен" },
   "onVideoLabel": { "message": "Показывать скорость и время на видео" },
   "onStreamLabel": { "message": "Показывать скорость и буфер на видео" },
+  "superTheaterLabel": { "message": "Супертеатр (YouTube)" },
+  "superTheaterHint": { "message": "На YouTube режим театра занимает всё окно; шапка автоматично прячется." },
   "kbdLabel": { "message": "Горячие клавиши" },
   "kbdSlowerFaster": { "message": "медленнее / быстрее" },
   "kbdReset": { "message": "сброс" },
-  "kbdSaveSite": { "message": "сохранить сайт" },
-  "kbdSaveChannel": { "message": "сохранить канал" },
+  "kbdSaveSite": { "message": "запомнить сайт" },
+  "kbdSaveChannel": { "message": "запомнить канал" },
   "rememberChannel": { "message": "Запомнить для канала" },
   "resetChannel": { "message": "Сбросить для канала" }
 }

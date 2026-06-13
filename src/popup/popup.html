@@ -41,57 +41,22 @@
             </div>
         </div>
 
-        <!-- Always visible: the slider, a one-row set of quick presets, and the
-             Reset / Remember actions — so you never have to expand the card just
-             to change or save a speed. -->
+        <!-- Always visible: the slider, the full preset grid, and the
+             Reset / Remember actions — change or save a speed without expanding. -->
         <input type="range" class="speed-slider" id="speedSlider" min="25" max="300" step="5" value="100">
 
-        <div class="buttons-grid quickrow">
+        <!-- One sorted grid. Collapsed, the "extra" buttons are hidden, so the four
+             quick presets (75/100/175/200) flow into a single row; expanding shows
+             all eight and FLIP-animates the shared four to their sorted spots. -->
+        <div class="buttons-grid presetgrid">
+            <button class="btn-speed extra" data-percent="50">50%</button>
             <button class="btn-speed" data-percent="75">75%</button>
             <button class="btn-speed" data-percent="100">100%</button>
+            <button class="btn-speed extra" data-percent="125">125%</button>
+            <button class="btn-speed extra" data-percent="150">150%</button>
             <button class="btn-speed" data-percent="175">175%</button>
             <button class="btn-speed" data-percent="200">200%</button>
-        </div>
-
-        <!-- Expanding swaps the quick row for the full set of preset values and
-             reveals the on-video toggle. -->
-        <div class="sync-body speed-body" id="speedBody">
-            <div class="buttons-grid">
-                <button class="btn-speed" data-percent="50">50%</button>
-                <button class="btn-speed" data-percent="75">75%</button>
-                <button class="btn-speed" data-percent="100">100%</button>
-                <button class="btn-speed" data-percent="125">125%</button>
-                <button class="btn-speed" data-percent="150">150%</button>
-                <button class="btn-speed" data-percent="175">175%</button>
-                <button class="btn-speed" data-percent="200">200%</button>
-                <button class="btn-speed" data-percent="250">250%</button>
-            </div>
-
-            <div class="extra-row">
-                <span data-i18n="onVideoLabel">Show speed &amp; time on video</span>
-                <label class="switch" for="onVideoToggle">
-                    <input type="checkbox" id="onVideoToggle" class="switch-input">
-                    <span class="switch-track"><span class="switch-knob"></span></span>
-                </label>
-            </div>
-
-            <div class="extra-row">
-                <span data-i18n="kbdLabel">Keyboard shortcuts</span>
-                <label class="switch" for="kbdToggle">
-                    <input type="checkbox" id="kbdToggle" class="switch-input">
-                    <span class="switch-track"><span class="switch-knob"></span></span>
-                </label>
-            </div>
-            <div class="kbd-hint">
-                <span class="kbd-line">
-                    <span class="kbd-row"><kbd>S</kbd><kbd>D</kbd><span data-i18n="kbdSlowerFaster">slower / faster</span></span>
-                    <span class="kbd-row"><kbd>R</kbd><span data-i18n="kbdReset">reset</span></span>
-                </span>
-                <span class="kbd-line">
-                    <span class="kbd-row"><kbd>Z</kbd><span data-i18n="kbdSaveSite">save site</span></span>
-                    <span class="kbd-row"><kbd>⇧</kbd><kbd>Z</kbd><span data-i18n="kbdSaveChannel">save channel</span></span>
-                </span>
-            </div>
+            <button class="btn-speed extra" data-percent="250">250%</button>
         </div>
 
         <div class="quick-actions">
@@ -112,6 +77,49 @@
                 <div class="split-menu" id="rememberMenu">
                     <button type="button" id="rememberChannelBtn" data-i18n="rememberChannel">Remember for channel</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Expanding reveals the settings toggles. -->
+        <div class="sync-body speed-body" id="speedBody">
+            <div class="extra-row">
+                <span data-i18n="onVideoLabel">Show speed &amp; time on video</span>
+                <label class="switch" for="onVideoToggle">
+                    <input type="checkbox" id="onVideoToggle" class="switch-input">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                </label>
+            </div>
+
+            <div class="extra-row" id="superTheaterRow">
+                <span class="extra-label">
+                    <span data-i18n="superTheaterLabel">Super theater (YouTube)</span>
+                    <span class="info tip-below" tabindex="0" role="button" aria-label="Info">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-1-3h2v-6h-2v6Zm0-8h2V7h-2v2Z"/></svg>
+                        <span class="tip" data-i18n="superTheaterHint">On YouTube, theater mode fills the whole window; the header auto-hides.</span>
+                    </span>
+                </span>
+                <label class="switch" for="superTheaterToggle">
+                    <input type="checkbox" id="superTheaterToggle" class="switch-input">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                </label>
+            </div>
+
+            <div class="extra-row">
+                <span data-i18n="kbdLabel">Keyboard shortcuts</span>
+                <label class="switch" for="kbdToggle">
+                    <input type="checkbox" id="kbdToggle" class="switch-input">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                </label>
+            </div>
+            <div class="kbd-hint">
+                <span class="kbd-line">
+                    <span class="kbd-row"><kbd>S</kbd><kbd>D</kbd><span data-i18n="kbdSlowerFaster">slower / faster</span></span>
+                    <span class="kbd-row"><kbd>R</kbd><span data-i18n="kbdReset">reset</span></span>
+                </span>
+                <span class="kbd-line">
+                    <span class="kbd-row"><kbd>Z</kbd><span data-i18n="kbdSaveSite">remember site</span></span>
+                    <span class="kbd-row"><kbd>⇧</kbd><kbd>Z</kbd><span data-i18n="kbdSaveChannel">remember channel</span></span>
+                </span>
             </div>
         </div>
 

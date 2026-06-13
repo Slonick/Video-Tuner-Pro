@@ -129,23 +129,23 @@
     margin-bottom: 10px;
 }
 
-/* The always-visible single row shown while the card is collapsed; once it's
-   expanded the full grid (with more values) takes over, so hide the quick row. */
-.buttons-grid.quickrow {
-    margin: 10px 0 0;
-}
-.speed-section:has(.sync-body.open) .quickrow {
+/* Collapsed hides the extra presets so the four quick ones form a single row;
+   expanding reveals all eight. The move/enter is animated in JS (FLIP), see
+   flipPresetGrid in sections.ts. */
+.presetgrid .extra {
     display: none;
 }
+.speed-section:has(.speed-body.open) .presetgrid .extra {
+    display: block;
+}
 
-/* The slider and the Reset / Remember actions live outside the collapsible body
-   (always reachable). Space them off the header / preset row above. */
+/* Slider, preset grid and Reset / Remember are always visible (change or save a
+   speed without expanding); the collapsible body below holds only the toggles. */
 .speed-section > .speed-slider {
-    margin: 12px 0 0;
+    margin: 12px 0 10px;
 }
 .speed-section > .quick-actions {
-    margin-top: 10px;
-    margin-bottom: 12px;   /* clearance so the bottom expand chevron isn't cramped against the buttons */
+    margin-bottom: 12px;
 }
 
 .btn-speed {
@@ -297,6 +297,18 @@
     margin-top: 12px;
     font-size: 12px;
     color: var(--text);
+}
+
+/* A toggle row whose label carries an info (i) tooltip — group the label + icon
+   and make the row the positioning context so the tip anchors to it. */
+.extra-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+#superTheaterRow {
+    position: relative;
 }
 
 /* The speed body is open by default, so trim its vertical chrome (the section's
