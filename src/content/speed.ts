@@ -1,5 +1,6 @@
 import { clamp } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
+import { currentChannel } from "./channel.js";
 import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
@@ -17,6 +18,32 @@ export function persistDomainSpeed(speed: number): void {
     const domains = (result.domains || {}) as Record<string, number>;
     domains[getDomain()] = speed;
     STORE.set({ domains });
+  });
+}
+
+export function persistChannelSpeed(speed: number): void {
+  if (!ctxValid()) return;
+  const ch = currentChannel();
+  if (!ch) return;
+  STORE.get(["channels"], (result) => {
+    const channels = (result.channels || {}) as Record<string, number>;
+    channels[ch] = speed;
+    STORE.set({ channels });
+  });
+}
+
+// Drop this channel's saved speed and fall back to the per-domain one (or 100%).
+export function resetChannelSpeed(): void {
+  if (!ctxValid()) return;
+  const ch = currentChannel();
+  if (!ch) return;
+  STORE.get(["channels", "domains"], (result) => {
+    const channels = (result.channels || {}) as Record<string, number>;
+    delete channels[ch];
+    STORE.set({ channels });
+    const domains = (result.domains || {}) as Record<string, number>;
+    const fallback = domains[getDomain()];
+    setSpeed(clamp(fallback != null ? fallback : 1.0), false, true);
   });
 }
 

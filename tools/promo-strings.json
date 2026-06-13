@@ -3,7 +3,7 @@
   "en": {
     "video": { "title": "Playback speed", "items": [
       ["Presets & fine slider", "One click or drag — 25% to 300%, on almost any video."],
-      ["Remember per site", "Save a speed for a site; applied automatically next time."],
+      ["Remember per site or channel", "Save a speed for a site — or a YouTube channel; applied automatically next time."],
       ["On-video readout", "Current speed and the real time left, right on the player."]
     ]},
     "stream": { "title": "Live streams", "items": [
@@ -17,7 +17,7 @@
   "ru": {
     "video": { "title": "Скорость воспроизведения", "items": [
       ["Пресеты и точный ползунок", "Клик или перетаскивание — от 25% до 300%, почти на любом видео."],
-      ["Запоминание для сайта", "Сохраните скорость для сайта — применится автоматически в следующий раз."],
+      ["Память по сайту или каналу", "Сохраните скорость для сайта или канала YouTube — применится автоматически в следующий раз."],
       ["Индикатор на видео", "Текущая скорость и реальное оставшееся время прямо на плеере."]
     ]},
     "stream": { "title": "Прямые эфиры", "items": [
@@ -31,7 +31,7 @@
   "uk": {
     "video": { "title": "Швидкість відтворення", "items": [
       ["Пресети та точний повзунок", "Клік або перетягування — від 25% до 300%, майже на будь-якому відео."],
-      ["Запам'ятовування для сайту", "Збережіть швидкість для сайту — застосується автоматично наступного разу."],
+      ["Пам'ять за сайтом або каналом", "Збережіть швидкість для сайту або каналу YouTube — застосується автоматично наступного разу."],
       ["Індикатор на відео", "Поточна швидкість і реальний залишок часу прямо на плеєрі."]
     ]},
     "stream": { "title": "Прямі трансляції", "items": [
@@ -45,7 +45,7 @@
   "de": {
     "video": { "title": "Wiedergabetempo", "items": [
       ["Presets & feiner Regler", "Ein Klick oder Ziehen — 25% bis 300%, auf fast jedem Video."],
-      ["Pro Seite merken", "Tempo für eine Seite speichern — beim nächsten Mal automatisch angewendet."],
+      ["Pro Seite oder Kanal merken", "Tempo für eine Seite oder einen YouTube-Kanal speichern — beim nächsten Mal automatisch angewendet."],
       ["Anzeige im Video", "Aktuelles Tempo und die echte Restzeit direkt im Player."]
     ]},
     "stream": { "title": "Livestreams", "items": [
@@ -59,7 +59,7 @@
   "es": {
     "video": { "title": "Velocidad de reproducción", "items": [
       ["Preajustes y control deslizante", "Un clic o arrastra — del 25% al 300%, en casi cualquier vídeo."],
-      ["Recordar por sitio", "Guarda una velocidad para un sitio; se aplica automáticamente la próxima vez."],
+      ["Recordar por sitio o canal", "Guarda una velocidad para un sitio o un canal de YouTube; se aplica automáticamente la próxima vez."],
       ["Indicador en el vídeo", "Velocidad actual y el tiempo real restante, en el propio reproductor."]
     ]},
     "stream": { "title": "Directos", "items": [
@@ -73,7 +73,7 @@
   "fr": {
     "video": { "title": "Vitesse de lecture", "items": [
       ["Préréglages et curseur fin", "Un clic ou un glissement — de 25% à 300%, sur presque toutes les vidéos."],
-      ["Mémoriser par site", "Enregistrez une vitesse pour un site ; appliquée automatiquement la prochaine fois."],
+      ["Mémoriser par site ou chaîne", "Enregistrez une vitesse pour un site ou une chaîne YouTube ; appliquée automatiquement la prochaine fois."],
       ["Affichage sur la vidéo", "Vitesse actuelle et temps réel restant, directement sur le lecteur."]
     ]},
     "stream": { "title": "Directs", "items": [
@@ -87,7 +87,7 @@
   "pt_BR": {
     "video": { "title": "Velocidade de reprodução", "items": [
       ["Predefinições e controle fino", "Um clique ou arraste — de 25% a 300%, em quase qualquer vídeo."],
-      ["Lembrar por site", "Salve uma velocidade para um site; aplicada automaticamente na próxima vez."],
+      ["Lembrar por site ou canal", "Salve uma velocidade para um site ou canal do YouTube; aplicada automaticamente na próxima vez."],
       ["Indicador no vídeo", "Velocidade atual e o tempo real restante, no próprio player."]
     ]},
     "stream": { "title": "Transmissões ao vivo", "items": [
@@ -101,7 +101,7 @@
   "ja": {
     "video": { "title": "再生速度", "items": [
       ["プリセットと微調整スライダー", "クリックまたはドラッグで25%〜300%、ほぼすべての動画で。"],
-      ["サイトごとに記憶", "サイトに速度を保存すると、次回から自動で適用。"],
+      ["サイトまたはチャンネルごとに記憶", "サイトやYouTubeチャンネルに速度を保存すると、次回から自動で適用。"],
       ["動画上に表示", "現在の速度と実際の残り時間をプレーヤー上に表示。"]
     ]},
     "stream": { "title": "ライブ配信", "items": [
@@ -115,7 +115,7 @@
   "zh_CN": {
     "video": { "title": "播放速度", "items": [
       ["预设与精细滑块", "点击或拖动 — 25% 到 300%，几乎适用于任何视频。"],
-      ["按站点记忆", "为站点保存速度，下次自动应用。"],
+      ["按站点或频道记忆", "为站点或 YouTube 频道保存速度，下次自动应用。"],
       ["视频上显示", "在播放器上直接显示当前速度和真实剩余时间。"]
     ]},
     "stream": { "title": "直播", "items": [
@@ -129,7 +129,7 @@
   "hi": {
     "video": { "title": "प्लेबैक गति", "items": [
       ["प्रीसेट और बारीक स्लाइडर", "एक क्लिक या ड्रैग — 25% से 300%, लगभग किसी भी वीडियो पर।"],
-      ["साइट के अनुसार याद रखें", "किसी साइट के लिए गति सहेजें; अगली बार स्वतः लागू।"],
+      ["साइट या चैनल के अनुसार याद रखें", "किसी साइट या YouTube चैनल के लिए गति सहेजें; अगली बार स्वतः लागू।"],
       ["वीडियो पर रीडआउट", "मौजूदा गति और वास्तविक शेष समय, सीधे प्लेयर पर।"]
     ]},
     "stream": { "title": "लाइव स्ट्रीम", "items": [

@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x 速度" },
   "resetButton": { "message": "重置 (100%)" },
   "rememberButton": { "message": "记住此网站" },
+  "speedScopeSite": { "message": "当前网站" },
   "savedFeedback": { "message": "✓ 已保存" },
   "noVideo": { "message": "页面上未找到视频——请打开视频并刷新。" },
   "liveNote": { "message": "直播：不应用手动速度——直播保持 100%，直到需要追赶进度。速度由 Live-sync 管理。" },
@@ -51,5 +52,7 @@
   "bufferLiveOnly": { "message": "仅限直播" },
   "bufferLowWarn": { "message": "缓冲不足 — 追赶受限" },
   "onVideoLabel": { "message": "在视频上显示速度和时间" },
-  "onStreamLabel": { "message": "在视频上显示速度和缓冲" }
+  "onStreamLabel": { "message": "在视频上显示速度和缓冲" },
+  "rememberChannel": { "message": "为频道记忆" },
+  "resetChannel": { "message": "重置频道" }
 }

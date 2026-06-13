@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x velocidade" },
   "resetButton": { "message": "Redefinir (100%)" },
   "rememberButton": { "message": "Lembrar site" },
+  "speedScopeSite": { "message": "Site atual" },
   "savedFeedback": { "message": "✓ Salvo" },
   "noVideo": { "message": "Nenhum vídeo encontrado na página — abra um vídeo e atualize." },
   "liveNote": { "message": "Ao vivo: a velocidade manual não é aplicada — a transmissão fica em 100% até precisar recuperar o atraso. A velocidade é gerenciada pelo Live-sync." },
@@ -51,5 +52,7 @@
   "bufferLiveOnly": { "message": "Apenas em transmissões ao vivo" },
   "bufferLowWarn": { "message": "Buffer baixo — recuperação limitada" },
   "onVideoLabel": { "message": "Mostrar velocidade e tempo no vídeo" },
-  "onStreamLabel": { "message": "Mostrar velocidade e buffer no vídeo" }
+  "onStreamLabel": { "message": "Mostrar velocidade e buffer no vídeo" },
+  "rememberChannel": { "message": "Lembrar para o canal" },
+  "resetChannel": { "message": "Redefinir para o canal" }
 }

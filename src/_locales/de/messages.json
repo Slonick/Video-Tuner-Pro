@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x Geschwindigkeit" },
   "resetButton": { "message": "Zurücksetzen (100%)" },
   "rememberButton": { "message": "Seite merken" },
+  "speedScopeSite": { "message": "Aktuelle Website" },
   "savedFeedback": { "message": "✓ Gespeichert" },
   "noVideo": { "message": "Kein Video auf der Seite gefunden — öffne ein Video und aktualisiere." },
   "liveNote": { "message": "Livestream: Manuelle Geschwindigkeit wird nicht angewendet — der Stream bleibt bei 100%, bis er aufholen muss. Die Geschwindigkeit steuert Live-sync." },
@@ -51,5 +52,7 @@
   "bufferLiveOnly": { "message": "Nur bei Livestreams" },
   "bufferLowWarn": { "message": "Puffer zu klein — Aufholen begrenzt" },
   "onVideoLabel": { "message": "Tempo & Zeit im Video anzeigen" },
-  "onStreamLabel": { "message": "Tempo & Puffer im Video anzeigen" }
+  "onStreamLabel": { "message": "Tempo & Puffer im Video anzeigen" },
+  "rememberChannel": { "message": "Für Kanal merken" },
+  "resetChannel": { "message": "Für Kanal zurücksetzen" }
 }

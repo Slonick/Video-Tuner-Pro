@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x speed" },
   "resetButton": { "message": "Reset (100%)" },
   "rememberButton": { "message": "Remember site" },
+  "speedScopeSite": { "message": "Current site" },
   "savedFeedback": { "message": "✓ Saved" },
   "noVideo": { "message": "No video found on the page — open a video and refresh." },
   "liveNote": { "message": "Live stream: manual speed isn't applied — the stream stays at 100% until it needs to catch up. Speed is managed by Live-sync." },
@@ -51,5 +52,7 @@
   "bufferLiveOnly": { "message": "Live streams only" },
   "bufferLowWarn": { "message": "Low buffer — catch-up limited" },
   "onVideoLabel": { "message": "Show speed & time on video" },
-  "onStreamLabel": { "message": "Show speed & buffer on video" }
+  "onStreamLabel": { "message": "Show speed & buffer on video" },
+  "rememberChannel": { "message": "Remember for channel" },
+  "resetChannel": { "message": "Reset for channel" }
 }

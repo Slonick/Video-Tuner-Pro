@@ -32,7 +32,7 @@ describe("popup integration", () => {
   });
 
   it("reflects the current speed from the page", () => {
-    expect(byId("speedValue").textContent).toBe("100%");
+    expect(byId("currentSpeedPct").textContent).toBe("100%");
   });
 
   it("shows the extension version in the header", () => {
@@ -48,7 +48,7 @@ describe("popup integration", () => {
   it("a preset button applies the speed to the page", () => {
     const btn = document.querySelector<HTMLElement>('.btn-speed[data-percent="150"]')!;
     btn.click();
-    expect(byId("speedValue").textContent).toBe("150%");
+    expect(byId("currentSpeedPct").textContent).toBe("150%");
     const calls = sendSpy.mock.calls.map((c) => c[1]);
     expect(calls).toContainEqual(expect.objectContaining({ action: "setSpeed", speed: 1.5 }));
   });
