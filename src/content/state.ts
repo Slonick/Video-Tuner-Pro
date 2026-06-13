@@ -18,6 +18,8 @@ export const S = {
   // Where the badge sits, as a fraction of the video frame — per site, set by
   // dragging it. null = the default top-left corner.
   badgePos: null as { fx: number; fy: number } | null,
+  // Whether the badge is pinned (per site): pinned → always visible, no auto-hide.
+  badgePinned: false,
   // Audio compression (raw DynamicsCompressor parameters)
   audioCompEnabled: false,
   audioCompThreshold: -60,  // dB, -100…0
