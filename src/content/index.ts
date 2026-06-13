@@ -12,9 +12,12 @@ import { announceAudioStatus } from "./audio/status.js";
 import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
 import { ownsNode } from "./badge/indicator.js";
 import "./messaging.js"; // registers the popup message handler (pulls in the bitrate sampler)
+import "./keyboard.js";  // registers the keyboard-shortcut listener
+import { currentChannel } from "./channel.js";
 
 let liveTick: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
+let lastChannel: string | null = null;   // re-resolve speed when the YouTube channel changes
 
 // The extension context dies on reload/update; shut down cleanly when it does.
 // Exported so live.js can call it without a circular value dependency.
@@ -23,18 +26,30 @@ export function teardown() {
   try { observer.disconnect(); } catch (e) { /* ignore */ }
 }
 
+// Resolve the page's speed: a per-channel speed wins over the per-domain one,
+// else 100%. Sites/channels the user never remembered stay at 100%.
+function applyResolved(domains: Record<string, number>, channels: Record<string, number>): void {
+  const ch = currentChannel();
+  lastChannel = ch;
+  const saved = (ch && channels[ch] != null) ? channels[ch] : domains[getDomain()];
+  S.userSpeed = clamp(saved != null ? saved : 1.0);
+  S.currentSpeed = S.userSpeed;
+}
+
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "liveSync", "liveSyncTarget",
+    ["domains", "channels", "liveSync", "liveSyncTarget",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
-     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge"],
+     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge", "keyboard"],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
+      const channels = (result.channels || {}) as Record<string, number>;
       // Defaults-on: features ship enabled; an explicit `false` in storage (the
       // user turned it off) is still respected.
       S.showRemaining = result.showRemaining !== false;
       S.streamBadge = result.streamBadge !== false;
+      S.keyboardEnabled = result.keyboard !== false;
       S.liveSyncEnabled = result.liveSync !== false;
       S.liveSyncTarget = clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 5);
       S.audioCompEnabled = result.audioComp !== false;
@@ -44,9 +59,7 @@ function loadSpeed() {
       S.audioCompAttack = clampNum(result.audioCompAttack, 0, 1, 0);
       S.audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 1);
       S.audioCompGain = clampNum(result.audioCompGain, 0, 24, 10);
-      // Only sites the user explicitly remembered get a saved speed; rest are 100%.
-      S.userSpeed = clamp(domains[getDomain()] || 1.0);
-      S.currentSpeed = S.userSpeed;
+      applyResolved(domains, channels);
       applyAll();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
@@ -55,11 +68,27 @@ function loadSpeed() {
   );
 }
 
+// YouTube is an SPA — navigating to another channel's video keeps this script
+// alive, so re-resolve when the detected channel changes (the 1s tick drives the
+// check; the owner link may render a beat after navigation).
+function reresolve() {
+  if (!ctxValid()) return;
+  STORE.get(["domains", "channels"], (r) => {
+    applyResolved((r.domains || {}) as Record<string, number>, (r.channels || {}) as Record<string, number>);
+    applyAll();
+    controlLive();
+    updateTimeBadge();
+  });
+}
+
 loadSpeed();
 
 // Steady background tick: re-apply speed (catches videos created inside shadow
 // roots, where document mutations don't fire) and drive live-sync.
-liveTick = setInterval(() => { applyAll(); controlLive(); updateTimeBadge(); }, 1000);
+liveTick = setInterval(() => {
+  applyAll(); controlLive(); updateTimeBadge();
+  if (currentChannel() !== lastChannel) reresolve();
+}, 1000);
 
 // Apply the speed the moment ANY video starts up — a second player added to the
 // page would otherwise wait for the next tick/mutation pass and could begin at
@@ -107,6 +136,7 @@ api.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.showRemaining) { S.showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }
   if (changes.streamBadge) { S.streamBadge = !!changes.streamBadge.newValue; updateTimeBadge(); flashBadge(); }
+  if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   let audioChanged = false;
   if (changes.audioComp) { S.audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
   if (changes.audioCompThreshold) { S.audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60); audioChanged = true; }

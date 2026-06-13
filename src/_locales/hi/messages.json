@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x गति" },
   "resetButton": { "message": "रीसेट करें (100%)" },
   "rememberButton": { "message": "साइट याद रखें" },
+  "speedScopeSite": { "message": "वर्तमान साइट" },
   "savedFeedback": { "message": "✓ सहेजा गया" },
   "noVideo": { "message": "पेज पर कोई वीडियो नहीं मिला — वीडियो खोलें और रीफ़्रेश करें।" },
   "liveNote": { "message": "लाइव स्ट्रीम: मैन्युअल गति लागू नहीं होती — जब तक पकड़ने की ज़रूरत न हो, स्ट्रीम 100% पर रहती है। गति Live-sync द्वारा नियंत्रित होती है।" },
@@ -51,5 +52,11 @@
   "bufferLiveOnly": { "message": "केवल लाइव स्ट्रीम" },
   "bufferLowWarn": { "message": "बफ़र कम — कैच-अप सीमित" },
   "onVideoLabel": { "message": "वीडियो पर गति और समय दिखाएँ" },
-  "onStreamLabel": { "message": "वीडियो पर गति और बफ़र दिखाएँ" }
+  "onStreamLabel": { "message": "वीडियो पर गति और बफ़र दिखाएँ" },
+  "kbdLabel": { "message": "कीबोर्ड शॉर्टकट" },
+  "kbdSlowerFaster": { "message": "धीमा / तेज़" },
+  "kbdReset": { "message": "रीसेट" },
+  "kbdSaved": { "message": "सहेजी गई गति" },
+  "rememberChannel": { "message": "चैनल के लिए याद रखें" },
+  "resetChannel": { "message": "चैनल के लिए रीसेट करें" }
 }

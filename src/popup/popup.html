@@ -9,10 +9,6 @@
 <body>
     <div class="header">
         <h1><span data-i18n="appHeader">Video Tuner</span><span class="pro-badge">PRO</span><span class="version" id="extVersion"></span></h1>
-        <div class="current-domain"><span id="currentDomain" data-i18n="loading">Loading…</span> · <span id="currentSpeedPct">100%</span></div>
-    </div>
-
-    <div class="speed-section">
         <a class="kofi" href="https://ko-fi.com/slonick" target="_blank" rel="noopener noreferrer" aria-label="Support the project on Ko-fi" title="Support the project ☕">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path class="cup" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M4 6.5h10.5V11a5.25 5.25 0 0 1-5.25 5.25A5.25 5.25 0 0 1 4 11z"/>
@@ -20,39 +16,101 @@
                 <path class="heart" fill="currentColor" d="M9.25 13.5S6.3 11.8 6.3 9.9c0-.9.7-1.4 1.4-1.4.7 0 1.25.5 1.55 1 .3-.5.85-1 1.55-1 .7 0 1.4.5 1.4 1.4 0 1.9-2.95 3.6-2.95 3.6z"/>
             </svg>
         </a>
-        <div class="speed-display">
-            <div class="speed-value" id="speedValue">100%</div>
-            <span class="info warn" id="liveWarn" tabindex="0" role="button" aria-label="Live" style="display:none;">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                <span class="tip" data-i18n="liveNote">Live stream: manual speed isn't applied — the stream stays at 100% until it needs to catch up. Speed is managed by Live-sync.</span>
-            </span>
+    </div>
+
+    <div class="sync-section speed-section">
+        <div class="sec-head">
+            <button type="button" class="sec-main" data-target="speedBody" aria-expanded="false">
+                <span class="sec-text">
+                    <strong class="current-domain" id="currentDomain" data-i18n="loading">Loading…</strong>
+                    <span class="switch-sub" id="speedScope" data-i18n="speedScopeSite">Current site</span>
+                </span>
+            </button>
+            <div class="speed-quick">
+                <button type="button" class="spin" id="speedDown" aria-label="Slower">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 11h14v2H5z"/></svg>
+                </button>
+                <span class="speed-pct" id="currentSpeedPct">100%</span>
+                <span class="info warn" id="liveWarn" tabindex="0" role="button" aria-label="Live" style="display:none;">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    <span class="tip" data-i18n="liveNote">Live stream: manual speed isn't applied — the stream stays at 100% until it needs to catch up. Speed is managed by Live-sync.</span>
+                </span>
+                <button type="button" class="spin" id="speedUp" aria-label="Faster">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+                </button>
+            </div>
         </div>
 
+        <!-- Always visible: the slider, a one-row set of quick presets, and the
+             Reset / Remember actions — so you never have to expand the card just
+             to change or save a speed. -->
         <input type="range" class="speed-slider" id="speedSlider" min="25" max="300" step="5" value="100">
 
-        <div class="buttons-grid">
-            <button class="btn-speed" data-percent="50">50%</button>
+        <div class="buttons-grid quickrow">
             <button class="btn-speed" data-percent="75">75%</button>
             <button class="btn-speed" data-percent="100">100%</button>
-            <button class="btn-speed" data-percent="125">125%</button>
-            <button class="btn-speed" data-percent="150">150%</button>
             <button class="btn-speed" data-percent="175">175%</button>
             <button class="btn-speed" data-percent="200">200%</button>
-            <button class="btn-speed" data-percent="250">250%</button>
+        </div>
+
+        <!-- Expanding swaps the quick row for the full set of preset values and
+             reveals the on-video toggle. -->
+        <div class="sync-body speed-body" id="speedBody">
+            <div class="buttons-grid">
+                <button class="btn-speed" data-percent="50">50%</button>
+                <button class="btn-speed" data-percent="75">75%</button>
+                <button class="btn-speed" data-percent="100">100%</button>
+                <button class="btn-speed" data-percent="125">125%</button>
+                <button class="btn-speed" data-percent="150">150%</button>
+                <button class="btn-speed" data-percent="175">175%</button>
+                <button class="btn-speed" data-percent="200">200%</button>
+                <button class="btn-speed" data-percent="250">250%</button>
+            </div>
+
+            <div class="extra-row">
+                <span data-i18n="onVideoLabel">Show speed &amp; time on video</span>
+                <label class="switch" for="onVideoToggle">
+                    <input type="checkbox" id="onVideoToggle" class="switch-input">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                </label>
+            </div>
+
+            <div class="extra-row">
+                <span data-i18n="kbdLabel">Keyboard shortcuts</span>
+                <label class="switch" for="kbdToggle">
+                    <input type="checkbox" id="kbdToggle" class="switch-input">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                </label>
+            </div>
+            <div class="kbd-hint">
+                <span class="kbd-row"><kbd>S</kbd><kbd>D</kbd><span data-i18n="kbdSlowerFaster">slower / faster</span></span>
+                <span class="kbd-row"><kbd>R</kbd><span data-i18n="kbdReset">reset</span></span>
+                <span class="kbd-row"><kbd>Z</kbd><span data-i18n="kbdSaved">saved speed</span></span>
+            </div>
         </div>
 
         <div class="quick-actions">
-            <button class="btn-action btn-reset" id="resetBtn" data-i18n="resetButton">Reset (100%)</button>
-            <button class="btn-action btn-default" id="setDefaultBtn" data-i18n="rememberButton">Remember site</button>
+            <div class="split" id="resetSplit">
+                <button class="btn-action btn-reset" id="resetBtn" data-i18n="resetButton">Reset (100%)</button>
+                <button type="button" class="split-caret" id="resetCaret" aria-label="More" aria-haspopup="true">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="split-menu" id="resetMenu">
+                    <button type="button" id="resetChannelBtn" data-i18n="resetChannel">Reset for channel</button>
+                </div>
+            </div>
+            <div class="split" id="rememberSplit">
+                <button class="btn-action btn-default" id="setDefaultBtn" data-i18n="rememberButton">Remember site</button>
+                <button type="button" class="split-caret" id="rememberCaret" aria-label="More" aria-haspopup="true">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="split-menu" id="rememberMenu">
+                    <button type="button" id="rememberChannelBtn" data-i18n="rememberChannel">Remember for channel</button>
+                </div>
+            </div>
         </div>
 
-        <div class="extra-row">
-            <span data-i18n="onVideoLabel">Show speed &amp; time on video</span>
-            <label class="switch" for="onVideoToggle">
-                <input type="checkbox" id="onVideoToggle" class="switch-input">
-                <span class="switch-track"><span class="switch-knob"></span></span>
-            </label>
-        </div>
+        <div class="expand-hint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     </div>
 
     <div class="sync-section">

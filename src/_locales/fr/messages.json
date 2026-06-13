@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x vitesse" },
   "resetButton": { "message": "Réinitialiser (100%)" },
   "rememberButton": { "message": "Mémoriser le site" },
+  "speedScopeSite": { "message": "Site actuel" },
   "savedFeedback": { "message": "✓ Enregistré" },
   "noVideo": { "message": "Aucune vidéo trouvée sur la page — ouvrez une vidéo et actualisez." },
   "liveNote": { "message": "Direct : la vitesse manuelle n'est pas appliquée — le flux reste à 100% jusqu'à ce qu'il doive rattraper. La vitesse est gérée par Live-sync." },
@@ -51,5 +52,11 @@
   "bufferLiveOnly": { "message": "Streams en direct uniquement" },
   "bufferLowWarn": { "message": "Tampon faible — rattrapage limité" },
   "onVideoLabel": { "message": "Afficher la vitesse et le temps sur la vidéo" },
-  "onStreamLabel": { "message": "Afficher la vitesse et le tampon sur la vidéo" }
+  "onStreamLabel": { "message": "Afficher la vitesse et le tampon sur la vidéo" },
+  "kbdLabel": { "message": "Raccourcis clavier" },
+  "kbdSlowerFaster": { "message": "ralentir / accélérer" },
+  "kbdReset": { "message": "réinitialiser" },
+  "kbdSaved": { "message": "vitesse enregistrée" },
+  "rememberChannel": { "message": "Mémoriser pour la chaîne" },
+  "resetChannel": { "message": "Réinitialiser pour la chaîne" }
 }

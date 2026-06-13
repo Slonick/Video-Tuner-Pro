@@ -4,76 +4,73 @@
    "show on video" toggle row.
    ============================================================ */
 
-.speed-section {
-    position: relative;
-    background: var(--surface);
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 10px;
-
-    /* When a live stream is detected, manual speed controls are disabled. */
-    &.locked {
-        .speed-slider,
-        .buttons-grid,
-        .quick-actions {
-            opacity: 0.4;
-            pointer-events: none;
-            filter: grayscale(0.3);
-        }
+/* The speed card reuses the collapsible .sync-section chrome (background, radius,
+   padding, the expand chevron); only the live-locked state — manual controls
+   disabled on a live stream — is specific to it. */
+.speed-section.locked {
+    .speed-slider,
+    .buttons-grid,
+    .quick-actions,
+    .speed-quick .spin {
+        opacity: 0.4;
+        pointer-events: none;
+        filter: grayscale(0.3);
     }
 }
 
-/* Unobtrusive Ko-fi cup in the card's top-right corner → opens the support page.
-   Muted and faint so it doesn't compete with the readout; full strength on hover. */
-.kofi {
-    position: absolute;
-    top: 5px;
-    right: 6px;
-    width: 32px;
-    height: 32px;
-    color: var(--muted);
-    opacity: 0.45;
-    z-index: 1;                /* above .speed-display (also positioned) so hover/click reach it */
-    transition: opacity 0.12s;
+/* --- Header: domain title + a gray scope subtitle (just "Site", or — on a
+   YouTube watch page — the channel name, written by the popup). Both clip with
+   an ellipsis so a long host/channel never reflows the header. ------------- */
+.current-domain,
+#speedScope {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- Header: the quick −/value/+ cluster on the right -------------------- */
+.speed-quick {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.speed-pct {
+    min-width: 44px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-align: center;
+}
+
+.spin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 7px;
+    background: var(--seg);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s, filter 0.12s;
 
     & svg {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;  /* the whole anchor box is the hit target, not just the thin strokes */
+        width: 16px;
+        height: 16px;
     }
 
-    &:hover,
-    &:focus-visible {
-        opacity: 1;
-
-        /* Only the heart picks up the Ko-fi brand red; the cup stays monochrome. */
-        .heart {
-            fill: #ff5e5b;
-        }
+    &:hover {
+        background: var(--track);
     }
-}
 
-/* --- Big readout --------------------------------------------------------- */
-.speed-display {
-    position: relative;
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 6px;
-    margin-bottom: 10px;
-}
-
-.speed-value {
-    font-size: 28px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-}
-
-.speed-sub {
-    font-size: 12px;
-    color: var(--muted);
+    &:active {
+        filter: brightness(0.95);
+    }
 }
 
 /* --- Slider -------------------------------------------------------------- */
@@ -130,6 +127,24 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     margin-bottom: 10px;
+}
+
+/* The always-visible single row shown while the card is collapsed; once it's
+   expanded the full grid (with more values) takes over, so hide the quick row. */
+.buttons-grid.quickrow {
+    margin: 10px 0 0;
+}
+.speed-section:has(.sync-body.open) .quickrow {
+    display: none;
+}
+
+/* The slider and the Reset / Remember actions live outside the collapsible body
+   (always reachable). Space them off the header / preset row above. */
+.speed-section > .speed-slider {
+    margin: 12px 0 0;
+}
+.speed-section > .quick-actions {
+    margin-top: 10px;
 }
 
 .btn-speed {
@@ -194,6 +209,84 @@
     }
 }
 
+/* Split buttons: the main action + a caret opening a "for channel" option, shown
+   only on a YouTube watch page (.has-channel, set by the popup). */
+.split {
+    position: relative;
+    display: flex;
+}
+.split > .btn-action {
+    flex: 1;
+    width: 100%;
+}
+.split-caret {
+    display: none;
+    flex: 0 0 30px;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+}
+.split-caret svg {
+    width: 15px;
+    height: 15px;
+}
+.split.has-channel .split-caret {
+    display: flex;
+}
+.split.has-channel > .btn-action {
+    border-radius: 8px 0 0 8px;
+}
+#resetSplit .split-caret {
+    background: var(--seg);
+    color: var(--text);
+    border-left: 1px solid var(--track);
+}
+#resetSplit .split-caret:hover {
+    filter: brightness(0.96);
+}
+#rememberSplit .split-caret {
+    background: var(--accent);
+    color: #fff;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+#rememberSplit .split-caret:hover {
+    filter: brightness(1.05);
+}
+
+.split-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 5;
+    min-width: 160px;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--track);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px var(--shadow);
+}
+.split.open .split-menu {
+    display: block;
+}
+.split-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+}
+.split-menu button:hover {
+    background: var(--seg);
+}
+
 /* Inline toggle: show speed + remaining time on the video. */
 .extra-row {
     display: flex;
@@ -203,4 +296,46 @@
     margin-top: 12px;
     font-size: 12px;
     color: var(--text);
+}
+
+/* The speed body is open by default, so trim its vertical chrome (the section's
+   12px top margin / 16px bottom padding) to keep the popup from scrolling on
+   open — Chrome caps popup height at ~600px. */
+.speed-body.sync-body.open {
+    margin-top: 8px;
+    padding-bottom: 8px;
+}
+.speed-body .extra-row {
+    margin-top: 8px;
+}
+
+/* Keyboard-shortcuts hint: the key letters as little keycap chips, each with its
+   localized action label. */
+.kbd-hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+}
+.kbd-hint .kbd-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.kbd-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 5px;
+    background: var(--seg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
 }

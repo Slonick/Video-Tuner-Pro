@@ -7,6 +7,7 @@
   "speedSuffix": { "message": "x швидкість" },
   "resetButton": { "message": "Скинути (100%)" },
   "rememberButton": { "message": "Запам’ятати сайт" },
+  "speedScopeSite": { "message": "Поточний сайт" },
   "savedFeedback": { "message": "✓ Збережено" },
   "noVideo": { "message": "На сторінці не знайдено відео — відкрийте відео та оновіть." },
   "liveNote": { "message": "Пряма трансляція: ручна швидкість не застосовується — трансляція йде на 100%, доки не потрібно наздоганяти. Швидкістю керує Live-sync." },
@@ -51,5 +52,11 @@
   "bufferLiveOnly": { "message": "Лише для прямих трансляцій" },
   "bufferLowWarn": { "message": "Буфер замалий — наздоганяння обмежено" },
   "onVideoLabel": { "message": "Показувати швидкість і час на відео" },
-  "onStreamLabel": { "message": "Показувати швидкість і буфер на відео" }
+  "onStreamLabel": { "message": "Показувати швидкість і буфер на відео" },
+  "kbdLabel": { "message": "Гарячі клавіші" },
+  "kbdSlowerFaster": { "message": "повільніше / швидше" },
+  "kbdReset": { "message": "скидання" },
+  "kbdSaved": { "message": "збережена швидкість" },
+  "rememberChannel": { "message": "Запам'ятати для каналу" },
+  "resetChannel": { "message": "Скинути для каналу" }
 }

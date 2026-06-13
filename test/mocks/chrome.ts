@@ -4,7 +4,7 @@
 export interface MockData {
   messages?: Record<string, { message: string }>;
   settings?: Record<string, unknown>;
-  speed?: { speed: number; live?: boolean };
+  speed?: { speed: number; live?: boolean; channel?: string | null; channelName?: string };
   monitor?: unknown;
   history?: unknown;
   tab?: { id: number; url: string };
@@ -53,7 +53,7 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
       query(_q: unknown, cb: (tabs: unknown[]) => void) { cb([tab]); },
       sendMessage(_id: number, msg: { action?: string; speed?: number }, cb?: Cb) {
         switch (msg?.action) {
-          case "getSpeed":   cb?.({ speed: data.speed?.speed ?? 1, live: data.speed?.live ?? false, domain: "twitch.tv" }); break;
+          case "getSpeed":   cb?.({ speed: data.speed?.speed ?? 1, live: data.speed?.live ?? false, domain: "twitch.tv", channel: data.speed?.channel ?? null, channelName: data.speed?.channelName }); break;
           case "setSpeed":   cb?.({ success: true, speed: msg.speed, live: data.speed?.live ?? false }); break;
           case "getMonitor": cb?.(data.monitor ?? null); break;
           case "getHistory": cb?.(data.history ?? null); break;

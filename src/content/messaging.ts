@@ -2,11 +2,12 @@
 // the frame holding the video replies, with the top frame as a deferred fallback.
 import { api } from "./platform/browser.js";
 import { getDomain } from "./core/domain.js";
+import { currentChannel, currentChannelName } from "./channel.js";
 import { clamp } from "./core/clamp.js";
 import { S } from "./state.js";
 import { collectVideos } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
-import { setSpeed, persistDomainSpeed } from "./speed.js";
+import { setSpeed, persistDomainSpeed, persistChannelSpeed, resetChannelSpeed } from "./speed.js";
 import { monitorData } from "./monitor.js";
 import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
 import { bufferLevelHist } from "./bitrate.js";
@@ -32,9 +33,20 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true, speed });
     return true;
   }
+  if (request.action === "rememberChannel") {
+    const speed = typeof request.speed === "number" ? clamp(request.speed) : S.currentSpeed;
+    persistChannelSpeed(speed);
+    sendResponse({ success: true, speed });
+    return true;
+  }
+  if (request.action === "resetChannel") {
+    resetChannelSpeed();
+    sendResponse({ success: true });
+    return true;
+  }
   if (request.action === "getSpeed") {
     return replyFromVideoFrame(sendResponse,
-      () => ({ speed: S.currentSpeed, domain: getDomain(), live: onStreamPage() }));
+      () => ({ speed: S.currentSpeed, domain: getDomain(), channel: currentChannel(), channelName: currentChannelName(), live: onStreamPage() }));
   }
   if (request.action === "getMonitor") {
     return replyFromVideoFrame(sendResponse, () => monitorData());
