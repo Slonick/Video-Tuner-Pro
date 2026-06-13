@@ -1,4 +1,4 @@
-import { MIN_FORWARD_BUFFER, LIVE_MAX_FLOOR } from "../core/constants.js";
+import { MIN_FORWARD_BUFFER } from "../core/constants.js";
 import { S } from "../state.js";
 import { primaryVideo } from "../videos.js";
 import { onStreamPage } from "../live/detection.js";
@@ -52,10 +52,9 @@ function renderBadge(v: HTMLVideoElement): void {
     // site latency the buffer IS the shown value, so no parenthetical.
     const lat = streamLatency();
     const buf = forwardBuffer(v);
-    // "⚠" when we're far behind but the buffer is too thin to catch up safely.
+    // "⚠" when we're far behind but the buffer is too thin to catch up at all.
     const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
-    const rate = Math.max(LIVE_MAX_FLOOR, S.liveSyncMax);
-    const warn = S.liveSyncEnabled && catchupBufferLimited(lat != null ? lat : buf, buf, target, rate) ? " ⚠" : "";
+    const warn = S.liveSyncEnabled && catchupBufferLimited(lat != null ? lat : buf, buf, target) ? " ⚠" : "";
     el.textContent = (lat != null
       ? `${sp}× · ${lat.toFixed(2)}s (${buf.toFixed(2)}s)`
       : `${sp}× · ${buf.toFixed(2)}s`) + warn;

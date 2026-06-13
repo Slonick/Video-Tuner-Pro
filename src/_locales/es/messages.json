@@ -14,8 +14,7 @@
   "syncSubtitle": { "message": "Ponerse al día con la transmisión en directo automáticamente" },
   "allowedDelay": { "message": "Retraso permitido" },
   "secondsShort": { "message": "s" },
-  "maxCatchupSpeed": { "message": "Velocidad de recuperación" },
-  "syncHint": { "message": "Cuando el directo se retrasa más del retardo permitido, se reproduce a la velocidad de recuperación hasta alcanzar el borde en vivo y luego vuelve al 100%. Se detiene si empiezan a perderse fotogramas." },
+  "syncHint": { "message": "Cuando el directo se retrasa más del retardo permitido, la reproducción se acelera suavemente — cuanto mayor el retraso, más rápido, hasta el 125% — y vuelve al 100% en el borde en vivo. Se desactiva si se pierden fotogramas o queda poco búfer." },
   "indicatorLive": { "message": "Directo — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$% (recuperando)",

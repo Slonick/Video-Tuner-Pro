@@ -14,8 +14,7 @@
   "syncSubtitle": { "message": "Rattraper automatiquement la diffusion en direct" },
   "allowedDelay": { "message": "Retard autorisé" },
   "secondsShort": { "message": "s" },
-  "maxCatchupSpeed": { "message": "Vitesse de rattrapage" },
-  "syncHint": { "message": "Quand le direct prend plus de retard que le délai autorisé, il joue à la vitesse de rattrapage jusqu'au bord du direct, puis revient à 100 %. Il s'arrête si des images sont perdues." },
+  "syncHint": { "message": "Quand le direct dépasse le retard autorisé, la lecture accélère en douceur — plus le retard est grand, plus c'est rapide, jusqu'à 125% — puis revient à 100% au direct. Elle s'interrompt si des images sont perdues ou si le tampon est faible." },
   "indicatorLive": { "message": "Direct — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$% (rattrapage)",

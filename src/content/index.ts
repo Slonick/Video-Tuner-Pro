@@ -2,7 +2,7 @@
 // as a side effect of being imported.
 import { api, ctxValid } from "./platform/browser.js";
 import { STORE, STORE_AREA } from "./platform/storage.js";
-import { clamp, clampTarget, clampMax, clampNum } from "./core/clamp.js";
+import { clamp, clampTarget, clampNum } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { S } from "./state.js";
 import { applyAll } from "./speed.js";
@@ -26,7 +26,7 @@ export function teardown() {
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "liveSync", "liveSyncTarget", "liveSyncMax",
+    ["domains", "liveSync", "liveSyncTarget",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
      "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge"],
     (result) => {
@@ -37,7 +37,6 @@ function loadSpeed() {
       S.streamBadge = result.streamBadge !== false;
       S.liveSyncEnabled = result.liveSync !== false;
       S.liveSyncTarget = clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 5);
-      S.liveSyncMax = clampMax(result.liveSyncMax != null ? result.liveSyncMax : 1.5);
       S.audioCompEnabled = result.audioComp !== false;
       S.audioCompThreshold = clampNum(result.audioCompThreshold, -100, 0, -60);
       S.audioCompKnee = clampNum(result.audioCompKnee, 0, 40, 30);
@@ -102,8 +101,7 @@ api.storage.onChanged.addListener((changes, area) => {
   if (area !== STORE_AREA) return;
   if (changes.liveSync) S.liveSyncEnabled = !!changes.liveSync.newValue;
   if (changes.liveSyncTarget) S.liveSyncTarget = clampTarget(changes.liveSyncTarget.newValue);
-  if (changes.liveSyncMax) S.liveSyncMax = clampMax(changes.liveSyncMax.newValue);
-  if (changes.liveSync || changes.liveSyncTarget || changes.liveSyncMax) {
+  if (changes.liveSync || changes.liveSyncTarget) {
     resetSyncAnnounce();
     controlLive();
   }

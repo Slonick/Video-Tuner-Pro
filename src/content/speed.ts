@@ -21,12 +21,18 @@ export function persistDomainSpeed(speed: number): void {
 }
 
 function applyToVideo(video: HTMLVideoElement): void {
-  try {
-    // Only set when it actually differs — applyAll runs often (1s tick + every
-    // MutationObserver pass). Re-assigning playbackRate each time restarts the
-    // audio time-stretcher and glitches sound during sped-up playback.
-    if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001) video.playbackRate = S.currentSpeed;
-  } catch (e) { /* some players reject rate before metadata is ready */ }
+  // A live video's rate is owned by controlLive (live/sync.ts). applyAll runs
+  // per mutation pass (≈frame rate on chat-heavy pages), so countering the
+  // player's own rate writes here flips the rate twice within a frame — every
+  // flip restarts the audio time-stretcher with an audible click.
+  if (!isLive(video)) {
+    try {
+      // Only set when it actually differs — applyAll runs often (1s tick + every
+      // MutationObserver pass). Re-assigning playbackRate each time restarts the
+      // audio time-stretcher and glitches sound during sped-up playback.
+      if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001) video.playbackRate = S.currentSpeed;
+    } catch (e) { /* some players reject rate before metadata is ready */ }
+  }
 
   if (seenVideos.has(video)) return;
   seenVideos.add(video);
