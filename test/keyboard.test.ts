@@ -7,7 +7,6 @@ const m = vi.hoisted(() => ({
   setSpeed: vi.fn(),
   persistDomainSpeed: vi.fn(),
   persistChannelSpeed: vi.fn(),
-  showIndicator: vi.fn(),
   channel: null as string | null,
   hasVideo: true,
 }));
@@ -19,8 +18,6 @@ vi.mock("../src/content/speed.js", () => ({
 }));
 vi.mock("../src/content/channel.js", () => ({ currentChannel: () => m.channel }));
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => (m.hasVideo ? ({} as HTMLVideoElement) : null) }));
-vi.mock("../src/content/badge/indicator.js", () => ({ showIndicator: m.showIndicator }));
-vi.mock("../src/content/platform/i18n.js", () => ({ i18n: (k: string) => k }));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
 
 import { S } from "../src/content/state.js";
@@ -57,12 +54,11 @@ describe("keyboard shortcuts", () => {
     expect(m.setSpeed).toHaveBeenCalledWith(1.0, false, true);
   });
 
-  it("Z remembers the speed for the site and confirms", () => {
+  it("Z remembers the speed for the site", () => {
     S.currentSpeed = 1.25;
     press("KeyZ");
     expect(m.persistDomainSpeed).toHaveBeenCalledWith(1.25);
     expect(m.persistChannelSpeed).not.toHaveBeenCalled();
-    expect(m.showIndicator).toHaveBeenCalled();
   });
 
   it("Shift+Z remembers the speed for the channel when on one", () => {
@@ -71,15 +67,13 @@ describe("keyboard shortcuts", () => {
     press("KeyZ", { shiftKey: true });
     expect(m.persistChannelSpeed).toHaveBeenCalledWith(1.25);
     expect(m.persistDomainSpeed).not.toHaveBeenCalled();
-    expect(m.showIndicator).toHaveBeenCalled();
   });
 
-  it("Shift+Z is a no-op (no save, no toast) off a channel", () => {
+  it("Shift+Z is a no-op off a channel", () => {
     m.channel = null;
     press("KeyZ", { shiftKey: true });
     expect(m.persistChannelSpeed).not.toHaveBeenCalled();
     expect(m.persistDomainSpeed).not.toHaveBeenCalled();
-    expect(m.showIndicator).not.toHaveBeenCalled();
   });
 
   it("does nothing while the shortcuts are disabled", () => {

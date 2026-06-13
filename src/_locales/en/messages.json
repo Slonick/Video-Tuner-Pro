@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "Allowed delay" },
   "secondsShort": { "message": "s" },
   "syncHint": { "message": "When the stream falls behind the allowed delay, playback speeds up smoothly — the farther behind, the faster, up to 125% — and returns to 100% at the live edge. It backs off when frames drop or the buffer runs low." },
-  "indicatorLive": { "message": "Live — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (catching up)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "Audio compression" },
   "audioSubtitle": { "message": "Even out loud and quiet sounds" },
   "audioGain": { "message": "Make-up gain" },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "Voice" },
   "presetNight": { "message": "Night" },
   "presetMovie": { "message": "Movie" },
-  "audioOn": { "message": "Audio compression on" },
-  "audioOff": { "message": "Audio compression off" },
-  "audioUnavailable": { "message": "Compression unavailable on this video" },
-  "audioInUse": { "message": "Audio already used by another extension/player" },
   "meterIn": { "message": "Input" },
   "meterOut": { "message": "Output" },
   "meterThr": { "message": "Threshold" },

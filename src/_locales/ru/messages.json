@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "Допустимое отставание" },
   "secondsShort": { "message": "c" },
   "syncHint": { "message": "Когда стрим отстаёт сильнее допустимой задержки, воспроизведение плавно ускоряется — чем больше отставание, тем выше скорость, до 125% — и возвращается к 100% у прямого эфира. При падении кадров или нехватке буфера ускорение отключается." },
-  "indicatorLive": { "message": "Эфир — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (догоняем)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "Компрессия звука" },
   "audioSubtitle": { "message": "Выровнять громкие и тихие звуки" },
   "audioGain": { "message": "Компенсация громкости" },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "Голос" },
   "presetNight": { "message": "Ночь" },
   "presetMovie": { "message": "Кино" },
-  "audioOn": { "message": "Компрессия включена" },
-  "audioOff": { "message": "Компрессия выключена" },
-  "audioUnavailable": { "message": "Здесь компрессия недоступна" },
-  "audioInUse": { "message": "Звук уже занят другим расширением или плеером" },
   "meterIn": { "message": "До" },
   "meterOut": { "message": "После" },
   "meterThr": { "message": "Порог" },

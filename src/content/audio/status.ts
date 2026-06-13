@@ -1,23 +1,17 @@
-// User-facing audio status. After the user flips the audio toggle, the graph may
-// not engage on the first try (src still loading, context suspended, player
-// swapping the <video>), so poll briefly and report the real outcome on screen
-// instead of a transient "unavailable".
+// After the user flips the audio toggle, compression may not engage on the first
+// try (src still loading, context suspended, the player swapping the <video>), so
+// re-apply a few times until it takes.
 import { S } from "../state.js";
-import { i18n } from "../platform/i18n.js";
-import { showIndicator } from "../badge/indicator.js";
 import { applyAudioComp } from "./compressor.js";
 
-let audioAnnounceTimer: ReturnType<typeof setTimeout> | undefined;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-export function announceAudioStatus(attempt?: number): void {
-  clearTimeout(audioAnnounceTimer);
-  if (!S.audioCompEnabled) { showIndicator(i18n("audioOff") || "Audio compression off"); return; }
+export function engageAudio(attempt = 0): void {
+  clearTimeout(retryTimer);
+  if (!S.audioCompEnabled) return;
   const res = applyAudioComp();
-  if (res.engaged > 0) { showIndicator(i18n("audioOn") || "Audio compression on"); return; }
-  if (res.reason === "inuse") { showIndicator(i18n("audioInUse") || "Audio already used by another extension/player"); return; }
-  if ((attempt || 0) < 6) { // ~3s of retries while it loads / resumes
-    audioAnnounceTimer = setTimeout(() => announceAudioStatus((attempt || 0) + 1), 500);
-    return;
+  if (res.engaged > 0 || res.reason === "inuse") return; // engaged, or can't (already in use)
+  if (attempt < 6) { // ~3s of retries while it loads / resumes
+    retryTimer = setTimeout(() => engageAudio(attempt + 1), 500);
   }
-  showIndicator(i18n("audioUnavailable") || "Compression unavailable on this video");
 }

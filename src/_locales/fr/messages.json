@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "Retard autorisé" },
   "secondsShort": { "message": "s" },
   "syncHint": { "message": "Quand le direct dépasse le retard autorisé, la lecture accélère en douceur — plus le retard est grand, plus c'est rapide, jusqu'à 125% — puis revient à 100% au direct. Elle s'interrompt si des images sont perdues ou si le tampon est faible." },
-  "indicatorLive": { "message": "Direct — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (rattrapage)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "Compression audio" },
   "audioSubtitle": { "message": "Égaliser les sons forts et faibles" },
   "audioHint": { "message": "Renforce les passages faibles et atténue les forts ; le gain de compensation relève le niveau global. Ne fonctionne pas sur les sites diffusant la vidéo en cross-origin sans CORS — le navigateur y coupe le Web Audio." },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "Voix" },
   "presetNight": { "message": "Nuit" },
   "presetMovie": { "message": "Film" },
-  "audioOn": { "message": "Compression audio activée" },
-  "audioOff": { "message": "Compression audio désactivée" },
-  "audioUnavailable": { "message": "Compression indisponible sur cette vidéo" },
-  "audioInUse": { "message": "L'audio est déjà utilisé par une autre extension ou le lecteur" },
   "meterIn": { "message": "Entrée" },
   "meterOut": { "message": "Sortie" },
   "meterThr": { "message": "Seuil" },

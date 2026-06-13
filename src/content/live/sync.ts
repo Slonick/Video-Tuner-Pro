@@ -1,17 +1,14 @@
 // Live-sync catch-up: on a live stream, speed is controlled ONLY here — manual
 // speed is never applied. Drives playback toward the live edge and back to 100%.
-import { i18n } from "../platform/i18n.js";
 import { ctxValid } from "../platform/browser.js";
 import { MIN_FORWARD_BUFFER } from "../core/constants.js";
 import { decideCatchupSpeed } from "./catchup.js";
 import { S } from "../state.js";
 import { applyAll } from "../speed.js";
-import { showIndicator } from "../badge/indicator.js";
 import { teardown } from "../index.js";
 import { liveVideo, onStreamPage } from "./detection.js";
 import { forwardBuffer, streamLatency } from "./metrics.js";
 
-let lastSyncPct = -1;
 let lastDropped = 0;    // dropped-frame counter from the previous tick
 let lastControlAt = 0;
 
@@ -69,7 +66,6 @@ export function controlLive(): void {
   if (Math.abs(S.currentSpeed - S.userSpeed) > 0.001) {
     S.currentSpeed = S.userSpeed;
     applyAll();
-    showIndicator();
   }
 }
 
@@ -79,7 +75,6 @@ function forceLiveNormal(video: HTMLVideoElement): void {
   if (changed) {
     S.currentSpeed = 1.0;
     applyAll();
-    showIndicator(i18n("indicatorLive"));
   }
   applyPitchMode(video);
   setLiveRate(video, 1.0, changed);
@@ -114,15 +109,4 @@ function runLiveSync(video: HTMLVideoElement): void {
   }
   applyPitchMode(video);
   setLiveRate(video, desired, changed);
-
-  const pct = Math.round(S.currentSpeed * 100);
-  if (pct !== lastSyncPct) {
-    lastSyncPct = pct;
-    showIndicator(pct > 100
-      ? i18n("indicatorCatchup", [String(pct)])
-      : i18n("indicatorSynced"));
-  }
 }
-
-// onChanged resets this so the next runLiveSync re-announces immediately.
-export function resetSyncAnnounce(): void { lastSyncPct = -1; }

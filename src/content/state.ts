@@ -15,6 +15,9 @@ export const S = {
   showRemaining: false,
   // On-video badge on live streams: speed + buffered-ahead seconds
   streamBadge: false,
+  // Where the badge sits, as a fraction of the video frame — per site, set by
+  // dragging it. null = the default top-left corner.
+  badgePos: null as { fx: number; fy: number } | null,
   // Audio compression (raw DynamicsCompressor parameters)
   audioCompEnabled: false,
   audioCompThreshold: -60,  // dB, -100…0

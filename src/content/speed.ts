@@ -9,7 +9,6 @@ import { isLive, probeLive, onStreamPage, trackDvr, resetDvr } from "./live/dete
 import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { updateBadge } from "./badge/icon.js";
-import { showIndicator } from "./badge/indicator.js";
 import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
 
 export function persistDomainSpeed(speed: number): void {
@@ -103,6 +102,5 @@ export function setSpeed(speed: number, persist?: boolean, manual?: boolean): vo
   S.userSpeed = S.currentSpeed; // remember it as the intended non-live speed
   applyAll();
   if (persist) persistDomainSpeed(S.currentSpeed);
-  showIndicator();
-  updateTimeBadge(); flashBadge();
+  updateTimeBadge(); flashBadge(); // the badge flashes the new speed as feedback
 }

@@ -6,11 +6,10 @@ import { clamp, clampTarget, clampNum, resolveTarget } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { S } from "./state.js";
 import { applyAll } from "./speed.js";
-import { controlLive, resetSyncAnnounce } from "./live/sync.js";
+import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
-import { announceAudioStatus } from "./audio/status.js";
-import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
-import { ownsNode } from "./badge/indicator.js";
+import { engageAudio } from "./audio/status.js";
+import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import "./messaging.js"; // registers the popup message handler (pulls in the bitrate sampler)
 import "./keyboard.js";  // registers the keyboard-shortcut listener
 import { currentChannel } from "./channel.js";
@@ -39,12 +38,14 @@ function applyResolved(domains: Record<string, number>, channels: Record<string,
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "channels", "liveSync", "liveSyncTarget", "syncTargets",
+    ["domains", "channels", "liveSync", "liveSyncTarget", "syncTargets", "badgePos",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
      "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge", "keyboard"],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
       const channels = (result.channels || {}) as Record<string, number>;
+      const badgePos = (result.badgePos || {}) as Record<string, { fx: number; fy: number }>;
+      S.badgePos = badgePos[getDomain()] || null;
       // Defaults-on: features ship enabled; an explicit `false` in storage (the
       // user turned it off) is still respected.
       S.showRemaining = result.showRemaining !== false;
@@ -111,7 +112,7 @@ for (const ev of ["play", "loadedmetadata"]) {
 const observer = new MutationObserver((mutations) => {
   if (!ctxValid()) { teardown(); return; }
   if (observerScheduled) return;
-  if (mutations.every((m) => ownsNode(m.target))) return;
+  if (mutations.every((m) => ownsBadgeNode(m.target))) return;
   observerScheduled = true;
   requestAnimationFrame(() => {
     observerScheduled = false;
@@ -138,11 +139,15 @@ api.storage.onChanged.addListener((changes, area) => {
     if (t != null) S.liveSyncTarget = clampTarget(t);
   }
   if (changes.liveSync || changes.syncTargets) {
-    resetSyncAnnounce();
     controlLive();
   }
   if (changes.showRemaining) { S.showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }
   if (changes.streamBadge) { S.streamBadge = !!changes.streamBadge.newValue; updateTimeBadge(); flashBadge(); }
+  if (changes.badgePos) {
+    const map = (changes.badgePos.newValue as Record<string, { fx: number; fy: number }> | undefined) || {};
+    S.badgePos = map[getDomain()] || null;
+    updateTimeBadge();
+  }
   if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   let audioChanged = false;
   if (changes.audioComp) { S.audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
@@ -153,9 +158,9 @@ api.storage.onChanged.addListener((changes, area) => {
   if (changes.audioCompRelease) { S.audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 1); audioChanged = true; }
   if (changes.audioCompGain) { S.audioCompGain = clampNum(changes.audioCompGain.newValue, 0, 24, 0); audioChanged = true; }
   if (audioChanged) {
-    // Apply immediately; when the user flipped the toggle, also poll briefly and
-    // report the real outcome on screen (it may take a moment to engage).
-    if (changes.audioComp) announceAudioStatus(0);
+    // On a toggle flip, retry a few times so it engages even if the video/context
+    // wasn't ready; a param tweak just re-applies once.
+    if (changes.audioComp) engageAudio(0);
     else applyAudioComp();
   }
 });

@@ -9,8 +9,6 @@ import { S } from "./state.js";
 import { setSpeed, persistDomainSpeed, persistChannelSpeed } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { currentChannel } from "./channel.js";
-import { showIndicator } from "./badge/indicator.js";
-import { i18n } from "./platform/i18n.js";
 import { primaryVideo } from "./videos.js";
 
 const STEP = 0.05;
@@ -48,6 +46,5 @@ document.addEventListener("keydown", (e) => {
     } else {
       persistDomainSpeed(S.currentSpeed);
     }
-    showIndicator(i18n("savedFeedback"));
   }
 }, true);

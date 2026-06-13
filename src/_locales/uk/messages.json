@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "Допустиме відставання" },
   "secondsShort": { "message": "с" },
   "syncHint": { "message": "Коли трансляція відстає більше за допустиму затримку, відтворення плавно пришвидшується — що більше відставання, то вища швидкість, до 125% — і повертається до 100% на прямому ефірі. У разі втрати кадрів або нестачі буфера пришвидшення вимикається." },
-  "indicatorLive": { "message": "Ефір — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (наздоганяємо)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "Компресія звуку" },
   "audioSubtitle": { "message": "Вирівняти гучні та тихі звуки" },
   "audioHint": { "message": "Підіймає тихі місця й приборкує гучні; компенсація гучності піднімає загальний рівень. Не працює на сайтах, що віддають відео з іншого домену без CORS — там браузер глушить Web Audio." },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "Голос" },
   "presetNight": { "message": "Ніч" },
   "presetMovie": { "message": "Кіно" },
-  "audioOn": { "message": "Компресію увімкнено" },
-  "audioOff": { "message": "Компресію вимкнено" },
-  "audioUnavailable": { "message": "Тут компресія недоступна" },
-  "audioInUse": { "message": "Звук уже зайнятий іншим розширенням або плеєром" },
   "meterIn": { "message": "До" },
   "meterOut": { "message": "Після" },
   "meterThr": { "message": "Поріг" },

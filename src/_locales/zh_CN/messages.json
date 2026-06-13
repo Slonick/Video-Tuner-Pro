@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "允许的延迟" },
   "secondsShort": { "message": "秒" },
   "syncHint": { "message": "当直播落后超过允许延迟时，播放会平滑加速 — 落后越多速度越快，最高 125% — 到达直播边缘后恢复 100%。出现掉帧或缓冲不足时会停止加速。" },
-  "indicatorLive": { "message": "直播 — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$%（追赶中）",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "音频压缩" },
   "audioSubtitle": { "message": "平衡大声与轻声" },
   "audioHint": { "message": "提升轻声部分、抑制大声部分；补偿增益整体提高音量。在以跨域且无 CORS 方式提供视频的网站上无法使用——浏览器会静音 Web Audio。" },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "人声" },
   "presetNight": { "message": "夜间" },
   "presetMovie": { "message": "电影" },
-  "audioOn": { "message": "音频压缩已开启" },
-  "audioOff": { "message": "音频压缩已关闭" },
-  "audioUnavailable": { "message": "此视频无法使用压缩" },
-  "audioInUse": { "message": "音频已被其他扩展或播放器占用" },
   "meterIn": { "message": "输入" },
   "meterOut": { "message": "输出" },
   "meterThr": { "message": "阈值" },

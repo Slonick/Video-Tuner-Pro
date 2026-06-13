@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "Retraso permitido" },
   "secondsShort": { "message": "s" },
   "syncHint": { "message": "Cuando el directo se retrasa más del retardo permitido, la reproducción se acelera suavemente — cuanto mayor el retraso, más rápido, hasta el 125% — y vuelve al 100% en el borde en vivo. Se desactiva si se pierden fotogramas o queda poco búfer." },
-  "indicatorLive": { "message": "Directo — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (recuperando)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "Compresión de audio" },
   "audioSubtitle": { "message": "Igualar sonidos fuertes y suaves" },
   "audioHint": { "message": "Sube las partes silenciosas y atenúa las fuertes; la ganancia de compensación eleva el nivel general. No funciona en sitios que sirven el vídeo de otro dominio sin CORS: ahí el navegador silencia Web Audio." },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "Voz" },
   "presetNight": { "message": "Noche" },
   "presetMovie": { "message": "Película" },
-  "audioOn": { "message": "Compresión de audio activada" },
-  "audioOff": { "message": "Compresión de audio desactivada" },
-  "audioUnavailable": { "message": "Compresión no disponible en este vídeo" },
-  "audioInUse": { "message": "El audio ya lo usa otra extensión o el reproductor" },
   "meterIn": { "message": "Entrada" },
   "meterOut": { "message": "Salida" },
   "meterThr": { "message": "Umbral" },

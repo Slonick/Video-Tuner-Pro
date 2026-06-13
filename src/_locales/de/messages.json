@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "Erlaubter Rückstand" },
   "secondsShort": { "message": "s" },
   "syncHint": { "message": "Fällt der Stream weiter als die erlaubte Verzögerung zurück, beschleunigt die Wiedergabe sanft — je größer der Rückstand, desto schneller, bis 125% — und kehrt am Live-Punkt zu 100% zurück. Bei Bildausfällen oder knappem Puffer wird abgebrochen." },
-  "indicatorLive": { "message": "Live — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (holt auf)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "Audiokompression" },
   "audioSubtitle": { "message": "Laute und leise Töne angleichen" },
   "audioHint": { "message": "Hebt leise Stellen an und dämpft laute; der Make-up-Gain hebt den Gesamtpegel. Funktioniert nicht auf Seiten, die Video cross-origin ohne CORS ausliefern — dort schaltet der Browser Web Audio stumm." },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "Stimme" },
   "presetNight": { "message": "Nacht" },
   "presetMovie": { "message": "Film" },
-  "audioOn": { "message": "Audiokompression an" },
-  "audioOff": { "message": "Audiokompression aus" },
-  "audioUnavailable": { "message": "Kompression für dieses Video nicht verfügbar" },
-  "audioInUse": { "message": "Audio wird bereits von einer anderen Erweiterung/dem Player genutzt" },
   "meterIn": { "message": "Eingang" },
   "meterOut": { "message": "Ausgang" },
   "meterThr": { "message": "Schwelle" },

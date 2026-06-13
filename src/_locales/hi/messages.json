@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "अनुमत देरी" },
   "secondsShort": { "message": "से" },
   "syncHint": { "message": "जब स्ट्रीम अनुमत देरी से ज़्यादा पीछे हो जाती है, प्लेबैक धीरे-धीरे तेज़ होता है — जितना ज़्यादा पीछे, उतनी तेज़ गति, अधिकतम 125% — और लाइव किनारे पर 100% पर लौट आता है। फ़्रेम गिरने या बफ़र कम होने पर यह रुक जाता है।" },
-  "indicatorLive": { "message": "लाइव — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$% (पकड़ रहे हैं)",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "ऑडियो कंप्रेशन" },
   "audioSubtitle": { "message": "तेज़ और धीमी आवाज़ें बराबर करें" },
   "audioHint": { "message": "धीमे हिस्सों को बढ़ाता है और तेज़ को कम करता है; मेक-अप गेन समग्र स्तर बढ़ाता है। उन साइटों पर काम नहीं करता जो वीडियो को बिना CORS के दूसरे डोमेन से देती हैं — वहाँ ब्राउज़र Web Audio को म्यूट कर देता है।" },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "आवाज़" },
   "presetNight": { "message": "रात" },
   "presetMovie": { "message": "मूवी" },
-  "audioOn": { "message": "ऑडियो कंप्रेशन चालू" },
-  "audioOff": { "message": "ऑडियो कंप्रेशन बंद" },
-  "audioUnavailable": { "message": "इस वीडियो पर कंप्रेशन उपलब्ध नहीं" },
-  "audioInUse": { "message": "ऑडियो पहले से किसी अन्य एक्सटेंशन या प्लेयर द्वारा उपयोग में है" },
   "meterIn": { "message": "इनपुट" },
   "meterOut": { "message": "आउटपुट" },
   "meterThr": { "message": "थ्रेशोल्ड" },

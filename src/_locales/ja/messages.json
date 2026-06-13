@@ -16,12 +16,6 @@
   "allowedDelay": { "message": "許容する遅延" },
   "secondsShort": { "message": "秒" },
   "syncHint": { "message": "配信が許容遅延より遅れると、再生がなめらかに速くなります — 遅れが大きいほど速く、最大125% — ライブ端で100%に戻ります。フレーム落ちやバッファ不足時は減速します。" },
-  "indicatorLive": { "message": "ライブ — 100%" },
-  "indicatorCatchup": {
-    "message": "Live-sync — $pct$%（追いつき中）",
-    "placeholders": { "pct": { "content": "$1" } }
-  },
-  "indicatorSynced": { "message": "Live-sync — 100%" },
   "audioTitle": { "message": "音声コンプレッション" },
   "audioSubtitle": { "message": "大きい音と小さい音を均一化" },
   "audioHint": { "message": "小さい音を持ち上げ、大きい音を抑えます。メイクアップゲインで全体の音量を上げます。CORSなしで別ドメインから配信される動画では、ブラウザがWeb Audioをミュートするため動作しません。" },
@@ -42,10 +36,6 @@
   "presetVoice": { "message": "音声" },
   "presetNight": { "message": "夜間" },
   "presetMovie": { "message": "映画" },
-  "audioOn": { "message": "音声コンプレッション オン" },
-  "audioOff": { "message": "音声コンプレッション オフ" },
-  "audioUnavailable": { "message": "この動画では圧縮を利用できません" },
-  "audioInUse": { "message": "音声は他の拡張機能またはプレーヤーが使用中です" },
   "meterIn": { "message": "入力" },
   "meterOut": { "message": "出力" },
   "meterThr": { "message": "スレッショルド" },
