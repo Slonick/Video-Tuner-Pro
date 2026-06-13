@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "Tampon faible — rattrapage limité" },
   "onVideoLabel": { "message": "Afficher la vitesse et le temps sur la vidéo" },
   "onStreamLabel": { "message": "Afficher la vitesse et le tampon sur la vidéo" },
+  "kbdLabel": { "message": "Raccourcis clavier" },
+  "kbdSlowerFaster": { "message": "ralentir / accélérer" },
+  "kbdReset": { "message": "réinitialiser" },
+  "kbdSaved": { "message": "vitesse enregistrée" },
   "rememberChannel": { "message": "Mémoriser pour la chaîne" },
   "resetChannel": { "message": "Réinitialiser pour la chaîne" }
 }

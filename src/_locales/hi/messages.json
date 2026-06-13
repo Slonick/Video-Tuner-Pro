@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "बफ़र कम — कैच-अप सीमित" },
   "onVideoLabel": { "message": "वीडियो पर गति और समय दिखाएँ" },
   "onStreamLabel": { "message": "वीडियो पर गति और बफ़र दिखाएँ" },
+  "kbdLabel": { "message": "कीबोर्ड शॉर्टकट" },
+  "kbdSlowerFaster": { "message": "धीमा / तेज़" },
+  "kbdReset": { "message": "रीसेट" },
+  "kbdSaved": { "message": "सहेजी गई गति" },
   "rememberChannel": { "message": "चैनल के लिए याद रखें" },
   "resetChannel": { "message": "चैनल के लिए रीसेट करें" }
 }

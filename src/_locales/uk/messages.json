@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "Буфер замалий — наздоганяння обмежено" },
   "onVideoLabel": { "message": "Показувати швидкість і час на відео" },
   "onStreamLabel": { "message": "Показувати швидкість і буфер на відео" },
+  "kbdLabel": { "message": "Гарячі клавіші" },
+  "kbdSlowerFaster": { "message": "повільніше / швидше" },
+  "kbdReset": { "message": "скидання" },
+  "kbdSaved": { "message": "збережена швидкість" },
   "rememberChannel": { "message": "Запам'ятати для каналу" },
   "resetChannel": { "message": "Скинути для каналу" }
 }

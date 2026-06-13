@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "Buffer baixo — recuperação limitada" },
   "onVideoLabel": { "message": "Mostrar velocidade e tempo no vídeo" },
   "onStreamLabel": { "message": "Mostrar velocidade e buffer no vídeo" },
+  "kbdLabel": { "message": "Atalhos de teclado" },
+  "kbdSlowerFaster": { "message": "mais lento / mais rápido" },
+  "kbdReset": { "message": "redefinir" },
+  "kbdSaved": { "message": "velocidade salva" },
   "rememberChannel": { "message": "Lembrar para o canal" },
   "resetChannel": { "message": "Redefinir para o canal" }
 }

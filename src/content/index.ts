@@ -12,6 +12,7 @@ import { announceAudioStatus } from "./audio/status.js";
 import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
 import { ownsNode } from "./badge/indicator.js";
 import "./messaging.js"; // registers the popup message handler (pulls in the bitrate sampler)
+import "./keyboard.js";  // registers the keyboard-shortcut listener
 import { currentChannel } from "./channel.js";
 
 let liveTick: ReturnType<typeof setInterval> | null = null;
@@ -40,7 +41,7 @@ function loadSpeed() {
   STORE.get(
     ["domains", "channels", "liveSync", "liveSyncTarget",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
-     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge"],
+     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge", "keyboard"],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
       const channels = (result.channels || {}) as Record<string, number>;
@@ -48,6 +49,7 @@ function loadSpeed() {
       // user turned it off) is still respected.
       S.showRemaining = result.showRemaining !== false;
       S.streamBadge = result.streamBadge !== false;
+      S.keyboardEnabled = result.keyboard !== false;
       S.liveSyncEnabled = result.liveSync !== false;
       S.liveSyncTarget = clampTarget(result.liveSyncTarget != null ? result.liveSyncTarget : 5);
       S.audioCompEnabled = result.audioComp !== false;
@@ -134,6 +136,7 @@ api.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.showRemaining) { S.showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }
   if (changes.streamBadge) { S.streamBadge = !!changes.streamBadge.newValue; updateTimeBadge(); flashBadge(); }
+  if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   let audioChanged = false;
   if (changes.audioComp) { S.audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
   if (changes.audioCompThreshold) { S.audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60); audioChanged = true; }

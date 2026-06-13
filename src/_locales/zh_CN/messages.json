@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "缓冲不足 — 追赶受限" },
   "onVideoLabel": { "message": "在视频上显示速度和时间" },
   "onStreamLabel": { "message": "在视频上显示速度和缓冲" },
+  "kbdLabel": { "message": "键盘快捷键" },
+  "kbdSlowerFaster": { "message": "更慢 / 更快" },
+  "kbdReset": { "message": "重置" },
+  "kbdSaved": { "message": "已保存的速度" },
   "rememberChannel": { "message": "为频道记忆" },
   "resetChannel": { "message": "重置频道" }
 }

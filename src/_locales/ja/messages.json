@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "バッファ不足 — 追いつき制限中" },
   "onVideoLabel": { "message": "速度と残り時間を動画に表示" },
   "onStreamLabel": { "message": "速度とバッファを動画に表示" },
+  "kbdLabel": { "message": "キーボードショートカット" },
+  "kbdSlowerFaster": { "message": "遅く / 速く" },
+  "kbdReset": { "message": "リセット" },
+  "kbdSaved": { "message": "保存した速度" },
   "rememberChannel": { "message": "チャンネルに記憶" },
   "resetChannel": { "message": "チャンネルをリセット" }
 }

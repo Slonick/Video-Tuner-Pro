@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "Буфер мал — догон ограничен" },
   "onVideoLabel": { "message": "Показывать скорость и время на видео" },
   "onStreamLabel": { "message": "Показывать скорость и буфер на видео" },
+  "kbdLabel": { "message": "Горячие клавиши" },
+  "kbdSlowerFaster": { "message": "медленнее / быстрее" },
+  "kbdReset": { "message": "сброс" },
+  "kbdSaved": { "message": "сохранённая скорость" },
   "rememberChannel": { "message": "Запомнить для канала" },
   "resetChannel": { "message": "Сбросить для канала" }
 }

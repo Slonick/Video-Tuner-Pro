@@ -53,6 +53,10 @@
   "bufferLowWarn": { "message": "Puffer zu klein — Aufholen begrenzt" },
   "onVideoLabel": { "message": "Tempo & Zeit im Video anzeigen" },
   "onStreamLabel": { "message": "Tempo & Puffer im Video anzeigen" },
+  "kbdLabel": { "message": "Tastenkürzel" },
+  "kbdSlowerFaster": { "message": "langsamer / schneller" },
+  "kbdReset": { "message": "zurücksetzen" },
+  "kbdSaved": { "message": "gespeichertes Tempo" },
   "rememberChannel": { "message": "Für Kanal merken" },
   "resetChannel": { "message": "Für Kanal zurücksetzen" }
 }

@@ -8,6 +8,8 @@ export const S = {
   // out not to be a live stream).
   userSpeed: 1.0,
   liveSyncEnabled: false,
+  // Keyboard shortcuts (S/D/R/Z) for playback speed
+  keyboardEnabled: true,
   liveSyncTarget: 5,        // seconds of allowed lag behind the live edge (1–30)
   // On-video badge: speed + real remaining time (VODs)
   showRemaining: false,
