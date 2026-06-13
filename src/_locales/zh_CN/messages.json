@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "缓冲不足 — 追赶受限" },
   "onVideoLabel": { "message": "在视频上显示速度和时间" },
   "onStreamLabel": { "message": "在视频上显示速度和缓冲" },
+  "superTheaterLabel": { "message": "超级影院 (YouTube)" },
+  "superTheaterHint": { "message": "在 YouTube 上，剧场模式填满整个窗口，顶栏自动隐藏。" },
   "kbdLabel": { "message": "键盘快捷键" },
   "kbdSlowerFaster": { "message": "更慢 / 更快" },
   "kbdReset": { "message": "重置" },
-  "kbdSaveSite": { "message": "保存网站" },
-  "kbdSaveChannel": { "message": "保存频道" },
+  "kbdSaveSite": { "message": "记住网站" },
+  "kbdSaveChannel": { "message": "记住频道" },
   "rememberChannel": { "message": "为频道记忆" },
   "resetChannel": { "message": "重置频道" }
 }

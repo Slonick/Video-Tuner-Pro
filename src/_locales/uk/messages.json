@@ -46,11 +46,13 @@
   "bufferLowWarn": { "message": "Буфер замалий — наздоганяння обмежено" },
   "onVideoLabel": { "message": "Показувати швидкість і час на відео" },
   "onStreamLabel": { "message": "Показувати швидкість і буфер на відео" },
+  "superTheaterLabel": { "message": "Супертеатр (YouTube)" },
+  "superTheaterHint": { "message": "На YouTube режим театру займає все вікно; шапка автоматично ховається." },
   "kbdLabel": { "message": "Гарячі клавіші" },
   "kbdSlowerFaster": { "message": "повільніше / швидше" },
   "kbdReset": { "message": "скидання" },
-  "kbdSaveSite": { "message": "зберегти сайт" },
-  "kbdSaveChannel": { "message": "зберегти канал" },
+  "kbdSaveSite": { "message": "запам’ятати сайт" },
+  "kbdSaveChannel": { "message": "запам’ятати канал" },
   "rememberChannel": { "message": "Запам'ятати для каналу" },
   "resetChannel": { "message": "Скинути для каналу" }
 }
