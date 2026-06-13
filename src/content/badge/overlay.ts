@@ -54,7 +54,7 @@ function renderBadge(v: HTMLVideoElement): void {
     const buf = forwardBuffer(v);
     // "⚠" when we're far behind but the buffer is too thin to catch up at all.
     const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
-    const warn = S.liveSyncEnabled && catchupBufferLimited(lat != null ? lat : buf, buf, target) ? " ⚠" : "";
+    const warn = S.liveSyncEnabled && catchupBufferLimited(lat, buf, target) ? " ⚠" : "";
     el.textContent = (lat != null
       ? `${sp}× · ${lat.toFixed(2)}s (${buf.toFixed(2)}s)`
       : `${sp}× · ${buf.toFixed(2)}s`) + warn;

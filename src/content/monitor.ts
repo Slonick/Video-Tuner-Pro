@@ -37,7 +37,7 @@ export function monitorData(): MonitorData {
     lag = l != null ? l : fb;
     if (l != null) bufAhead = fb;
     limited = S.liveSyncEnabled
-      && catchupBufferLimited(lag, fb, Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER));
+      && catchupBufferLimited(l, fb, Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER));
   }
   return {
     audio: audioLevels(),
