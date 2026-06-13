@@ -23,6 +23,37 @@
     }
 }
 
+/* Unobtrusive Ko-fi cup in the card's top-right corner → opens the support page.
+   Muted and faint so it doesn't compete with the readout; full strength on hover. */
+.kofi {
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    color: var(--muted);
+    opacity: 0.45;
+    z-index: 1;                /* above .speed-display (also positioned) so hover/click reach it */
+    transition: opacity 0.12s;
+
+    & svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;  /* the whole anchor box is the hit target, not just the thin strokes */
+    }
+
+    &:hover,
+    &:focus-visible {
+        opacity: 1;
+
+        /* Only the heart picks up the Ko-fi brand red; the cup stays monochrome. */
+        .heart {
+            fill: #ff5e5b;
+        }
+    }
+}
+
 /* --- Big readout --------------------------------------------------------- */
 .speed-display {
     position: relative;
