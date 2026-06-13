@@ -7,10 +7,13 @@ export interface CatchupInput {
   target: number;          // already floored at MIN_FORWARD_BUFFER
 }
 
-// Buffer needed to sustain catch-up at `rate`: the floor plus what one full
-// control interval (worst case 1s between ticks) drains at that rate.
-export function catchupReserve(rate: number): number {
-  return MIN_FORWARD_BUFFER + Math.max(0, rate - 1);
+// The buffer level catch-up must never drain below. With a real
+// latency-to-broadcaster reading the floor is the allowed delay itself —
+// draining to 1s just trades lag for rebuffering stalls; the user's own
+// tolerance (3-5s) is the sensible reserve. Without latency the lag IS the
+// buffer, so the floor stays at the bare anti-stall minimum.
+export function catchupBufferFloor(latency: number | null, target: number): number {
+  return latency != null ? target : MIN_FORWARD_BUFFER;
 }
 
 // Stepped catch-up: 105% engages just past the allowed delay, and each full
@@ -25,13 +28,14 @@ export function decideCatchupSpeed(o: CatchupInput): number {
   const excess = lag - o.target;
   if (excess < 1) return 1.0; // deadband: don't dither right at the target
   const byLag = 0.05 + Math.floor(excess / CATCHUP_STEP_LAG) * 0.05;
-  const byBuffer = Math.floor((o.buffer - MIN_FORWARD_BUFFER) * 20) / 20; // inverse of catchupReserve
+  const byBuffer = Math.floor((o.buffer - catchupBufferFloor(o.latency, o.target)) * 20) / 20;
   return 1 + Math.max(0, Math.min(CATCHUP_MAX - 1, byLag, byBuffer));
 }
 
 // True when we're clearly behind the live edge but the buffer is too thin to
 // catch up at all (not even the smallest 5% step) — latency will stay high
 // until the buffer refills, which the UI warns about.
-export function catchupBufferLimited(lag: number, buffer: number, target: number): boolean {
-  return lag > target + CATCHUP_START && buffer < catchupReserve(1.05);
+export function catchupBufferLimited(latency: number | null, buffer: number, target: number): boolean {
+  const lag = latency != null ? latency : buffer;
+  return lag > target + CATCHUP_START && buffer < catchupBufferFloor(latency, target) + 0.05;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decideCatchupSpeed, catchupBufferLimited, catchupReserve } from "../src/content/live/catchup.js";
+import { decideCatchupSpeed, catchupBufferLimited, catchupBufferFloor } from "../src/content/live/catchup.js";
 
 // constants: MIN_FORWARD_BUFFER=1.0, CATCHUP_MAX=1.25, CATCHUP_STEP_LAG=7,
 // CATCHUP_START=2.0 (warning threshold).
@@ -34,14 +34,16 @@ describe("decideCatchupSpeed — stepped ramp", () => {
 });
 
 describe("decideCatchupSpeed — anti-stall guards", () => {
-  it("a thin buffer sustains a small step rather than none", () => {
-    // far behind, but the buffer only covers a small step (reserve = 1 + rate-1)
-    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 1.06 })).toBe(1.05);
-    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 1.19 })).toBe(1.15);
+  it("with real latency, the buffer floor is the allowed delay itself", () => {
+    // far behind, but the buffer barely exceeds the 5s target → small steps only
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 5.06 })).toBe(1.05);
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 5.19 })).toBe(1.15);
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 5.0 })).toBe(1);
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 1.5 })).toBe(1);
   });
-  it("no speed-up at all below the 1s buffer floor", () => {
-    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 1.0 })).toBe(1);
-    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 0.4 })).toBe(1);
+  it("without latency (buffer is the lag), the floor stays at the 1s minimum", () => {
+    // lag = buffer = 11 → excess 6 → 105%; byBuffer (11-1=10) doesn't cap it
+    expect(decideCatchupSpeed({ ...base, latency: null, buffer: 11 })).toBe(1.05);
   });
   it("bails if frames drop", () => {
     expect(decideCatchupSpeed({ ...base, latency: 100, dropped: 2 })).toBe(1);
@@ -49,20 +51,21 @@ describe("decideCatchupSpeed — anti-stall guards", () => {
 });
 
 describe("catchupBufferLimited (the UI warning)", () => {
-  it("warns when far behind with a buffer too thin for even the smallest step", () => {
-    expect(catchupBufferLimited(30, 1.0, 5)).toBe(true);
+  it("warns when far behind with a buffer at/below the floor", () => {
+    expect(catchupBufferLimited(30, 5.0, 5)).toBe(true);   // latency-based floor = target
+    expect(catchupBufferLimited(30, 1.5, 5)).toBe(true);
   });
   it("quiet when the buffer sustains some catch-up", () => {
-    expect(catchupBufferLimited(30, 4, 5)).toBe(false);
+    expect(catchupBufferLimited(30, 6, 5)).toBe(false);
   });
   it("quiet when not behind, however small the buffer", () => {
     expect(catchupBufferLimited(5.5, 1.0, 5)).toBe(false);
   });
 });
 
-describe("catchupReserve", () => {
-  it("scales with the catch-up rate", () => {
-    expect(catchupReserve(1.05)).toBe(1.05);
-    expect(catchupReserve(1.25)).toBe(1.25);
+describe("catchupBufferFloor", () => {
+  it("allowed delay with latency, bare 1s minimum without", () => {
+    expect(catchupBufferFloor(12, 5)).toBe(5);
+    expect(catchupBufferFloor(null, 5)).toBe(1);
   });
 });
