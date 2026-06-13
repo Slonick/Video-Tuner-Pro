@@ -14,8 +14,7 @@
   "syncSubtitle": { "message": "Recuperar o atraso da transmissão ao vivo automaticamente" },
   "allowedDelay": { "message": "Atraso permitido" },
   "secondsShort": { "message": "s" },
-  "maxCatchupSpeed": { "message": "Velocidade de recuperação" },
-  "syncHint": { "message": "Quando a transmissão atrasa mais que o atraso permitido, ela toca na velocidade de recuperação até alcançar a borda ao vivo e volta a 100%. Para se começarem a cair quadros." },
+  "syncHint": { "message": "Quando a transmissão fica além do atraso permitido, a reprodução acelera suavemente — quanto maior o atraso, mais rápido, até 125% — e volta a 100% na borda ao vivo. Recua se houver perda de quadros ou buffer baixo." },
   "indicatorLive": { "message": "Ao vivo — 100%" },
   "indicatorCatchup": {
     "message": "Live-sync — $pct$% (recuperando)",

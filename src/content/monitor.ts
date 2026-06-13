@@ -1,4 +1,4 @@
-import { MIN_FORWARD_BUFFER, LIVE_MAX_FLOOR } from "./core/constants.js";
+import { MIN_FORWARD_BUFFER } from "./core/constants.js";
 import { S } from "./state.js";
 import { primaryVideo } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
@@ -37,8 +37,7 @@ export function monitorData(): MonitorData {
     lag = l != null ? l : fb;
     if (l != null) bufAhead = fb;
     limited = S.liveSyncEnabled
-      && catchupBufferLimited(lag, fb, Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER),
-                              Math.max(LIVE_MAX_FLOOR, S.liveSyncMax));
+      && catchupBufferLimited(l, fb, Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER));
   }
   return {
     audio: audioLevels(),
