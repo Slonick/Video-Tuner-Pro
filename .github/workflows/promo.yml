@@ -30,27 +30,30 @@ jobs:
         with:
           chrome-version: stable
 
-      # The runner has no CJK/Devanagari fonts — ja/zh_CN/hi promos render as
-      # tofu boxes without these.
-      - name: Install fonts for non-Latin locales
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-core
+      # The runner has no CJK/Devanagari fonts (ja/zh_CN/hi → tofu boxes without
+      # them); ffmpeg encodes the README GIF.
+      - name: Install fonts and ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-core ffmpeg
 
       - run: npm ci
 
       - name: Build (the popup the promos render)
         run: npm run build
 
-      - name: Render promos (all locales × states)
+      - name: Render store assets and the README GIF
         env:
           CHROME: ${{ steps.chrome.outputs.chrome-path }}
-        run: npm run promo
+        run: |
+          rm -rf .promo/store          # drop stale assets from older layouts/sizes
+          npm run promo                # localized store screenshots + tiles
+          npm run promo:gif            # README animation
 
       - name: Open/update a PR with the promo images
         env:
           GH_TOKEN: ${{ github.token }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if [ -z "$(git status --porcelain .promo/store)" ]; then
+          if [ -z "$(git status --porcelain .promo)" ]; then
             echo "No promo changes — nothing to PR."
             exit 0
           fi
@@ -58,11 +61,11 @@ jobs:
           git config user.name "slonick"
           git config user.email "contact@slonick.dev"
           git switch -C "$BRANCH"
-          git add .promo/store
-          git commit -m "chore(promo): regenerate store images"
+          git add .promo
+          git commit -m "chore(promo): regenerate store assets and README GIF"
           git push -f origin "$BRANCH"
           # Reuse the open PR for this branch if there is one, else open a new one.
           gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -qx OPEN || \
             gh pr create --base "$DEFAULT_BRANCH" --head "$BRANCH" \
-              --title "chore(promo): regenerate store images" \
-              --body "Automated promo regeneration. Review the updated \`.promo/store/\` images and merge."
+              --title "chore(promo): regenerate store assets and README GIF" \
+              --body "Automated promo regeneration. Review the updated \`.promo/\` assets and merge."

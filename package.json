@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "screenshot": "node tools/screenshot.mjs",
-    "promo": "node tools/promo.mjs"
+    "promo": "node tools/promo.mjs",
+    "promo:gif": "node tools/promo-gif.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.43",
