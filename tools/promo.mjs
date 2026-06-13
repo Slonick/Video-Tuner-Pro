@@ -5,14 +5,13 @@
 //
 //   node tools/promo.mjs [locale|all] [state|all]
 //   states: video (overview) | stream (live-sync) | audio (compressor, expanded)
-import { renderPopup } from "./render-popup.mjs";
+import { renderPopup, runChrome } from "./render-popup.mjs";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { cpus } from "node:os";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const TMP = join(ROOT, ".screenshots/_work");
 const OUT = join(ROOT, ".promo/store");
 
@@ -73,33 +72,43 @@ const locales = localeArg === "all" ? allLocales : [localeArg];
 const states = stateArg === "all" ? Object.keys(STATES) : [stateArg];
 await mkdir(OUT, { recursive: true });
 
-for (const locale of locales) {
+async function renderOne(locale, stateName) {
   const msg = JSON.parse(await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"));
   const m = (k, fb = "") => msg[k]?.message ?? fb;
 
-  for (const stateName of states) {
-    const st = STATES[stateName];
-    const light = join(TMP, `p-${locale}-${stateName}-light.png`);
-    const dark = join(TMP, `p-${locale}-${stateName}-dark.png`);
-    const opts = { scenario: st.scenario, expand: st.expand, extraCss: st.extraCss || "", locale, dpr: 2 };
-    await renderPopup({ ...opts, theme: "light", out: light });
-    await renderPopup({ ...opts, theme: "dark", out: dark });
+  const st = STATES[stateName];
+  const light = join(TMP, `p-${locale}-${stateName}-light.png`);
+  const dark = join(TMP, `p-${locale}-${stateName}-dark.png`);
+  const opts = { scenario: st.scenario, expand: st.expand, extraCss: st.extraCss || "", locale, dpr: 2 };
+  // Themes don't change layout — measure once on the light pass, reuse for dark.
+  const { height } = await renderPopup({ ...opts, theme: "light", out: light });
+  await renderPopup({ ...opts, theme: "dark", out: dark, height });
 
-    const html = promoHTML({
-      brand: m("appHeader", "Video Tuner"),
-      headline: m(st.headline),
-      sub: m(st.sub),
-      bullets: st.bullets.map((k) => m(k)).filter(Boolean),
-      light, dark,
-    });
-    const htmlPath = join(TMP, `promo-${locale}-${stateName}.html`);
-    await writeFile(htmlPath, html);
-    const out = join(OUT, `${locale}-${stateName}.png`);
-    execFileSync(CHROME, [
-      "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
-      "--force-device-scale-factor=1", "--window-size=1280,800",
-      "--virtual-time-budget=2000", `--screenshot=${out}`, `file://${htmlPath}`,
-    ], { stdio: "ignore" });
-    console.log("→", out);
-  }
+  const html = promoHTML({
+    brand: m("appHeader", "Video Tuner"),
+    headline: m(st.headline),
+    sub: m(st.sub),
+    bullets: st.bullets.map((k) => m(k)).filter(Boolean),
+    light, dark,
+  });
+  const htmlPath = join(TMP, `promo-${locale}-${stateName}.html`);
+  await writeFile(htmlPath, html);
+  const out = join(OUT, `${locale}-${stateName}.png`);
+  await runChrome([
+    "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+    "--force-device-scale-factor=1", "--window-size=1280,800",
+    "--virtual-time-budget=2000", `--screenshot=${out}`, `file://${htmlPath}`,
+  ]);
+  console.log("→", out);
 }
+
+// Renders are independent (Chrome per shot, per-render temp files) — run them
+// through a small worker pool sized to the machine.
+const tasks = locales.flatMap((locale) => states.map((stateName) => [locale, stateName]));
+const CONCURRENCY = Math.max(1, Math.min(6, cpus().length - 1));
+await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+  while (tasks.length) {
+    const [locale, stateName] = tasks.shift();
+    await renderOne(locale, stateName);
+  }
+}));
