@@ -3,15 +3,7 @@ import { STORE } from "./platform/storage.js";
 import { clampNum } from "./core/clamp.js";
 import { byId } from "./dom.js";
 import { autoExpandOnFirstEnable } from "./sections.js";
-
-const AUDIO_DEFAULTS = {
-  audioCompThreshold: -60,
-  audioCompKnee: 30,
-  audioCompRatio: 10,
-  audioCompAttack: 0,
-  audioCompRelease: 1,
-  audioCompGain: 10,
-};
+import { COMP_PRESETS, compToStorage, type CompParams, type PresetName } from "./audio-presets.js";
 
 interface AudioUI {
   enabled: boolean;
@@ -103,15 +95,15 @@ ADV.forEach(([id, key, lo, hi, def]) => {
   });
 });
 
-byId("audioReset").addEventListener("click", () => {
-  reflectAudioUI({
-    enabled: byId<HTMLInputElement>("audioCompToggle").checked,
-    threshold: AUDIO_DEFAULTS.audioCompThreshold,
-    knee: AUDIO_DEFAULTS.audioCompKnee,
-    ratio: AUDIO_DEFAULTS.audioCompRatio,
-    attack: AUDIO_DEFAULTS.audioCompAttack,
-    release: AUDIO_DEFAULTS.audioCompRelease,
-    gain: AUDIO_DEFAULTS.audioCompGain,
+// Apply a preset: fill every slider, persist, and switch compression on.
+function applyComp(p: CompParams): void {
+  reflectAudioUI({ enabled: true, ...p });
+  saveAudio({ ...compToStorage(p), audioComp: true });
+}
+
+document.querySelectorAll<HTMLElement>(".btn-preset").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const p = COMP_PRESETS[btn.dataset.preset as PresetName];
+    if (p) applyComp(p);
   });
-  saveAudio(Object.assign({}, AUDIO_DEFAULTS));
 });

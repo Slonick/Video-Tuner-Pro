@@ -139,7 +139,30 @@
     }
 }
 
-.audio-reset {
-    width: 100%;
-    margin-top: 4px;
+/* Compressor presets — one-tap profile buttons at the top of the audio body. */
+.preset-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.btn-preset {
+    padding: 8px 0;
+    border: none;
+    border-radius: 8px;
+    background: var(--seg);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, filter 0.12s;
+
+    &:hover {
+        background: var(--track);
+    }
+
+    &:active {
+        filter: brightness(0.96);
+    }
 }

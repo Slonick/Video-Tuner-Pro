@@ -52,4 +52,14 @@ describe("popup integration", () => {
     const calls = sendSpy.mock.calls.map((c) => c[1]);
     expect(calls).toContainEqual(expect.objectContaining({ action: "setSpeed", speed: 1.5 }));
   });
+
+  it("a compressor preset fills in every slider and turns compression on", () => {
+    (byId("audioCompToggle") as HTMLInputElement).checked = false;
+    document.querySelector<HTMLElement>('.btn-preset[data-preset="movie"]')!.click();
+    expect((byId("acThreshold") as HTMLInputElement).value).toBe("-28");
+    expect((byId("acRatio") as HTMLInputElement).value).toBe("8");
+    expect((byId("acGain") as HTMLInputElement).value).toBe("6");
+    expect(byId("acThresholdVal").textContent).toBe("-28 dB");
+    expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
+  });
 });
