@@ -1,4 +1,4 @@
-import { MIN_FORWARD_BUFFER } from "../core/constants.js";
+import { MIN_FORWARD_BUFFER, LIVE_MAX_FLOOR } from "../core/constants.js";
 import { S } from "../state.js";
 import { primaryVideo } from "../videos.js";
 import { onStreamPage } from "../live/detection.js";
@@ -54,7 +54,8 @@ function renderBadge(v: HTMLVideoElement): void {
     const buf = forwardBuffer(v);
     // "⚠" when we're far behind but the buffer is too thin to catch up safely.
     const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
-    const warn = S.liveSyncEnabled && catchupBufferLimited(lat != null ? lat : buf, buf, target) ? " ⚠" : "";
+    const rate = Math.max(LIVE_MAX_FLOOR, S.liveSyncMax);
+    const warn = S.liveSyncEnabled && catchupBufferLimited(lat != null ? lat : buf, buf, target, rate) ? " ⚠" : "";
     el.textContent = (lat != null
       ? `${sp}× · ${lat.toFixed(2)}s (${buf.toFixed(2)}s)`
       : `${sp}× · ${buf.toFixed(2)}s`) + warn;
@@ -83,7 +84,9 @@ function hookBadgeMouse(): void {
     if (!enabled || !timeBadgeEl || !bv) return;
     const r = bv.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
-    renderBadge(bv);
+    // Only reveal the badge here — content is re-rendered by the 1s tick
+    // (updateTimeBadge). Rendering per mousemove made the continuous buffer
+    // value flicker at pointer-event rate.
     flashBadge();
   }, { passive: true });
 }
