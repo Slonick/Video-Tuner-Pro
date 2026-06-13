@@ -5,11 +5,7 @@ on the live edge, and even out loud and quiet sounds — all from one little pop
 Works on virtually any site, in light and dark themes, in 10 languages, with no
 accounts and no tracking.
 
-![Video Tuner Pro — speed presets, live-sync and audio compression in one popup](.promo/store/en-video.png)
-
-![Keep stream live — allowed delay, catch-up speed and the real-time latency graph](.promo/store/en-stream.png)
-
-![Audio compression — threshold, knee, ratio and make-up gain with a live meter](.promo/store/en-audio.png)
+![Video Tuner Pro — playback speed, live-stream sync and audio compression in one popup](.promo/github/promo.gif)
 
 ## Install
 

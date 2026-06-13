@@ -1,6 +1,6 @@
 {
   "extName": { "message": "Video Tuner Pro" },
-  "extDescription": { "message": "Керування швидкістю відео на будь-якому сайті: пресети, відсотки та розумна синхронізація прямих трансляцій." },
+  "extDescription": { "message": "Тонке налаштування відео: швидкість, розумна синхронізація трансляцій і компресія звуку для рівномірної гучності." },
   "pageTitle": { "message": "Video Tuner" },
   "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Завантаження…" },

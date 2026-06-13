@@ -58,7 +58,7 @@
   },
   "es": {
     "video": { "title": "Velocidad de reproducción", "items": [
-      ["Ajustes y control fino", "Un clic o arrastra — del 25% al 300%, en casi cualquier vídeo."],
+      ["Preajustes y control deslizante", "Un clic o arrastra — del 25% al 300%, en casi cualquier vídeo."],
       ["Recordar por sitio", "Guarda una velocidad para un sitio; se aplica automáticamente la próxima vez."],
       ["Indicador en el vídeo", "Velocidad actual y el tiempo real restante, en el propio reproductor."]
     ]},
@@ -72,16 +72,16 @@
   },
   "fr": {
     "video": { "title": "Vitesse de lecture", "items": [
-      ["Préréglages et curseur fin", "Un clic ou glissez — de 25% à 300%, sur presque toutes les vidéos."],
+      ["Préréglages et curseur fin", "Un clic ou un glissement — de 25% à 300%, sur presque toutes les vidéos."],
       ["Mémoriser par site", "Enregistrez une vitesse pour un site ; appliquée automatiquement la prochaine fois."],
       ["Affichage sur la vidéo", "Vitesse actuelle et temps réel restant, directement sur le lecteur."]
     ]},
     "stream": { "title": "Directs", "items": [
       ["Rattrapage Live-sync", "Accélère juste assez pour rejoindre le direct, puis revient."],
-      ["Latence réelle", "Latence réelle vers le diffuseur sur Twitch et YouTube — pas juste le tampon."],
+      ["Latence réelle", "Latence réelle jusqu'au diffuseur sur Twitch et YouTube — pas seulement le tampon."],
       ["Badge vitesse et tampon", "Affiche la vitesse et le tampon actuels sur la vidéo."]
     ]},
-    "audioLead": "Égalise les sons forts et faibles — dialogues clairs, pas d'explosions assourdissantes. Réglez-le une fois, c'est tout.",
+    "audioLead": "Égalise les sons forts et faibles — dialogues clairs, pas d'explosions assourdissantes. Réglez une fois, oubliez ensuite.",
     "advanced": "Paramètres avancés"
   },
   "pt_BR": {
@@ -95,7 +95,7 @@
       ["Latência real", "Latência real até o transmissor no Twitch e YouTube — não só o buffer."],
       ["Selo de velocidade e buffer", "Mostra a velocidade e o buffer atuais no vídeo."]
     ]},
-    "audioLead": "Equaliza sons altos e baixos — diálogos claros, sem explosões ensurdecedoras. Configure uma vez e esqueça.",
+    "audioLead": "Equilibra sons altos e baixos — diálogos claros, sem explosões ensurdecedoras. Configure uma vez e esqueça.",
     "advanced": "Configurações avançadas"
   },
   "ja": {
@@ -109,7 +109,7 @@
       ["実際の遅延", "TwitchやYouTubeでの配信者までの実遅延 — バッファだけではありません。"],
       ["速度・バッファ表示", "現在の速度とバッファを動画上に表示。"]
     ]},
-    "audioLead": "大きい音と小さい音を均一に — セリフは明瞭に、爆発音で驚かない。一度設定すれば完了。",
+    "audioLead": "大きい音と小さい音を均一化 — セリフは明瞭に、爆発音に驚かされない。一度設定すれば、あとはおまかせ。",
     "advanced": "詳細設定"
   },
   "zh_CN": {
@@ -123,7 +123,7 @@
       ["真实延迟", "Twitch 和 YouTube 上到主播的真实延迟 — 不只是缓冲。"],
       ["速度与缓冲标记", "在视频上显示当前速度和缓冲。"]
     ]},
-    "audioLead": "平衡大声和小声 — 对白清晰，爆炸不震耳。设置一次即可。",
+    "audioLead": "平衡大声与轻声 — 对白清晰，爆炸声不再震耳。一次设置，长期省心。",
     "advanced": "高级设置"
   },
   "hi": {
@@ -137,7 +137,7 @@
       ["वास्तविक लेटेंसी", "Twitch और YouTube पर प्रसारक तक वास्तविक लेटेंसी — सिर्फ़ बफ़र नहीं।"],
       ["गति और बफ़र बैज", "वीडियो पर मौजूदा गति और बफ़र दिखाता है।"]
     ]},
-    "audioLead": "तेज़ और धीमी आवाज़ें संतुलित करें — साफ़ संवाद, कान फाड़ने वाले धमाके नहीं। एक बार सेट करें और भूल जाएँ।",
+    "audioLead": "तेज़ और धीमी आवाज़ें बराबर करें — साफ़ संवाद, कान फाड़ने वाले धमाके नहीं। एक बार सेट करें और भूल जाएँ।",
     "advanced": "उन्नत सेटिंग्स"
   }
 }

@@ -1,6 +1,6 @@
 {
   "extName": { "message": "Video Tuner Pro" },
-  "extDescription": { "message": "किसी भी साइट पर वीडियो की प्लेबैक गति नियंत्रित करें: प्रीसेट, प्रतिशत और स्मार्ट लाइव-स्ट्रीम सिंक।" },
+  "extDescription": { "message": "किसी भी वीडियो को ट्यून करें: प्लेबैक गति, स्मार्ट लाइव-स्ट्रीम सिंक और तेज़-धीमी आवाज़ें बराबर करने वाला ऑडियो कंप्रेशन।" },
   "pageTitle": { "message": "Video Tuner" },
   "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "लोड हो रहा है…" },

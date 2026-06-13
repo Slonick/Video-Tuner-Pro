@@ -1,6 +1,6 @@
 {
   "extName": { "message": "Video Tuner Pro" },
-  "extDescription": { "message": "Controla la velocidad de reproducción de vídeo en cualquier sitio: ajustes, porcentajes y sincronización inteligente de directos." },
+  "extDescription": { "message": "Ajusta cualquier vídeo: velocidad de reproducción, sincronización inteligente de directos y compresión de audio." },
   "pageTitle": { "message": "Video Tuner" },
   "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "Cargando…" },

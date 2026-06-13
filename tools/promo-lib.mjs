@@ -71,7 +71,7 @@ export function frameHTML({ p = 0, video, stream, popH, copy, W = 1280, H = 800,
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans','Noto Sans CJK SC',sans-serif;}
 .promo{width:${W}px;height:${H}px;display:flex;align-items:stretch;overflow:hidden;background:linear-gradient(to right,#eef1f5 0,#eef1f5 50%,#16181d 50%,#16181d 100%);}
 .col{width:392px;height:${H}px;position:relative;}
-.layer{position:absolute;inset:0;padding:0 48px;display:flex;flex-direction:column;justify-content:center;}
+.layer{position:absolute;inset:0;padding:0 32px;display:flex;flex-direction:column;justify-content:center;}
 .col h2{font-size:33px;font-weight:800;line-height:1.1;letter-spacing:-0.015em;}
 .col .sub{margin-top:14px;font-size:18px;line-height:1.45;}
 .col h3{font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px;}

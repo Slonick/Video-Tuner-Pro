@@ -1,6 +1,6 @@
 {
   "extName": { "message": "Video Tuner Pro" },
-  "extDescription": { "message": "在任何网站控制视频播放速度：预设、百分比和智能直播同步。" },
+  "extDescription": { "message": "调校任何视频：播放速度、智能直播同步，以及平衡大声与轻声的音频压缩。" },
   "pageTitle": { "message": "Video Tuner" },
   "appHeader": { "message": "Video Tuner" },
   "loading": { "message": "加载中…" },
