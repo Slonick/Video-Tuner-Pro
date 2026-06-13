@@ -39,10 +39,11 @@ async function buildMock() {
 }
 
 function measureHeight(file) {
+  // stderr ignored: headless Chrome on CI spams harmless dbus connection errors.
   const dom = execFileSync(CHROME, [
     "--headless=new", "--disable-gpu", "--no-sandbox",
     "--virtual-time-budget=1200", "--dump-dom", `file://${file}`,
-  ], { encoding: "utf8" });
+  ], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const m = dom.match(/VH(\d+)/);
   return m ? Number(m[1]) : 600;
 }
