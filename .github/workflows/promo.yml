@@ -55,8 +55,8 @@ jobs:
             exit 0
           fi
           BRANCH="chore/promo-images"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "slonick"
+          git config user.email "contact@slonick.dev"
           git switch -C "$BRANCH"
           git add .promo/store
           git commit -m "chore(promo): regenerate store images"
