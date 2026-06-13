@@ -50,6 +50,7 @@
   "superTheaterHint": { "message": "Auf YouTube füllt der Theatermodus das ganze Fenster; die Kopfzeile blendet sich automatisch aus." },
   "kbdLabel": { "message": "Tastenkürzel" },
   "kbdSlowerFaster": { "message": "langsamer / schneller" },
+  "kbdBigStep": { "message": "10 %-Schritt" },
   "kbdReset": { "message": "zurücksetzen" },
   "kbdSaveSite": { "message": "Seite merken" },
   "kbdSaveChannel": { "message": "Kanal merken" },

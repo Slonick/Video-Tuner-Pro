@@ -49,6 +49,18 @@ describe("keyboard shortcuts", () => {
     expect(m.setSpeed).toHaveBeenCalledWith(expect.closeTo(1.45), false, true);
   });
 
+  it("Shift+D speeds up by 10% (manual)", () => {
+    S.currentSpeed = 1.0;
+    press("KeyD", { shiftKey: true });
+    expect(m.setSpeed).toHaveBeenCalledWith(expect.closeTo(1.1), false, true);
+  });
+
+  it("Shift+S slows down by 10% (manual)", () => {
+    S.currentSpeed = 1.5;
+    press("KeyS", { shiftKey: true });
+    expect(m.setSpeed).toHaveBeenCalledWith(expect.closeTo(1.4), false, true);
+  });
+
   it("R resets to 100%", () => {
     press("KeyR");
     expect(m.setSpeed).toHaveBeenCalledWith(1.0, false, true);

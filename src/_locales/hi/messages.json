@@ -50,6 +50,7 @@
   "superTheaterHint": { "message": "YouTube पर थिएटर मोड पूरी विंडो भर देता है; हेडर अपने आप छिप जाता है।" },
   "kbdLabel": { "message": "कीबोर्ड शॉर्टकट" },
   "kbdSlowerFaster": { "message": "धीमा / तेज़" },
+  "kbdBigStep": { "message": "10% चरण" },
   "kbdReset": { "message": "रीसेट" },
   "kbdSaveSite": { "message": "साइट याद रखें" },
   "kbdSaveChannel": { "message": "चैनल याद रखें" },

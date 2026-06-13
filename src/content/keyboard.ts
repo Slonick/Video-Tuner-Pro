@@ -1,7 +1,8 @@
 // In-page keyboard shortcuts for playback speed (default-on; toggled in the popup).
 // Bare single keys by physical position (e.code, so they hold across layouts):
-//   S / D — slower / faster,  R — reset to 100%,  Z — remember the current speed
-//   for this site,  Shift+Z — remember it for the YouTube channel.
+//   S / D — slower / faster by 5% (Shift+S / Shift+D step by 10%),  R — reset to
+//   100%,  Z — remember the current speed for this site,  Shift+Z — remember it
+//   for the YouTube channel.
 // Ignored while typing in a field, while Ctrl/Cmd/Alt is held, and on pages with
 // no video. Speed changes (S/D/R) go through setSpeed's `manual` flag, so a live
 // stream at the live edge safely ignores them.
@@ -11,7 +12,8 @@ import { ctxValid } from "./platform/browser.js";
 import { currentChannel } from "./channel.js";
 import { primaryVideo } from "./videos.js";
 
-const STEP = 0.05;
+const STEP = 0.05;       // S / D
+const BIG_STEP = 0.10;   // Shift+S / Shift+D
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
 function deepActive(): Element | null {
@@ -35,8 +37,9 @@ document.addEventListener("keydown", (e) => {
   if (!primaryVideo()) return;   // nothing to act on — leave the key to the page
 
   e.preventDefault();
-  if (e.code === "KeyD") setSpeed(S.currentSpeed + STEP, false, true);
-  else if (e.code === "KeyS") setSpeed(S.currentSpeed - STEP, false, true);
+  const step = e.shiftKey ? BIG_STEP : STEP;
+  if (e.code === "KeyD") setSpeed(S.currentSpeed + step, false, true);
+  else if (e.code === "KeyS") setSpeed(S.currentSpeed - step, false, true);
   else if (e.code === "KeyR") setSpeed(1.0, false, true);
   else {
     // KeyZ — remember the current speed: Shift+Z for the channel, plain Z for the site.

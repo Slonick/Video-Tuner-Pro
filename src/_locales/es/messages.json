@@ -50,6 +50,7 @@
   "superTheaterHint": { "message": "En YouTube, el modo cine ocupa toda la ventana; la cabecera se oculta automáticamente." },
   "kbdLabel": { "message": "Atajos de teclado" },
   "kbdSlowerFaster": { "message": "más lento / más rápido" },
+  "kbdBigStep": { "message": "paso del 10 %" },
   "kbdReset": { "message": "restablecer" },
   "kbdSaveSite": { "message": "recordar sitio" },
   "kbdSaveChannel": { "message": "recordar canal" },

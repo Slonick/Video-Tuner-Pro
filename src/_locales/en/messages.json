@@ -50,6 +50,7 @@
   "superTheaterHint": { "message": "On YouTube, theater mode fills the whole window; the header auto-hides." },
   "kbdLabel": { "message": "Keyboard shortcuts" },
   "kbdSlowerFaster": { "message": "slower / faster" },
+  "kbdBigStep": { "message": "10% step" },
   "kbdReset": { "message": "reset" },
   "kbdSaveSite": { "message": "remember site" },
   "kbdSaveChannel": { "message": "remember channel" },
