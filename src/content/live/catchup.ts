@@ -1,39 +1,41 @@
-import { MIN_FORWARD_BUFFER, CATCHUP_START, CATCHUP_STOP } from "../core/constants.js";
+import { MIN_FORWARD_BUFFER, CATCHUP_MAX, CATCHUP_STEP_LAG, CATCHUP_START } from "../core/constants.js";
 
 export interface CatchupInput {
-  currentSpeed: number;
   buffer: number;
   latency: number | null;
   dropped: number;
   target: number;          // already floored at MIN_FORWARD_BUFFER
-  rate: number;
 }
 
-// Buffer needed to sustain catch-up at `rate`: the floor plus what one full
-// control interval (worst case 1s between ticks) drains at that rate. At 3×
-// playback eats 2s of buffer per second — a thin low-latency buffer can die
-// between two checks, so the reserve scales with the rate.
-export function catchupReserve(rate: number): number {
-  return MIN_FORWARD_BUFFER + Math.max(0, rate - 1);
+// The buffer level catch-up must never drain below. With a real
+// latency-to-broadcaster reading the floor is the allowed delay itself —
+// draining to 1s just trades lag for rebuffering stalls; the user's own
+// tolerance (3-5s) is the sensible reserve. Without latency the lag IS the
+// buffer, so the floor stays at the bare anti-stall minimum.
+export function catchupBufferFloor(latency: number | null, target: number): number {
+  return latency != null ? target : MIN_FORWARD_BUFFER;
 }
 
-// Latency drives the lag where the site exposes it (else the buffer); the buffer
-// still gates catch-up so it can't stall. Hysteresis (START vs STOP) + the
-// rate-aware reserve avoid oscillation once latency can't be reduced further.
+// Stepped catch-up: 105% engages just past the allowed delay, and each full
+// 7s of lag beyond it adds another +5% (e.g. target 3s → 110% from 10s,
+// 115% from 17s …), capped at 125%. Pitch IS preserved; the low steps keep
+// the time-stretcher's speech warble inaudible at the usual 105–110%.
+// The buffer caps the rate by the same 5% scale (a thin buffer sustains a
+// small step rather than none), and dropped frames pause catch-up entirely.
 export function decideCatchupSpeed(o: CatchupInput): number {
+  if (o.dropped > 0) return 1.0;
   const lag = o.latency != null ? o.latency : o.buffer;
-  const reserve = catchupReserve(o.rate);
-  if (o.currentSpeed > 1.0) {
-    if (lag <= o.target + CATCHUP_STOP || o.dropped > 0 || o.buffer <= reserve) return 1.0;
-    return o.currentSpeed;
-  }
-  if (lag > o.target + CATCHUP_START && o.dropped === 0 && o.buffer > reserve + CATCHUP_STOP) return o.rate;
-  return o.currentSpeed;
+  const excess = lag - o.target;
+  if (excess < 1) return 1.0; // deadband: don't dither right at the target
+  const byLag = 0.05 + Math.floor(excess / CATCHUP_STEP_LAG) * 0.05;
+  const byBuffer = Math.floor((o.buffer - catchupBufferFloor(o.latency, o.target)) * 20) / 20;
+  return 1 + Math.max(0, Math.min(CATCHUP_MAX - 1, byLag, byBuffer));
 }
 
 // True when we're clearly behind the live edge but the buffer is too thin to
-// catch up safely (same gate decideCatchupSpeed uses) — latency will stay high
+// catch up at all (not even the smallest 5% step) — latency will stay high
 // until the buffer refills, which the UI warns about.
-export function catchupBufferLimited(lag: number, buffer: number, target: number, rate: number): boolean {
-  return lag > target + CATCHUP_START && buffer <= catchupReserve(rate) + CATCHUP_STOP;
+export function catchupBufferLimited(latency: number | null, buffer: number, target: number): boolean {
+  const lag = latency != null ? latency : buffer;
+  return lag > target + CATCHUP_START && buffer < catchupBufferFloor(latency, target) + 0.05;
 }

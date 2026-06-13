@@ -1,82 +1,71 @@
 import { describe, it, expect } from "vitest";
-import { decideCatchupSpeed, catchupBufferLimited, catchupReserve } from "../src/content/live/catchup.js";
+import { decideCatchupSpeed, catchupBufferLimited, catchupBufferFloor } from "../src/content/live/catchup.js";
 
-// constants: MIN_FORWARD_BUFFER=1.0, CATCHUP_START=2.0, CATCHUP_STOP=0.3
-// reserve(rate) = 1.0 + (rate - 1): at 1.5× → 1.5s, at 3× → 3s
-const base = { target: 5, rate: 1.5, dropped: 0, buffer: 8, latency: null as number | null, currentSpeed: 1 };
+// constants: MIN_FORWARD_BUFFER=1.0, CATCHUP_MAX=1.25, CATCHUP_STEP_LAG=7,
+// CATCHUP_START=2.0 (warning threshold).
+// 105% just past the target (deadband 1s), +5% per full 7s of excess, ≤125%;
+// the buffer caps the step by the same 5% scale.
+const base = { target: 5, dropped: 0, buffer: 60, latency: null as number | null };
 
-describe("decideCatchupSpeed — start (at 1×)", () => {
-  it("stays 1× when within the allowed delay", () => {
-    expect(decideCatchupSpeed({ ...base, buffer: 3 })).toBe(1);          // lag 3 < target+START(7)
+describe("decideCatchupSpeed — stepped ramp", () => {
+  it("stays 1× at or near the allowed delay", () => {
+    expect(decideCatchupSpeed({ ...base, latency: 4 })).toBe(1);
+    expect(decideCatchupSpeed({ ...base, latency: 5.9 })).toBe(1);   // within the 1s deadband
   });
-  it("starts catching up once clearly behind with enough buffer", () => {
-    expect(decideCatchupSpeed({ ...base, buffer: 8 })).toBe(1.5);        // lag 8 > 7, buffer ok
+  it("105% just past the target, +5% per full 7s of excess", () => {
+    expect(decideCatchupSpeed({ ...base, latency: 6.5 })).toBe(1.05);   // excess 1.5s
+    expect(decideCatchupSpeed({ ...base, latency: 12.1 })).toBe(1.1);   // excess ≥7s
+    expect(decideCatchupSpeed({ ...base, latency: 19.1 })).toBe(1.15);  // excess ≥14s
   });
-  it("latency drives the lag when exposed (buffer may be small)", () => {
-    expect(decideCatchupSpeed({ ...base, latency: 8, buffer: 2 })).toBe(1.5);
+  it("matches the spec example: target 3 → 110% from 10s, 115% from 17s", () => {
+    const t3 = { ...base, target: 3 };
+    expect(decideCatchupSpeed({ ...t3, latency: 9.9 })).toBe(1.05);
+    expect(decideCatchupSpeed({ ...t3, latency: 10 })).toBe(1.1);
+    expect(decideCatchupSpeed({ ...t3, latency: 17 })).toBe(1.15);
   });
-  it("won't start if the buffer is too low to do it safely (anti-stall)", () => {
-    expect(decideCatchupSpeed({ ...base, latency: 8, buffer: 1.7 })).toBe(1); // ≤ reserve(1.5)+0.3
+  it("caps at 125% no matter how far behind", () => {
+    expect(decideCatchupSpeed({ ...base, latency: 33.1 })).toBe(1.25);  // excess ≥28s
+    expect(decideCatchupSpeed({ ...base, latency: 300 })).toBe(1.25);
   });
-  it("the faster the catch-up, the more buffer it demands to start", () => {
-    // 2.5s of buffer can't survive a 1s control gap at 3× (drains 2s/s).
-    expect(decideCatchupSpeed({ ...base, latency: 30, buffer: 2.5, rate: 3 })).toBe(1);
-    expect(decideCatchupSpeed({ ...base, latency: 30, buffer: 4, rate: 3 })).toBe(3);
-  });
-  it("buffer-fallback (no latency) matches buffer-as-lag", () => {
-    expect(decideCatchupSpeed({ ...base, latency: null, buffer: 6 })).toBe(1);   // 6 < 7
-    expect(decideCatchupSpeed({ ...base, latency: null, buffer: 8 })).toBe(1.5); // 8 > 7
+  it("buffer-fallback (no latency) uses the buffer as the lag", () => {
+    expect(decideCatchupSpeed({ ...base, latency: null, buffer: 5.5 })).toBe(1);
+    expect(decideCatchupSpeed({ ...base, latency: null, buffer: 11 })).toBe(1.05);
   });
 });
 
-describe("decideCatchupSpeed — stop (catching up at rate)", () => {
-  const up = { ...base, currentSpeed: 1.5 };
-  it("stops once back near the target", () => {
-    expect(decideCatchupSpeed({ ...up, latency: 5.2 })).toBe(1);         // 5.2 ≤ target+STOP(5.3)
+describe("decideCatchupSpeed — anti-stall guards", () => {
+  it("with real latency, the buffer floor is the allowed delay itself", () => {
+    // far behind, but the buffer barely exceeds the 5s target → small steps only
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 5.06 })).toBe(1.05);
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 5.19 })).toBe(1.15);
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 5.0 })).toBe(1);
+    expect(decideCatchupSpeed({ ...base, latency: 100, buffer: 1.5 })).toBe(1);
+  });
+  it("without latency (buffer is the lag), the floor stays at the 1s minimum", () => {
+    // lag = buffer = 11 → excess 6 → 105%; byBuffer (11-1=10) doesn't cap it
+    expect(decideCatchupSpeed({ ...base, latency: null, buffer: 11 })).toBe(1.05);
   });
   it("bails if frames drop", () => {
-    expect(decideCatchupSpeed({ ...up, latency: 8, dropped: 2 })).toBe(1);
-  });
-  it("bails if the buffer runs low (anti-stall)", () => {
-    expect(decideCatchupSpeed({ ...up, latency: 8, buffer: 0.3 })).toBe(1);
-  });
-  it("never drains the buffer below the rate-aware reserve", () => {
-    expect(decideCatchupSpeed({ ...up, latency: 30, buffer: 0.9 })).toBe(1);
-    expect(decideCatchupSpeed({ ...up, latency: 30, buffer: 1.4 })).toBe(1);   // ≤ reserve(1.5)
-    expect(decideCatchupSpeed({ ...up, latency: 30, buffer: 2.9, rate: 3, currentSpeed: 3 })).toBe(1);
-  });
-  it("keeps catching up while still behind with buffer", () => {
-    expect(decideCatchupSpeed({ ...up, latency: 8, buffer: 5 })).toBe(1.5);
-  });
-});
-
-describe("decideCatchupSpeed — no oscillation", () => {
-  it("after a buffer-floor stop, won't restart unless clearly behind again", () => {
-    // Latency stuck at 6.5 (target 5) — above STOP but below START. At 1× it must
-    // NOT restart (6.5 < target+START 7), so no speed flapping.
-    expect(decideCatchupSpeed({ ...base, currentSpeed: 1, latency: 6.5, buffer: 2 })).toBe(1);
+    expect(decideCatchupSpeed({ ...base, latency: 100, dropped: 2 })).toBe(1);
   });
 });
 
 describe("catchupBufferLimited (the UI warning)", () => {
-  it("warns when far behind with a too-thin buffer", () => {
-    expect(catchupBufferLimited(30, 1.1, 5, 1.5)).toBe(true);
+  it("warns when far behind with a buffer at/below the floor", () => {
+    expect(catchupBufferLimited(30, 5.0, 5)).toBe(true);   // latency-based floor = target
+    expect(catchupBufferLimited(30, 1.5, 5)).toBe(true);
   });
-  it("quiet when the buffer is healthy", () => {
-    expect(catchupBufferLimited(30, 4, 5, 1.5)).toBe(false);
+  it("quiet when the buffer sustains some catch-up", () => {
+    expect(catchupBufferLimited(30, 6, 5)).toBe(false);
   });
   it("quiet when not behind, however small the buffer", () => {
-    expect(catchupBufferLimited(5.5, 1.1, 5, 1.5)).toBe(false);
-  });
-  it("matches the rate-aware start gate", () => {
-    expect(catchupBufferLimited(30, 3.2, 5, 3)).toBe(true);   // ≤ reserve(3)+0.3
-    expect(catchupBufferLimited(30, 3.4, 5, 3)).toBe(false);
+    expect(catchupBufferLimited(5.5, 1.0, 5)).toBe(false);
   });
 });
 
-describe("catchupReserve", () => {
-  it("scales with the catch-up rate", () => {
-    expect(catchupReserve(1.5)).toBe(1.5);
-    expect(catchupReserve(3)).toBe(3);
+describe("catchupBufferFloor", () => {
+  it("allowed delay with latency, bare 1s minimum without", () => {
+    expect(catchupBufferFloor(12, 5)).toBe(5);
+    expect(catchupBufferFloor(null, 5)).toBe(1);
   });
 });

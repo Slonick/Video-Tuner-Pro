@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clamp, clampTarget, clampMax, clampNum } from "../src/content/core/clamp.js";
+import { clamp, clampTarget, clampNum } from "../src/content/core/clamp.js";
 import { normalizeHost } from "../src/content/core/domain.js";
 import { normalizeHost as popupNormalizeHost } from "../src/popup/core/domain.js";
 import { debounce } from "../src/popup/core/debounce.js";
@@ -17,12 +17,6 @@ describe("clamp", () => {
     expect(clampTarget(0)).toBe(1);
     expect(clampTarget(-3)).toBe(1);
     expect(clampTarget("nope")).toBe(5);
-  });
-  it("clampMax → [1.25,3], default 1.5 on NaN", () => {
-    expect(clampMax(1.5)).toBe(1.5);
-    expect(clampMax(1)).toBe(1.25);
-    expect(clampMax(9)).toBe(3);
-    expect(clampMax(undefined)).toBe(1.5);
   });
   it("clampNum → [lo,hi] with fallback", () => {
     expect(clampNum(5, 0, 10, 3)).toBe(5);

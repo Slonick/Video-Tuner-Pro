@@ -56,7 +56,7 @@
                         <strong data-i18n="syncTitle">Keep stream live</strong>
                         <span class="info" tabindex="0" role="button" aria-label="Info">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-1-3h2v-6h-2v6Zm0-8h2V7h-2v2Z"/></svg>
-                            <span class="tip" data-i18n="syncHint">If the stream falls behind by more than the value above, the speed rises smoothly (up to the max) and returns to 100% once caught up. The buffer is respected — it won't speed up when little is buffered ahead.</span>
+                            <span class="tip" data-i18n="syncHint">When the stream falls behind the allowed delay, playback speeds up smoothly — the farther behind, the faster, up to 125% — and returns to 100% at the live edge. It backs off when frames drop or the buffer runs low.</span>
                         </span>
                     </span>
                     <span class="switch-sub" data-i18n="syncSubtitle">Automatically catch up to the live broadcast</span>
@@ -79,9 +79,6 @@
         <div class="sync-body" id="syncBody">
             <div class="sync-label"><span data-i18n="allowedDelay">Allowed delay</span>: <b id="syncTargetVal">3</b> <span data-i18n="secondsShort">s</span></div>
             <input type="range" class="speed-slider" id="syncTarget" min="1" max="30" step="1" value="3">
-
-            <div class="sync-label" style="margin-top:12px;"><span data-i18n="maxCatchupSpeed">Max catch-up speed</span>: <b id="syncMaxVal">150</b>%</div>
-            <input type="range" class="speed-slider" id="syncMax" min="125" max="300" step="5" value="150">
 
             <div class="extra-row">
                 <span data-i18n="onStreamLabel">Show speed &amp; buffer on video</span>

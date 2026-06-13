@@ -72,14 +72,21 @@
   }
 
   // The player's own live flag (getVideoData().isLive) — authoritative when
-  // present, null when the player/API isn't there yet. Published to LIVE_ATTR so
-  // the isolated script's detection doesn't have to rely on CSS-class heuristics.
+  // present, null when unknown. Published to LIVE_ATTR so the isolated script's
+  // detection doesn't have to rely on CSS-class heuristics.
+  // "false" needs care: before playback starts (and while an ad plays) isLive
+  // is false even on a live stream — publishing "0" then would silence the
+  // whole live UI. Only trust it once the player is actually on the content.
   function youtubeIsLive(): boolean | null {
     try {
       const yp: any = youtubePlayer();
-      const vd = yp && typeof yp.getVideoData === "function" ? yp.getVideoData() : null;
+      if (!yp || typeof yp.getVideoData !== "function") return null;
+      if (yp.classList && (yp.classList.contains("ad-showing") || yp.classList.contains("ad-interrupting"))) return null;
+      const vd = yp.getVideoData();
       if (!vd || typeof vd.isLive !== "boolean") return null;
-      return vd.isLive;
+      if (vd.isLive) return true;
+      const st = typeof yp.getPlayerState === "function" ? yp.getPlayerState() : null;
+      return (st === 1 || st === 2 || st === 3) ? false : null; // playing/paused/buffering
     } catch (e) { return null; }
   }
 
@@ -96,16 +103,17 @@
       let statsLat: number | null = null;
       if (typeof yp.getStatsForNerds === "function") {
         const s = yp.getStatsForNerds() || {};
-        for (const k in s) {
-          if (/latency/i.test(k)) {
-            const raw = String(s[k]);
-            const n = parseFloat(raw.replace(",", "."));
-            if (isFinite(n) && n > 0) {
-              if (raw !== statsLatRaw) { statsLatRaw = raw; statsLatChangedAt = Date.now(); }
-              statsLat = n;
-            }
-            break;
-          }
+        // Several keys match /latency/ (live_latency, live_latency_style:
+        // "display:none", live_latency_samples) in no guaranteed order — prefer
+        // the exact key, then take the first one that parses to a number.
+        const keys = ["live_latency", ...Object.keys(s).filter((k) => k !== "live_latency" && /latency/i.test(k))];
+        for (const k of keys) {
+          const raw = s[k] == null ? "" : String(s[k]);
+          const n = parseFloat(raw.replace(",", "."));
+          if (!(isFinite(n) && n > 0)) continue;
+          if (raw !== statsLatRaw) { statsLatRaw = raw; statsLatChangedAt = Date.now(); }
+          statsLat = n;
+          break;
         }
       }
       // YouTube stops refreshing stats-for-nerds while the player UI is idle (no
