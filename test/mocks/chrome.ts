@@ -8,6 +8,7 @@ export interface MockData {
   monitor?: unknown;
   history?: unknown;
   tab?: { id: number; url: string };
+  version?: string;   // manifest version the popup header shows (screenshots pass the real one)
 }
 
 type Cb = (arg?: unknown) => void;
@@ -43,7 +44,7 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
     storage: { sync: area(), local: area(), onChanged: { addListener() {} } },
     runtime: {
       id: "mock", lastError: null as unknown, onMessage: { addListener() {} }, sendMessage() {},
-      getManifest: () => ({ version: "0.0.0" }),
+      getManifest: () => ({ version: data.version ?? "0.0.0" }),
     },
     action: {
       setBadgeText() {}, setBadgeBackgroundColor() {}, setBadgeTextColor() {}, setIcon() {},

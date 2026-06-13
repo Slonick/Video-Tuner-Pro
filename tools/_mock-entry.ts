@@ -9,9 +9,11 @@ declare global {
   interface Window {
     __SCENARIO__?: ScenarioName;
     __MESSAGES__?: Record<string, { message: string }>;
+    __VERSION__?: string;
   }
 }
 
 const name = window.__SCENARIO__ || "audio";
 const messages = window.__MESSAGES__ || {};
-(window as unknown as { chrome: typeof chrome }).chrome = createMockChrome({ ...scenario(name), messages });
+(window as unknown as { chrome: typeof chrome }).chrome =
+  createMockChrome({ ...scenario(name), messages, version: window.__VERSION__ });
