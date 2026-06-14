@@ -9,3 +9,18 @@ import { createMockChrome } from "./mocks/chrome.js";
 if (typeof HTMLCanvasElement !== "undefined") {
   HTMLCanvasElement.prototype.getContext = (() => null) as never;
 }
+
+// jsdom has no matchMedia; report "reduced motion" so slider tweens settle
+// synchronously and tests can read the final value right after an action.
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = ((q: string) => ({
+    matches: /prefers-reduced-motion/.test(q),
+    media: q,
+    onchange: null,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent() { return false; },
+  })) as typeof window.matchMedia;
+}

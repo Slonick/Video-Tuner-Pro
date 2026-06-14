@@ -22,7 +22,7 @@ export function setupGraphs(): void {
       g.audioHist.push({ t, in: g.cur.in, out: g.cur.out });
       while (g.audioHist.length && t - g.audioHist[0].t > A_WINDOW + 200) g.audioHist.shift();
     } else if (g.audioHist.length) {
-      g.audioHist.length = 0; g.audioDiffShown = null;
+      g.audioHist.length = 0; g.audioInShown = g.audioOutShown = null;
     }
     drawAudio(g, t);
     drawBuffer(g, t);

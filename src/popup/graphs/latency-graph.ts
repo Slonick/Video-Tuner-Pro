@@ -5,7 +5,7 @@ import { byId } from "../dom.js";
 import { msg } from "../i18n.js";
 import { col, fitCanvas, smoothLine } from "./draw-util.js";
 import { BUF_WINDOW } from "./state.js";
-import type { GraphState } from "./state.js";
+import type { GraphState, BufSample } from "./state.js";
 
 function fmtBitrate(bps: number | null): string | null {
   if (bps == null || !isFinite(bps) || bps <= 0) return null;
@@ -26,57 +26,111 @@ export function drawBuffer(g: GraphState, t: number): void {
     return;
   }
   const target = Number(byId<HTMLInputElement>("syncTarget").value);
+  // Latency = accent line/value, buffer-ahead = green. When the site exposes
+  // latency both are shown; otherwise the single series IS the buffer (green).
+  const LAT_COL = col("--accent", "#0a84ff");
+  const BUF_COL = "#30d158";
+  const hasAhead = g.bufAheadShown != null;
   const padT = 5, padB = 11, gh = h - padT - padB;
-  // dynamic Y scale that fits target + recent history
-  let mx = (Number.isNaN(target) ? 6 : target + 1);
-  for (const p of g.bufHist) if (t - p.t <= BUF_WINDOW && p.v > mx) mx = p.v;
-  g.yMax += (Math.max(6, mx * 1.15) - g.yMax) * 0.08;
-  const yMax = g.yMax;
-  const yFor = (v: number) => padT + gh * (1 - Math.min(Math.max(v, 0), yMax) / yMax);
+  const mid = padT + gh / 2;            // centre line = 0 / "now"
+  const halfAmp = gh / 2 - 1;
+  // Each half scales to its OWN peak (plus the target so the dashed line stays in
+  // view) — small values still fill the graph instead of hugging the centre.
+  const tgt = Number.isNaN(target) ? 0 : target;
+  let latMx = tgt, bufMx = tgt;
+  for (const p of g.bufHist) if (t - p.t <= BUF_WINDOW) {
+    if (hasAhead) {
+      if (p.v > latMx) latMx = p.v;
+      if (p.a != null && p.a > bufMx) bufMx = p.a;
+    } else if (p.v > bufMx) bufMx = p.v;
+  }
+  g.yMax += (Math.max(1.5, latMx * 1.2) - g.yMax) * 0.08;
+  g.yMaxAhead += (Math.max(1.5, bufMx * 1.2) - g.yMaxAhead) * 0.08;
   const xFor = (ts: number) => w * (1 - (t - ts) / BUF_WINDOW);
+  const ampLat = (v: number) => Math.min(Math.max(v, 0), g.yMax) / g.yMax * halfAmp;
+  const ampBuf = (v: number) => Math.min(Math.max(v, 0), g.yMaxAhead) / g.yMaxAhead * halfAmp;
 
+  const bottom = padT + gh;
+  const ampFull = (v: number) => Math.min(Math.max(v, 0), g.yMaxAhead) / g.yMaxAhead * gh;
+  const fmtS = (val: number) => val.toFixed(2) + "s";
+  const halo = col("--seg", "#eee");
+  const v = g.bufShown != null ? (g.bufHist.length ? g.bufShown : 0) : (g.bufHist.length ? g.bufHist[g.bufHist.length - 1].v : 0);
   bcx.clearRect(0, 0, w, h);
-  bcx.strokeStyle = "rgba(127,127,127,0.16)"; bcx.lineWidth = 1;
-  bcx.fillStyle = col("--muted", "#888"); bcx.font = "9px -apple-system, sans-serif"; bcx.textAlign = "left";
-  const step = yMax <= 8 ? 2 : (yMax <= 16 ? 5 : 10);
-  for (let v = step; v < yMax; v += step) {
-    const y = Math.round(yFor(v)) + 0.5;
-    bcx.beginPath(); bcx.moveTo(0, y); bcx.lineTo(w, y); bcx.stroke();
-    bcx.fillText(v + "s", 3, y - 2);
-  }
-  if (g.bufHist.length) {
-    const pts = g.bufHist.map((p) => ({ x: xFor(p.t), y: yFor(p.v) }));
-    const baseY = padT + gh;
-    bcx.beginPath();
-    smoothLine(bcx, pts);
-    bcx.lineTo(pts[pts.length - 1].x, baseY); bcx.lineTo(pts[0].x, baseY); bcx.closePath();
-    bcx.fillStyle = "rgba(10,132,255,0.16)"; bcx.fill();
-    bcx.beginPath(); smoothLine(bcx, pts);
-    bcx.strokeStyle = col("--accent", "#0a84ff"); bcx.lineWidth = 2; bcx.lineJoin = "round"; bcx.lineCap = "round"; bcx.stroke();
-  }
-  if (!Number.isNaN(target)) {
-    const y = Math.round(yFor(target)) + 0.5;
+
+  const target2 = (y: number): void => {   // dashed amber target line at y, labelled
+    const yy = Math.round(y) + 0.5;
     bcx.strokeStyle = "#ff9f0a"; bcx.lineWidth = 1.5; bcx.setLineDash([4, 3]);
-    bcx.beginPath(); bcx.moveTo(0, y); bcx.lineTo(w, y); bcx.stroke();
-    bcx.setLineDash([]);
-    bcx.fillStyle = "#ff9f0a"; bcx.textAlign = "right";
-    bcx.fillText(target + "s", w - 3, y - 2);
-  }
-  // background-colored halo so the value stays readable over the line, grid and target dash
-  if (g.bufHist.length) {
-    const fmtS = (v: number) => (v < 10 ? v.toFixed(1) : Math.round(v)) + "s";
-    const v = g.bufHist[g.bufHist.length - 1].v;
-    // "latency (buffer)" when the plotted value is the site latency; without it
-    // the plotted value already IS the buffer, so there's nothing to append.
-    const label = fmtS(v) + (g.bufAheadShown != null ? ` (${fmtS(g.bufAheadShown)})` : "");
-    bcx.font = "700 17px -apple-system, sans-serif";
-    bcx.textAlign = "center"; bcx.textBaseline = "middle";
-    bcx.lineWidth = 4; bcx.lineJoin = "round";
-    bcx.strokeStyle = col("--seg", "#eee");
-    bcx.strokeText(label, w / 2, h / 2);
-    bcx.fillStyle = col("--text", "#222");
-    bcx.fillText(label, w / 2, h / 2);
-    bcx.textBaseline = "alphabetic";
+    bcx.beginPath(); bcx.moveTo(0, yy); bcx.lineTo(w, yy); bcx.stroke(); bcx.setLineDash([]);
+    bcx.fillStyle = "#ff9f0a"; bcx.textAlign = "right"; bcx.font = "9px -apple-system, sans-serif";
+    bcx.fillText(target + "s", w - 3, yy - 2);
+  };
+  const put = (s: string, y: number, color: string): void => {
+    bcx.strokeStyle = halo; bcx.strokeText(s, w / 2, y);
+    bcx.fillStyle = color; bcx.fillText(s, w / 2, y);
+  };
+  // Amber gradient over the part of a series past the target (like the audio
+  // over-threshold fill): faint at the target line, solid toward the scale edge.
+  const overTarget = (pts: { x: number; y: number }[], base: number, yT: number, yEdge: number): void => {
+    if (Number.isNaN(target) || pts.length < 2) return;
+    const grad = bcx.createLinearGradient(0, yT, 0, yEdge);
+    grad.addColorStop(0, "rgba(255,159,10,0.10)");
+    grad.addColorStop(1, "rgba(255,159,10,0.7)");
+    bcx.save();
+    const c0 = Math.min(yT, yEdge), c1 = Math.max(yT, yEdge);
+    bcx.beginPath(); bcx.rect(0, c0, w, c1 - c0); bcx.clip();
+    bcx.fillStyle = grad;
+    bcx.beginPath(); smoothLine(bcx, pts);
+    bcx.lineTo(pts[pts.length - 1].x, base); bcx.lineTo(pts[0].x, base); bcx.closePath(); bcx.fill();
+    bcx.restore();
+  };
+
+  if (hasAhead) {
+    // Two series → mirror like the audio meter: latency fills DOWN from the centre
+    // (accent), buffer-ahead fills UP (green); centre line = 0 ("now").
+    bcx.strokeStyle = "rgba(127,127,127,0.18)"; bcx.lineWidth = 1;
+    bcx.beginPath(); bcx.moveTo(0, Math.round(mid) + 0.5); bcx.lineTo(w, Math.round(mid) + 0.5); bcx.stroke();
+    const fillArea = (get: (p: BufSample) => number | null | undefined, dir: number, amp: (x: number) => number, color: string, fill: string): void => {
+      const pts = g.bufHist.filter((p) => get(p) != null).map((p) => ({ x: xFor(p.t), y: mid + dir * amp(get(p) as number) }));
+      if (pts.length < 2) return;
+      bcx.beginPath(); smoothLine(bcx, pts);
+      bcx.lineTo(pts[pts.length - 1].x, mid); bcx.lineTo(pts[0].x, mid); bcx.closePath();
+      bcx.fillStyle = fill; bcx.fill();
+      bcx.beginPath(); smoothLine(bcx, pts);
+      bcx.strokeStyle = color; bcx.lineWidth = 2; bcx.lineJoin = "round"; bcx.lineCap = "round"; bcx.stroke();
+      overTarget(pts, mid, mid + dir * amp(target), mid + dir * halfAmp);
+    };
+    if (g.bufHist.length) {
+      fillArea((p) => p.v, 1, ampLat, LAT_COL, "rgba(10,132,255,0.16)");   // latency ↓
+      fillArea((p) => p.a, -1, ampBuf, BUF_COL, "rgba(48,209,88,0.16)");   // buffer ↑
+    }
+    // Target mirrored on both halves (each at its own scale).
+    if (!Number.isNaN(target)) { target2(mid + ampLat(target)); target2(mid - ampBuf(target)); }
+    if (g.bufHist.length) {
+      bcx.font = "700 15px -apple-system, sans-serif";
+      bcx.textAlign = "center"; bcx.textBaseline = "middle"; bcx.lineWidth = 3.5; bcx.lineJoin = "round";
+      put(fmtS(g.bufAheadShown as number), mid - 12, BUF_COL);   // buffer (top)
+      put(fmtS(v), mid + 12, LAT_COL);                            // latency (bottom)
+      bcx.textBaseline = "alphabetic";
+    }
+  } else {
+    // One series (buffer only) → fill the FULL height from the bottom (0 = bottom),
+    // with one big green value.
+    if (g.bufHist.length) {
+      const pts = g.bufHist.map((p) => ({ x: xFor(p.t), y: bottom - ampFull(p.v) }));
+      bcx.beginPath(); smoothLine(bcx, pts);
+      bcx.lineTo(pts[pts.length - 1].x, bottom); bcx.lineTo(pts[0].x, bottom); bcx.closePath();
+      bcx.fillStyle = "rgba(48,209,88,0.16)"; bcx.fill();
+      bcx.beginPath(); smoothLine(bcx, pts);
+      bcx.strokeStyle = BUF_COL; bcx.lineWidth = 2; bcx.lineJoin = "round"; bcx.lineCap = "round"; bcx.stroke();
+      overTarget(pts, bottom, bottom - ampFull(target), bottom - gh);
+    }
+    if (!Number.isNaN(target)) target2(bottom - ampFull(target));
+    if (g.bufHist.length) {
+      bcx.font = "700 16px -apple-system, sans-serif";
+      bcx.textAlign = "center"; bcx.textBaseline = "middle"; bcx.lineWidth = 4; bcx.lineJoin = "round";
+      put(fmtS(v), h / 2, BUF_COL);
+      bcx.textBaseline = "alphabetic";
+    }
   }
   const br = fmtBitrate(g.bufBitrateShown);
   if (br) {

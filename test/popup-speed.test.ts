@@ -155,6 +155,18 @@ describe("scope control", () => {
     expect(lastCall("remember")).toMatchObject({ action: "remember", scope: "channel", speed: 1.4 });
   });
 
+  it("dots the slot on Save and clears the dot on Reset", () => {
+    vi.useFakeTimers();
+    byId("scopeSite").click();
+    byId("setDefaultBtn").click();
+    expect(byId("scopeSite").classList.contains("has-saved")).toBe(true);
+    replies.reset = { success: true };
+    replies.getSpeed = { speed: 1, domain: "youtube.com", channel: null, channelName: "", scope: null, live: false };
+    byId("resetBtn").click();
+    expect(byId("scopeSite").classList.contains("has-saved")).toBe(false);
+    vi.useRealTimers();
+  });
+
   it("Reset forgets the selected scope and pulls the fallback speed back", () => {
     vi.useFakeTimers();
     byId("scopeGlobal").click();        // delete the global default

@@ -64,6 +64,10 @@
     background: var(--accent);
 }
 
+.dot-ahead {
+    background: #30d158;
+}
+
 .dot-thr {
     width: 2px;
     height: 9px;
@@ -72,11 +76,26 @@
 }
 
 /* --- Compressor parameter rows ------------------------------------------- */
+/* Each param in its own filled card so it reads as a separate control. */
 .param {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background: var(--seg);
+    border: 1px solid var(--track);
+    border-radius: 9px;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
 
     input[type="range"] {
-        margin: 5px 0 2px;
+        margin: 6px 0 8px;
+    }
+
+    /* No desc under the slider (buffer card) — let the card padding be the
+       bottom gap instead of doubling it with the slider's own margin. */
+    input[type="range"]:last-child {
+        margin-bottom: 0;
     }
 }
 
@@ -141,28 +160,40 @@
 
 /* Compressor presets — one-tap profile buttons at the top of the audio body. */
 .preset-row {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin-bottom: 12px;
+    gap: 3px;
+    padding: 3px;
+    margin-bottom: 10px;
+    border: 1px solid var(--track);
+    border-radius: 9px;
 }
 
+/* Filled cells with the pill riding above them — matches the scope picker. */
 .btn-preset {
-    padding: 8px 0;
+    position: relative;
+    z-index: 1;
+    padding: 6px 0;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--seg);
     color: var(--text);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.12s, filter 0.12s;
+    transition: background 0.12s, color 0.12s, filter 0.12s;
 
-    &:hover {
+    &:hover:not(.active) {
         background: var(--track);
     }
 
-    &:active {
-        filter: brightness(0.96);
+    /* Lit (via the sliding pill) when the current values match this profile —
+       active goes transparent + above the pill so the label stays on top. */
+    &.active {
+        z-index: 3;
+        background: transparent;
+        color: #fff;
+        font-weight: 600;
     }
 }
