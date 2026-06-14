@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   CATEGORIES, KEY_CATEGORY, KEYS_BY_CATEGORY, categoryOf, normalizeConfig,
   areaForCategory, areaForKey, groupKeysByArea, DEFAULT_SYNC,
+  ALL_LOCAL, effectiveConfig,
 } from "../src/shared/sync-config.js";
 
 describe("categoryOf", () => {
@@ -10,11 +11,12 @@ describe("categoryOf", () => {
     expect(categoryOf("syncTargets")).toBe("delays");
     expect(categoryOf("audioCompRatio")).toBe("audio");
     expect(categoryOf("keymap")).toBe("shortcuts");
-    expect(categoryOf("speedPresets")).toBe("presets");
+    expect(categoryOf("theme")).toBe("general");
   });
   it("falls back to general for unknown keys", () => {
     expect(categoryOf("somethingNew")).toBe("general");
     expect(categoryOf("badgePos")).toBe("general");
+    expect(categoryOf("speedPresets")).toBe("general"); // presets are no longer a category
   });
 });
 
@@ -22,6 +24,27 @@ describe("KEYS_BY_CATEGORY", () => {
   it("partitions every registered key exactly once", () => {
     const flat = CATEGORIES.flatMap((c) => KEYS_BY_CATEGORY[c]);
     expect(flat.sort()).toEqual(Object.keys(KEY_CATEGORY).sort());
+  });
+});
+
+describe("effectiveConfig", () => {
+  it("returns the per-category preferences when the master switch is on", () => {
+    const prefs = { ...DEFAULT_SYNC, speeds: false };
+    expect(effectiveConfig(prefs, true)).toEqual(prefs);
+  });
+
+  it("forces every category local when the master switch is off", () => {
+    expect(effectiveConfig({ ...DEFAULT_SYNC }, false)).toEqual(ALL_LOCAL);
+    expect(ALL_LOCAL).toEqual(
+      CATEGORIES.reduce((a, c) => ({ ...a, [c]: false }), {}),
+    );
+  });
+
+  it("does not mutate its input", () => {
+    const prefs = { ...DEFAULT_SYNC };
+    effectiveConfig(prefs, false);
+    effectiveConfig(prefs, true);
+    expect(prefs).toEqual(DEFAULT_SYNC);
   });
 });
 

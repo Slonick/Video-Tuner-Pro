@@ -94,6 +94,113 @@ describe("routed STORE without a sync area", () => {
     setCategorySync("speeds", false); // nowhere to migrate to — just records intent
     expect(env.backing.local.globalSpeed).toBe(2);
   });
+
+  it("master switch without a sync area just records the choice", async () => {
+    const env = makeChrome();
+    (env.chrome.storage as { sync?: unknown }).sync = undefined;
+    const { STORE, setMasterSync, getSyncMaster } = await freshStore(env.chrome);
+    STORE.set({ globalSpeed: 2 });
+    setMasterSync(false);
+    expect(getSyncMaster()).toBe(false);
+    expect(env.backing.local.syncMaster).toBe(false);
+    expect(env.backing.local.globalSpeed).toBe(2); // nowhere to migrate
+  });
+});
+
+describe("master sync switch", () => {
+  it("defaults on; turning it off moves every synced category to local", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 1.75; // speeds
+    env.backing.sync.audioComp = true;   // audio
+    const { getSyncMaster, setMasterSync } = await freshStore(env.chrome);
+    expect(getSyncMaster()).toBe(true);
+
+    setMasterSync(false);
+    expect(getSyncMaster()).toBe(false);
+    expect(env.backing.local.globalSpeed).toBe(1.75);
+    expect(env.backing.local.audioComp).toBe(true);
+    expect(env.backing.sync.globalSpeed).toBeUndefined();
+    expect(env.backing.sync.audioComp).toBeUndefined();
+    expect(env.backing.local.syncMaster).toBe(false);
+  });
+
+  it("with the switch off, every write lands in local regardless of category", async () => {
+    const env = makeChrome();
+    env.backing.local.syncMaster = false;
+    const { STORE } = await freshStore(env.chrome);
+    STORE.set({ globalSpeed: 2, audioComp: true, keymap: { slower: "KeyA" } });
+    expect(env.backing.local).toMatchObject({ globalSpeed: 2, audioComp: true });
+    expect(env.backing.sync).toEqual({});
+    // Reads come back from local.
+    let got: Record<string, unknown> = {};
+    STORE.get(["globalSpeed", "audioComp"], (r) => { got = r; });
+    expect(got).toEqual({ globalSpeed: 2, audioComp: true });
+  });
+
+  it("turning it back on restores synced categories to sync, leaving opted-out ones local", async () => {
+    const env = makeChrome();
+    env.backing.local.syncMaster = false;
+    env.backing.local.syncCategories = { speeds: false };  // speeds opted out
+    env.backing.local.globalSpeed = 1.5;  // speeds → stays local
+    env.backing.local.audioComp = true;   // audio synced-pref, local while master off
+    const { setMasterSync } = await freshStore(env.chrome);
+
+    setMasterSync(true);
+    expect(env.backing.sync.audioComp).toBe(true);       // pulled up
+    expect(env.backing.local.audioComp).toBeUndefined();
+    expect(env.backing.local.globalSpeed).toBe(1.5);     // opted-out stays put
+    expect(env.backing.sync.globalSpeed).toBeUndefined();
+    expect(env.backing.local.syncMaster).toBe(true);
+  });
+
+  it("remembers per-category preferences across an off→on round trip", async () => {
+    const env = makeChrome();
+    env.backing.sync.audioComp = true;
+    env.backing.local.syncCategories = { audio: true, speeds: false };
+    env.backing.local.globalSpeed = 1.5; // speeds opted out
+    const { getSyncConfig, setMasterSync } = await freshStore(env.chrome);
+
+    setMasterSync(false);
+    expect(getSyncConfig()).toMatchObject({ audio: true, speeds: false }); // prefs untouched
+    setMasterSync(true);
+    expect(getSyncConfig()).toMatchObject({ audio: true, speeds: false });
+    expect(env.backing.sync.audioComp).toBe(true);    // back in sync
+    expect(env.backing.local.globalSpeed).toBe(1.5);  // still local
+  });
+
+  it("while master is off, toggling a category only records intent (no migration)", async () => {
+    const env = makeChrome();
+    env.backing.local.syncMaster = false;
+    env.backing.local.audioComp = true;
+    const { setCategorySync, getSyncConfig } = await freshStore(env.chrome);
+
+    setCategorySync("audio", false);
+    expect(env.backing.local.audioComp).toBe(true);        // unchanged — already local
+    expect(env.backing.sync.audioComp).toBeUndefined();
+    expect(getSyncConfig().audio).toBe(false);             // preference recorded
+    expect((env.backing.local.syncCategories as Record<string, boolean>).audio).toBe(false);
+  });
+
+  it("setting the switch to its current value is a no-op (still persisted, nothing moved)", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 2;
+    const { setMasterSync } = await freshStore(env.chrome);
+    setMasterSync(true); // already on
+    expect(env.backing.sync.globalSpeed).toBe(2);   // unmoved
+    expect(env.backing.local.syncMaster).toBe(true); // recorded
+  });
+
+  it("reacts to an external master-switch change (live recompute)", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 2;
+    const { STORE } = await freshStore(env.chrome);
+    // Another context flips the switch off via local storage.
+    env.chrome.storage.local.set({ syncMaster: false });
+    // The router now reads speeds from local (where the value isn't) instead of sync.
+    let got: Record<string, unknown> = {};
+    STORE.get(["globalSpeed"], (r) => { got = r; });
+    expect(got.globalSpeed).toBeUndefined();
+  });
 });
 
 describe("setCategorySync migration", () => {

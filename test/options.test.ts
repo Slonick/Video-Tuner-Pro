@@ -34,7 +34,7 @@ describe("sync category controls", () => {
   it("renders a switch per category, reflecting the saved config", async () => {
     await mount({ syncCategories: { speeds: false } });
     const rows = document.querySelectorAll("#syncRows .sync-cat-row");
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(5);
     const speeds = document.querySelector<HTMLInputElement>("#syncRows .sync-cat-row input");
     expect(speeds!.checked).toBe(false); // speeds opted out
   });
@@ -45,26 +45,6 @@ describe("sync category controls", () => {
     inputs[0].checked = false;            // speeds is the first row
     inputs[0].dispatchEvent(new Event("change"));
     expect((get(["syncCategories"]).syncCategories as Record<string, boolean>).speeds).toBe(false);
-  });
-});
-
-describe("preset editor", () => {
-  it("renders eight inputs and normalizes on save", async () => {
-    const get = await mount({ speedPresets: [50, 75, 100, 125, 150, 175, 200, 250] });
-    const inputs = document.querySelectorAll<HTMLInputElement>("#presetEdit input");
-    expect(inputs).toHaveLength(8);
-    inputs[0].value = "9999"; // out of range → clamped to 300 and sorted last
-    byId("presetSaveBtn").click();
-    const saved = get(["speedPresets"]).speedPresets as number[];
-    expect(saved).toHaveLength(8);
-    expect(Math.max(...saved)).toBe(300);
-    expect([...saved]).toEqual([...saved].sort((a, b) => a - b));
-  });
-
-  it("reset restores the defaults", async () => {
-    const get = await mount({ speedPresets: [25, 25, 25, 25, 25, 25, 25, 25] });
-    byId("presetResetBtn").click();
-    expect(get(["speedPresets"]).speedPresets).toEqual([50, 75, 100, 125, 150, 175, 200, 250]);
   });
 });
 
