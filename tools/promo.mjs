@@ -22,10 +22,10 @@ if (!only) await rm(STORE, { recursive: true, force: true });   // fresh full ru
 
 async function screenshots(locale, dir) {
   const copy = await loadCopy(locale);
-  const { video, stream, popH } = await renderHalves(locale);
+  const { video, stream, popH, winH, scrollMax } = await renderHalves(locale);
   await mkdir(dir, { recursive: true });
-  await shoot(frameHTML({ p: 0, video, stream, popH, copy }), 1280, 800, join(dir, "screenshot-overview.png"));
-  await shoot(frameHTML({ p: 1, video, stream, popH, copy }), 1280, 800, join(dir, "screenshot-audio.png"));
+  await shoot(frameHTML({ p: 0, video, stream, popH, winH, scrollMax, copy }), 1280, 800, join(dir, "screenshot-overview.png"));
+  await shoot(frameHTML({ p: 1, video, stream, popH, winH, scrollMax, copy }), 1280, 800, join(dir, "screenshot-audio.png"));
   return { copy, video, stream, popH };
 }
 
