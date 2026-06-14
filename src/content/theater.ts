@@ -4,7 +4,7 @@
 // Iridium, which is open source) does the rest, and only ever matches while
 // YouTube itself is in theater / full-bleed mode.
 import { api } from "./platform/browser.js";
-import { STORE, STORE_AREA } from "./platform/storage.js";
+import { STORE, OUR_AREAS } from "./platform/storage.js";
 
 const ATTR = "vtp-super-theater";
 
@@ -64,7 +64,7 @@ export function applySuperTheater(on: boolean): void {
 if (isYouTube()) {
   STORE.get(["superTheater"], (r) => applySuperTheater(r.superTheater === true));
   api.storage.onChanged.addListener((changes, area) => {
-    if (area !== STORE_AREA) return;
+    if (!OUR_AREAS.has(area)) return;
     if (changes.superTheater) applySuperTheater(changes.superTheater.newValue === true);
   });
 }

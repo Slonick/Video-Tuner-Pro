@@ -1,7 +1,7 @@
 // Content script entry. Imported modules register their own listeners/samplers
 // as a side effect of being imported.
 import { api, ctxValid } from "./platform/browser.js";
-import { STORE, STORE_AREA } from "./platform/storage.js";
+import { STORE, OUR_AREAS, whenReady } from "./platform/storage.js";
 import { clamp, clampTarget, clampNum } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { resolveSpeed, resolveSyncTarget } from "./core/resolve.js";
@@ -106,7 +106,9 @@ function reresolve() {
   applyResolvedTargetFromStore();   // the channel changed — its allowed-delay may differ
 }
 
-loadSpeed();
+// Wait for the selective-sync config so the first resolve reads each setting from
+// the area it actually lives in (an opted-out category is in local, not sync).
+whenReady(loadSpeed);
 
 // Steady background tick: re-apply speed (catches videos created inside shadow
 // roots, where document mutations don't fire) and drive live-sync.
@@ -158,7 +160,7 @@ if (document.documentElement) {
 
 // React instantly when settings change in the popup.
 api.storage.onChanged.addListener((changes, area) => {
-  if (area !== STORE_AREA) return;
+  if (!OUR_AREAS.has(area)) return;
   if (changes.liveSync) S.liveSyncEnabled = !!changes.liveSync.newValue;
   // Any allowed-delay scope key changed → re-resolve the chain (also re-runs
   // controlLive). The legacy liveSyncTarget is folded in as the old global.

@@ -1,6 +1,6 @@
 // Each imported module registers its own DOM listeners as a load-time side effect.
 import { api } from "./platform/browser.js";
-import { STORE } from "./platform/storage.js";
+import { STORE, whenReady } from "./platform/storage.js";
 import { byId } from "./dom.js";
 import { localize } from "./i18n.js";
 import "./sections.js";
@@ -10,18 +10,22 @@ import { loadAudioSettings } from "./audio-settings.js";
 import { setupGraphs } from "./graphs/index.js";
 
 localize();
-init();
-loadSyncSettings();
-loadAudioSettings();
-
 byId("extVersion").textContent = "v" + api.runtime.getManifest().version;
 
-// Badge/keyboard toggles default to on; Super theater (YouTube) defaults off.
-STORE.get(["showRemaining", "streamBadge", "keyboard", "superTheater"], (r) => {
-  byId<HTMLInputElement>("onVideoToggle").checked = r.showRemaining !== false;
-  byId<HTMLInputElement>("onStreamToggle").checked = r.streamBadge !== false;
-  byId<HTMLInputElement>("kbdToggle").checked = r.keyboard !== false;
-  byId<HTMLInputElement>("superTheaterToggle").checked = r.superTheater === true;
+// Wait for the selective-sync config so each setting is read from the area it
+// actually lives in (an opted-out category is in local, not sync).
+whenReady(() => {
+  init();
+  loadSyncSettings();
+  loadAudioSettings();
+
+  // Badge/keyboard toggles default to on; Super theater (YouTube) defaults off.
+  STORE.get(["showRemaining", "streamBadge", "keyboard", "superTheater"], (r) => {
+    byId<HTMLInputElement>("onVideoToggle").checked = r.showRemaining !== false;
+    byId<HTMLInputElement>("onStreamToggle").checked = r.streamBadge !== false;
+    byId<HTMLInputElement>("kbdToggle").checked = r.keyboard !== false;
+    byId<HTMLInputElement>("superTheaterToggle").checked = r.superTheater === true;
+  });
 });
 byId<HTMLInputElement>("onVideoToggle").addEventListener("change", (e) => {
   STORE.set({ showRemaining: (e.target as HTMLInputElement).checked });
