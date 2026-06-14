@@ -9,7 +9,6 @@ const RANGES: Record<string, [number, number]> = {
   ratio: [1, 20],
   attack: [0, 1],
   release: [0, 1],
-  gain: [0, 24],
 };
 
 describe("compressor presets", () => {
@@ -30,7 +29,6 @@ describe("compressor presets", () => {
       audioCompRatio: 8,
       audioCompAttack: 0.01,
       audioCompRelease: 0.5,
-      audioCompGain: 6,
     });
   });
 

@@ -55,10 +55,12 @@ describe("popup integration", () => {
 
   it("a compressor preset fills in every slider and turns compression on", () => {
     (byId("audioCompToggle") as HTMLInputElement).checked = false;
+    // Gain is a manual control a preset must leave untouched.
+    (byId("acGain") as HTMLInputElement).value = "15";
     document.querySelector<HTMLElement>('.btn-preset[data-preset="movie"]')!.click();
     expect((byId("acThreshold") as HTMLInputElement).value).toBe("-28");
     expect((byId("acRatio") as HTMLInputElement).value).toBe("8");
-    expect((byId("acGain") as HTMLInputElement).value).toBe("6");
+    expect((byId("acGain") as HTMLInputElement).value).toBe("15");
     expect(byId("acThresholdVal").textContent).toBe("-28 dB");
     expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
   });

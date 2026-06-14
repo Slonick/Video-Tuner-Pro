@@ -12,7 +12,6 @@ interface AudioUI {
   ratio: number;
   attack: number;
   release: number;
-  gain: number;
 }
 
 function fmtParam(key: string, v: unknown): string {
@@ -38,7 +37,6 @@ function reflectAudioUI(s: AudioUI): void {
   setParam("acRatio", "audioCompRatio", s.ratio);
   setParam("acAttack", "audioCompAttack", s.attack);
   setParam("acRelease", "audioCompRelease", s.release);
-  setParam("acGain", "audioCompGain", s.gain);
 }
 
 export function loadAudioSettings(): void {
@@ -48,13 +46,15 @@ export function loadAudioSettings(): void {
     (r) => {
       reflectAudioUI({
         enabled: r.audioComp !== false,
-        gain: clampNum(r.audioCompGain, 0, 24, 0),
         threshold: clampNum(r.audioCompThreshold, -100, 0, -60),
         knee: clampNum(r.audioCompKnee, 0, 40, 30),
         ratio: clampNum(r.audioCompRatio, 1, 20, 10),
         attack: clampNum(r.audioCompAttack, 0, 1, 0),
         release: clampNum(r.audioCompRelease, 0, 1, 1),
       });
+      // Gain is reflected on its own — presets never touch it, so it isn't part
+      // of the shared comp-params shape.
+      setParam("acGain", "audioCompGain", clampNum(r.audioCompGain, 0, 24, 0));
     }
   );
 }
