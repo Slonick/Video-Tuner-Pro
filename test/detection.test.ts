@@ -35,6 +35,24 @@ describe("isLive (player-published data-vtp-live flag)", () => {
   });
 });
 
+describe("isLive (live signals are scoped to the video's own player)", () => {
+  beforeEach(() => { vi.stubGlobal("location", { hostname: "www.youtube.com" }); });
+  afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = ""; });
+
+  // A Short (or any inline preview) sits in its own .html5-video-player while a
+  // stale watch player left over from a previous live stream lingers elsewhere in
+  // the DOM, still carrying the ytp-live markers. Detection must look only inside
+  // THIS video's player — a global query would let the stale markers leak in.
+  it("a live time-display in a different (stale) player does not mark this video live", () => {
+    document.body.innerHTML =
+      `<div class="html5-video-player ytp-live"><span class="ytp-time-display ytp-live"></span></div>` +
+      `<div id="active" class="html5-video-player"><video></video></div>`;
+    const video = document.querySelector("#active video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 30, configurable: true });
+    expect(isLive(video)).toBe(false);
+  });
+});
+
 describe("probeLive (generic real-time-edge detection)", () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0); });
   afterEach(() => { vi.useRealTimers(); });
