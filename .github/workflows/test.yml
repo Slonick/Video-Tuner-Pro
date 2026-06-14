@@ -80,8 +80,8 @@ jobs:
       - name: Build the extension and run the E2E suite
         run: npm run test:e2e
 
-      - name: Upload the Playwright report on failure
-        if: failure()
+      - name: Upload the Playwright HTML report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report

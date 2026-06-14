@@ -11,7 +11,13 @@ export default defineConfig({
   workers: 1,
   timeout: 30_000,
   expect: { timeout: 7_000 },
-  reporter: [["list"]],
+  // Console list always; a self-contained HTML report on every run (open it with
+  // `npx playwright show-report`); inline PR annotations when on CI.
+  reporter: [
+    ["list"],
+    ["html", { open: "never" }],
+    ...(process.env.CI ? [["github"] as [string]] : []),
+  ],
   webServer: {
     command: "node e2e/server.mjs",
     port: 5599,
