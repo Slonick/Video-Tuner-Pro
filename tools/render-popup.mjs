@@ -101,7 +101,11 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
     ? `<script>addEventListener("load",()=>{const e=document.getElementById(${JSON.stringify(expand)});if(e){e.style.transition="none";e.classList.add("open");e.style.maxHeight="none";}const b=document.querySelector('[data-target="${expand}"]');if(b)b.setAttribute("aria-expanded","true");});</script>\n`
     : "";
 
-  const extra = extraCss ? `<style>${extraCss}</style>` : "";
+  // The mock sets toggles checked at runtime, which fires the knob's slide
+  // transition; a screenshot can land mid-slide and freeze the knob off-centre.
+  // Kill the switch transition so the checked state renders at its final spot.
+  const freeze = '<style>.switch-track,.switch-knob{transition:none!important}</style>';
+  const extra = freeze + (extraCss ? `<style>${extraCss}</style>` : "");
   let html = await readFile(join(DIST, "popup.html"), "utf8");
   html = html.replace('<link rel="stylesheet" href="popup.css">', '<link rel="stylesheet" href="popup.css">' + (await themeStyle(theme)) + extra);
   html = html.replace('<script src="popup.js"></script>', inject + '<script src="popup.js"></script>\n' + expandJs);
