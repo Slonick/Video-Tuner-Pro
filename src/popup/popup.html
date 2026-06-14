@@ -75,6 +75,7 @@
         <div class="quick-actions">
             <span class="scope-label" data-i18n="scopeLabel">Save for</span>
             <div class="scope-seg" id="scopeSeg" role="radiogroup" aria-label="Save scope">
+                <span class="seg-pill" aria-hidden="true"></span>
                 <button type="button" class="scope-opt" id="scopeGlobal" data-scope="global" role="radio" aria-checked="false" data-i18n="scopeGlobal" title="Save for all sites" data-i18n-title="tipScopeGlobal">Global</button>
                 <button type="button" class="scope-opt" id="scopeSite" data-scope="site" role="radio" aria-checked="false" data-i18n="scopeSite" title="Save for this site" data-i18n-title="tipScopeSite">Site</button>
                 <button type="button" class="scope-opt scope-channel" id="scopeChannel" data-scope="channel" role="radio" aria-checked="false" data-i18n="scopeChannel" title="Save for this channel" data-i18n-title="tipScopeChannel">Channel</button>
@@ -156,14 +157,17 @@
         <div class="meter buffer always">
             <div class="meter-legend">
                 <span><i class="dot dot-buf"></i><span data-i18n="meterLatency">Latency</span></span>
+                <span><i class="dot dot-ahead"></i><span data-i18n="meterBuffer">Buffer</span></span>
                 <span class="meter-thr"><i class="dot dot-thr"></i><span data-i18n="meterTargetMark">Target</span></span>
             </div>
             <canvas id="bufferMeter"></canvas>
         </div>
 
         <div class="sync-body" id="syncBody">
-            <div class="sync-label"><span data-i18n="allowedDelay">Allowed delay</span>: <b id="syncTargetVal">3</b> <span data-i18n="secondsShort">s</span></div>
-            <input type="range" class="speed-slider" id="syncTarget" min="1" max="30" step="1" value="3">
+            <div class="param">
+                <div class="sync-label"><span data-i18n="allowedDelay">Allowed delay</span>: <b id="syncTargetVal">3</b> <span data-i18n="secondsShort">s</span></div>
+                <input type="range" class="speed-slider" id="syncTarget" min="1" max="30" step="1" value="3">
+            </div>
 
             <div class="extra-row">
                 <span data-i18n="onStreamLabel">Show speed &amp; buffer on video</span>
@@ -213,6 +217,7 @@
         <div class="sync-body" id="audioBody">
             <div class="sync-label" data-i18n="presetsLabel">Presets</div>
             <div class="preset-row">
+                <span class="seg-pill" aria-hidden="true"></span>
                 <button type="button" class="btn-preset" data-preset="voice" data-i18n="presetVoice">Voice</button>
                 <button type="button" class="btn-preset" data-preset="night" data-i18n="presetNight">Night</button>
                 <button type="button" class="btn-preset" data-preset="movie" data-i18n="presetMovie">Movie</button>

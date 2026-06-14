@@ -54,12 +54,20 @@ export function startPoll(g: GraphState): void {
         const raw = Number(resp.buffer);
         const bs = g.bufSmooth == null ? raw : g.bufSmooth + (raw - g.bufSmooth) * 0.18;
         g.bufSmooth = bs;
-        g.bufHist.push({ t, v: bs });
+        // Buffer-ahead, smoothed the same way, plotted as its own line. Null when
+        // the site doesn't expose latency (then the primary line IS the buffer).
+        const rawA = typeof resp.bufferAhead === "number" ? resp.bufferAhead : null;
+        const as = rawA == null ? null : (g.bufAheadSmooth == null ? rawA : g.bufAheadSmooth + (rawA - g.bufAheadSmooth) * 0.18);
+        g.bufAheadSmooth = as;
+        g.bufHist.push({ t, v: bs, a: as });
         while (g.bufHist.length && t - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
         g.bufBitrate = typeof resp.bitrate === "number" ? resp.bitrate : null;
-        g.bufAhead = typeof resp.bufferAhead === "number" ? resp.bufferAhead : null;
+        g.bufAhead = as;
         g.bufLimited = !!resp.bufLimited;
         // Refresh the displayed values at most once a second so the digits sit still.
+        if (g.bufShown == null || t - g.bufShownAt > 1000) {
+          g.bufShown = bs; g.bufShownAt = t;
+        }
         if (g.bufBitrateShown == null || t - g.bufBitrateAt > 1000) {
           g.bufBitrateShown = g.bufBitrate; g.bufBitrateAt = t;
         }
@@ -69,8 +77,9 @@ export function startPoll(g: GraphState): void {
       } else {
         // Not a live stream — the graph is meaningless, so keep it empty.
         g.bufHist.length = 0; g.bufSmooth = null;
+        g.bufShown = null; g.bufShownAt = 0;
         g.bufBitrate = g.bufBitrateShown = null;
-        g.bufAhead = g.bufAheadShown = null; g.bufAheadAt = 0;
+        g.bufAhead = g.bufAheadSmooth = g.bufAheadShown = null; g.bufAheadAt = 0;
         g.bufLimited = false;
       }
     });

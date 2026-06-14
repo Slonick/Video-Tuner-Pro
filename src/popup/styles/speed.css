@@ -177,8 +177,11 @@
 .buttons-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 3px;
+    padding: 3px;
+    margin-bottom: 8px;
+    border: 1px solid var(--track);
+    border-radius: 9px;
 }
 
 /* Collapsed hides the extra presets so the four quick ones form a single row;
@@ -199,8 +202,8 @@
     top: 0;
     right: 0;
     padding: 1px 4px;
-    /* Flush into the corner: top-right matches the button's 8px round, inner corner tucked. */
-    border-radius: 0 8px 0 6px;
+    /* Flush into the corner: top-right matches the button's 6px round, inner corner tucked. */
+    border-radius: 0 6px 0 4px;
     font-size: 9px;
     font-weight: 600;
     line-height: 1.2;
@@ -230,17 +233,23 @@
 /* Slider, preset grid and Reset / Remember are always visible (change or save a
    speed without expanding); the collapsible body below holds only the toggles. */
 .speed-section > .speed-slider {
-    margin: 12px 0 10px;
+    margin: 10px 0 8px;
 }
+/* Extra gap below the actions only when the body is open — it separates them
+   from the toggle rows. Collapsed, the bottom gap is just the card's 12px
+   padding, uniform with the other cards. */
 .speed-section > .quick-actions {
+    margin-bottom: 0;
+}
+.speed-section:has(.speed-body.open) > .quick-actions {
     margin-bottom: 12px;
 }
 
 .btn-speed {
     position: relative;
-    padding: 8px 0;
+    padding: 6px 0;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--seg);
     color: var(--text);
     font-size: 12px;
@@ -271,14 +280,15 @@
 }
 
 .btn-action {
-    padding: 9px;
+    padding: 7px;
     border: none;
     border-radius: 8px;
     color: var(--text);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: filter 0.12s;
+    /* background/color animate so the green "Saved" flash fades in and out. */
+    transition: background 0.2s, color 0.2s, filter 0.12s;
 }
 
 .btn-reset {
@@ -306,22 +316,32 @@
     color: var(--muted);
 }
 
-/* Scope picker: Global / Site / Channel as separate buttons (styled like the
-   speed presets). The Channel button shows only on a YouTube watch page
-   (.has-channel, set by the popup); the row is then three columns. The selected
-   scope is filled with the accent. */
+/* Scope picker: Global / Site / Channel as a segmented control — a bordered
+   group holds the three filled options, the selected one filled with the accent,
+   so it reads as 1-of-N rather than three loose buttons. The Channel option shows
+   only on a YouTube watch page (.has-channel, set by the popup); the row is then
+   three columns. */
 .scope-seg {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--track);
+    border-radius: 9px;
 }
 .scope-seg.has-channel {
     grid-template-columns: 1fr 1fr 1fr;
 }
+/* Filled cells; the pill rides ABOVE them (z 2) so it stays visible while it
+   slides, and the active cell sits ABOVE the pill (z 3) — transparent, so the
+   pill shows through with the label on top. */
 .scope-opt {
-    padding: 8px 0;
+    position: relative;
+    z-index: 1;
+    padding: 6px 0;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--seg);
     color: var(--text);
     font-size: 12px;
@@ -334,13 +354,46 @@
     }
 
     &.active {
-        background: var(--accent);
+        z-index: 3;
+        background: transparent;
         color: #fff;
         font-weight: 600;
+    }
+}
 
-        &:hover {
-            filter: brightness(1.05);
-        }
+/* Corner dot marking a scope whose slot holds a saved speed. Accent on a filled
+   cell; white when active (it then sits on the accent pill). */
+.scope-opt.has-saved::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+.scope-opt.has-saved.active::after {
+    background: #fff;
+}
+
+/* Sliding selection pill shared by the segmented groups (scope, audio presets):
+   rides over the filled cells (z 2) and glides to the active cell. Positioned/
+   sized in JS (movePill) by measuring the active button's box. */
+.seg-pill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 2;
+    border-radius: 6px;
+    background: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s ease, width 0.2s ease, height 0.2s ease, opacity 0.15s;
+}
+@media (prefers-reduced-motion: reduce) {
+    .seg-pill {
+        transition: opacity 0.15s;
     }
 }
 .scope-channel {
