@@ -54,12 +54,18 @@ export function isLive(video: HTMLVideoElement): boolean {
   // player and time-display, and shows a live badge — only while a live stream is
   // playing, never on regular VOD. Use those as the signal.
   if (isYouTube()) {
+    // Scope every check to the player that owns THIS video, not the whole
+    // document — a stale watch player left over from a previous live stream
+    // still carries ytp-live classes and a badge, and a global query would let
+    // those leak onto an unrelated (e.g. inline-preview) video.
     const player = (video.closest && video.closest(".html5-video-player")) ||
                    document.querySelector(".html5-video-player");
-    if (player && player.classList.contains("ytp-live")) return true;
-    if (document.querySelector(".ytp-time-display.ytp-live")) return true;
-    const badge = document.querySelector<HTMLElement>(".ytp-live-badge");
-    if (badge && badge.offsetParent !== null) return true; // visible = live
+    if (player) {
+      if (player.classList.contains("ytp-live")) return true;
+      if (player.querySelector(".ytp-time-display.ytp-live")) return true;
+      const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
+      if (badge && badge.offsetParent !== null) return true; // visible = live
+    }
   }
 
   // Generic fallback (covers Twitch low-latency etc., where duration isn't

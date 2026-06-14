@@ -68,7 +68,18 @@
   }
 
   function youtubePlayer(): any {
-    return document.getElementById("movie_player") || document.querySelector(".html5-video-player");
+    // Both the watch player (#movie_player) and the Shorts player (#shorts-player)
+    // carry .html5-video-player. After an SPA navigation the previous one lingers
+    // in the DOM but hidden (clientWidth/Height 0) — and still reports its old
+    // video's getVideoData().isLive. Read only a VISIBLE player so a stale live
+    // watch player can't make Shorts (or an inline preview) look like a stream.
+    const players = document.querySelectorAll<HTMLElement>(".html5-video-player");
+    let fallback: HTMLElement | null = null;
+    for (const p of players) {
+      if (!fallback) fallback = p;
+      if (p.clientWidth > 0 && p.clientHeight > 0) return p;
+    }
+    return fallback;
   }
 
   // The player's own live flag (getVideoData().isLive) — authoritative when
