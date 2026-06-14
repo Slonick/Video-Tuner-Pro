@@ -42,8 +42,10 @@ export function audioLevels(): AudioLevels {
 }
 
 // Accumulate audio-level history whenever a graph already exists (no new routing),
-// so re-opening the popup shows a pre-filled graph.
-setInterval(() => {
+// so re-opening the popup shows a pre-filled graph. One sample per call — the
+// content entry schedules it every A_HIST_MS; keeping the body here (and the
+// setInterval at the entry point) leaves this unit-testable.
+export function recordAudioSample(): void {
   if (!ctxValid()) return;
   const v = primaryVideo();
   const g = v ? audioGraphs.get(v) : null;
@@ -52,4 +54,4 @@ setInterval(() => {
   const inDb = analyserDb(g.analyserIn);
   audioLevelHist.push({ in: inDb, out: audioOutDb(g, inDb) });
   while (audioLevelHist.length > A_HIST_MAX) audioLevelHist.shift();
-}, A_HIST_MS);
+}

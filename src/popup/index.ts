@@ -4,7 +4,7 @@ import { STORE } from "./platform/storage.js";
 import { byId } from "./dom.js";
 import { localize } from "./i18n.js";
 import "./sections.js";
-import { init } from "./speed.js";
+import { init, pollSpeed } from "./speed.js";
 import { loadSyncSettings } from "./live-sync.js";
 import { loadAudioSettings } from "./audio-settings.js";
 import { setupGraphs } from "./graphs/index.js";
@@ -37,3 +37,6 @@ byId<HTMLInputElement>("superTheaterToggle").addEventListener("change", (e) => {
 });
 
 setupGraphs();
+
+// Poll the page every second so live-sync speed changes show in the readout.
+setInterval(pollSpeed, 1000);

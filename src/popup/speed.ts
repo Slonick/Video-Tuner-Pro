@@ -205,7 +205,8 @@ byId("resetChannelBtn").addEventListener("click", () => { closeMenus(); resetCha
 document.addEventListener("click", closeMenus);
 
 // Poll while the popup is open so live-sync speed changes show in the readout.
-setInterval(() => {
+// The entry point schedules this every second; the body stays here, testable.
+export function pollSpeed(): void {
   if (ctx.activeTabId == null) return;
   api.tabs.sendMessage(ctx.activeTabId, { action: "getSpeed" }, (resp) => {
     if (api.runtime.lastError || !resp) return;
@@ -218,4 +219,4 @@ setInterval(() => {
       setLive(false);
     }
   });
-}, 1000);
+}

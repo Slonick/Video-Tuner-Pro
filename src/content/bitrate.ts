@@ -4,7 +4,8 @@ import { forwardBuffer, streamLatency } from "./live/metrics.js";
 
 // Recent latency/buffer samples on live streams, to pre-fill the live graph.
 export const bufferLevelHist: { at: number; v: number }[] = [];
-const BUF_HIST_MS = 500, BUF_HIST_MAX = 64;
+export const BUF_HIST_MS = 500;
+const BUF_HIST_MAX = 64;
 
 // Estimated download bitrate (bits/s) from the decoder's byte counter — unlike
 // Resource Timing, this isn't blocked by cross-origin CDNs. Chromium-only
@@ -27,8 +28,9 @@ export function streamBitrate(v: HTMLVideoElement | null): number | null {
 }
 
 // Sample latency-to-broadcaster (or buffered-ahead, where latency isn't exposed)
-// on live streams, to pre-fill the live graph.
-setInterval(() => {
+// on live streams, to pre-fill the live graph. One sample per call — the content
+// entry schedules it every BUF_HIST_MS; the body stays here so it's unit-testable.
+export function recordBufferSample(): void {
   if (!ctxValid()) return;
   if (!onStreamPage()) { if (bufferLevelHist.length) bufferLevelHist.length = 0; return; }
   const lv = liveVideo();
@@ -36,4 +38,4 @@ setInterval(() => {
   const l = streamLatency();
   bufferLevelHist.push({ at: Date.now(), v: l != null ? l : forwardBuffer(lv) });
   while (bufferLevelHist.length > BUF_HIST_MAX) bufferLevelHist.shift();
-}, BUF_HIST_MS);
+}

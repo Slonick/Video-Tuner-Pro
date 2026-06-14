@@ -10,7 +10,9 @@ import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
-import "./messaging.js"; // registers the popup message handler (pulls in the bitrate sampler)
+import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
+import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
+import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js";  // registers the keyboard-shortcut listener
 import "./theater.js";   // applies the YouTube "super theater" layout when enabled
 import { currentChannel, channelKeys } from "./channel.js";
@@ -98,6 +100,12 @@ liveTick = setInterval(() => {
   applyAll(); controlLive(); updateTimeBadge();
   if (currentChannel() !== lastChannel) reresolve();
 }, 1000);
+
+// Background graph samplers (pre-fill the popup's audio/latency graphs). The
+// sample bodies live in their modules (unit-tested); only the scheduling lives
+// here, in the browser-wired entry point.
+setInterval(recordAudioSample, A_HIST_MS);
+setInterval(recordBufferSample, BUF_HIST_MS);
 
 // Apply the speed the moment ANY video starts up — a second player added to the
 // page would otherwise wait for the next tick/mutation pass and could begin at
