@@ -16,7 +16,10 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export const smooth = (a, b, p) => { const t = clamp((p - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 export const POPW = 340;    // popup display width (native 680 → 0.5×, so display px == css px)
-const WINH = 615;           // popup window — frames the audio panel with a little air on top
+const WINH = 615;           // fallback popup-window height (callers pass an adaptive one)
+// Padding around the compressor block when the window frames it: the 10px
+// inter-section gap on top, the section's own 12px on the bottom.
+const FRAME_TOP = 10, FRAME_BOT = 12;
 
 export async function loadCopy(locale) {
   const STR = JSON.parse(await readFile(join(ROOT, "tools/promo-strings.json"), "utf8"))[locale];
@@ -47,12 +50,18 @@ export async function renderHalves(locale) {
   const video = join(TMP, `${locale}-video.png`);
   const stream = join(TMP, `${locale}-stream.png`);
   const opt = { expand: "audioBody", locale, dpr: 2 };
-  const { height: hV } = await renderPopup({ ...opt, scenario: "audio", theme: "light", out: video });
-  const { height: hS } = await renderPopup({ ...opt, scenario: "live", theme: "dark", out: stream });
-  const popH = Math.max(hV, hS);
-  if (hV !== popH) await renderPopup({ ...opt, scenario: "audio", theme: "light", out: video, height: popH });
-  if (hS !== popH) await renderPopup({ ...opt, scenario: "live", theme: "dark", out: stream, height: popH });
-  return { video, stream, popH };
+  const v = await renderPopup({ ...opt, scenario: "audio", theme: "light", out: video });
+  const s = await renderPopup({ ...opt, scenario: "live", theme: "dark", out: stream });
+  const popH = Math.max(v.height, s.height);
+  if (v.height !== popH) await renderPopup({ ...opt, scenario: "audio", theme: "light", out: video, height: popH });
+  if (s.height !== popH) await renderPopup({ ...opt, scenario: "live", theme: "dark", out: stream, height: popH });
+  // Size the window to the compressor block (measured on the visible light half)
+  // plus its frame padding, and stop the scroll where that block is boxed — so
+  // the audio frame fits the whole section with even padding in every locale.
+  const aTop = v.audioTop ?? Math.max(0, popH - WINH), aBot = v.audioBottom ?? popH;
+  const winH = Math.round((aBot - aTop) + FRAME_TOP + FRAME_BOT);
+  const scrollMax = Math.max(0, Math.round(aTop - FRAME_TOP));
+  return { video, stream, popH, winH, scrollMax };
 }
 
 const section = (title, items) => `<h3>${esc(title)}</h3>` +
@@ -61,8 +70,9 @@ const lead = (title, text) => `<h2>${esc(title)}</h2><p class="sub">${esc(text)}
 
 // One canvas, two uses: a 1280×800 screenshot/GIF frame, and (at 1400×560) the
 // marquee. p drives the popup scroll + the in-place copy swap (overview → audio).
-export function frameHTML({ p = 0, video, stream, popH, copy, W = 1280, H = 800, winH = WINH, showBrand = true }) {
-  const scroll = (p * Math.max(0, popH - winH)).toFixed(1);
+export function frameHTML({ p = 0, video, stream, popH, copy, W = 1280, H = 800, winH = WINH, scrollMax = null, showBrand = true }) {
+  const sMax = scrollMax != null ? scrollMax : Math.max(0, popH - winH);
+  const scroll = (p * sMax).toFixed(1);
   const oOut = smooth(0.30, 0.55, p), aIn = smooth(0.45, 0.72, p);
   const ov = `opacity:${(1 - oOut).toFixed(3)};transform:translateY(${(-34 * oOut).toFixed(1)}px)`;
   const au = `opacity:${aIn.toFixed(3)};transform:translateY(${(34 * (1 - aIn)).toFixed(1)}px)`;

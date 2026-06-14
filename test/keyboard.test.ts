@@ -5,10 +5,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // we test only the key handling (which action fires, and the guards).
 const m = vi.hoisted(() => ({
   setSpeed: vi.fn(),
+  resetToSaved: vi.fn(),
   hasVideo: true,
 }));
 
-vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed }));
+vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed, resetToSaved: m.resetToSaved }));
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => (m.hasVideo ? ({} as HTMLVideoElement) : null) }));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
 
@@ -52,9 +53,10 @@ describe("keyboard shortcuts", () => {
     expect(m.setSpeed).toHaveBeenCalledWith(expect.closeTo(1.4), false, true);
   });
 
-  it("R resets to 100%", () => {
+  it("R reverts the manual change to the saved speed (deletes nothing)", () => {
     press("KeyR");
-    expect(m.setSpeed).toHaveBeenCalledWith(1.0, false, true);
+    expect(m.resetToSaved).toHaveBeenCalled();
+    expect(m.setSpeed).not.toHaveBeenCalled();
   });
 
   it("does nothing while the shortcuts are disabled", () => {

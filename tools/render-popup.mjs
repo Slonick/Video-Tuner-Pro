@@ -72,13 +72,16 @@ export async function runChrome(args) {
   }
 }
 
+// Measure the body height and — when the compressor section is in the DOM — its
+// top/bottom, so callers can frame that block tightly with uniform padding.
 async function measureHeight(file) {
   const { stdout } = await runChrome([
     "--headless=new", "--disable-gpu", "--no-sandbox",
     "--virtual-time-budget=1200", "--dump-dom", `file://${file}`,
   ]);
-  const m = stdout.match(/VH(\d+)/);
-  return m ? Number(m[1]) : 600;
+  const h = stdout.match(/VH(\d+)/);
+  const a = stdout.match(/AUD(\d+)_(\d+)/);
+  return { height: h ? Number(h[1]) : 600, audioTop: a ? Number(a[1]) : null, audioBottom: a ? Number(a[2]) : null };
 }
 
 // `height`: skip the measure pass and capture at this height — themes don't
@@ -108,14 +111,16 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   const pageFile = join(TMP, `popup-${tag}.html`);
   await writeFile(pageFile, html);
 
+  let audioTop = null, audioBottom = null;
   if (height == null) {
     // Measure pass → tight capture (uniform padding, no empty tail). Wait past
-    // the section open transition (0.28s) before measuring.
+    // the section open transition (0.28s) before measuring. Also record the
+    // compressor section's bounds so promo framing can box it tightly.
     const meas = html.replace("</body>",
-      '<script>addEventListener("load",()=>setTimeout(()=>document.title="VH"+Math.ceil(document.body.getBoundingClientRect().height),450))</script></body>');
+      '<script>addEventListener("load",()=>setTimeout(()=>{const b=Math.ceil(document.body.getBoundingClientRect().height);const e=document.getElementById("audioBody");let a="";if(e){const r=e.closest(".sync-section").getBoundingClientRect();a="AUD"+Math.round(r.top)+"_"+Math.round(r.bottom);}document.title="VH"+b+" "+a;},450))</script></body>');
     const measFile = join(TMP, `measure-${tag}.html`);
     await writeFile(measFile, meas);
-    height = await measureHeight(measFile);
+    ({ height, audioTop, audioBottom } = await measureHeight(measFile));
   }
 
   await runChrome([
@@ -125,5 +130,5 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
     `file://${pageFile}`,
   ]);
 
-  return { out, width, height };
+  return { out, width, height, audioTop, audioBottom };
 }

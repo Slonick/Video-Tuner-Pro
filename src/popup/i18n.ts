@@ -8,4 +8,10 @@ export function localize(): void {
     const text = key ? msg(key) : "";
     if (text) el.textContent = text;
   });
+  // Hover tooltips: localize the `title` attribute when present.
+  document.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach((el) => {
+    const key = el.dataset.i18nTitle;
+    const text = key ? msg(key) : "";
+    if (text) el.title = text;
+  });
 }

@@ -19,12 +19,12 @@ await mkdir(FR, { recursive: true });
 await mkdir(OUT, { recursive: true });
 
 const copy = await loadCopy("en");
-const { video, stream, popH } = await renderHalves("en");
+const { video, stream, popH, winH, scrollMax } = await renderHalves("en");
 
 // Render the unique scroll-down frames.
 const frame = (i) => join(FR, `d-${String(i).padStart(3, "0")}.png`);
 for (let i = 0; i < NDOWN; i++) {
-  await shoot(frameHTML({ p: i / (NDOWN - 1), video, stream, popH, copy }), 1280, 800, frame(i));
+  await shoot(frameHTML({ p: i / (NDOWN - 1), video, stream, popH, winH, scrollMax, copy }), 1280, 800, frame(i));
   process.stdout.write(`\rframe ${i + 1}/${NDOWN}`);
 }
 console.log();

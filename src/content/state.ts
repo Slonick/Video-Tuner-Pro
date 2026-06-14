@@ -7,6 +7,9 @@ export const S = {
   // The user's intended speed for NON-live playback (restored when a page turns
   // out not to be a live stream).
   userSpeed: 1.0,
+  // Which saved scope the current resolved speed came from (channel/site/global),
+  // or null when nothing is saved. The popup reads it to preselect the scope.
+  speedScope: null as "channel" | "site" | "global" | null,
   liveSyncEnabled: false,
   // Keyboard shortcuts (S/D/R/Z) for playback speed
   keyboardEnabled: true,

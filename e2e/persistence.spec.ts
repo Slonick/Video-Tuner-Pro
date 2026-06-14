@@ -11,7 +11,7 @@ test.beforeEach(async ({ serviceWorker }) => {
 test("remember-site persists the speed across a reload (real chrome.storage)", async ({ page, serviceWorker }) => {
   await page.goto("/");
   await sendToContent(serviceWorker, "setSpeed", { speed: 1.5 });
-  await sendToContent(serviceWorker, "rememberSite", { speed: 1.5 });
+  await sendToContent(serviceWorker, "remember", { scope: "site", speed: 1.5 });
   await page.reload();
   await expect.poll(() => rate(page)).toBeCloseTo(1.5, 2);
 });
@@ -22,7 +22,19 @@ test("a stored per-site speed is applied to the video on load", async ({ page, s
   await expect.poll(() => rate(page)).toBeCloseTo(1.25, 2);
 });
 
-test("an un-remembered site stays at 100%", async ({ page }) => {
+test("a global default applies where no per-site speed is saved", async ({ page, serviceWorker }) => {
+  await setStorage(serviceWorker, { globalSpeed: 1.4 });
+  await page.goto("/");
+  await expect.poll(() => rate(page)).toBeCloseTo(1.4, 2);
+});
+
+test("a per-site speed wins over the global default", async ({ page, serviceWorker }) => {
+  await setStorage(serviceWorker, { globalSpeed: 1.4, domains: { localhost: 1.75 } });
+  await page.goto("/");
+  await expect.poll(() => rate(page)).toBeCloseTo(1.75, 2);
+});
+
+test("an un-remembered site with no global default stays at 100%", async ({ page }) => {
   await page.goto("/");
   await expect.poll(() => rate(page)).toBe(1);
 });

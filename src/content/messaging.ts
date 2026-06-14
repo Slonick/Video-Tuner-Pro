@@ -7,7 +7,7 @@ import { clamp } from "./core/clamp.js";
 import { S } from "./state.js";
 import { collectVideos } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
-import { setSpeed, persistDomainSpeed, persistChannelSpeed, resetChannelSpeed } from "./speed.js";
+import { setSpeed, persistDomainSpeed, persistChannelSpeed, persistGlobalSpeed, resetScope, resetToSaved } from "./speed.js";
 import { monitorData } from "./monitor.js";
 import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
 import { bufferLevelHist } from "./bitrate.js";
@@ -27,26 +27,27 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse,
       () => ({ success: true, speed: S.currentSpeed, live: onStreamPage() }));
   }
-  if (request.action === "rememberSite") {
+  if (request.action === "remember") {
     const speed = typeof request.speed === "number" ? clamp(request.speed) : S.currentSpeed;
-    persistDomainSpeed(speed);
+    if (request.scope === "channel") persistChannelSpeed(speed);
+    else if (request.scope === "global") persistGlobalSpeed(speed);
+    else persistDomainSpeed(speed);
     sendResponse({ success: true, speed });
     return true;
   }
-  if (request.action === "rememberChannel") {
-    const speed = typeof request.speed === "number" ? clamp(request.speed) : S.currentSpeed;
-    persistChannelSpeed(speed);
-    sendResponse({ success: true, speed });
+  if (request.action === "reset") {
+    resetScope(request.scope === "channel" || request.scope === "global" ? request.scope : "site");
+    sendResponse({ success: true });
     return true;
   }
-  if (request.action === "resetChannel") {
-    resetChannelSpeed();
+  if (request.action === "resetToSaved") {
+    resetToSaved();
     sendResponse({ success: true });
     return true;
   }
   if (request.action === "getSpeed") {
     return replyFromVideoFrame(sendResponse,
-      () => ({ speed: S.currentSpeed, domain: getDomain(), channel: currentChannel(), channelName: currentChannelName(), live: onStreamPage() }));
+      () => ({ speed: S.currentSpeed, domain: getDomain(), channel: currentChannel(), channelName: currentChannelName(), scope: S.speedScope, live: onStreamPage() }));
   }
   if (request.action === "getMonitor") {
     return replyFromVideoFrame(sendResponse, () => monitorData());

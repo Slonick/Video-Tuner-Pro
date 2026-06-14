@@ -4,6 +4,7 @@ import { api, ctxValid } from "./platform/browser.js";
 import { STORE, STORE_AREA } from "./platform/storage.js";
 import { clamp, clampTarget, clampNum, resolveTarget } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
+import { resolveSpeed } from "./core/resolve.js";
 import { S } from "./state.js";
 import { applyAll } from "./speed.js";
 import { controlLive } from "./live/sync.js";
@@ -28,23 +29,25 @@ export function teardown() {
   try { observer.disconnect(); } catch (e) { /* ignore */ }
 }
 
-// Resolve the page's speed: a per-channel speed wins over the per-domain one,
-// else 100%. Sites/channels the user never remembered stay at 100%.
-function applyResolved(domains: Record<string, number>, channels: Record<string, number>): void {
+// Resolve the page's speed by priority: per-channel > per-site > global > 100%.
+// Sites/channels with nothing saved (and no global default) stay at 100%.
+function applyResolved(
+  domains: Record<string, number>,
+  channels: Record<string, number>,
+  globalSpeed: number | undefined,
+): void {
   const keys = channelKeys();
   lastChannel = keys[0] ?? null;
-  // Match a per-channel speed saved under EITHER the channel-id or the @handle
-  // form (YouTube exposes both), so it wins over the per-domain speed.
-  const chKey = keys.find((k) => channels[k] != null);
-  const saved = chKey != null ? channels[chKey] : domains[getDomain()];
-  S.userSpeed = clamp(saved != null ? saved : 1.0);
+  const r = resolveSpeed(keys, getDomain(), domains, channels, globalSpeed);
+  S.userSpeed = clamp(r.speed);
   S.currentSpeed = S.userSpeed;
+  S.speedScope = r.scope;
 }
 
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "channels", "liveSync", "liveSyncTarget", "syncTargets", "badgePos", "badgePinned",
+    ["domains", "channels", "globalSpeed", "liveSync", "liveSyncTarget", "syncTargets", "badgePos", "badgePinned",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
      "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge", "keyboard"],
     (result) => {
@@ -70,7 +73,7 @@ function loadSpeed() {
       S.audioCompAttack = clampNum(result.audioCompAttack, 0, 1, 0);
       S.audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 1);
       S.audioCompGain = clampNum(result.audioCompGain, 0, 24, 0);
-      applyResolved(domains, channels);
+      applyResolved(domains, channels, result.globalSpeed as number | undefined);
       applyAll();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
@@ -84,8 +87,11 @@ function loadSpeed() {
 // check; the owner link may render a beat after navigation).
 function reresolve() {
   if (!ctxValid()) return;
-  STORE.get(["domains", "channels"], (r) => {
-    applyResolved((r.domains || {}) as Record<string, number>, (r.channels || {}) as Record<string, number>);
+  STORE.get(["domains", "channels", "globalSpeed"], (r) => {
+    applyResolved(
+      (r.domains || {}) as Record<string, number>,
+      (r.channels || {}) as Record<string, number>,
+      r.globalSpeed as number | undefined);
     applyAll();
     controlLive();
     updateTimeBadge();
