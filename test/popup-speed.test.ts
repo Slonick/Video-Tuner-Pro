@@ -133,4 +133,16 @@ describe("channel menus", () => {
     byId("rememberChannelBtn").click();
     expect(lastCall("rememberChannel")).toMatchObject({ action: "rememberChannel", speed: 1.4 });
   });
+
+  it("reset-channel resets and pulls the fallback speed back into the readout", () => {
+    vi.useFakeTimers();
+    replies.resetChannel = { success: true };
+    // The content falls back to the domain speed (or 100%); the popup re-reads it.
+    replies.getSpeed = { speed: 1.8, domain: "youtube.com", channel: null, channelName: "", live: false };
+    byId("resetChannelBtn").click();
+    expect(lastCall("resetChannel")).toMatchObject({ action: "resetChannel" });
+    vi.advanceTimersByTime(80);         // deferred getSpeed round-trip
+    expect(byId("currentSpeedPct").textContent).toBe("180%");
+    vi.useRealTimers();
+  });
 });
