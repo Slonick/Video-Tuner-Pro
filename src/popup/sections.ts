@@ -64,10 +64,22 @@ function toggleSection(btn: HTMLElement): void {
     const open = body.classList.toggle("open");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
     if (open) revealOnExpand(body);
+    else body.style.overflow = "";   // clip again (CSS hidden) while it collapses
   };
   if (body.id === "speedBody") flipPresetGrid(apply);
   else apply();
 }
+
+// A collapsed body clips with overflow:hidden (for the max-height animation).
+// Once it's fully open, drop the clip so an in-body info tooltip can overflow the
+// body instead of being cut off at its edge.
+document.querySelectorAll<HTMLElement>(".sync-body").forEach((body) => {
+  body.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "max-height" && body.classList.contains("open")) {
+      body.style.overflow = "visible";
+    }
+  });
+});
 
 // Auto-expand a section the first time it's switched on so the user sees its
 // settings; a persistent flag ensures this happens only once, ever.
