@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { currentChannel, currentChannelName } from "../src/content/channel.js";
+import { currentChannel, channelKeys, currentChannelName } from "../src/content/channel.js";
 
 function at(hostname: string, pathname: string): void {
   vi.stubGlobal("location", { hostname, pathname });
@@ -24,6 +24,25 @@ describe("currentChannel (stable per-channel key)", () => {
     document.body.innerHTML =
       `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/channel/UCabc_123">Name</a></ytd-video-owner-renderer>`;
     expect(currentChannel()).toBe("channel/UCabc_123");
+  });
+
+  it("prefers the stable id (and exposes both) when the owner has handle + id links", () => {
+    // Real YouTube: the owner section carries a /@handle link AND a /channel/UC…
+    // link. The key must be deterministic (was flipping with DOM order), so the
+    // id wins — but both forms are returned so a speed saved under either matches.
+    at("www.youtube.com", "/watch");
+    document.body.innerHTML =
+      `<ytd-video-owner-renderer>
+         <a class="yt-simple-endpoint" href="/@WGC098">WGC</a>
+         <ytd-channel-name><a class="yt-simple-endpoint" href="/channel/UCabc_123">WGC</a></ytd-channel-name>
+       </ytd-video-owner-renderer>`;
+    expect(currentChannel()).toBe("channel/UCabc_123");
+    expect(channelKeys()).toEqual(["channel/UCabc_123", "@WGC098"]);
+  });
+
+  it("is empty (no keys) off a watch page", () => {
+    at("www.youtube.com", "/results");
+    expect(channelKeys()).toEqual([]);
   });
 
   it("is null off YouTube", () => {

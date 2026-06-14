@@ -13,7 +13,7 @@ import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import "./messaging.js"; // registers the popup message handler (pulls in the bitrate sampler)
 import "./keyboard.js";  // registers the keyboard-shortcut listener
 import "./theater.js";   // applies the YouTube "super theater" layout when enabled
-import { currentChannel } from "./channel.js";
+import { currentChannel, channelKeys } from "./channel.js";
 
 let liveTick: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
@@ -29,9 +29,12 @@ export function teardown() {
 // Resolve the page's speed: a per-channel speed wins over the per-domain one,
 // else 100%. Sites/channels the user never remembered stay at 100%.
 function applyResolved(domains: Record<string, number>, channels: Record<string, number>): void {
-  const ch = currentChannel();
-  lastChannel = ch;
-  const saved = (ch && channels[ch] != null) ? channels[ch] : domains[getDomain()];
+  const keys = channelKeys();
+  lastChannel = keys[0] ?? null;
+  // Match a per-channel speed saved under EITHER the channel-id or the @handle
+  // form (YouTube exposes both), so it wins over the per-domain speed.
+  const chKey = keys.find((k) => channels[k] != null);
+  const saved = chKey != null ? channels[chKey] : domains[getDomain()];
   S.userSpeed = clamp(saved != null ? saved : 1.0);
   S.currentSpeed = S.userSpeed;
 }
