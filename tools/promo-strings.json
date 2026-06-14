@@ -6,7 +6,7 @@
       ["Remember per site or channel", "Save a speed for a site — or a YouTube channel; applied automatically next time."],
       ["On-video readout", "Current speed and the real time left, right on the player."],
       ["Super theater (YouTube)", "One toggle makes theater mode fill the whole window — the header tucks away on its own."],
-      ["Keyboard shortcuts", "Nudge speed with S / D (Shift for bigger steps) and remember it with Z — no mouse needed."]
+      ["Keyboard shortcuts", "Adjust speed with A / D — hold Shift for bigger steps, no mouse needed."]
     ]},
     "stream": { "title": "Live streams", "items": [
       ["Live-sync catch-up", "Speeds up just enough to reach the live edge, then backs off."],
@@ -23,7 +23,7 @@
       ["Память по сайту или каналу", "Сохраните скорость для сайта или канала YouTube — применится автоматически в следующий раз."],
       ["Индикатор на видео", "Текущая скорость и реальное оставшееся время прямо на плеере."],
       ["Супертеатр (YouTube)", "Один переключатель — и режим театра занимает всё окно, шапка прячется сама."],
-      ["Горячие клавиши", "Меняйте скорость на S / D (Shift — крупный шаг) и запоминайте на Z — без мыши."]
+      ["Горячие клавиши", "Меняйте скорость на A / D — с Shift крупный шаг, без мыши."]
     ]},
     "stream": { "title": "Прямые эфиры", "items": [
       ["Догон Live-sync", "Ускоряется ровно настолько, чтобы догнать эфир, затем сбавляет."],
@@ -40,7 +40,7 @@
       ["Пам'ять за сайтом або каналом", "Збережіть швидкість для сайту або каналу YouTube — застосується автоматично наступного разу."],
       ["Індикатор на відео", "Поточна швидкість і реальний залишок часу прямо на плеєрі."],
       ["Супертеатр (YouTube)", "Один перемикач — і режим театру займає все вікно, шапка ховається сама."],
-      ["Гарячі клавіші", "Змінюйте швидкість на S / D (Shift — більший крок) і запам'ятовуйте на Z — без миші."]
+      ["Гарячі клавіші", "Змінюйте швидкість на A / D — із Shift більший крок, без миші."]
     ]},
     "stream": { "title": "Прямі трансляції", "items": [
       ["Догін Live-sync", "Прискорюється рівно настільки, щоб наздогнати ефір, потім сповільнюється."],
@@ -57,7 +57,7 @@
       ["Pro Seite oder Kanal merken", "Tempo für eine Seite oder einen YouTube-Kanal speichern — beim nächsten Mal automatisch angewendet."],
       ["Anzeige im Video", "Aktuelles Tempo und die echte Restzeit direkt im Player."],
       ["Super-Theater (YouTube)", "Ein Schalter — der Theatermodus füllt das ganze Fenster, die Kopfzeile blendet sich selbst aus."],
-      ["Tastenkürzel", "Tempo mit S / D ändern (Shift für größere Schritte) und mit Z merken — ganz ohne Maus."]
+      ["Tastenkürzel", "Tempo mit A / D ändern — mit Shift größere Schritte, ganz ohne Maus."]
     ]},
     "stream": { "title": "Livestreams", "items": [
       ["Live-sync-Aufholen", "Beschleunigt gerade so weit, um den Livestream einzuholen, dann zurück."],
@@ -74,7 +74,7 @@
       ["Recordar por sitio o canal", "Guarda una velocidad para un sitio o un canal de YouTube; se aplica automáticamente la próxima vez."],
       ["Indicador en el vídeo", "Velocidad actual y el tiempo real restante, en el propio reproductor."],
       ["Súper teatro (YouTube)", "Un interruptor y el modo cine llena toda la ventana — la cabecera se oculta sola."],
-      ["Atajos de teclado", "Ajusta la velocidad con S / D (Shift para pasos mayores) y recuérdala con Z, sin ratón."]
+      ["Atajos de teclado", "Ajusta la velocidad con A / D — con Shift, pasos mayores, sin ratón."]
     ]},
     "stream": { "title": "Directos", "items": [
       ["Sincronización en directo", "Acelera lo justo para alcanzar el directo y luego vuelve."],
@@ -91,7 +91,7 @@
       ["Mémoriser par site ou chaîne", "Enregistrez une vitesse pour un site ou une chaîne YouTube ; appliquée automatiquement la prochaine fois."],
       ["Affichage sur la vidéo", "Vitesse actuelle et temps réel restant, directement sur le lecteur."],
       ["Super cinéma (YouTube)", "Un bouton et le mode cinéma remplit toute la fenêtre — l'en-tête se masque tout seul."],
-      ["Raccourcis clavier", "Réglez la vitesse avec S / D (Shift pour de plus grands pas) et mémorisez-la avec Z, sans souris."]
+      ["Raccourcis clavier", "Réglez la vitesse avec A / D — avec Maj, de plus grands pas, sans souris."]
     ]},
     "stream": { "title": "Directs", "items": [
       ["Rattrapage Live-sync", "Accélère juste assez pour rejoindre le direct, puis revient."],
@@ -108,7 +108,7 @@
       ["Lembrar por site ou canal", "Salve uma velocidade para um site ou canal do YouTube; aplicada automaticamente na próxima vez."],
       ["Indicador no vídeo", "Velocidade atual e o tempo real restante, no próprio player."],
       ["Super teatro (YouTube)", "Um botão e o modo cinema preenche a janela inteira — o cabeçalho se esconde sozinho."],
-      ["Atalhos de teclado", "Ajuste a velocidade com S / D (Shift para passos maiores) e memorize com Z — sem mouse."]
+      ["Atalhos de teclado", "Ajuste a velocidade com A / D — com Shift, passos maiores, sem mouse."]
     ]},
     "stream": { "title": "Transmissões ao vivo", "items": [
       ["Sincronização ao vivo", "Acelera só o necessário para alcançar a transmissão e depois volta."],
@@ -125,7 +125,7 @@
       ["サイトまたはチャンネルごとに記憶", "サイトやYouTubeチャンネルに速度を保存すると、次回から自動で適用。"],
       ["動画上に表示", "現在の速度と実際の残り時間をプレーヤー上に表示。"],
       ["スーパーシアター（YouTube）", "切り替えるだけでシアターモードがウィンドウ全体に広がり、ヘッダーは自動で隠れます。"],
-      ["キーボードショートカット", "S / D で速度を調整（Shift で大きく）、Z で記憶 — マウス不要。"]
+      ["キーボードショートカット", "A / D で速度を調整（Shift で大きく）— マウス不要。"]
     ]},
     "stream": { "title": "ライブ配信", "items": [
       ["ライブ同期で追いつく", "ライブの先端に追いつくだけ速度を上げ、その後戻ります。"],
@@ -142,7 +142,7 @@
       ["按站点或频道记忆", "为站点或 YouTube 频道保存速度，下次自动应用。"],
       ["视频上显示", "在播放器上直接显示当前速度和真实剩余时间。"],
       ["超级影院（YouTube）", "一键让影院模式铺满整个窗口 — 顶栏自动隐藏。"],
-      ["键盘快捷键", "用 S / D 调速（Shift 步进更大），按 Z 记住 — 无需鼠标。"]
+      ["键盘快捷键", "用 A / D 调速（Shift 步进更大）— 无需鼠标。"]
     ]},
     "stream": { "title": "直播", "items": [
       ["直播同步追赶", "仅加速到追上直播边缘，然后恢复。"],
@@ -159,7 +159,7 @@
       ["साइट या चैनल के अनुसार याद रखें", "किसी साइट या YouTube चैनल के लिए गति सहेजें; अगली बार स्वतः लागू।"],
       ["वीडियो पर रीडआउट", "मौजूदा गति और वास्तविक शेष समय, सीधे प्लेयर पर।"],
       ["सुपर थिएटर (YouTube)", "एक टॉगल और थिएटर मोड पूरी विंडो भर देता है — हेडर खुद छिप जाता है।"],
-      ["कीबोर्ड शॉर्टकट", "S / D से गति बदलें (Shift से बड़ा कदम), Z से याद रखें — माउस की ज़रूरत नहीं।"]
+      ["कीबोर्ड शॉर्टकट", "A / D से गति बदलें (Shift से बड़ा कदम) — माउस की ज़रूरत नहीं।"]
     ]},
     "stream": { "title": "लाइव स्ट्रीम", "items": [
       ["लाइव-सिंक कैच-अप", "लाइव किनारे तक पहुँचने भर तेज़ होता है, फिर वापस।"],
