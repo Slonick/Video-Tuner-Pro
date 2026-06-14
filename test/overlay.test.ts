@@ -41,6 +41,15 @@ describe("updateTimeBadge — visibility", () => {
     if (el) expect((el as HTMLElement).style.display).toBe("none");
   });
 
+  it("hides on a live stream when the stream badge is disabled", () => {
+    h.onStream = true; h.latency = 3; h.buffer = 5;
+    S.streamBadge = false;
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const el = badgeEl();
+    if (el) expect((el as HTMLElement).style.display).toBe("none");
+  });
+
   it("hides a VOD badge when the video has no finite duration", () => {
     h.primary = fakeVideo({} as DOMRect);
     (h.primary as { duration: number }).duration = Infinity;

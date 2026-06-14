@@ -103,6 +103,21 @@ describe("getMonitor / getHistory", () => {
   });
 });
 
+describe("unknown actions", () => {
+  it("ignores an unrecognized action (returns false, never replies)", () => {
+    const { ret, called } = send({ action: "totallyUnknown" });
+    expect(ret).toBe(false);
+    expect(called).toBe(false);
+    expect(speed.setSpeed).not.toHaveBeenCalled();
+  });
+
+  it("ignores a message with no action", () => {
+    const { ret, called } = send({});
+    expect(ret).toBe(false);
+    expect(called).toBe(false);
+  });
+});
+
 describe("replyFromVideoFrame fallback", () => {
   it("a subframe without a video stays silent (returns false)", () => {
     h.hasVideo = false;

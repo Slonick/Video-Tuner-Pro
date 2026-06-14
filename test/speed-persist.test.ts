@@ -125,12 +125,48 @@ describe("setSpeed", () => {
   });
 });
 
+describe("dead extension context — never writes", () => {
+  let savedId: unknown;
+  beforeEach(() => { savedId = globalThis.chrome.runtime.id; (globalThis.chrome.runtime as { id?: unknown }).id = undefined; });
+  afterEach(() => { (globalThis.chrome.runtime as { id?: unknown }).id = savedId; });
+
+  it("persistDomainSpeed bails when the context is gone", () => {
+    persistDomainSpeed(1.5);
+    expect(get(["domains"]).domains).toEqual({});
+  });
+
+  it("persistChannelSpeed bails when the context is gone", () => {
+    h.keys = ["UC1"];
+    persistChannelSpeed(1.5);
+    expect(get(["channels"]).channels).toEqual({});
+  });
+
+  it("resetChannelSpeed bails when the context is gone", () => {
+    STORE.set({ channels: { UC1: 2.0 } });
+    h.keys = ["UC1"];
+    resetChannelSpeed();
+    expect((get(["channels"]).channels as Record<string, number>).UC1).toBe(2.0); // untouched
+  });
+});
+
 describe("applyToVideo (via applyAll)", () => {
   it("writes the current speed onto a non-live video", () => {
     const v = fakeVideo(1.0);
     h.videos = [v];
     setSpeed(1.75);
     expect(v.playbackRate).toBeCloseTo(1.75, 5);
+  });
+
+  it("does NOT re-assign playbackRate when it already matches (avoids the audio glitch)", () => {
+    let writes = 0, current = 1.5;
+    const v = { addEventListener: vi.fn() } as unknown as HTMLVideoElement;
+    Object.defineProperty(v, "playbackRate", { get: () => current, set: (x: number) => { writes++; current = x; } });
+    h.videos = [v];
+    setSpeed(1.5);            // equal → no write
+    expect(writes).toBe(0);
+    setSpeed(1.6);            // differs → one write
+    expect(writes).toBe(1);
+    expect(current).toBeCloseTo(1.6, 5);
   });
 
   it("leaves a live video's rate alone (owned by live-sync)", () => {
