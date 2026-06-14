@@ -322,37 +322,36 @@
     margin-top: 8px;
 }
 
-/* Keyboard-shortcuts hint: the key letters as little keycap chips, each with its
-   localized action label. Two fixed lines — moves/reset on top, the save keys
-   together below. */
-.kbd-hint {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--muted);
+/* Shortcut keycaps inside the Keyboard-shortcuts info tooltip. The tooltip
+   background is inverted per theme, so the keys use a neutral grey that reads on
+   either, and inherit the tooltip's text colour. */
+/* Two columns — the bare key + its Shift form — so the Shift chips line up under
+   each other regardless of the (varying-width) labels in the first column. */
+.kbd-tip {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    align-items: center;
+    justify-content: start;
+    gap: 7px 16px;
 }
-.kbd-line {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 12px;
-}
-.kbd-hint .kbd-row {
+.kbd-tip .kbd-g {
     display: inline-flex;
     align-items: center;
     gap: 5px;
 }
-.kbd-hint kbd {
+.kbd-tip .amt {
+    opacity: 0.8;
+}
+.kbd-tip kbd {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 17px;
-    height: 17px;
+    min-width: 16px;
+    height: 16px;
     padding: 0 4px;
-    border-radius: 5px;
-    background: var(--seg);
-    color: var(--text);
+    border-radius: 4px;
+    background: rgba(128, 128, 128, 0.3);
+    color: inherit;
     font-family: inherit;
     font-size: 10px;
     font-weight: 600;

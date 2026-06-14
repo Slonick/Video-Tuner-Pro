@@ -49,11 +49,9 @@
   "superTheaterLabel": { "message": "Super cinéma (YouTube)" },
   "superTheaterHint": { "message": "Sur YouTube, le mode cinéma remplit toute la fenêtre ; l’en-tête se masque automatiquement." },
   "kbdLabel": { "message": "Raccourcis clavier" },
-  "kbdSlowerFaster": { "message": "ralentir / accélérer" },
-  "kbdBigStep": { "message": "pas de 10 %" },
+  "kbdFaster": { "message": "augmenter" },
+  "kbdSlower": { "message": "réduire" },
   "kbdReset": { "message": "réinitialiser" },
-  "kbdSaveSite": { "message": "mémoriser le site" },
-  "kbdSaveChannel": { "message": "mémoriser la chaîne" },
   "rememberChannel": { "message": "Mémoriser pour la chaîne" },
   "resetChannel": { "message": "Réinitialiser pour la chaîne" }
 }

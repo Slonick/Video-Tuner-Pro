@@ -49,11 +49,9 @@
   "superTheaterLabel": { "message": "Super-Theater (YouTube)" },
   "superTheaterHint": { "message": "Auf YouTube füllt der Theatermodus das ganze Fenster; die Kopfzeile blendet sich automatisch aus." },
   "kbdLabel": { "message": "Tastenkürzel" },
-  "kbdSlowerFaster": { "message": "langsamer / schneller" },
-  "kbdBigStep": { "message": "10 %-Schritt" },
+  "kbdFaster": { "message": "erhöhen" },
+  "kbdSlower": { "message": "verringern" },
   "kbdReset": { "message": "zurücksetzen" },
-  "kbdSaveSite": { "message": "Seite merken" },
-  "kbdSaveChannel": { "message": "Kanal merken" },
   "rememberChannel": { "message": "Für Kanal merken" },
   "resetChannel": { "message": "Für Kanal zurücksetzen" }
 }

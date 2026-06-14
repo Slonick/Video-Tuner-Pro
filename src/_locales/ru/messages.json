@@ -49,11 +49,9 @@
   "superTheaterLabel": { "message": "Супертеатр (YouTube)" },
   "superTheaterHint": { "message": "На YouTube режим театра занимает всё окно; шапка автоматично прячется." },
   "kbdLabel": { "message": "Горячие клавиши" },
-  "kbdSlowerFaster": { "message": "медленнее / быстрее" },
-  "kbdBigStep": { "message": "шаг 10%" },
+  "kbdFaster": { "message": "увеличить" },
+  "kbdSlower": { "message": "уменьшить" },
   "kbdReset": { "message": "сброс" },
-  "kbdSaveSite": { "message": "запомнить сайт" },
-  "kbdSaveChannel": { "message": "запомнить канал" },
   "rememberChannel": { "message": "Запомнить для канала" },
   "resetChannel": { "message": "Сбросить для канала" }
 }

@@ -49,11 +49,9 @@
   "superTheaterLabel": { "message": "Super teatro (YouTube)" },
   "superTheaterHint": { "message": "No YouTube, o modo cinema preenche toda a janela; o cabeçalho se oculta automaticamente." },
   "kbdLabel": { "message": "Atalhos de teclado" },
-  "kbdSlowerFaster": { "message": "mais lento / mais rápido" },
-  "kbdBigStep": { "message": "passo de 10%" },
+  "kbdFaster": { "message": "aumentar" },
+  "kbdSlower": { "message": "diminuir" },
   "kbdReset": { "message": "redefinir" },
-  "kbdSaveSite": { "message": "lembrar site" },
-  "kbdSaveChannel": { "message": "lembrar canal" },
   "rememberChannel": { "message": "Lembrar para o canal" },
   "resetChannel": { "message": "Redefinir para o canal" }
 }

@@ -49,11 +49,9 @@
   "superTheaterLabel": { "message": "スーパーシアター (YouTube)" },
   "superTheaterHint": { "message": "YouTubeでシアターモードがウィンドウ全体に広がり、ヘッダーは自動的に隠れます。" },
   "kbdLabel": { "message": "キーボードショートカット" },
-  "kbdSlowerFaster": { "message": "遅く / 速く" },
-  "kbdBigStep": { "message": "10%刻み" },
+  "kbdFaster": { "message": "上げる" },
+  "kbdSlower": { "message": "下げる" },
   "kbdReset": { "message": "リセット" },
-  "kbdSaveSite": { "message": "サイトを記憶" },
-  "kbdSaveChannel": { "message": "チャンネルを記憶" },
   "rememberChannel": { "message": "チャンネルに記憶" },
   "resetChannel": { "message": "チャンネルをリセット" }
 }
