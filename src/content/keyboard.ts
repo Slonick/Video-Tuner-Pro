@@ -1,12 +1,13 @@
 // In-page keyboard shortcuts for playback speed (default-on; toggled in the popup).
 // Bare single keys by physical position (e.code, so they hold across layouts):
-//   A — decrease, D — increase by 5% (Shift makes it 10%),  R — reset to 100%.
+//   A — decrease, D — increase by 5% (Shift makes it 10%),  R — drop the manual
+//   change and re-take the saved speed by priority (channel > site > global > 100%).
 // (Remembering a speed is done by hand from the popup's Remember buttons.)
 // Ignored while typing in a field, while Ctrl/Cmd/Alt is held, and on pages with
 // no video. Speed changes go through setSpeed's `manual` flag, so a live stream
 // at the live edge safely ignores them.
 import { S } from "./state.js";
-import { setSpeed } from "./speed.js";
+import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 
@@ -38,5 +39,5 @@ document.addEventListener("keydown", (e) => {
   const step = e.shiftKey ? BIG_STEP : STEP;
   if (e.code === "KeyD") setSpeed(S.currentSpeed + step, false, true);
   else if (e.code === "KeyA") setSpeed(S.currentSpeed - step, false, true);
-  else if (e.code === "KeyR") setSpeed(1.0, false, true);
+  else if (e.code === "KeyR") resetToSaved();
 }, true);

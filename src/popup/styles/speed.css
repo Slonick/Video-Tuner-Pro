@@ -49,6 +49,14 @@
     gap: 6px;
 }
 
+/* Thin separator between the −/+ nudges and the ⟲ reset-to-saved button. */
+.speed-quick-div {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 18px;
+    background: var(--track);
+}
+
 .speed-pct {
     min-width: 44px;
     font-size: 15px;
@@ -218,10 +226,10 @@
     }
 }
 
-/* --- Quick actions: Reset / Remember site -------------------------------- */
+/* --- Quick actions: scope picker + Reset / Remember ---------------------- */
 .quick-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 6px;
 }
 
@@ -254,82 +262,61 @@
     }
 }
 
-/* Split buttons: the main action + a caret opening a "for channel" option, shown
-   only on a YouTube watch page (.has-channel, set by the popup). */
-.split {
-    position: relative;
-    display: flex;
-}
-.split > .btn-action {
-    flex: 1;
-    width: 100%;
-}
-.split-caret {
-    display: none;
-    flex: 0 0 30px;
-    border: none;
-    border-radius: 0 8px 8px 0;
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
-}
-.split-caret svg {
-    width: 15px;
-    height: 15px;
-}
-.split.has-channel .split-caret {
-    display: flex;
-}
-.split.has-channel > .btn-action {
-    border-radius: 8px 0 0 8px;
-}
-#resetSplit .split-caret {
-    background: var(--seg);
-    color: var(--text);
-    border-left: 1px solid var(--track);
-}
-#resetSplit .split-caret:hover {
-    filter: brightness(0.96);
-}
-#rememberSplit .split-caret {
-    background: var(--accent);
-    color: #fff;
-    border-left: 1px solid rgba(255, 255, 255, 0.25);
-}
-#rememberSplit .split-caret:hover {
-    filter: brightness(1.05);
+/* Small heading over the scope picker. */
+.scope-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
 }
 
-.split-menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    z-index: 5;
-    min-width: 160px;
-    padding: 4px;
-    background: var(--surface);
-    border: 1px solid var(--track);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px var(--shadow);
+/* Scope picker: Global / Site / Channel as separate buttons (styled like the
+   speed presets). The Channel button shows only on a YouTube watch page
+   (.has-channel, set by the popup); the row is then three columns. The selected
+   scope is filled with the accent. */
+.scope-seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
 }
-.split.open .split-menu {
-    display: block;
+.scope-seg.has-channel {
+    grid-template-columns: 1fr 1fr 1fr;
 }
-.split-menu button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 8px 10px;
+.scope-opt {
+    padding: 8px 0;
     border: none;
-    border-radius: 6px;
-    background: transparent;
+    border-radius: 8px;
+    background: var(--seg);
     color: var(--text);
     font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
+    transition: background 0.12s, color 0.12s, filter 0.12s;
+
+    &:hover:not(.active) {
+        background: var(--track);
+    }
+
+    &.active {
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+
+        &:hover {
+            filter: brightness(1.05);
+        }
+    }
 }
-.split-menu button:hover {
-    background: var(--seg);
+.scope-channel {
+    display: none;
+}
+.scope-seg.has-channel .scope-channel {
+    display: block;
+}
+
+.action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
 }
 
 /* Inline toggle: show speed + remaining time on the video. */

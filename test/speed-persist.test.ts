@@ -21,7 +21,7 @@ const h_onStream = () => onStream;
 
 import { S } from "../src/content/state.js";
 import { STORE } from "../src/content/platform/storage.js";
-import { persistDomainSpeed, persistChannelSpeed, resetChannelSpeed, setSpeed } from "../src/content/speed.js";
+import { persistDomainSpeed, persistChannelSpeed, persistGlobalSpeed, resetScope, setSpeed } from "../src/content/speed.js";
 
 const get = (keys: string[]): Record<string, unknown> => {
   let out: Record<string, unknown> = {};
@@ -31,6 +31,7 @@ const get = (keys: string[]): Record<string, unknown> => {
 
 beforeEach(() => {
   STORE.set({ domains: {}, channels: {} });
+  STORE.remove("globalSpeed");
   h.keys = [];
   h.videos = [];
   h.live = false;
@@ -82,19 +83,48 @@ describe("persistChannelSpeed", () => {
   });
 });
 
-describe("resetChannelSpeed", () => {
-  it("drops every key form and falls back to the per-domain speed", () => {
+describe("persistGlobalSpeed", () => {
+  it("writes the global speed (top frame)", () => {
+    persistGlobalSpeed(1.6);
+    expect(get(["globalSpeed"]).globalSpeed).toBe(1.6);
+  });
+
+  it("does NOT write from a subframe", () => {
+    Object.defineProperty(window, "top", { value: {}, configurable: true });
+    persistGlobalSpeed(1.6);
+    expect(get(["globalSpeed"]).globalSpeed).toBeUndefined();
+  });
+});
+
+describe("resetScope", () => {
+  it("channel: drops every key form and falls back to the per-domain speed", () => {
     STORE.set({ channels: { UC123: 2.0, "@handle": 2.0 }, domains: { localhost: 1.5 } });
     h.keys = ["UC123", "@handle"];
-    resetChannelSpeed();
+    resetScope("channel");
     expect(get(["channels"]).channels).toEqual({});
     expect(S.currentSpeed).toBe(1.5); // fell back to the domain default
   });
 
-  it("falls back to 100% when no domain default exists", () => {
-    STORE.set({ channels: { UC123: 2.0 }, domains: {} });
+  it("channel: with no domain speed, falls back through global", () => {
+    STORE.set({ channels: { UC123: 2.0 }, domains: {}, globalSpeed: 1.25 });
     h.keys = ["UC123"];
-    resetChannelSpeed();
+    resetScope("channel");
+    expect(S.currentSpeed).toBe(1.25);
+  });
+
+  it("site: clears the domain speed and falls back to global", () => {
+    STORE.set({ channels: {}, domains: { localhost: 1.5 }, globalSpeed: 1.2 });
+    h.keys = [];
+    resetScope("site");
+    expect(get(["domains"]).domains).toEqual({});
+    expect(S.currentSpeed).toBeCloseTo(1.2, 5);
+  });
+
+  it("global: clears the global speed and falls back to 100%", () => {
+    STORE.set({ channels: {}, domains: {}, globalSpeed: 1.4 });
+    h.keys = [];
+    resetScope("global");
+    expect(get(["globalSpeed"]).globalSpeed).toBeUndefined();
     expect(S.currentSpeed).toBe(1.0);
   });
 });
@@ -141,10 +171,10 @@ describe("dead extension context — never writes", () => {
     expect(get(["channels"]).channels).toEqual({});
   });
 
-  it("resetChannelSpeed bails when the context is gone", () => {
+  it("resetScope bails when the context is gone", () => {
     STORE.set({ channels: { UC1: 2.0 } });
     h.keys = ["UC1"];
-    resetChannelSpeed();
+    resetScope("channel");
     expect((get(["channels"]).channels as Record<string, number>).UC1).toBe(2.0); // untouched
   });
 });

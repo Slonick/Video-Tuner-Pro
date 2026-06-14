@@ -25,16 +25,38 @@ function setLive(flag: boolean): void {
   document.querySelector(".speed-section")?.classList.toggle("locked", flag);
 }
 
-// The "for channel" caret/menu shows only on a YouTube watch page (content sends
+type Scope = "global" | "site" | "channel";
+
+// The "Channel" scope segment shows only on a YouTube watch page (content sends
 // the channel key in getSpeed; null elsewhere).
 function setChannel(channel: string | null | undefined, name?: string | null): void {
   const on = !!channel;
-  byId("resetSplit").classList.toggle("has-channel", on);
-  byId("rememberSplit").classList.toggle("has-channel", on);
+  byId("scopeSeg").classList.toggle("has-channel", on);
+  // If the channel segment vanished while it was selected, fall back to "site".
+  if (!on && selectedScope() === "channel") selectScope("site");
   const label = name || channel || "";
   // Scope subtitle under the domain: the channel on a YouTube watch page, else
   // just the static "Site" label.
   byId("speedScope").textContent = on && label ? label : msg("speedScopeSite");
+}
+
+function scopeOpts(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>(".scope-opt"));
+}
+function selectedScope(): Scope {
+  return (scopeOpts().find((b) => b.classList.contains("active"))?.dataset.scope as Scope) || "site";
+}
+function selectScope(scope: Scope): void {
+  scopeOpts().forEach((b) => {
+    const on = b.dataset.scope === scope;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-checked", String(on));
+  });
+}
+// Default the picker to "site"; only preselect "channel" when a channel speed is
+// actually saved (the page's speed resolves from the channel scope).
+function applyDefaultScope(scope: Scope | null | undefined, hasChannel: boolean): void {
+  selectScope(hasChannel && scope === "channel" ? "channel" : "site");
 }
 
 // The current speed (as a fraction) read back from the header readout — the one
@@ -75,35 +97,81 @@ function setSpeed(speed: number): void {
   sendSpeed(clamped);
 }
 
-function resetSpeed(): void {
-  setSpeed(1.0);
+// Clear the saved speed for the selected scope, then pull the re-resolved speed
+// back into the readout. The selected scope segment stays put (the user chose it).
+function resetScopeFallback(scope: Scope): void {
+  if (scope === "channel") { setSpeed(1.0); return; } // no DOM keys available off the page
+  if (scope === "global") { STORE.remove("globalSpeed", fallbackFromStorage); return; }
+  if (scope === "site" && ctx.currentDomain) {
+    STORE.get(["domains"], (result) => {
+      const domains = (result.domains || {}) as Record<string, number>;
+      delete domains[ctx.currentDomain];
+      STORE.set({ domains }, fallbackFromStorage);
+    });
+  } else {
+    fallbackFromStorage();
+  }
 }
 
-function saveDomainSpeed(speed: number): void {
-  if (!ctx.currentDomain) return;
-  STORE.get(["domains"], (result) => {
-    const domains = (result.domains || {}) as Record<string, number>;
-    domains[ctx.currentDomain] = speed;
-    STORE.set({ domains });
+// The ⟲ button by the readout: revert a manual change to the saved speed
+// (priority chain), deleting nothing. Pulls the re-resolved value back.
+function resetManual(): void {
+  const tabId = ctx.activeTabId;
+  if (tabId == null) { fallbackFromStorage(); return; }
+  api.tabs.sendMessage(tabId, { action: "resetToSaved" }, () => {
+    if (api.runtime.lastError) { fallbackFromStorage(); return; }
+    setTimeout(() => api.tabs.sendMessage(tabId, { action: "getSpeed" }, (r) => {
+      if (!api.runtime.lastError && r && typeof r.speed === "number") updateUI(r.speed);
+    }), 80);
   });
+}
+
+function resetSpeed(): void {
+  const scope = selectedScope();
+  const tabId = ctx.activeTabId;
+  if (tabId == null) { resetScopeFallback(scope); return; }
+  api.tabs.sendMessage(tabId, { action: "reset", scope }, () => {
+    if (api.runtime.lastError) { resetScopeFallback(scope); return; }
+    // Content cleared the scope and re-resolved; pull the new value back.
+    setTimeout(() => api.tabs.sendMessage(tabId, { action: "getSpeed" }, (r) => {
+      if (!api.runtime.lastError && r && typeof r.speed === "number") updateUI(r.speed);
+    }), 80);
+  });
+}
+
+// No content script (chrome:// / store pages): write the scope's speed straight
+// to storage. The channel scope needs the page DOM, so it has no fallback.
+function saveScopeFallback(scope: Scope, speed: number): void {
+  if (scope === "global") { STORE.set({ globalSpeed: speed }); return; }
+  if (scope === "site" && ctx.currentDomain) {
+    STORE.get(["domains"], (result) => {
+      const domains = (result.domains || {}) as Record<string, number>;
+      domains[ctx.currentDomain] = speed;
+      STORE.set({ domains });
+    });
+  }
 }
 
 function setAsDefault(): void {
   const speed = currentPctSpeed();
+  const scope = selectedScope();
   if (ctx.activeTabId != null) {
-    api.tabs.sendMessage(ctx.activeTabId, { action: "rememberSite", speed }, () => {
-      if (api.runtime.lastError) saveDomainSpeed(speed);
+    api.tabs.sendMessage(ctx.activeTabId, { action: "remember", scope, speed }, () => {
+      if (api.runtime.lastError) saveScopeFallback(scope, speed);
     });
   } else {
-    saveDomainSpeed(speed);
+    saveScopeFallback(scope, speed);
   }
   flashSaved(byId("setDefaultBtn"));
 }
 
+// Mirror of the content resolver for the no-content-script display path:
+// site > global > 100% (channel needs the page, absent here).
 function fallbackFromStorage(): void {
-  STORE.get(["domains"], (result) => {
+  STORE.get(["domains", "globalSpeed"], (result) => {
     const domains = (result.domains || {}) as Record<string, number>;
-    updateUI(clamp(domains[ctx.currentDomain] || 1.0));
+    const v = domains[ctx.currentDomain] ?? (result.globalSpeed as number | undefined) ?? 1.0;
+    updateUI(clamp(v));
   });
 }
 
@@ -130,8 +198,10 @@ export async function init(): Promise<void> {
         updateUI(resp.speed);
         setLive(!!resp.live);
         setChannel(resp.channel, resp.channelName);
+        applyDefaultScope(resp.scope, !!resp.channel);
       } else {
         fallbackFromStorage();
+        applyDefaultScope(null, false);
       }
     });
   } else {
@@ -167,42 +237,12 @@ byId("setDefaultBtn").addEventListener("click", setAsDefault);
 // can adjust without expanding the card.
 byId("speedDown").addEventListener("click", () => setSpeed(currentPctSpeed() - 0.05));
 byId("speedUp").addEventListener("click", () => setSpeed(currentPctSpeed() + 0.05));
+byId("speedReset").addEventListener("click", resetManual);
 
-// "For channel" actions (the split-button menus) — only reachable on YouTube,
-// where the caret is shown.
-function rememberChannel(): void {
-  const speed = currentPctSpeed();
-  if (ctx.activeTabId != null) {
-    api.tabs.sendMessage(ctx.activeTabId, { action: "rememberChannel", speed }, () => { void api.runtime.lastError; });
-  }
-  flashSaved(byId("setDefaultBtn"));
-}
-function resetChannel(): void {
-  const tabId = ctx.activeTabId;
-  if (tabId == null) return;
-  api.tabs.sendMessage(tabId, { action: "resetChannel" }, () => {
-    if (api.runtime.lastError) return;
-    // The content falls back to the domain speed (or 100%); pull the new value.
-    setTimeout(() => api.tabs.sendMessage(tabId, { action: "getSpeed" }, (r) => {
-      if (!api.runtime.lastError && r && typeof r.speed === "number") updateUI(r.speed);
-    }), 80);
-  });
-}
-function closeMenus(): void {
-  document.querySelectorAll(".split.open").forEach((s) => s.classList.remove("open"));
-}
-for (const id of ["resetCaret", "rememberCaret"]) {
-  byId(id).addEventListener("click", (e) => {
-    e.stopPropagation();
-    const split = (e.currentTarget as HTMLElement).closest(".split");
-    const open = split?.classList.contains("open");
-    closeMenus();
-    if (!open) split?.classList.add("open");
-  });
-}
-byId("rememberChannelBtn").addEventListener("click", () => { closeMenus(); rememberChannel(); });
-byId("resetChannelBtn").addEventListener("click", () => { closeMenus(); resetChannel(); });
-document.addEventListener("click", closeMenus);
+// Picking a scope segment just changes where the next Reset / Remember acts.
+scopeOpts().forEach((btn) => {
+  btn.addEventListener("click", () => selectScope(btn.dataset.scope as Scope));
+});
 
 // Poll while the popup is open so live-sync speed changes show in the readout.
 // The entry point schedules this every second; the body stays here, testable.

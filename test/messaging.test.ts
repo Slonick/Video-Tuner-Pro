@@ -21,7 +21,8 @@ vi.mock("../src/content/channel.js", () => ({
 vi.mock("../src/content/videos.js", () => ({ collectVideos: () => (h.hasVideo ? [{}] : []) }));
 vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream }));
 const speed = vi.hoisted(() => ({
-  setSpeed: vi.fn(), persistDomainSpeed: vi.fn(), persistChannelSpeed: vi.fn(), resetChannelSpeed: vi.fn(),
+  setSpeed: vi.fn(), persistDomainSpeed: vi.fn(), persistChannelSpeed: vi.fn(),
+  persistGlobalSpeed: vi.fn(), resetScope: vi.fn(),
 }));
 vi.mock("../src/content/speed.js", () => speed);
 vi.mock("../src/content/monitor.js", () => ({ monitorData: () => ({ mock: "monitor" }) }));
@@ -55,38 +56,49 @@ describe("setSpeed action", () => {
   });
 });
 
-describe("rememberSite / rememberChannel / resetChannel", () => {
-  it("rememberSite clamps and persists the domain speed", () => {
-    const { resp } = send({ action: "rememberSite", speed: 99 });
+describe("remember / reset by scope", () => {
+  it("remember site clamps and persists the domain speed", () => {
+    const { resp } = send({ action: "remember", scope: "site", speed: 99 });
     expect(speed.persistDomainSpeed).toHaveBeenCalled();
     const passed = speed.persistDomainSpeed.mock.calls[0][0];
     expect(passed).toBeLessThanOrEqual(16); // clamped
     expect((resp as { success: boolean }).success).toBe(true);
   });
 
-  it("rememberSite without a number falls back to the current speed", () => {
+  it("remember without a number falls back to the current speed", () => {
     S.currentSpeed = 1.3;
-    send({ action: "rememberSite" });
+    send({ action: "remember", scope: "site" });
     expect(speed.persistDomainSpeed).toHaveBeenCalledWith(1.3);
   });
 
-  it("rememberChannel persists the channel speed", () => {
-    send({ action: "rememberChannel", speed: 1.2 });
+  it("remember channel persists the channel speed", () => {
+    send({ action: "remember", scope: "channel", speed: 1.2 });
     expect(speed.persistChannelSpeed).toHaveBeenCalledWith(1.2);
   });
 
-  it("resetChannel resets and acknowledges", () => {
-    const { resp } = send({ action: "resetChannel" });
-    expect(speed.resetChannelSpeed).toHaveBeenCalled();
+  it("remember global persists the global speed", () => {
+    send({ action: "remember", scope: "global", speed: 1.5 });
+    expect(speed.persistGlobalSpeed).toHaveBeenCalledWith(1.5);
+  });
+
+  it("reset routes the scope through resetScope and acknowledges", () => {
+    const { resp } = send({ action: "reset", scope: "global" });
+    expect(speed.resetScope).toHaveBeenCalledWith("global");
     expect(resp).toEqual({ success: true });
+  });
+
+  it("reset defaults an unknown/absent scope to site", () => {
+    send({ action: "reset" });
+    expect(speed.resetScope).toHaveBeenCalledWith("site");
   });
 });
 
 describe("getSpeed", () => {
-  it("returns speed + domain + channel context", () => {
+  it("returns speed + domain + channel + scope context", () => {
     S.currentSpeed = 1.25;
+    S.speedScope = "channel";
     const { resp } = send({ action: "getSpeed" });
-    expect(resp).toEqual({ speed: 1.25, domain: "localhost", channel: "UCabc", channelName: "Cool Channel", live: false });
+    expect(resp).toEqual({ speed: 1.25, domain: "localhost", channel: "UCabc", channelName: "Cool Channel", scope: "channel", live: false });
   });
 });
 

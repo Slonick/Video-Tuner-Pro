@@ -31,6 +31,11 @@ describe("popup integration", () => {
     expect(document.querySelector('[data-i18n="audioTitle"]')?.textContent).toBe("Audio compression");
   });
 
+  it("localizes [data-i18n-title] tooltips", () => {
+    expect(byId("scopeGlobal").title).toBe("Save for all sites");
+    expect(byId("speedReset").title).toBe("Reset to the saved speed");
+  });
+
   it("reflects the current speed from the page", () => {
     expect(byId("currentSpeedPct").textContent).toBe("100%");
   });

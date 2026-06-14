@@ -35,7 +35,10 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
       cb(out);
     },
     set(obj: Record<string, unknown>, cb?: () => void) { Object.assign(store, obj); cb?.(); },
-    remove(_keys: unknown, cb?: () => void) { cb?.(); },
+    remove(keys: string | string[], cb?: () => void) {
+      for (const k of Array.isArray(keys) ? keys : [keys]) delete store[k];
+      cb?.();
+    },
     onChanged: { addListener() {} },
   });
 

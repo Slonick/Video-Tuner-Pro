@@ -1,5 +1,6 @@
 import { clamp } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
+import { resolveSpeed, type SpeedScope } from "./core/resolve.js";
 import { channelKeys } from "./channel.js";
 import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
@@ -38,19 +39,59 @@ export function persistChannelSpeed(speed: number): void {
   });
 }
 
-// Drop this channel's saved speed (under either key form) and fall back to the
-// per-domain one (or 100%).
-export function resetChannelSpeed(): void {
+export function persistGlobalSpeed(speed: number): void {
   if (!ctxValid()) return;
-  const keys = channelKeys();
-  if (!keys.length) return;
-  STORE.get(["channels", "domains"], (result) => {
+  if (window.top !== window) return; // top frame only — keep parity with the other writers
+  STORE.set({ globalSpeed: speed });
+}
+
+// Re-resolve the chain (channel > site > global > 100%) from the given maps and
+// apply it — dropping any manual in-tab override.
+function applyResolvedNow(
+  channels: Record<string, number>,
+  domains: Record<string, number>,
+  globalSpeed: number | undefined,
+): void {
+  const r = resolveSpeed(channelKeys(), getDomain(), domains, channels, globalSpeed);
+  S.speedScope = r.scope;
+  setSpeed(clamp(r.speed), false, true);
+}
+
+// Reset just the manual change: re-take the saved speed by priority, deleting
+// nothing. Backs the R hotkey and the reset button by the readout.
+export function resetToSaved(): void {
+  if (!ctxValid()) return;
+  STORE.get(["channels", "domains", "globalSpeed"], (result) => {
+    applyResolvedNow(
+      (result.channels || {}) as Record<string, number>,
+      (result.domains || {}) as Record<string, number>,
+      result.globalSpeed as number | undefined);
+  });
+}
+
+// Drop the saved speed for one scope (channel/site/global) and re-resolve the
+// remaining chain, applying the new speed.
+export function resetScope(scope: SpeedScope): void {
+  if (!ctxValid()) return;
+  STORE.get(["channels", "domains", "globalSpeed"], (result) => {
     const channels = (result.channels || {}) as Record<string, number>;
-    for (const k of keys) delete channels[k];
-    STORE.set({ channels });
     const domains = (result.domains || {}) as Record<string, number>;
-    const fallback = domains[getDomain()];
-    setSpeed(clamp(fallback != null ? fallback : 1.0), false, true);
+    let globalSpeed = result.globalSpeed as number | undefined;
+    if (scope === "channel") {
+      const keys = channelKeys();
+      if (!keys.length) return;
+      for (const k of keys) delete channels[k];
+      STORE.set({ channels });
+    } else if (scope === "site") {
+      delete domains[getDomain()];
+      STORE.set({ domains });
+    } else if (scope === "global") {
+      globalSpeed = undefined;
+      STORE.remove("globalSpeed");
+    } else {
+      return;
+    }
+    applyResolvedNow(channels, domains, globalSpeed);
   });
 }
 

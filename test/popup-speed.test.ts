@@ -69,10 +69,16 @@ describe("speed buttons & readout", () => {
     expect(byId("currentSpeedPct").textContent).toBe("100%");
   });
 
-  it("reset returns to 100%", () => {
+  it("the ⟲ button reverts a manual change to the saved speed", () => {
+    vi.useFakeTimers();
     byId("currentSpeedPct").textContent = "175%";
-    byId("resetBtn").click();
-    expect(byId("currentSpeedPct").textContent).toBe("100%");
+    replies.resetToSaved = { success: true };
+    replies.getSpeed = { speed: 1.5, domain: "youtube.com", channel: null, channelName: "", scope: "site", live: false };
+    byId("speedReset").click();
+    expect(lastCall("resetToSaved")).toMatchObject({ action: "resetToSaved" });
+    vi.advanceTimersByTime(80);         // deferred getSpeed round-trip
+    expect(byId("currentSpeedPct").textContent).toBe("150%");
+    vi.useRealTimers();
   });
 });
 
@@ -114,36 +120,48 @@ describe("live lock", () => {
   });
 });
 
-describe("channel menus", () => {
-  it("shows the channel scope label and channel affordance on a YouTube watch page", async () => {
-    replies.getSpeed = { speed: 1, domain: "youtube.com", channel: "UCabc", channelName: "Some Channel", live: false };
+describe("scope control", () => {
+  it("shows the channel segment on a YouTube watch page but defaults to Site", async () => {
+    replies.getSpeed = { speed: 1, domain: "youtube.com", channel: "UCabc", channelName: "Some Channel", scope: null, live: false };
     await init();
     await new Promise((r) => setTimeout(r, 0));
     expect(byId("speedScope").textContent).toBe("Some Channel");
-    expect(byId("resetSplit").classList.contains("has-channel")).toBe(true);
+    expect(byId("scopeSeg").classList.contains("has-channel")).toBe(true);
+    // Nothing saved for the channel → Site stays the default, not Channel.
+    expect(byId("scopeSite").classList.contains("active")).toBe(true);
   });
 
-  it("a caret opens its split menu and clicking elsewhere closes it", () => {
-    const caret = byId("resetCaret");
-    caret.click();
-    expect(caret.closest(".split")?.classList.contains("open")).toBe(true);
-    document.body.click();
-    expect(document.querySelector(".split.open")).toBeNull();
+  it("preselects Channel only when a channel speed is saved", async () => {
+    replies.getSpeed = { speed: 1.5, domain: "youtube.com", channel: "UCabc", channelName: "Ch", scope: "channel", live: false };
+    await init();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(byId("scopeChannel").classList.contains("active")).toBe(true);
   });
 
-  it("remember-channel pushes a rememberChannel message", () => {
+  it("defaults to Site when the page speed comes from the global scope", async () => {
+    replies.getSpeed = { speed: 1.5, domain: "youtube.com", channel: "UCabc", channelName: "Ch", scope: "global", live: false };
+    await init();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(byId("scopeSite").classList.contains("active")).toBe(true);
+  });
+
+  it("Remember sends the selected scope", async () => {
+    replies.getSpeed = { speed: 1, domain: "youtube.com", channel: "UCabc", channelName: "Ch", scope: null, live: false };
+    await init();
+    await new Promise((r) => setTimeout(r, 0));
     byId("currentSpeedPct").textContent = "140%";
-    byId("rememberChannelBtn").click();
-    expect(lastCall("rememberChannel")).toMatchObject({ action: "rememberChannel", speed: 1.4 });
+    byId("scopeChannel").click();       // select the channel scope
+    byId("setDefaultBtn").click();
+    expect(lastCall("remember")).toMatchObject({ action: "remember", scope: "channel", speed: 1.4 });
   });
 
-  it("reset-channel resets and pulls the fallback speed back into the readout", () => {
+  it("Reset forgets the selected scope and pulls the fallback speed back", () => {
     vi.useFakeTimers();
-    replies.resetChannel = { success: true };
-    // The content falls back to the domain speed (or 100%); the popup re-reads it.
-    replies.getSpeed = { speed: 1.8, domain: "youtube.com", channel: null, channelName: "", live: false };
-    byId("resetChannelBtn").click();
-    expect(lastCall("resetChannel")).toMatchObject({ action: "resetChannel" });
+    byId("scopeGlobal").click();        // delete the global default
+    replies.reset = { success: true };
+    replies.getSpeed = { speed: 1.8, domain: "youtube.com", channel: null, channelName: "", scope: null, live: false };
+    byId("resetBtn").click();
+    expect(lastCall("reset")).toMatchObject({ action: "reset", scope: "global" });
     vi.advanceTimersByTime(80);         // deferred getSpeed round-trip
     expect(byId("currentSpeedPct").textContent).toBe("180%");
     vi.useRealTimers();
