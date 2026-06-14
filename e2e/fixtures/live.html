@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>VTP E2E — live</title>
+  <style>html,body{margin:0;background:#111} video{width:640px;height:360px;display:block}</style>
+</head>
+<body>
+  <!-- A MediaStream source has duration === Infinity, so the content script's
+       live detection treats this exactly like a live broadcast. -->
+  <video id="v" autoplay muted playsinline></video>
+  <script>
+    const c = document.createElement("canvas");
+    c.width = 160; c.height = 120;
+    const ctx = c.getContext("2d");
+    setInterval(() => {
+      ctx.fillStyle = "#" + ((Math.random() * 0xffffff) | 0).toString(16).padStart(6, "0");
+      ctx.fillRect(0, 0, 160, 120);
+    }, 100);
+    document.getElementById("v").srcObject = c.captureStream(10);
+  </script>
+</body>
+</html>

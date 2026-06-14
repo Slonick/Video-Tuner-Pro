@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>VTP E2E fixture</title>
+  <style>html,body{margin:0;background:#111} video{width:640px;height:360px;display:block}</style>
+</head>
+<body>
+  <!-- A same-origin VOD: finite duration (so it's treated as non-live and honours
+       playbackRate) and same-origin (so the audio compressor graph may route it). -->
+  <video id="v" src="sample.webm" playsinline preload="auto"></video>
+</body>
+</html>
