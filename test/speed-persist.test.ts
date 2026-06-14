@@ -4,11 +4,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // speed.ts owns the per-site / per-channel persistence (with the top-frame write
 // guards) and setSpeed. Mock the video/live/audio/badge plumbing so we test the
 // real persistence + clamp + fallback logic against the in-memory chrome storage.
-const h = vi.hoisted(() => ({ keys: [] as string[] }));
+const h = vi.hoisted(() => ({ keys: [] as string[], videos: [] as HTMLVideoElement[], live: false }));
 vi.mock("../src/content/channel.js", () => ({ channelKeys: () => h.keys }));
-vi.mock("../src/content/videos.js", () => ({ collectVideos: () => [], seenVideos: new WeakSet() }));
+vi.mock("../src/content/videos.js", () => ({ collectVideos: () => h.videos, seenVideos: new WeakSet() }));
 vi.mock("../src/content/live/detection.js", () => ({
-  isLive: () => false, probeLive: vi.fn(), onStreamPage: () => h_onStream(),
+  isLive: () => h.live, probeLive: vi.fn(), onStreamPage: () => h_onStream(),
   trackDvr: vi.fn(), resetDvr: vi.fn(),
 }));
 vi.mock("../src/content/live/sync.js", () => ({ controlLive: vi.fn() }));
@@ -32,10 +32,15 @@ const get = (keys: string[]): Record<string, unknown> => {
 beforeEach(() => {
   STORE.set({ domains: {}, channels: {} });
   h.keys = [];
+  h.videos = [];
+  h.live = false;
   onStream = false;
   S.currentSpeed = 1.0; S.userSpeed = 1.0;
   // jsdom: window is its own top frame by default.
 });
+
+const fakeVideo = (rate: number) =>
+  ({ playbackRate: rate, addEventListener: vi.fn() }) as unknown as HTMLVideoElement;
 afterEach(() => {
   // Restore the top-frame identity if a test overrode it.
   try { Object.defineProperty(window, "top", { value: window, configurable: true }); } catch (e) { /* ignore */ }
@@ -117,5 +122,32 @@ describe("setSpeed", () => {
     onStream = true;
     setSpeed(1.1, false, false);
     expect(S.currentSpeed).toBeCloseTo(1.1, 5);
+  });
+});
+
+describe("applyToVideo (via applyAll)", () => {
+  it("writes the current speed onto a non-live video", () => {
+    const v = fakeVideo(1.0);
+    h.videos = [v];
+    setSpeed(1.75);
+    expect(v.playbackRate).toBeCloseTo(1.75, 5);
+  });
+
+  it("leaves a live video's rate alone (owned by live-sync)", () => {
+    const v = fakeVideo(1.0);
+    h.videos = [v];
+    h.live = true;
+    setSpeed(1.75);
+    expect(v.playbackRate).toBe(1.0); // untouched
+  });
+
+  it("registers playback listeners exactly once per video", () => {
+    const v = fakeVideo(1.0);
+    h.videos = [v];
+    setSpeed(1.5);
+    const callsAfterFirst = (v.addEventListener as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    setSpeed(1.6); // same video again — seenVideos guard prevents re-wiring
+    expect((v.addEventListener as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
   });
 });

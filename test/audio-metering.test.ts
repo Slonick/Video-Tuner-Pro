@@ -9,17 +9,18 @@ const m = vi.hoisted(() => ({
   primary: null as unknown,
   graphs: new Map<unknown, unknown>(),
   translation: false,
+  ctx: null as { state: string } | null,
 }));
 
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => m.primary }));
 vi.mock("../src/content/audio/translation.js", () => ({ translationActive: () => m.translation }));
 vi.mock("../src/content/audio/routing.js", () => ({
-  audioContext: () => null,
+  audioContext: () => m.ctx,
   audioGraphs: m.graphs,
 }));
 
 import { S } from "../src/content/state.js";
-import { audioLevels, A_HIST_MS } from "../src/content/audio/metering.js";
+import { audioLevels, recordAudioSample, audioLevelHist, A_HIST_MS } from "../src/content/audio/metering.js";
 
 // rms 0.5 over the buffer → ~-6.02 dB (matches levels.test.ts).
 function makeGraph(reduction: number) {
@@ -32,14 +33,17 @@ function makeGraph(reduction: number) {
   };
 }
 
+beforeEach(() => {
+  m.graphs.clear();
+  m.primary = null;
+  m.translation = false;
+  m.ctx = null;
+  audioLevelHist.length = 0;
+  S.audioCompEnabled = true;
+  S.audioCompThreshold = -30;
+});
+
 describe("audioLevels", () => {
-  beforeEach(() => {
-    m.graphs.clear();
-    m.primary = null;
-    m.translation = false;
-    S.audioCompEnabled = true;
-    S.audioCompThreshold = -30;
-  });
 
   it("inactive when there is no primary video", () => {
     expect(audioLevels()).toEqual({ active: false, enabled: true, translation: false });
@@ -94,5 +98,36 @@ describe("audioLevels", () => {
 
   it("history step is 150 ms", () => {
     expect(A_HIST_MS).toBe(150);
+  });
+});
+
+describe("recordAudioSample", () => {
+  it("does nothing without a running context", () => {
+    const v = {} as HTMLVideoElement;
+    m.primary = v; m.graphs.set(v, makeGraph(-3)); m.ctx = { state: "suspended" };
+    recordAudioSample();
+    expect(audioLevelHist.length).toBe(0);
+  });
+
+  it("does nothing when there's no graph", () => {
+    m.primary = {} as HTMLVideoElement; m.ctx = { state: "running" };
+    recordAudioSample();
+    expect(audioLevelHist.length).toBe(0);
+  });
+
+  it("appends an in/out sample when a graph runs", () => {
+    const v = {} as HTMLVideoElement;
+    m.primary = v; m.graphs.set(v, makeGraph(-3)); m.ctx = { state: "running" };
+    recordAudioSample();
+    expect(audioLevelHist.length).toBe(1);
+    expect(audioLevelHist[0].in).toBeCloseTo(-6.02, 1);
+    expect(audioLevelHist[0].out).toBeCloseTo(-9.02, 1);
+  });
+
+  it("caps the history at 48 samples (drops the oldest)", () => {
+    const v = {} as HTMLVideoElement;
+    m.primary = v; m.graphs.set(v, makeGraph(0)); m.ctx = { state: "running" };
+    for (let i = 0; i < 60; i++) recordAudioSample();
+    expect(audioLevelHist.length).toBe(48);
   });
 });

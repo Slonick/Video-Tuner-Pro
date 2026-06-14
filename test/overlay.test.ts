@@ -119,3 +119,73 @@ describe("ownsBadgeNode", () => {
     expect(ownsBadgeNode(null)).toBe(false);
   });
 });
+
+// Dispatch a pointer/mouse event by type name (the handlers listen by type, so a
+// MouseEvent of type "pointermove" still fires the pointermove listener — and it
+// sidesteps jsdom's partial PointerEvent support).
+const fire = (el: EventTarget, type: string, init: MouseEventInit = {}) =>
+  el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, ...init }));
+
+describe("badge drag", () => {
+  it("dropping after a drag saves the per-site position fraction", () => {
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    // Land the badge at the centre of the 640x360 frame.
+    el.getBoundingClientRect = () => ({ left: 320, top: 180, width: 0, height: 0, right: 320, bottom: 180, x: 320, y: 180, toJSON() {} });
+    fire(el, "pointerdown", { clientX: 10, clientY: 10 });
+    fire(el, "pointermove", { clientX: 330, clientY: 190 });
+    fire(el, "pointerup", { clientX: 330, clientY: 190 });
+    expect(S.badgePos).not.toBeNull();
+    expect(S.badgePos!.fx).toBeCloseTo(0.5, 1);
+    expect(S.badgePos!.fy).toBeCloseTo(0.5, 1);
+  });
+
+  it("a double-click resets to the default corner", () => {
+    S.badgePos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    fire(badgeEl()!, "dblclick");
+    expect(S.badgePos).toBeNull();
+  });
+});
+
+describe("badge pin", () => {
+  it("clicking the pin toggles the pinned state", () => {
+    S.badgePinned = false;
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const pin = badgeEl()!.querySelectorAll("span")[1]; // [text, pin]
+    fire(pin, "click");
+    expect(S.badgePinned).toBe(true);
+    fire(pin, "click");
+    expect(S.badgePinned).toBe(false);
+  });
+});
+
+describe("flashBadge auto-hide", () => {
+  it("reveals on mouse move over the video, then fades after the timeout", () => {
+    vi.useFakeTimers();
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    el.style.opacity = "0";
+    fire(document, "mousemove", { clientX: 100, clientY: 100 }); // inside the 640x360 frame
+    expect(el.style.opacity).toBe("1");
+    vi.advanceTimersByTime(2600);
+    expect(el.style.opacity).toBe("0");
+    vi.useRealTimers();
+  });
+
+  it("stays visible while pinned (no fade scheduled)", () => {
+    vi.useFakeTimers();
+    S.badgePinned = true;
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    fire(document, "mousemove", { clientX: 100, clientY: 100 });
+    vi.advanceTimersByTime(5000);
+    expect(el.style.opacity).toBe("1");
+    vi.useRealTimers();
+  });
+});

@@ -11,6 +11,8 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
 const byId = (id: string) => document.getElementById(id) as HTMLElement;
 
 let init: () => Promise<void>;
+let pollSpeed: () => void;
+let ctx: { activeTabId: number | null; currentDomain: string; liveMisses: number };
 let sendSpy: ReturnType<typeof vi.fn>;
 // What a tabs.sendMessage(action) call resolves to, per test.
 let replies: Record<string, unknown>;
@@ -23,7 +25,8 @@ beforeAll(async () => {
   const chrome = createMockChrome({ messages, tab: { id: 7, url: "https://www.youtube.com/watch?v=x" } });
   (globalThis as unknown as { chrome: typeof chrome }).chrome = chrome;
 
-  ({ init } = await import("../src/popup/speed.js"));
+  ({ init, pollSpeed } = await import("../src/popup/speed.js"));
+  ({ ctx } = await import("../src/popup/state.js"));
 });
 
 beforeEach(async () => {
@@ -144,5 +147,36 @@ describe("channel menus", () => {
     vi.advanceTimersByTime(80);         // deferred getSpeed round-trip
     expect(byId("currentSpeedPct").textContent).toBe("180%");
     vi.useRealTimers();
+  });
+});
+
+describe("pollSpeed", () => {
+  it("locks and updates the readout while the page reports live", () => {
+    ctx.liveMisses = 0;
+    replies.getSpeed = { speed: 1.6, domain: "youtube.com", channel: null, channelName: "", live: true };
+    pollSpeed();
+    expect(byId("liveWarn").style.display).toBe("inline-flex");
+    expect(byId("currentSpeedPct").textContent).toBe("160%");
+  });
+
+  it("unlocks only after several consecutive non-live polls (debounced)", () => {
+    // Start locked.
+    replies.getSpeed = { speed: 1, domain: "youtube.com", channel: null, channelName: "", live: true };
+    pollSpeed();
+    expect(document.querySelector(".speed-section")?.classList.contains("locked")).toBe(true);
+
+    ctx.liveMisses = 0;
+    replies.getSpeed = { speed: 1, domain: "youtube.com", channel: null, channelName: "", live: false };
+    pollSpeed(); pollSpeed(); pollSpeed();
+    expect(document.querySelector(".speed-section")?.classList.contains("locked")).toBe(true); // 3 misses < 4
+    pollSpeed();
+    expect(document.querySelector(".speed-section")?.classList.contains("locked")).toBe(false); // 4th miss unlocks
+  });
+
+  it("no-ops when there is no active tab", () => {
+    ctx.activeTabId = null;
+    const before = sendSpy.mock.calls.length;
+    pollSpeed();
+    expect(sendSpy.mock.calls.length).toBe(before);
   });
 });
