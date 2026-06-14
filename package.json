@@ -14,12 +14,14 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "screenshot": "node tools/screenshot.mjs",
     "promo": "node tools/promo.mjs",
     "promo:gif": "node tools/promo-gif.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.43",
+    "@vitest/coverage-v8": "^4.1.8",
     "esbuild": "^0.28.1",
     "jsdom": "^29.1.1",
     "lightningcss": "^1.32.0",
