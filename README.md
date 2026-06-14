@@ -15,7 +15,7 @@ accounts and no tracking.
 ## What it does
 
 - **Playback speed** — one-click presets or a fine slider, on almost any video.
-- **Remember per site** — save a speed for a site and it's applied automatically next time. Other sites stay at normal speed.
+- **Remember speed per channel, site, or globally** — save a speed for a YouTube channel, the current site, or as a global default; it's applied automatically next time, by priority (channel → site → global). Anything not saved stays at normal speed.
 - **Live-sync** — automatically catches live streams back up to the live edge, then returns to normal.
 - **Audio compression** — evens out loud and quiet parts so you don't keep reaching for the volume.
 - **On-video readout** — optional badge showing the current speed and how much time is really left at that speed.
@@ -26,7 +26,7 @@ accounts and no tracking.
 
 1. Open a page with a video and click the extension icon.
 2. Drag the slider or pick a preset — the speed changes instantly. The toolbar icon shows the current speed.
-3. Click **Remember site** to keep that speed for the site.
+3. Pick a scope — **Global**, **Site**, or **Channel** (on YouTube) — and click **Save** to keep that speed; **Reset** forgets the saved value for that scope. The ⟲ button by the readout (or the **R** key) drops a manual change and re-applies the saved speed without deleting anything.
 
 Turn on **Show speed & time on video** to see the speed and the real remaining
 time right on the player — it appears when you move the mouse and fades away on
