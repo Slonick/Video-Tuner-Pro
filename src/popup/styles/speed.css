@@ -191,6 +191,42 @@
     display: block;
 }
 
+/* Shift+N shortcut hint, in the button's corner. Only shown once the grid is
+   expanded — collapsed, four presets are hidden and the numbering would gap. */
+.btn-speed[data-key]::before {
+    content: "⇧" attr(data-key);
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 1px 4px;
+    /* Flush into the corner: top-right matches the button's 8px round, inner corner tucked. */
+    border-radius: 0 8px 0 6px;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.2;
+    /* Inactive button → badge wears the active (accent) look, and vice versa. */
+    background: var(--accent);
+    color: #fff;
+    /* Hidden by default; fades + grows out of the corner when shown (see below). */
+    opacity: 0;
+    transform: translateY(-2px) scale(0.8);
+    transform-origin: top right;
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease, background 0.12s, color 0.12s;
+}
+.btn-speed.active[data-key]::before {
+    background: var(--seg);
+    color: var(--text);
+}
+.speed-section:has(.speed-body.open):has(#kbdToggle:checked) .btn-speed[data-key]::before {
+    opacity: 1;
+    transform: none;
+}
+/* Nudge the (centered) label left so the corner badge doesn't sit over it. */
+.speed-section:has(.speed-body.open):has(#kbdToggle:checked) .btn-speed[data-key] {
+    padding-right: 20px;
+}
+
 /* Slider, preset grid and Reset / Remember are always visible (change or save a
    speed without expanding); the collapsible body below holds only the toggles. */
 .speed-section > .speed-slider {
@@ -201,6 +237,7 @@
 }
 
 .btn-speed {
+    position: relative;
     padding: 8px 0;
     border: none;
     border-radius: 8px;
@@ -209,7 +246,7 @@
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.12s, color 0.12s, filter 0.12s;
+    transition: background 0.12s, color 0.12s, filter 0.12s, padding 0.16s ease;
 
     &:hover:not(.active) {
         background: var(--track);
