@@ -35,13 +35,14 @@ export default defineConfig({
       reporter: ["text", "text-summary", "html", "json-summary"],
       // CI fails when any metric drops below its floor. Set a few points under the
       // current numbers so routine edits don't trip the gate; ratchet them up as
-      // coverage improves. (At time of writing: ~78% stmts, 68% branch, 79% funcs,
-      // 83% lines on the gated set.)
+      // coverage improves. (At time of writing: ~90% stmts, 78% branch, 89% funcs,
+      // 95% lines on the gated set — periodic samplers and timer scheduling live in
+      // the excluded entry points, so the gated set is the real unit-testable logic.)
       thresholds: {
-        statements: 75,
-        branches: 64,
-        functions: 75,
-        lines: 78,
+        statements: 87,
+        branches: 74,
+        functions: 87,
+        lines: 92,
       },
     },
   },
