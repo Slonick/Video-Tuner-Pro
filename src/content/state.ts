@@ -10,6 +10,9 @@ export const S = {
   // Which saved scope the current resolved speed came from (channel/site/global),
   // or null when nothing is saved. The popup reads it to preselect the scope.
   speedScope: null as "channel" | "site" | "global" | null,
+  // Which saved scope the current allowed-delay (liveSyncTarget) came from, for
+  // the popup to preselect. Mirrors speedScope.
+  targetScope: null as "channel" | "site" | "global" | null,
   liveSyncEnabled: false,
   // Keyboard shortcuts (S/D/R/Z) for playback speed
   keyboardEnabled: true,

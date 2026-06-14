@@ -45,11 +45,24 @@ describe("currentChannel (stable per-channel key)", () => {
     expect(channelKeys()).toEqual([]);
   });
 
-  it("is null off YouTube", () => {
-    at("www.twitch.tv", "/watch");
+  it("does not read YouTube owner links off YouTube", () => {
+    at("www.twitch.tv", "/watch/extra");   // 2 segments → not a Twitch channel page
     document.body.innerHTML =
       `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
     expect(currentChannel()).toBeNull();
+  });
+
+  it("reads the Twitch login from a channel page", () => {
+    at("www.twitch.tv", "/Shroud");
+    expect(currentChannel()).toBe("twitch:shroud");
+    expect(channelKeys()).toEqual(["twitch:shroud"]);
+  });
+
+  it("ignores Twitch reserved routes and multi-segment paths", () => {
+    at("www.twitch.tv", "/directory");
+    expect(channelKeys()).toEqual([]);
+    at("www.twitch.tv", "/shroud/videos");
+    expect(channelKeys()).toEqual([]);
   });
 
   it("is null off a /watch page (home, channel page, search…)", () => {
@@ -80,5 +93,13 @@ describe("currentChannelName (display name for the header)", () => {
 
   it("returns an empty string when no owner section is present", () => {
     expect(currentChannelName()).toBe("");
+  });
+
+  it("reads the Twitch display name, falling back to the login", () => {
+    at("www.twitch.tv", "/shroud");
+    document.body.innerHTML = `<span data-a-target="user-display-name">Shroud</span>`;
+    expect(currentChannelName()).toBe("Shroud");
+    document.body.innerHTML = "";
+    expect(currentChannelName()).toBe("shroud");
   });
 });

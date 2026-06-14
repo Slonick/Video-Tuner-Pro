@@ -2,12 +2,13 @@
 // as a side effect of being imported.
 import { api, ctxValid } from "./platform/browser.js";
 import { STORE, STORE_AREA } from "./platform/storage.js";
-import { clamp, clampTarget, clampNum, resolveTarget } from "./core/clamp.js";
+import { clamp, clampTarget, clampNum } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
-import { resolveSpeed } from "./core/resolve.js";
+import { resolveSpeed, resolveSyncTarget } from "./core/resolve.js";
 import { S } from "./state.js";
 import { applyAll } from "./speed.js";
 import { controlLive } from "./live/sync.js";
+import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
@@ -47,7 +48,8 @@ function applyResolved(
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "channels", "globalSpeed", "liveSync", "liveSyncTarget", "syncTargets", "badgePos", "badgePinned",
+    ["domains", "channels", "globalSpeed", "liveSync", "liveSyncTarget", "syncTargets",
+     "syncTargetChannels", "syncTargetGlobal", "badgePos", "badgePinned",
      "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
      "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge", "keyboard"],
     (result) => {
@@ -62,10 +64,15 @@ function loadSpeed() {
       S.streamBadge = result.streamBadge !== false;
       S.keyboardEnabled = result.keyboard !== false;
       S.liveSyncEnabled = result.liveSync !== false;
-      // Allowed delay is per-site (syncTargets), falling back to the legacy
-      // global value, then the 5s default.
-      S.liveSyncTarget = resolveTarget(
-        result.syncTargets as Record<string, number> | undefined, getDomain(), result.liveSyncTarget);
+      // Allowed delay resolves by scope: channel > site > global > 5s. The legacy
+      // `liveSyncTarget` acts as the old global fallback.
+      const rt = resolveSyncTarget(
+        channelKeys(), getDomain(),
+        (result.syncTargets || {}) as Record<string, number>,
+        (result.syncTargetChannels || {}) as Record<string, number>,
+        (result.syncTargetGlobal ?? result.liveSyncTarget) as number | undefined);
+      S.targetScope = rt.scope;
+      S.liveSyncTarget = clampTarget(rt.target);
       S.audioCompEnabled = result.audioComp !== false;
       S.audioCompThreshold = clampNum(result.audioCompThreshold, -100, 0, -60);
       S.audioCompKnee = clampNum(result.audioCompKnee, 0, 40, 30);
@@ -96,6 +103,7 @@ function reresolve() {
     controlLive();
     updateTimeBadge();
   });
+  applyResolvedTargetFromStore();   // the channel changed — its allowed-delay may differ
 }
 
 loadSpeed();
@@ -152,12 +160,11 @@ if (document.documentElement) {
 api.storage.onChanged.addListener((changes, area) => {
   if (area !== STORE_AREA) return;
   if (changes.liveSync) S.liveSyncEnabled = !!changes.liveSync.newValue;
-  if (changes.syncTargets) {
-    // Per-site allowed delay — apply only when this domain's value changed.
-    const t = (changes.syncTargets.newValue as Record<string, number> | undefined || {})[getDomain()];
-    if (t != null) S.liveSyncTarget = clampTarget(t);
-  }
-  if (changes.liveSync || changes.syncTargets) {
+  // Any allowed-delay scope key changed → re-resolve the chain (also re-runs
+  // controlLive). The legacy liveSyncTarget is folded in as the old global.
+  if (changes.syncTargets || changes.syncTargetChannels || changes.syncTargetGlobal || changes.liveSyncTarget) {
+    applyResolvedTargetFromStore();
+  } else if (changes.liveSync) {
     controlLive();
   }
   if (changes.showRemaining) { S.showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }

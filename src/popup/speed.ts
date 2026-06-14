@@ -65,7 +65,8 @@ function setChannel(channel: string | null | undefined, name?: string | null): v
 }
 
 function scopeOpts(): HTMLElement[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(".scope-opt"));
+  // Scoped to the speed picker — the live-sync card has its own .scope-opt buttons.
+  return Array.from(document.querySelectorAll<HTMLElement>("#scopeSeg .scope-opt"));
 }
 function selectedScope(): Scope {
   return (scopeOpts().find((b) => b.classList.contains("active"))?.dataset.scope as Scope) || "site";

@@ -155,6 +155,15 @@ describe("scope control", () => {
     expect(lastCall("remember")).toMatchObject({ action: "remember", scope: "channel", speed: 1.4 });
   });
 
+  it("selecting a speed scope leaves the live-sync scope buttons untouched", () => {
+    byId("scopeChannel").click();          // pick the speed channel scope
+    expect(byId("scopeChannel").classList.contains("active")).toBe(true);
+    // The buffer card has its own .scope-opt buttons — they must not move.
+    expect(byId("syncScopeChannel").classList.contains("active")).toBe(false);
+    expect(byId("syncScopeSite").classList.contains("active")).toBe(false);
+    expect(byId("syncScopeGlobal").classList.contains("active")).toBe(false);
+  });
+
   it("dots the slot on Save and clears the dot on Reset", () => {
     vi.useFakeTimers();
     byId("scopeSite").click();

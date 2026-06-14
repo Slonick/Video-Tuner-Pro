@@ -25,6 +25,11 @@ const speed = vi.hoisted(() => ({
   persistGlobalSpeed: vi.fn(), resetScope: vi.fn(),
 }));
 vi.mock("../src/content/speed.js", () => speed);
+const target = vi.hoisted(() => ({
+  setTarget: vi.fn(), persistSiteTarget: vi.fn(), persistChannelTarget: vi.fn(),
+  persistGlobalTarget: vi.fn(), resetTargetScope: vi.fn(),
+}));
+vi.mock("../src/content/live/target.js", () => target);
 vi.mock("../src/content/monitor.js", () => ({ monitorData: () => ({ mock: "monitor" }) }));
 vi.mock("../src/content/audio/metering.js", () => ({ audioLevelHist: [{ in: -10, out: -12 }], A_HIST_MS: 150 }));
 vi.mock("../src/content/bitrate.js", () => ({ bufferLevelHist: [] }));
@@ -99,6 +104,37 @@ describe("getSpeed", () => {
     S.speedScope = "channel";
     const { resp } = send({ action: "getSpeed" });
     expect(resp).toEqual({ speed: 1.25, domain: "localhost", channel: "UCabc", channelName: "Cool Channel", scope: "channel", live: false });
+  });
+});
+
+describe("live-sync target by scope", () => {
+  it("setTarget previews live and replies from the video frame", () => {
+    S.liveSyncTarget = 7;
+    const { resp } = send({ action: "setTarget", target: 7 });
+    expect(target.setTarget).toHaveBeenCalledWith(7);
+    expect(resp).toEqual({ success: true, target: 7 });
+  });
+
+  it("rememberTarget clamps and persists by scope", () => {
+    send({ action: "rememberTarget", scope: "channel", target: 99 });
+    expect(target.persistChannelTarget).toHaveBeenCalledWith(30); // clamped to the 30s cap
+    send({ action: "rememberTarget", scope: "global", target: 12 });
+    expect(target.persistGlobalTarget).toHaveBeenCalledWith(12);
+    send({ action: "rememberTarget", scope: "site", target: 8 });
+    expect(target.persistSiteTarget).toHaveBeenCalledWith(8);
+  });
+
+  it("resetTarget routes the scope and defaults to site", () => {
+    expect(send({ action: "resetTarget", scope: "global" }).resp).toEqual({ success: true });
+    expect(target.resetTargetScope).toHaveBeenCalledWith("global");
+    send({ action: "resetTarget" });
+    expect(target.resetTargetScope).toHaveBeenCalledWith("site");
+  });
+
+  it("getTarget returns target + scope + channel context", () => {
+    S.liveSyncTarget = 9; S.targetScope = "site";
+    const { resp } = send({ action: "getTarget" });
+    expect(resp).toEqual({ target: 9, scope: "site", channel: "UCabc", channelName: "Cool Channel", live: false });
   });
 });
 

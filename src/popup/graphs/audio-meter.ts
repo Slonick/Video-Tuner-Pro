@@ -77,6 +77,26 @@ export function drawAudio(g: GraphState, t: number): void {
       acx.beginPath(); acx.moveTo(op[0].x, op[0].y);
       for (let i = 1; i < op.length; i++) acx.lineTo(op[i].x, op[i].y);
       acx.stroke(); acx.globalAlpha = 1;
+
+      // Ghost of the input level mirrored onto the output (top) half: the gap down
+      // to the actual output is how much the compressor pulled the level off — the
+      // before/after difference. Fades in with the compressor; off, output == input
+      // so it vanishes.
+      const gp = g.audioHist.map((p) => ({ x: xFor(p.t), gi: center - halfAmp * frac(p.in), go: center - halfAmp * frac(p.out) }));
+      acx.save();
+      acx.globalAlpha = 0.18 * c;                   // "removed" band
+      acx.fillStyle = A_OVER;
+      acx.beginPath();
+      acx.moveTo(gp[0].x, gp[0].gi);
+      for (let i = 0; i < gp.length; i++) acx.lineTo(gp[i].x, gp[i].gi);
+      for (let i = gp.length - 1; i >= 0; i--) acx.lineTo(gp[i].x, gp[i].go);
+      acx.closePath(); acx.fill();
+      acx.globalAlpha = 0.5 * c;                    // dashed "would-be" input level
+      acx.strokeStyle = "rgb(214,218,226)"; acx.lineWidth = 1; acx.setLineDash([2, 2]);
+      acx.beginPath(); acx.moveTo(gp[0].x, gp[0].gi);
+      for (let i = 1; i < gp.length; i++) acx.lineTo(gp[i].x, gp[i].gi);
+      acx.stroke(); acx.setLineDash([]);
+      acx.restore();
     }
   }
 

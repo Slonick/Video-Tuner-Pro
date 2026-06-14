@@ -20,3 +20,21 @@ export function resolveSpeed(
   if (globalSpeed != null) return { speed: globalSpeed, scope: "global" };
   return { speed: 1.0, scope: null };
 }
+
+// The live-sync allowed-delay (seconds), resolved the same way as speed:
+//   channel > site > global > 5s default. Caller clamps the returned target.
+export type TargetScope = "channel" | "site" | "global" | null;
+
+export function resolveSyncTarget(
+  channelKeys: string[],
+  domain: string,
+  siteTargets: Record<string, number>,
+  channelTargets: Record<string, number>,
+  globalTarget: number | undefined,
+): { target: number; scope: TargetScope } {
+  const chKey = channelKeys.find((k) => channelTargets[k] != null);
+  if (chKey != null) return { target: channelTargets[chKey], scope: "channel" };
+  if (siteTargets[domain] != null) return { target: siteTargets[domain], scope: "site" };
+  if (globalTarget != null) return { target: globalTarget, scope: "global" };
+  return { target: 5, scope: null };
+}

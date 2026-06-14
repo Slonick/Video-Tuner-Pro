@@ -173,6 +173,19 @@
     background-repeat: no-repeat;
 }
 
+/* Tick marks on the buffer slider (1–30 s, range 29): every 5 s →
+   5/10/15/20/25/30. A tick every 5/29 = 17.2414% of the thumb's travel, the
+   first centred at (5−1)/29 = 13.7931% (the 5 s pos). */
+#syncTarget {
+    background-image: repeating-linear-gradient(to right,
+        transparent 0, transparent calc(13.7931% - 0.75px),
+        var(--muted) calc(13.7931% - 0.75px), var(--muted) calc(13.7931% + 0.75px),
+        transparent calc(13.7931% + 0.75px), transparent 17.2414%);
+    background-size: calc(100% - 18px) 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
 /* --- Preset buttons — active one filled with the accent. ----------------- */
 .buttons-grid {
     display: grid;
@@ -278,6 +291,46 @@
     flex-direction: column;
     gap: 6px;
 }
+/* The buffer scope is a labelled group box — "Save for" sits in the border
+   (native <legend>), framing the segmented control inside. */
+.scope-group {
+    margin: 0;               /* spacing comes from the surrounding flex gap */
+    padding: 7px 8px 8px;
+    border: 1px solid var(--track);
+    border-radius: 9px;
+    min-inline-size: auto;   /* override the fieldset default */
+}
+.scope-group legend {
+    padding: 0 5px;
+    margin-left: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+}
+/* The group box already frames it — drop the segmented control's own border. */
+.scope-group .scope-seg {
+    border: none;
+    padding: 0;
+}
+
+/* "Allowed delay" row: label on the left, a −/value/+ cluster on the right
+   (reusing .speed-quick / .spin from the speed header). */
+.sync-delay-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text);
+}
+.sync-val {
+    min-width: 36px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
 
 .btn-action {
     padding: 7px;
@@ -307,13 +360,6 @@
     &:hover {
         filter: brightness(1.05);
     }
-}
-
-/* Small heading over the scope picker. */
-.scope-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--muted);
 }
 
 /* Scope picker: Global / Site / Channel as a segmented control — a bordered

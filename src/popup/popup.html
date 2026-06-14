@@ -73,13 +73,15 @@
              channel > site > global > 100%. The Channel segment shows only on a
              YouTube watch page (.has-channel, set by the popup). -->
         <div class="quick-actions">
-            <span class="scope-label" data-i18n="scopeLabel">Save for</span>
-            <div class="scope-seg" id="scopeSeg" role="radiogroup" aria-label="Save scope">
-                <span class="seg-pill" aria-hidden="true"></span>
-                <button type="button" class="scope-opt" id="scopeGlobal" data-scope="global" role="radio" aria-checked="false" data-i18n="scopeGlobal" title="Save for all sites" data-i18n-title="tipScopeGlobal">Global</button>
-                <button type="button" class="scope-opt" id="scopeSite" data-scope="site" role="radio" aria-checked="false" data-i18n="scopeSite" title="Save for this site" data-i18n-title="tipScopeSite">Site</button>
-                <button type="button" class="scope-opt scope-channel" id="scopeChannel" data-scope="channel" role="radio" aria-checked="false" data-i18n="scopeChannel" title="Save for this channel" data-i18n-title="tipScopeChannel">Channel</button>
-            </div>
+            <fieldset class="scope-group">
+                <legend data-i18n="scopeLabel">Save for</legend>
+                <div class="scope-seg" id="scopeSeg" role="radiogroup" aria-label="Save scope">
+                    <span class="seg-pill" aria-hidden="true"></span>
+                    <button type="button" class="scope-opt" id="scopeGlobal" data-scope="global" role="radio" aria-checked="false" data-i18n="scopeGlobal" title="Save for all sites" data-i18n-title="tipScopeGlobal">Global</button>
+                    <button type="button" class="scope-opt" id="scopeSite" data-scope="site" role="radio" aria-checked="false" data-i18n="scopeSite" title="Save for this site" data-i18n-title="tipScopeSite">Site</button>
+                    <button type="button" class="scope-opt scope-channel" id="scopeChannel" data-scope="channel" role="radio" aria-checked="false" data-i18n="scopeChannel" title="Save for this channel" data-i18n-title="tipScopeChannel">Channel</button>
+                </div>
+            </fieldset>
             <div class="action-row">
                 <button class="btn-action btn-reset" id="resetBtn" data-i18n="resetButton">Reset</button>
                 <button class="btn-action btn-default" id="setDefaultBtn" data-i18n="rememberButton">Save</button>
@@ -164,9 +166,38 @@
         </div>
 
         <div class="sync-body" id="syncBody">
-            <div class="param">
-                <div class="sync-label"><span data-i18n="allowedDelay">Allowed delay</span>: <b id="syncTargetVal">3</b> <span data-i18n="secondsShort">s</span></div>
-                <input type="range" class="speed-slider" id="syncTarget" min="1" max="30" step="1" value="3">
+            <!-- Delay control on top, then the Save block (scope "Save for" group box
+                 + Reset / Save) together below — mirroring the speed card. The delay is
+                 stored at the chosen level (Global / Site / Channel), resolved by
+                 priority channel > site > global > 5s. Dragging previews live; Save
+                 commits. The Channel segment shows only with a channel. -->
+            <div class="sync-delay-row">
+                <span data-i18n="allowedDelay">Allowed delay</span>
+                <div class="speed-quick">
+                    <button type="button" class="spin" id="syncDown" aria-label="Shorter" title="−1 s">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 11h14v2H5z"/></svg>
+                    </button>
+                    <span class="sync-val"><b id="syncTargetVal">3</b> <span data-i18n="secondsShort">s</span></span>
+                    <button type="button" class="spin" id="syncUp" aria-label="Longer" title="+1 s">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+                    </button>
+                </div>
+            </div>
+            <input type="range" class="speed-slider" id="syncTarget" min="1" max="30" step="1" value="3">
+            <div class="quick-actions">
+                <fieldset class="scope-group">
+                    <legend data-i18n="scopeLabel">Save for</legend>
+                    <div class="scope-seg" id="syncScopeSeg" role="radiogroup" aria-label="Save allowed delay">
+                        <span class="seg-pill" aria-hidden="true"></span>
+                        <button type="button" class="scope-opt" id="syncScopeGlobal" data-scope="global" role="radio" aria-checked="false" data-i18n="scopeGlobal" title="Save for all sites" data-i18n-title="tipScopeGlobal">Global</button>
+                        <button type="button" class="scope-opt" id="syncScopeSite" data-scope="site" role="radio" aria-checked="false" data-i18n="scopeSite" title="Save for this site" data-i18n-title="tipScopeSite">Site</button>
+                        <button type="button" class="scope-opt scope-channel" id="syncScopeChannel" data-scope="channel" role="radio" aria-checked="false" data-i18n="scopeChannel" title="Save for this channel" data-i18n-title="tipScopeChannel">Channel</button>
+                    </div>
+                </fieldset>
+                <div class="action-row">
+                    <button class="btn-action btn-reset" id="syncResetBtn" data-i18n="resetButton">Reset</button>
+                    <button class="btn-action btn-default" id="syncSetBtn" data-i18n="rememberButton">Save</button>
+                </div>
             </div>
 
             <div class="extra-row">

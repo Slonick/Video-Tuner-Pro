@@ -3,11 +3,12 @@
 import { api } from "./platform/browser.js";
 import { getDomain } from "./core/domain.js";
 import { currentChannel, currentChannelName } from "./channel.js";
-import { clamp } from "./core/clamp.js";
+import { clamp, clampTarget } from "./core/clamp.js";
 import { S } from "./state.js";
 import { collectVideos } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
 import { setSpeed, persistDomainSpeed, persistChannelSpeed, persistGlobalSpeed, resetScope, resetToSaved } from "./speed.js";
+import { setTarget, persistSiteTarget, persistChannelTarget, persistGlobalTarget, resetTargetScope } from "./live/target.js";
 import { monitorData } from "./monitor.js";
 import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
 import { bufferLevelHist } from "./bitrate.js";
@@ -48,6 +49,29 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getSpeed") {
     return replyFromVideoFrame(sendResponse,
       () => ({ speed: S.currentSpeed, domain: getDomain(), channel: currentChannel(), channelName: currentChannelName(), scope: S.speedScope, live: onStreamPage() }));
+  }
+  // --- Live-sync allowed delay (buffer target), per scope — mirrors speed above.
+  if (request.action === "setTarget") {
+    setTarget(request.target);   // live preview, no persist
+    return replyFromVideoFrame(sendResponse,
+      () => ({ success: true, target: S.liveSyncTarget }));
+  }
+  if (request.action === "rememberTarget") {
+    const target = clampTarget(request.target);
+    if (request.scope === "channel") persistChannelTarget(target);
+    else if (request.scope === "global") persistGlobalTarget(target);
+    else persistSiteTarget(target);
+    sendResponse({ success: true, target });
+    return true;
+  }
+  if (request.action === "resetTarget") {
+    resetTargetScope(request.scope === "channel" || request.scope === "global" ? request.scope : "site");
+    sendResponse({ success: true });
+    return true;
+  }
+  if (request.action === "getTarget") {
+    return replyFromVideoFrame(sendResponse,
+      () => ({ target: S.liveSyncTarget, scope: S.targetScope, channel: currentChannel(), channelName: currentChannelName(), live: onStreamPage() }));
   }
   if (request.action === "getMonitor") {
     return replyFromVideoFrame(sendResponse, () => monitorData());
