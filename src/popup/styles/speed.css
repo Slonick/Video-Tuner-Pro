@@ -8,14 +8,25 @@
    padding, the expand chevron); only the live-locked state — manual controls
    disabled on a live stream — is specific to it. */
 .speed-section.locked {
+    /* Super theater still works on a YouTube live stream, so its row stays
+       active; the speed-affecting controls and the (no-op on a stream) on-video
+       / keyboard rows dim like the buttons. */
     .speed-slider,
     .buttons-grid,
     .quick-actions,
-    .speed-quick .spin {
+    .speed-quick .spin,
+    .speed-body .extra-row:not(#superTheaterRow) {
         opacity: 0.4;
         pointer-events: none;
         filter: grayscale(0.3);
     }
+}
+
+/* Off YouTube, Super theater does nothing either — so dim it with the rest. */
+.speed-section.locked:not(.is-youtube) .speed-body #superTheaterRow {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(0.3);
 }
 
 /* --- Header: domain title + a gray scope subtitle (just "Site", or — on a
@@ -44,6 +55,39 @@
     font-weight: 600;
     letter-spacing: -0.01em;
     text-align: center;
+}
+
+/* On a live stream the ⚠ sits to the right of the domain+channel block, centred
+   across both lines (via .sec-main's align-items). The text column clips on its
+   own, so a long domain or channel never crowds the badge out. */
+#liveWarn {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin-left: 3px;
+
+    & svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* The live note is anchored to the header (so it spans the card width), and
+   revealed when the ⚠ next to the domain is hovered or focused. */
+.tip.live-note {
+    left: 0;
+    right: 0;
+    top: calc(100% + 8px);
+    bottom: auto;
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    border: 1px solid var(--warn-line);
+    transform: translateY(-4px);
+}
+.sec-head:has(#liveWarn:hover) .live-note,
+.sec-head:has(#liveWarn:focus-visible) .live-note {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .spin {
@@ -324,9 +368,9 @@
 
 /* Shortcut keycaps inside the Keyboard-shortcuts info tooltip. The tooltip
    background is inverted per theme, so the keys use a neutral grey that reads on
-   either, and inherit the tooltip's text colour. */
-/* Two columns — the bare key + its Shift form — so the Shift chips line up under
-   each other regardless of the (varying-width) labels in the first column. */
+   either, and inherit the tooltip's text colour. Two columns — the bare key + its
+   Shift form — so the Shift chips line up under each other regardless of the
+   (varying-width) labels in the first column. */
 .kbd-tip {
     display: grid;
     grid-template-columns: max-content max-content;

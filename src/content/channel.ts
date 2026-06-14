@@ -9,14 +9,30 @@ const OWNER_SEL = [
   "#upload-info #channel-name a",
 ].join(",");
 
-export function currentChannel(): string | null {
+// Every stable key the current channel can be addressed by. The owner section
+// exposes BOTH a /channel/UC… id link and a /@handle link, in either DOM order —
+// so a plain querySelector(OWNER_SEL) returned whichever came first, flipping the
+// key between renders and losing a speed saved under the other form. Collect both
+// instead; the id is canonical (handles can change) and comes first.
+// Empty off a YouTube watch page, or before the owner link has rendered.
+export function channelKeys(): string[] {
   const h = window.location.hostname;
-  if (!/(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(h)) return null;
-  if (window.location.pathname !== "/watch") return null;
-  const a = document.querySelector<HTMLAnchorElement>(OWNER_SEL);
-  const href = a?.getAttribute("href") || "";
-  const m = href.match(/\/(@[A-Za-z0-9._-]+|channel\/UC[A-Za-z0-9_-]+)/);
-  return m ? m[1] : null;
+  if (!/(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(h)) return [];
+  if (window.location.pathname !== "/watch") return [];
+  let id: string | null = null, handle: string | null = null;
+  for (const a of document.querySelectorAll<HTMLAnchorElement>(OWNER_SEL)) {
+    const href = a.getAttribute("href") || "";
+    if (!id) { const m = href.match(/\/(channel\/UC[A-Za-z0-9_-]+)/); if (m) id = m[1]; }
+    if (!handle) { const m = href.match(/\/(@[A-Za-z0-9._-]+)/); if (m) handle = m[1]; }
+  }
+  return [id, handle].filter((k): k is string => k != null);
+}
+
+// The canonical channel key (for saving + change-tracking): the stable id when
+// present, else the handle. A speed saved under the other form is still matched
+// at lookup, so it survives whichever link YouTube happens to expose.
+export function currentChannel(): string | null {
+  return channelKeys()[0] ?? null;
 }
 
 // The channel's display name (not the @handle), for the popup header. The owner

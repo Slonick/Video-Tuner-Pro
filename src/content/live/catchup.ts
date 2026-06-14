@@ -1,4 +1,4 @@
-import { MIN_FORWARD_BUFFER, CATCHUP_MAX, CATCHUP_STEP_LAG, CATCHUP_START } from "../core/constants.js";
+import { MIN_FORWARD_BUFFER, MAX_BUFFER_RESERVE, CATCHUP_MAX, CATCHUP_STEP_LAG, CATCHUP_START } from "../core/constants.js";
 
 export interface CatchupInput {
   buffer: number;
@@ -8,12 +8,16 @@ export interface CatchupInput {
 }
 
 // The buffer level catch-up must never drain below. With a real
-// latency-to-broadcaster reading the floor is the allowed delay itself —
-// draining to 1s just trades lag for rebuffering stalls; the user's own
-// tolerance (3-5s) is the sensible reserve. Without latency the lag IS the
-// buffer, so the floor stays at the bare anti-stall minimum.
+// latency-to-broadcaster reading the floor is the allowed delay, but capped at
+// MAX_BUFFER_RESERVE (3s): when the lag is far larger than the buffer, fully
+// reaching a high allowed-delay would be impossible anyway — chasing it just
+// drains the buffer toward a stall. Capping the reserve at 3s lets catch-up
+// spend the surplus buffer to claw back as much lag as it can while still
+// keeping a stall-safe cushion. (e.g. lag 24s, buffer 16s, delay 5s → reserve
+// 3s, so catch-up drains 16→3 and pulls lag 24→~11, instead of touching 0.)
+// Without latency the lag IS the buffer, so the floor stays at the bare minimum.
 export function catchupBufferFloor(latency: number | null, target: number): number {
-  return latency != null ? target : MIN_FORWARD_BUFFER;
+  return latency != null ? Math.min(MAX_BUFFER_RESERVE, target) : MIN_FORWARD_BUFFER;
 }
 
 // Stepped catch-up: 105% engages just past the allowed delay, and each full

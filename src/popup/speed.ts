@@ -117,6 +117,10 @@ export async function init(): Promise<void> {
     ctx.currentDomain = "";
   }
   byId("currentDomain").textContent = ctx.currentDomain || "—";
+  // Super theater only does anything on YouTube, so only there does it stay
+  // usable while a live stream locks the rest of the card.
+  document.querySelector(".speed-section")
+    ?.classList.toggle("is-youtube", /(^|\.)youtube(-nocookie)?\.com$/.test(ctx.currentDomain));
 
   let resolved = false;
   if (ctx.activeTabId != null) {

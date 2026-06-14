@@ -25,20 +25,22 @@
                     <strong class="current-domain" id="currentDomain" data-i18n="loading">Loading…</strong>
                     <span class="switch-sub" id="speedScope" data-i18n="speedScopeSite">Current site</span>
                 </span>
+                <span class="info warn" id="liveWarn" aria-label="Live" style="display:none;">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                </span>
             </button>
             <div class="speed-quick">
                 <button type="button" class="spin" id="speedDown" aria-label="Slower">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 11h14v2H5z"/></svg>
                 </button>
                 <span class="speed-pct" id="currentSpeedPct">100%</span>
-                <span class="info warn" id="liveWarn" tabindex="0" role="button" aria-label="Live" style="display:none;">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                    <span class="tip" data-i18n="liveNote">Live stream: manual speed isn't applied — the stream stays at 100% until it needs to catch up. Speed is managed by Live-sync.</span>
-                </span>
                 <button type="button" class="spin" id="speedUp" aria-label="Faster">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
                 </button>
             </div>
+            <!-- The live note is anchored to the header (not the tiny ⚠) so it
+                 spans the card width; revealed on hover/focus of #liveWarn. -->
+            <span class="tip live-note" data-i18n="liveNote">Live stream: manual speed isn't applied — the stream stays at 100% until it needs to catch up. Speed is managed by Live-sync.</span>
         </div>
 
         <!-- Always visible: the slider, the full preset grid, and the
