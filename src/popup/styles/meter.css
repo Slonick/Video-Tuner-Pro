@@ -165,7 +165,7 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 3px;
     padding: 3px;
-    margin-bottom: 10px;
+    margin-bottom: 0;
     border: 1px solid var(--track);
     border-radius: 9px;
 }
@@ -196,4 +196,12 @@
         color: #fff;
         font-weight: 600;
     }
+}
+
+/* Presets sit in the always-visible area, between the meter and the slider body.
+   The bottom margin lifts the buttons clear of the 18px expand-hint strip at the
+   section's bottom edge, so tapping the centre preset doesn't hit the chevron. */
+.preset-block {
+    margin-top: 12px;
+    margin-bottom: 8px;
 }

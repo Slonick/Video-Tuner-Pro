@@ -252,15 +252,20 @@
             <canvas id="audioMeter"></canvas>
         </div>
 
-        <div class="sync-body" id="audioBody">
-            <div class="sync-label" data-i18n="presetsLabel">Presets</div>
+        <!-- One-tap profiles, always visible (no expand needed) — sit between the
+             meter and the slider body. No "Presets" label: the three buttons are
+             self-evident and the label would push the collapsed popup past the
+             ~600px no-scroll cap. -->
+        <div class="preset-block">
             <div class="preset-row">
                 <span class="seg-pill" aria-hidden="true"></span>
                 <button type="button" class="btn-preset" data-preset="voice" data-i18n="presetVoice">Voice</button>
                 <button type="button" class="btn-preset" data-preset="night" data-i18n="presetNight">Night</button>
                 <button type="button" class="btn-preset" data-preset="movie" data-i18n="presetMovie">Movie</button>
             </div>
+        </div>
 
+        <div class="sync-body" id="audioBody">
             <div class="param">
                 <div class="param-row"><label data-i18n="audioThreshold">Threshold</label><b class="param-val" id="acThresholdVal">−60 dB</b></div>
                 <input type="range" class="speed-slider" id="acThreshold" min="-100" max="0" step="1">
