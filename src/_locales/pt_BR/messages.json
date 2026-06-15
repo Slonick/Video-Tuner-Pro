@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "Predefinições de velocidade" },
   "optPresetsDesc": { "message": "Os oito valores por trás da grade do popup e dos atalhos Shift+1–8 (25–300%)." },
   "optResetDefaults": { "message": "Restaurar padrões" },
+  "optCompPresetsTitle": { "message": "Predefinições do compressor" },
+  "optCompPresetsDesc": { "message": "Ajuste os perfis de um toque do compressor de áudio — renomeie-os e altere seus valores (o ganho de make-up continua manual)." },
   "optKeysDesc": { "message": "Clique em uma tecla e pressione a nova.\nCom Shift, diminuir/aumentar muda em passos de 10%." },
   "optKeyReset": { "message": "Voltar à velocidade salva" },
   "optKeyPress": { "message": "Pressione uma tecla…" },

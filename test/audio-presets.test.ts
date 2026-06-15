@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COMP_PRESETS, compToStorage } from "../src/popup/audio-presets.js";
+import { COMP_PRESET_DEFAULTS as COMP_PRESETS, compToStorage, resolvePresets } from "../src/shared/comp-presets.js";
 
 // The slider ranges the popup enforces (clampNum) — a preset outside these would
 // be silently altered on apply, so every value must already fit.
@@ -35,5 +35,20 @@ describe("compressor presets", () => {
   it("the three presets are all distinct", () => {
     const shapes = Object.values(COMP_PRESETS).map((p) => JSON.stringify(p));
     expect(new Set(shapes).size).toBe(3);
+  });
+
+  it("resolvePresets overlays stored values + name on the defaults", () => {
+    const r = resolvePresets({ voice: { threshold: -40, name: "Speech" } });
+    expect(r.voice.threshold).toBe(-40);               // overridden
+    expect(r.voice.knee).toBe(COMP_PRESETS.voice.knee); // untouched default
+    expect(r.voice.name).toBe("Speech");
+    expect(r.night.name).toBeUndefined();              // no override → default name
+    expect(r.movie).toEqual({ ...COMP_PRESETS.movie });
+  });
+
+  it("resolvePresets returns the defaults when nothing is stored", () => {
+    const r = resolvePresets(undefined);
+    expect(r.voice).toEqual({ ...COMP_PRESETS.voice });
+    expect(r.voice.name).toBeUndefined();
   });
 });

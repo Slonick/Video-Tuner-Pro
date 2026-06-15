@@ -5,7 +5,28 @@ import { byId } from "./dom.js";
 import { tweenSlider } from "./core/tween-slider.js";
 import { movePill } from "./core/seg-pill.js";
 import { autoExpandOnFirstEnable } from "./sections.js";
-import { COMP_PRESETS, compToStorage, type CompParams, type PresetName } from "./audio-presets.js";
+import { resolvePresets, compToStorage, type CompParams, type PresetName, type StoredPresets } from "../shared/comp-presets.js";
+
+// Resolved presets (defaults until storage loads). The popup buttons keep their
+// localized labels unless the user renamed a preset on the options page.
+let PRESETS = resolvePresets(undefined);
+
+function relabelPresets(): void {
+  document.querySelectorAll<HTMLElement>(".btn-preset").forEach((btn) => {
+    const custom = PRESETS[btn.dataset.preset as PresetName]?.name;
+    if (custom) btn.textContent = custom;   // else the localized default (data-i18n) stays
+  });
+}
+
+// Load the user's edited presets (values + names). Call after localize() so a
+// custom name overrides the localized default rather than the reverse.
+export function loadCompPresets(): void {
+  STORE.get(["compPresets"], (r) => {
+    PRESETS = resolvePresets(r.compPresets as StoredPresets | undefined);
+    relabelPresets();
+    syncPresetHighlight();
+  });
+}
 
 interface AudioUI {
   enabled: boolean;
@@ -46,7 +67,7 @@ function syncPresetHighlight(): void {
   };
   const eq = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
   document.querySelectorAll<HTMLElement>(".btn-preset").forEach((btn) => {
-    const p = COMP_PRESETS[btn.dataset.preset as PresetName];
+    const p = PRESETS[btn.dataset.preset as PresetName];
     const on = !!p && eq(cur.threshold, p.threshold) && eq(cur.knee, p.knee) &&
       eq(cur.ratio, p.ratio) && eq(cur.attack, p.attack) && eq(cur.release, p.release);
     btn.classList.toggle("active", on);
@@ -124,8 +145,11 @@ ADV.forEach(([id, key, lo, hi, def]) => {
 });
 
 function applyComp(name: PresetName): void {
-  const p = COMP_PRESETS[name];
-  reflectAudioUI({ enabled: true, ...p }, true);
+  const p = PRESETS[name];
+  reflectAudioUI({
+    enabled: true,
+    threshold: p.threshold, knee: p.knee, ratio: p.ratio, attack: p.attack, release: p.release,
+  }, true);
   saveAudio({ ...compToStorage(p), audioComp: true });
   // Values settle on the profile after the glide; light it now. A later manual
   // drag re-runs syncPresetHighlight and clears it.
@@ -137,6 +161,6 @@ function applyComp(name: PresetName): void {
 document.querySelectorAll<HTMLElement>(".btn-preset").forEach((btn) => {
   btn.addEventListener("click", () => {
     const name = btn.dataset.preset as PresetName;
-    if (COMP_PRESETS[name]) applyComp(name);
+    if (PRESETS[name]) applyComp(name);
   });
 });

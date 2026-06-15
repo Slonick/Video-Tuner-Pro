@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "Пресети швидкості" },
   "optPresetsDesc": { "message": "Вісім значень для сітки у спливному вікні та гарячих клавіш Shift+1–8 (25–300%)." },
   "optResetDefaults": { "message": "Скинути до типових" },
+  "optCompPresetsTitle": { "message": "Пресети компресора" },
+  "optCompPresetsDesc": { "message": "Налаштуйте профілі компресора звуку в один дотик — перейменуйте їх і змініть значення (make-up gain лишається ручним)." },
   "optKeysDesc": { "message": "Натисніть клавішу, потім натисніть нову.\nShift робить крок зменшення/збільшення на 10%." },
   "optKeyReset": { "message": "Повернути збережену швидкість" },
   "optKeyPress": { "message": "Натисніть клавішу…" },

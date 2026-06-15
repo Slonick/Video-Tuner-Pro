@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "Speed presets" },
   "optPresetsDesc": { "message": "The eight values behind the popup grid and the Shift+1–8 shortcuts (25–300%)." },
   "optResetDefaults": { "message": "Reset to defaults" },
+  "optCompPresetsTitle": { "message": "Compressor presets" },
+  "optCompPresetsDesc": { "message": "Tune the one-tap profiles in the audio compressor — rename them and adjust their values (make-up gain stays manual)." },
   "optKeysDesc": { "message": "Click a key, then press the new one.\nShift makes slower/faster step by 10%." },
   "optKeyReset": { "message": "Reset to saved speed" },
   "optKeyPress": { "message": "Press a key…" },

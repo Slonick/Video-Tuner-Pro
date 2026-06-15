@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "गति प्रीसेट" },
   "optPresetsDesc": { "message": "पॉपअप ग्रिड और Shift+1–8 शॉर्टकट के पीछे के आठ मान (25–300%)।" },
   "optResetDefaults": { "message": "डिफ़ॉल्ट पर रीसेट करें" },
+  "optCompPresetsTitle": { "message": "कंप्रेसर प्रीसेट" },
+  "optCompPresetsDesc": { "message": "ऑडियो कंप्रेसर के वन-टैप प्रोफ़ाइल समायोजित करें — उनका नाम बदलें और मान बदलें (मेक-अप गेन मैनुअल रहता है)।" },
   "optKeysDesc": { "message": "किसी कुंजी पर क्लिक करें, फिर नई कुंजी दबाएँ।\nShift धीमा/तेज़ करने का चरण 10% कर देता है।" },
   "optKeyReset": { "message": "सहेजी गई गति पर रीसेट करें" },
   "optKeyPress": { "message": "कोई कुंजी दबाएँ…" },

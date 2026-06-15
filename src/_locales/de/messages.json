@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "Geschwindigkeits-Voreinstellungen" },
   "optPresetsDesc": { "message": "Die acht Werte hinter dem Raster im Popup und den Kürzeln Shift+1–8 (25–300%)." },
   "optResetDefaults": { "message": "Auf Standard zurücksetzen" },
+  "optCompPresetsTitle": { "message": "Kompressor-Presets" },
+  "optCompPresetsDesc": { "message": "Passe die Ein-Klick-Profile des Audiokompressors an — benenne sie um und ändere ihre Werte (Make-up-Gain bleibt manuell)." },
   "optKeysDesc": { "message": "Auf eine Taste klicken, dann die neue drücken.\nMit Shift ändert sich die Geschwindigkeit in feineren Schritten von 10%." },
   "optKeyReset": { "message": "Auf gespeicherte Geschwindigkeit zurücksetzen" },
   "optKeyPress": { "message": "Taste drücken…" },

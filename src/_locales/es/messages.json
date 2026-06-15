@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "Velocidades predefinidas" },
   "optPresetsDesc": { "message": "Los ocho valores de la cuadrícula del popup y los atajos Shift+1–8 (25–300%)." },
   "optResetDefaults": { "message": "Restablecer valores predeterminados" },
+  "optCompPresetsTitle": { "message": "Presets del compresor" },
+  "optCompPresetsDesc": { "message": "Ajusta los perfiles de un toque del compresor de audio: renómbralos y cambia sus valores (la ganancia de make-up sigue siendo manual)." },
   "optKeysDesc": { "message": "Haz clic en una tecla y luego pulsa la nueva.\nShift cambia el paso de reducir/aumentar a 10%." },
   "optKeyReset": { "message": "Volver a la velocidad guardada" },
   "optKeyPress": { "message": "Pulsa una tecla…" },

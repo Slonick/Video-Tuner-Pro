@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "Préréglages de vitesse" },
   "optPresetsDesc": { "message": "Les huit valeurs de la grille du popup et des raccourcis Shift+1–8 (25–300%)." },
   "optResetDefaults": { "message": "Rétablir les valeurs par défaut" },
+  "optCompPresetsTitle": { "message": "Préréglages du compresseur" },
+  "optCompPresetsDesc": { "message": "Ajustez les profils en un clic du compresseur audio — renommez-les et modifiez leurs valeurs (le gain de compensation reste manuel)." },
   "optKeysDesc": { "message": "Cliquez sur une touche, puis appuyez sur la nouvelle.\nAvec Shift, les touches plus lent/plus rapide changent la vitesse de 10%." },
   "optKeyReset": { "message": "Revenir à la vitesse enregistrée" },
   "optKeyPress": { "message": "Appuyez sur une touche…" },

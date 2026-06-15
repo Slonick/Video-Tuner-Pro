@@ -7,7 +7,7 @@ import { initTheme } from "../shared/theme.js";
 import "./sections.js";
 import { init, pollSpeed } from "./speed.js";
 import { loadSyncSettings } from "./live-sync.js";
-import { loadAudioSettings } from "./audio-settings.js";
+import { loadAudioSettings, loadCompPresets } from "./audio-settings.js";
 import { setupGraphs } from "./graphs/index.js";
 
 initTheme();
@@ -23,6 +23,7 @@ whenReady(() => {
     init();
     loadSyncSettings();
     loadAudioSettings();
+    loadCompPresets();   // edited preset values/names (after localize, so a custom name wins)
 
     // Badge/keyboard toggles default to on; Super theater (YouTube) defaults off.
     STORE.get(["showRemaining", "streamBadge", "keyboard", "superTheater"], (r) => {

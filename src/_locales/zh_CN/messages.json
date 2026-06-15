@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "速度预设" },
   "optPresetsDesc": { "message": "弹窗网格和 Shift+1–8 快捷键背后的八个数值 (25–300%)。" },
   "optResetDefaults": { "message": "恢复默认值" },
+  "optCompPresetsTitle": { "message": "压缩器预设" },
+  "optCompPresetsDesc": { "message": "调整音频压缩器的一键配置——可重命名并修改其数值（增益补偿仍为手动）。" },
   "optKeysDesc": { "message": "点击某个按键，然后按下新按键。\nShift 让减速/加速以 10% 为步进。" },
   "optKeyReset": { "message": "恢复到已保存的速度" },
   "optKeyPress": { "message": "按下一个键…" },

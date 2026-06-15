@@ -6,6 +6,7 @@ import { whenReady } from "../shared/store.js";
 import { initTheme } from "../shared/theme.js";
 import { initAppearance } from "./appearance.js";
 import { initKeys } from "./keys.js";
+import { initPresets } from "./presets.js";
 import { initSaved } from "./saved.js";
 import { initSync } from "./sync.js";
 import { initBackup } from "./backup.js";
@@ -17,6 +18,7 @@ whenReady(() => {
     localize();
     initAppearance();
     initKeys();
+    initPresets();
     initSaved();
     initSync();
     initBackup();

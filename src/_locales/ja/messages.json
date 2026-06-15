@@ -75,6 +75,8 @@
   "optPresetsTitle": { "message": "速度プリセット" },
   "optPresetsDesc": { "message": "ポップアップのグリッドと Shift+1–8 ショートカットの背後にある8つの値（25–300%）。" },
   "optResetDefaults": { "message": "初期設定に戻す" },
+  "optCompPresetsTitle": { "message": "コンプレッサーのプリセット" },
+  "optCompPresetsDesc": { "message": "オーディオコンプレッサーのワンタップ・プロファイルを調整します。名前を変更し、値を変更できます（メイクアップゲインは手動のままです）。" },
   "optKeysDesc": { "message": "キーをクリックして、新しいキーを押してください。\nShift で遅く／速くを 10% 刻みにします。" },
   "optKeyReset": { "message": "保存した速度に戻す" },
   "optKeyPress": { "message": "キーを押してください…" },
