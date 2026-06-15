@@ -59,8 +59,8 @@ export function startPoll(g: GraphState): void {
         const rawA = typeof resp.bufferAhead === "number" ? resp.bufferAhead : null;
         const as = rawA == null ? null : (g.bufAheadSmooth == null ? rawA : g.bufAheadSmooth + (rawA - g.bufAheadSmooth) * 0.18);
         g.bufAheadSmooth = as;
-        g.bufHist.push({ t, v: bs, a: as });
-        while (g.bufHist.length && t - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
+        // The point itself is recorded per-frame (see graphs/index.ts) so the live
+        // edge advances smoothly; here we only update the eased targets above.
         g.bufBitrate = typeof resp.bitrate === "number" ? resp.bitrate : null;
         g.bufAhead = as;
         g.bufLimited = !!resp.bufLimited;

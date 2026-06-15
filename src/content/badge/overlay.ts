@@ -253,6 +253,7 @@ export function updateTimeBadge(): void {
   let el = timeBadgeEl;
   if (!el) {
     el = document.createElement("div");
+    el.setAttribute("data-vtp-badge", "");   // marker so a re-injected instance can remove a leftover badge
     el.style.cssText = [
       "position:fixed", "z-index:2147483646", "pointer-events:none", "cursor:grab",
       "touch-action:none", "user-select:none",

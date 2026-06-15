@@ -174,6 +174,19 @@ function resetTarget(): void {
   });
 }
 
+// Revert a previewed/manual delay back to the saved value (channel > site >
+// global > 5s), without forgetting anything — mirrors the speed card's reset.
+function resetTargetManual(): void {
+  const id = tabId;
+  if (id == null) { targetFromStorage(); return; }
+  api.tabs.sendMessage(id, { action: "resetTargetToSaved" }, () => {
+    if (api.runtime.lastError) { targetFromStorage(); return; }
+    setTimeout(() => api.tabs.sendMessage(id, { action: "getTarget" }, (r) => {
+      if (!api.runtime.lastError && r && typeof r.target === "number") reflectTarget(clampTarget(r.target));
+    }), 80);
+  });
+}
+
 // Dragging previews the delay live (no persist) — Save commits it to the scope.
 const previewTarget = debounce((v: number) => {
   if (tabId != null) api.tabs.sendMessage(tabId, { action: "setTarget", target: v }, () => { void api.runtime.lastError; });
@@ -197,6 +210,7 @@ function nudgeTarget(delta: number): void {
 }
 byId("syncDown").addEventListener("click", () => nudgeTarget(-1));
 byId("syncUp").addEventListener("click", () => nudgeTarget(1));
+byId("syncReset").addEventListener("click", resetTargetManual);
 scopeOpts().forEach((btn) => {
   btn.addEventListener("click", () => selectScope(btn.dataset.scope as Scope));
 });

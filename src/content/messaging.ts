@@ -8,7 +8,7 @@ import { S } from "./state.js";
 import { collectVideos } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
 import { setSpeed, persistDomainSpeed, persistChannelSpeed, persistGlobalSpeed, resetScope, resetToSaved } from "./speed.js";
-import { setTarget, persistSiteTarget, persistChannelTarget, persistGlobalTarget, resetTargetScope } from "./live/target.js";
+import { setTarget, persistSiteTarget, persistChannelTarget, persistGlobalTarget, resetTargetScope, applyResolvedTargetFromStore } from "./live/target.js";
 import { monitorData } from "./monitor.js";
 import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
 import { bufferLevelHist } from "./bitrate.js";
@@ -66,6 +66,11 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.action === "resetTarget") {
     resetTargetScope(request.scope === "channel" || request.scope === "global" ? request.scope : "site");
+    sendResponse({ success: true });
+    return true;
+  }
+  if (request.action === "resetTargetToSaved") {
+    applyResolvedTargetFromStore();   // discard the live preview, re-apply the saved delay
     sendResponse({ success: true });
     return true;
   }

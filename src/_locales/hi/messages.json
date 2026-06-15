@@ -14,6 +14,7 @@
   "tipSlower": { "message": "धीमा (−5%)" },
   "tipFaster": { "message": "तेज़ (+5%)" },
   "tipResetSpeed": { "message": "सहेजी गई गति पर लौटें" },
+  "tipResetTarget": { "message": "सहेजी गई देरी पर लौटें" },
   "tipScopeGlobal": { "message": "सभी साइटों के लिए सहेजें" },
   "tipScopeSite": { "message": "इस साइट के लिए सहेजें" },
   "tipScopeChannel": { "message": "इस चैनल के लिए सहेजें" },
