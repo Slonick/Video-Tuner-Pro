@@ -1,5 +1,5 @@
 import { byId } from "../dom.js";
-import { col, fitCanvas } from "./draw-util.js";
+import { col, fitCanvas, levelMark } from "./draw-util.js";
 import { A_MIN, A_MAX, A_WINDOW } from "./state.js";
 import type { GraphState } from "./state.js";
 
@@ -18,18 +18,27 @@ export function drawAudio(g: GraphState, t: number): void {
   acx.clearRect(0, 0, w, h);
 
   const c = g.compAnim;                          // 0 = off (input only, full height) … 1 = on (mirrored)
-  const top = 1, bottom = h - 1, center = h / 2, halfAmp = h / 2 - 1, fullH = bottom - top;
+  const padR = 36, pw = w - padR;                // right gutter reserved for the scale labels (matches the buffer graph)
+  const pad = 7;                                 // top/bottom inset so the 0 / −100 ticks aren't flush to the edge
+  const top = pad, bottom = h - pad, center = h / 2, halfAmp = h / 2 - pad, fullH = bottom - top;
   const frac = (db: number) => (Math.max(A_MIN, Math.min(A_MAX, db)) - A_MIN) / (A_MAX - A_MIN);
   // Input y morphs from "rise from the bottom" (off, −100 at the floor) to "fall
   // from the centre" (on); at c=1 this equals centre + halfAmp·frac — the mirror.
   const inY = (db: number) => (bottom - fullH * frac(db)) * (1 - c) + (center + halfAmp * frac(db)) * c;
   const baseY = inY(A_MIN);                       // the −100 dB baseline
-  const xFor = (ts: number) => w * (1 - (t - ts) / A_WINDOW);
+  const xFor = (ts: number) => pw * (1 - (t - ts) / A_WINDOW);
   const thr = Number(byId<HTMLInputElement>("acThreshold").value);
 
-  // Baseline (input zero / −100 dB).
-  acx.strokeStyle = "rgba(127,127,127,0.18)"; acx.lineWidth = 1;
-  acx.beginPath(); acx.moveTo(0, Math.round(baseY) + 0.5); acx.lineTo(w, Math.round(baseY) + 0.5); acx.stroke();
+  // Scale grid (behind the waveform): −100 dB sits on the baseline — silence —
+  // which slides to the centre as the compressor mirrors; 0 dB (loudest) at the
+  // top edge. Each value is tied to its level by a gridline + tick in the gutter.
+  const dbTick = (db: number) => (db < 0 ? "−" + -db : String(db));   // number only — the unit lives in the readout
+  levelMark(acx, baseY, dbTick(A_MIN), pw, w, h, { line: "rgba(127,127,127,0.32)" });
+  levelMark(acx, top, dbTick(A_MAX), pw, w, h);
+  // Mirrored mode: the bottom half is the input rising back to 0 dB (loudest), so
+  // label it too — otherwise markers on the input scale (e.g. the threshold) look
+  // like they sit below −100. Fades in with the compressor.
+  if (c > 0.01) levelMark(acx, inY(A_MAX), dbTick(A_MAX), pw, w, h, { alpha: c });
 
   if (g.audioHist.length >= 2) {
     // Input area (always): baseline → input level (muted).
@@ -57,7 +66,7 @@ export function drawAudio(g: GraphState, t: number): void {
       acx.save();
       acx.globalAlpha = c;
       const cy0 = Math.min(yThr, yLoud), cy1 = Math.max(yThr, yLoud);
-      acx.beginPath(); acx.rect(0, cy0, w, cy1 - cy0); acx.clip();
+      acx.beginPath(); acx.rect(0, cy0, pw, cy1 - cy0); acx.clip();
       acx.fillStyle = grad;
       acx.beginPath(); acx.moveTo(ip[0].x, baseY);
       for (const p of ip) acx.lineTo(p.x, p.y);
@@ -100,14 +109,19 @@ export function drawAudio(g: GraphState, t: number): void {
     }
   }
 
-  // Threshold guide (level above which the input is compressed) — dashed amber,
-  // fades in with the compressor and morphs with the input.
+  // Threshold guide (level above which the input is compressed) — amber dashed,
+  // drawn inside the plot like the buffer's target line. The value sits at the
+  // right end, nudged above or below the line so it never clips at the edges.
   if (!Number.isNaN(thr) && c > 0.01) {
-    const y = Math.round(inY(thr)) + 0.5;
+    const y = inY(thr), yy = Math.round(y) + 0.5;
+    acx.save();
     acx.globalAlpha = c;
     acx.strokeStyle = A_OVER; acx.lineWidth = 1.2; acx.setLineDash([3, 3]);
-    acx.beginPath(); acx.moveTo(0, y); acx.lineTo(w, y); acx.stroke();
-    acx.setLineDash([]); acx.globalAlpha = 1;
+    acx.beginPath(); acx.moveTo(0, yy); acx.lineTo(pw, yy); acx.stroke(); acx.setLineDash([]);
+    acx.fillStyle = A_OVER; acx.font = "9px -apple-system, sans-serif";
+    acx.textAlign = "right"; acx.textBaseline = "alphabetic";
+    acx.fillText(dbTick(thr) + " dB", pw - 2, y < 12 ? yy + 10 : yy - 3);   // below the line near the top, above otherwise
+    acx.restore();
   }
 
   // Readout (throttled so digits sit still), bigger, no difference. OFF → the
@@ -125,8 +139,8 @@ export function drawAudio(g: GraphState, t: number): void {
       acx.globalAlpha = offA;
       acx.font = "700 16px -apple-system, sans-serif"; acx.textBaseline = "middle"; acx.lineWidth = 4;
       const lvl = fmtLevel(inV);
-      acx.strokeStyle = seg; acx.strokeText(lvl, w / 2, center);
-      acx.fillStyle = "#c7c7cc"; acx.fillText(lvl, w / 2, center);
+      acx.strokeStyle = seg; acx.strokeText(lvl, pw / 2, center);
+      acx.fillStyle = "#c7c7cc"; acx.fillText(lvl, pw / 2, center);
       acx.globalAlpha = 1;
     }
     const onA = Math.max(0, Math.min(1, (c - 0.45) * 2.2));
@@ -135,10 +149,10 @@ export function drawAudio(g: GraphState, t: number): void {
       const outC = col("--meter-out", "#7fb8ff"), inC = col("--meter-in", "#cfcfd4");
       acx.font = "700 15px -apple-system, sans-serif"; acx.textBaseline = "middle"; acx.lineWidth = 3.5;
       const outL = fmtLevel(outV), inL = fmtLevel(inV);
-      acx.strokeStyle = seg; acx.strokeText(outL, w / 2, center - 12);
-      acx.fillStyle = outC; acx.fillText(outL, w / 2, center - 12);
-      acx.strokeStyle = seg; acx.strokeText(inL, w / 2, center + 12);
-      acx.fillStyle = inC; acx.fillText(inL, w / 2, center + 12);
+      acx.strokeStyle = seg; acx.strokeText(outL, pw / 2, center - 12);
+      acx.fillStyle = outC; acx.fillText(outL, pw / 2, center - 12);
+      acx.strokeStyle = seg; acx.strokeText(inL, pw / 2, center + 12);
+      acx.fillStyle = inC; acx.fillText(inL, pw / 2, center + 12);
       acx.globalAlpha = 1;
     }
     acx.textBaseline = "alphabetic";

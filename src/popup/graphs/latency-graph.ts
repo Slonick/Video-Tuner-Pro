@@ -3,7 +3,7 @@
 // target line and the download bitrate.
 import { byId } from "../dom.js";
 import { msg } from "../i18n.js";
-import { col, fitCanvas, smoothLine } from "./draw-util.js";
+import { col, fitCanvas, smoothLine, levelMark } from "./draw-util.js";
 import { BUF_WINDOW } from "./state.js";
 import type { GraphState, BufSample } from "./state.js";
 
@@ -31,7 +31,8 @@ export function drawBuffer(g: GraphState, t: number): void {
   const LAT_COL = col("--accent", "#0a84ff");
   const BUF_COL = "#30d158";
   const hasAhead = g.bufAheadShown != null;
-  const padT = 5, padB = 11, gh = h - padT - padB;
+  const padT = 7, padB = 11, gh = h - padT - padB;
+  const padR = 36, pw = w - padR;       // right gutter reserved for the scale labels (matches the audio graph)
   const mid = padT + gh / 2;            // centre line = 0 / "now"
   const halfAmp = gh / 2 - 1;
   // Each half scales to its OWN peak (plus the target so the dashed line stays in
@@ -46,7 +47,7 @@ export function drawBuffer(g: GraphState, t: number): void {
   }
   g.yMax += (Math.max(1.5, latMx * 1.2) - g.yMax) * 0.08;
   g.yMaxAhead += (Math.max(1.5, bufMx * 1.2) - g.yMaxAhead) * 0.08;
-  const xFor = (ts: number) => w * (1 - (t - ts) / BUF_WINDOW);
+  const xFor = (ts: number) => pw * (1 - (t - ts) / BUF_WINDOW);
   const ampLat = (v: number) => Math.min(Math.max(v, 0), g.yMax) / g.yMax * halfAmp;
   const ampBuf = (v: number) => Math.min(Math.max(v, 0), g.yMaxAhead) / g.yMaxAhead * halfAmp;
 
@@ -57,16 +58,32 @@ export function drawBuffer(g: GraphState, t: number): void {
   const v = g.bufShown != null ? (g.bufHist.length ? g.bufShown : 0) : (g.bufHist.length ? g.bufHist[g.bufHist.length - 1].v : 0);
   bcx.clearRect(0, 0, w, h);
 
+  // Scale grid (behind the series): each half autoscales to its own peak, so
+  // labelling those peaks — each tied to its level by a gridline + tick in the
+  // gutter — is what makes the shape legible. 0 ("now") sits on the centre line.
+  if (g.bufHist.length) {
+    const sLbl = (val: number) => (Math.round(val * 2) / 2).toFixed(1);   // number only — the unit lives in the readout
+    const zero = { line: "rgba(127,127,127,0.32)" };
+    if (hasAhead) {
+      levelMark(bcx, padT, sLbl(g.yMaxAhead), pw, w, h);   // buffer-ahead peak (top)
+      levelMark(bcx, mid, "0", pw, w, h, zero);            // 0 / "now" (centre)
+      levelMark(bcx, bottom, sLbl(g.yMax), pw, w, h);      // latency peak (bottom)
+    } else {
+      levelMark(bcx, padT, sLbl(g.yMaxAhead), pw, w, h);   // buffer peak (top)
+      levelMark(bcx, bottom, "0", pw, w, h, zero);         // 0 (bottom)
+    }
+  }
+
   const target2 = (y: number): void => {   // dashed amber target line at y, labelled
     const yy = Math.round(y) + 0.5;
     bcx.strokeStyle = "#ff9f0a"; bcx.lineWidth = 1.5; bcx.setLineDash([4, 3]);
-    bcx.beginPath(); bcx.moveTo(0, yy); bcx.lineTo(w, yy); bcx.stroke(); bcx.setLineDash([]);
+    bcx.beginPath(); bcx.moveTo(0, yy); bcx.lineTo(pw, yy); bcx.stroke(); bcx.setLineDash([]);
     bcx.fillStyle = "#ff9f0a"; bcx.textAlign = "right"; bcx.font = "9px -apple-system, sans-serif";
-    bcx.fillText(target + "s", w - 3, yy - 2);
+    bcx.fillText(target + "s", pw - 2, yy - 2);
   };
   const put = (s: string, y: number, color: string): void => {
-    bcx.strokeStyle = halo; bcx.strokeText(s, w / 2, y);
-    bcx.fillStyle = color; bcx.fillText(s, w / 2, y);
+    bcx.strokeStyle = halo; bcx.strokeText(s, pw / 2, y);
+    bcx.fillStyle = color; bcx.fillText(s, pw / 2, y);
   };
   // Amber gradient over the part of a series past the target (like the audio
   // over-threshold fill): faint at the target line, solid toward the scale edge.
@@ -77,7 +94,7 @@ export function drawBuffer(g: GraphState, t: number): void {
     grad.addColorStop(1, "rgba(255,159,10,0.7)");
     bcx.save();
     const c0 = Math.min(yT, yEdge), c1 = Math.max(yT, yEdge);
-    bcx.beginPath(); bcx.rect(0, c0, w, c1 - c0); bcx.clip();
+    bcx.beginPath(); bcx.rect(0, c0, pw, c1 - c0); bcx.clip();
     bcx.fillStyle = grad;
     bcx.beginPath(); smoothLine(bcx, pts);
     bcx.lineTo(pts[pts.length - 1].x, base); bcx.lineTo(pts[0].x, base); bcx.closePath(); bcx.fill();
@@ -87,9 +104,7 @@ export function drawBuffer(g: GraphState, t: number): void {
   if (hasAhead) {
     // Two series → mirror like the audio meter: latency fills DOWN from the centre
     // (accent), buffer-ahead fills UP (green); centre line = 0 ("now").
-    bcx.strokeStyle = "rgba(127,127,127,0.18)"; bcx.lineWidth = 1;
-    bcx.beginPath(); bcx.moveTo(0, Math.round(mid) + 0.5); bcx.lineTo(w, Math.round(mid) + 0.5); bcx.stroke();
-    const fillArea = (get: (p: BufSample) => number | null | undefined, dir: number, amp: (x: number) => number, color: string, fill: string): void => {
+    const fillArea =(get: (p: BufSample) => number | null | undefined, dir: number, amp: (x: number) => number, color: string, fill: string): void => {
       const pts = g.bufHist.filter((p) => get(p) != null).map((p) => ({ x: xFor(p.t), y: mid + dir * amp(get(p) as number) }));
       if (pts.length < 2) return;
       bcx.beginPath(); smoothLine(bcx, pts);

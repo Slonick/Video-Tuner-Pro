@@ -25,7 +25,9 @@ export interface GraphState {
   audioOutShown: number | null;
 
   bufHist: BufSample[];                   // {t, v, a} smoothed latency/buffer history
-  bufSmooth: number | null;               // EMA state (primary)
+  bufSmooth: number | null;               // EMA state (primary) — per-poll target
+  bufCur: number | null;                  // per-frame eased value (primary), recorded each frame
+  bufCurAhead: number | null;             // per-frame eased value (buffer-ahead)
   bufShown: number | null;                // primary value drawn (refreshed ~1×/s)
   bufShownAt: number;
   bufLive: boolean;                       // only graph on live streams
@@ -51,7 +53,7 @@ export function createGraphState(
     tgt: { in: A_MIN, out: A_MIN },
     audioActive: false, audioEnabled: false, compAnim: 0, histSeeded: false,
     audioHist: [], audioDiffAt: 0, audioInShown: null, audioOutShown: null,
-    bufHist: [], bufSmooth: null, bufShown: null, bufShownAt: 0, bufLive: false,
+    bufHist: [], bufSmooth: null, bufCur: null, bufCurAhead: null, bufShown: null, bufShownAt: 0, bufLive: false,
     bufAhead: null, bufAheadSmooth: null, bufAheadShown: null, bufAheadAt: 0, bufLimited: false,
     bufBitrate: null, bufBitrateShown: null, bufBitrateAt: 0, yMax: 8, yMaxAhead: 8,
   };
