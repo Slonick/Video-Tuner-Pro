@@ -14,6 +14,7 @@
   "tipSlower": { "message": "Slower (−5%)" },
   "tipFaster": { "message": "Faster (+5%)" },
   "tipResetSpeed": { "message": "Reset to the saved speed" },
+  "tipResetTarget": { "message": "Reset to the saved delay" },
   "tipScopeGlobal": { "message": "Save for all sites" },
   "tipScopeSite": { "message": "Save for this site" },
   "tipScopeChannel": { "message": "Save for this channel" },

@@ -14,6 +14,7 @@
   "tipSlower": { "message": "减速 (−5%)" },
   "tipFaster": { "message": "加速 (+5%)" },
   "tipResetSpeed": { "message": "恢复到已保存的速度" },
+  "tipResetTarget": { "message": "恢复到已保存的延迟" },
   "tipScopeGlobal": { "message": "保存到所有网站" },
   "tipScopeSite": { "message": "保存到此网站" },
   "tipScopeChannel": { "message": "保存到此频道" },

@@ -14,6 +14,7 @@
   "tipSlower": { "message": "遅く (−5%)" },
   "tipFaster": { "message": "速く (+5%)" },
   "tipResetSpeed": { "message": "保存した速度に戻す" },
+  "tipResetTarget": { "message": "保存した遅延に戻す" },
   "tipScopeGlobal": { "message": "すべてのサイトに保存" },
   "tipScopeSite": { "message": "このサイトに保存" },
   "tipScopeChannel": { "message": "このチャンネルに保存" },

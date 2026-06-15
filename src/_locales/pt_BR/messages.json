@@ -14,6 +14,7 @@
   "tipSlower": { "message": "Mais lento (−5%)" },
   "tipFaster": { "message": "Mais rápido (+5%)" },
   "tipResetSpeed": { "message": "Voltar à velocidade salva" },
+  "tipResetTarget": { "message": "Voltar ao atraso salvo" },
   "tipScopeGlobal": { "message": "Salvar para todos os sites" },
   "tipScopeSite": { "message": "Salvar para este site" },
   "tipScopeChannel": { "message": "Salvar para este canal" },

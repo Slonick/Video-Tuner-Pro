@@ -181,6 +181,13 @@
                     <button type="button" class="spin" id="syncUp" aria-label="Longer" title="+1 s">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
                     </button>
+                    <!-- Revert a manual change to the saved delay (channel > site >
+                         global > 5s). Deletes nothing — the scope "Reset" below
+                         forgets a saved value. Mirrors the speed card's reset. -->
+                    <span class="speed-quick-div" aria-hidden="true"></span>
+                    <button type="button" class="spin" id="syncReset" aria-label="Reset" title="Reset to the saved delay" data-i18n-title="tipResetTarget">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+                    </button>
                 </div>
             </div>
             <input type="range" class="speed-slider" id="syncTarget" min="1" max="30" step="1" value="3">

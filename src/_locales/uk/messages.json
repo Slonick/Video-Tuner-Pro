@@ -14,6 +14,7 @@
   "tipSlower": { "message": "Повільніше (−5%)" },
   "tipFaster": { "message": "Швидше (+5%)" },
   "tipResetSpeed": { "message": "Повернути збережену швидкість" },
+  "tipResetTarget": { "message": "Повернути збережене відставання" },
   "tipScopeGlobal": { "message": "Зберегти для всіх сайтів" },
   "tipScopeSite": { "message": "Зберегти для цього сайту" },
   "tipScopeChannel": { "message": "Зберегти для цього каналу" },
