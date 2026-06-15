@@ -54,6 +54,28 @@ if (api.tabs && api.tabs.onUpdated) {
   });
 }
 
+// On reload/update the content scripts already running in open tabs are orphaned
+// (their extension context is dead) and the browser won't re-inject until the page
+// navigates — so the page silently stops responding to the popup/shortcuts until a
+// manual refresh. Re-inject the isolated content script into every open http(s) tab
+// so it keeps working without a refresh. (The MAIN-world latency probe is plain
+// page JS with no extension dependency, so it survives the reload and isn't
+// re-injected; the fresh content script removes any leftover badge and the old
+// instance tears itself down on its next tick.)
+if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
+  api.runtime.onInstalled.addListener(() => {
+    call(() => api.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
+      for (const tab of tabs || []) {
+        if (tab.id == null) continue;
+        call(() => api.scripting.executeScript({
+          target: { tabId: tab.id as number, allFrames: true },
+          files: ["content.js"],
+        }));
+      }
+    }));
+  });
+}
+
 // One-time migration: copy any pre-existing device-local settings into synced
 // storage (only if sync has none yet), so upgrading users keep their settings.
 if (api.runtime && api.runtime.onInstalled && api.storage && api.storage.sync) {

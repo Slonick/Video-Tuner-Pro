@@ -22,13 +22,24 @@ import "./theater.js";   // applies the YouTube "super theater" layout when enab
 import { currentChannel, channelKeys } from "./channel.js";
 
 let liveTick: ReturnType<typeof setInterval> | null = null;
+let audioSampler: ReturnType<typeof setInterval> | null = null;
+let bufferSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
 let lastChannel: string | null = null;   // re-resolve speed when the YouTube channel changes
+
+// After an extension reload this script is re-injected into the already-open tab
+// (see background/index.ts). A previous instance may have left its on-video badge
+// in the DOM — remove it so we don't end up with two. (Removing it is also a DOM
+// mutation, which makes the old instance's observer notice the dead context and
+// tear itself down.)
+try { document.querySelectorAll("[data-vtp-badge]").forEach((n) => n.remove()); } catch (e) { /* ignore */ }
 
 // The extension context dies on reload/update; shut down cleanly when it does.
 // Exported so live.js can call it without a circular value dependency.
 export function teardown() {
   if (liveTick) { clearInterval(liveTick); liveTick = null; }
+  if (audioSampler) { clearInterval(audioSampler); audioSampler = null; }
+  if (bufferSampler) { clearInterval(bufferSampler); bufferSampler = null; }
   try { observer.disconnect(); } catch (e) { /* ignore */ }
 }
 
@@ -118,6 +129,7 @@ whenReady(loadSpeed);
 // Steady background tick: re-apply speed (catches videos created inside shadow
 // roots, where document mutations don't fire) and drive live-sync.
 liveTick = setInterval(() => {
+  if (!ctxValid()) { teardown(); return; }   // orphaned after a reload — stop the dead instance
   applyAll(); controlLive(); updateTimeBadge();
   if (currentChannel() !== lastChannel) reresolve();
 }, 1000);
@@ -125,8 +137,8 @@ liveTick = setInterval(() => {
 // Background graph samplers (pre-fill the popup's audio/latency graphs). The
 // sample bodies live in their modules (unit-tested); only the scheduling lives
 // here, in the browser-wired entry point.
-setInterval(recordAudioSample, A_HIST_MS);
-setInterval(recordBufferSample, BUF_HIST_MS);
+audioSampler = setInterval(recordAudioSample, A_HIST_MS);
+bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
 
 // Apply the speed the moment ANY video starts up — a second player added to the
 // page would otherwise wait for the next tick/mutation pass and could begin at
