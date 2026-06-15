@@ -10,10 +10,16 @@ declare global {
     __SCENARIO__?: ScenarioName;
     __MESSAGES__?: Record<string, { message: string }>;
     __VERSION__?: string;
+    __THEME__?: string;
   }
 }
 
 const name = window.__SCENARIO__ || "audio";
 const messages = window.__MESSAGES__ || {};
+const data = scenario(name);
+// Force the palette by seeding the saved theme the popup reads (initTheme), so the
+// data-theme attribute — not the OS prefers-color-scheme — decides the colours.
+const theme = window.__THEME__;
+if (theme === "light" || theme === "dark") data.settings = { ...data.settings, theme };
 (window as unknown as { chrome: typeof chrome }).chrome =
-  createMockChrome({ ...scenario(name), messages, version: window.__VERSION__ });
+  createMockChrome({ ...data, messages, version: window.__VERSION__ });

@@ -17,9 +17,10 @@ export const smooth = (a, b, p) => { const t = clamp((p - a) / (b - a), 0, 1); r
 
 export const POPW = 340;    // popup display width (native 680 → 0.5×, so display px == css px)
 const WINH = 615;           // fallback popup-window height (callers pass an adaptive one)
-// Padding around the compressor block when the window frames it: the 10px
-// inter-section gap on top, the section's own 12px on the bottom.
-const FRAME_TOP = 10, FRAME_BOT = 12;
+// Padding around the compressor block when the window frames it. Keep the top
+// padding *below* the 10px inter-section gap so the window starts in clean
+// background and doesn't catch the rounded bottom edge of the section above.
+const FRAME_TOP = 6, FRAME_BOT = 12;
 
 export async function loadCopy(locale) {
   const STR = JSON.parse(await readFile(join(ROOT, "tools/promo-strings.json"), "utf8"))[locale];
@@ -79,7 +80,7 @@ export function frameHTML({ p = 0, video, stream, popH, copy, W = 1280, H = 800,
   const [vT, vI] = copy.video, [sT, sI] = copy.stream;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans','Noto Sans CJK SC',sans-serif;}
-.promo{width:${W}px;height:${H}px;display:flex;align-items:stretch;overflow:hidden;background:linear-gradient(to right,#eef1f5 0,#eef1f5 50%,#16181d 50%,#16181d 100%);}
+.promo{width:${W}px;height:${H}px;position:relative;display:flex;align-items:stretch;overflow:hidden;background:linear-gradient(to right,#eef1f5 0,#eef1f5 50%,#16181d 50%,#16181d 100%);}
 .col{width:392px;height:${H}px;position:relative;}
 .layer{position:absolute;inset:0;padding:0 32px;display:flex;flex-direction:column;justify-content:center;}
 .col h2{font-size:33px;font-weight:800;line-height:1.1;letter-spacing:-0.015em;}
@@ -91,8 +92,8 @@ export function frameHTML({ p = 0, video, stream, popH, copy, W = 1280, H = 800,
 .left{color:#1d1d1f;}.left .sub{color:#5a5a5f;}.left h3{color:#0a84ff;}.left .pd{color:#86868b;}
 .right .layer{text-align:right;align-items:flex-end;}.right{color:#f5f5f7;}
 .right .sub{color:rgba(255,255,255,.82);}.right h3{color:#7fb8ff;}.right .pd{color:rgba(255,255,255,.5);}
-.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding-top:14px;}
-.brand{display:inline-flex;align-items:center;gap:9px;padding:9px 18px;border-radius:13px;background:#0a84ff;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.01em;box-shadow:0 12px 30px rgba(10,132,255,.4);}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;}
+.brand{position:absolute;top:28px;left:32px;z-index:5;display:inline-flex;align-items:center;gap:9px;padding:9px 18px;border-radius:13px;background:#0a84ff;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.01em;box-shadow:0 12px 30px rgba(10,132,255,.4);}
 .brand .pro{font-size:12px;font-weight:700;letter-spacing:.05em;background:rgba(255,255,255,.26);padding:3px 7px;border-radius:6px;}
 .window{width:${POPW}px;height:${winH}px;overflow:hidden;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,.34);position:relative;}
 .scroller{position:absolute;top:0;left:0;transform:translateY(-${scroll}px);}
