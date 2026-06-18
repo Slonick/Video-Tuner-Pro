@@ -99,6 +99,11 @@ jobs:
     name: e2e
     needs: lint
     runs-on: ubuntu-latest
+    # The official Playwright image ships Chromium + every required system lib
+    # preinstalled, so the job skips the slow "--with-deps" apt install AND the
+    # browser download (~7 min → seconds; just an image pull). Keep this tag in
+    # lockstep with @playwright/test in package.json on every Playwright bump.
+    container: mcr.microsoft.com/playwright:v1.60.0-jammy
     steps:
       - uses: actions/checkout@v7
 
@@ -109,17 +114,11 @@ jobs:
 
       - run: npm ci
 
-      # Cache the downloaded browser binaries (~/.cache/ms-playwright). On a hit
-      # the install below skips the Chromium download and only re-runs the apt
-      # system deps. Keyed on the lockfile so a Playwright bump refetches.
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Playwright Chromium + system deps
-        run: npx playwright install --with-deps chromium
+      # Chromium is baked into the image at the matching revision; this is a
+      # no-op on a match (no --with-deps, no apt) and only fetches if the npm
+      # Playwright build ever drifts ahead of the image tag.
+      - name: Ensure Playwright Chromium
+        run: npx playwright install chromium
 
       - name: Build the extension and run the E2E suite
         run: npm run test:e2e
