@@ -234,6 +234,22 @@ export function SpeedCard({ speed: s, domain }: Props) {
           </span>
           <StoredToggle id="kbdToggle" storageKey="keyboard" defaultOn />
         </div>
+
+        <div className="extra-row">
+          <span className="extra-label">
+            <span>{msg("audioSpeedLabel")}</span>
+            <InfoTip below tip={msg("audioSpeedHint")} />
+          </span>
+          <StoredToggle id="audioSpeedToggle" storageKey="audioSpeed" defaultOn={false} />
+        </div>
+
+        <div className="extra-row">
+          <span className="extra-label">
+            <span>{msg("forceRateLabel")}</span>
+            <InfoTip below tip={msg("forceRateHint")} />
+          </span>
+          <StoredToggle id="forceRateToggle" storageKey="forceRate" defaultOn={false} />
+        </div>
       </div>
 
       <div className="expand-hint" aria-hidden="true" onClick={toggle}>
