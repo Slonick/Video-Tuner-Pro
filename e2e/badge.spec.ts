@@ -1,9 +1,11 @@
 import { test, expect, sendToContent, setStorage, clearStorage } from "./fixtures/extension.js";
 import type { Page } from "@playwright/test";
 
-// The on-video badge has no id; find the fixed overlay div by its speed glyph.
+// The on-video badge renders inside a shadow root on a marked host in the light
+// DOM (document.querySelector doesn't pierce shadow roots, so go via shadowRoot).
 const badge = (page: Page) => page.evaluate(() => {
-  const el = [...document.querySelectorAll("div")].find((d) => /×/.test(d.textContent || ""));
+  const host = document.querySelector("[data-vtp-badge]");
+  const el = host?.shadowRoot?.querySelector("div");
   return el ? { text: el.textContent, opacity: (el as HTMLElement).style.opacity } : null;
 });
 

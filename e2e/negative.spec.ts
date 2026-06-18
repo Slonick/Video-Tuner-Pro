@@ -4,8 +4,13 @@ import type { Page } from "@playwright/test";
 // Guard tests: assert the extension does NOT do what it shouldn't.
 const rate = (page: Page) =>
   page.evaluate(() => (document.getElementById("v") as HTMLVideoElement | null)?.playbackRate);
+// The badge renders inside a shadow root on a marked host — pierce it (a plain
+// document query never sees shadow content, which would make this trivially pass).
 const hasBadge = (page: Page) =>
-  page.evaluate(() => [...document.querySelectorAll("div")].some((d) => /×/.test(d.textContent || "")));
+  page.evaluate(() => {
+    const el = document.querySelector("[data-vtp-badge]")?.shadowRoot?.querySelector("div");
+    return !!el && /×/.test(el.textContent || "");
+  });
 
 test.beforeEach(async ({ serviceWorker }) => {
   await clearStorage(serviceWorker);
