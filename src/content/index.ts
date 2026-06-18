@@ -8,7 +8,7 @@ import { resolveSpeed, resolveSyncTarget } from "./core/resolve.js";
 import { presetFractions } from "../shared/presets.js";
 import { normalizeKeymap } from "../shared/keymap.js";
 import { S } from "./state.js";
-import { applyAll } from "./speed.js";
+import { applyAll, reassertRate, resetAudios } from "./speed.js";
 import { controlLive } from "./live/sync.js";
 import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
@@ -98,6 +98,8 @@ function loadSpeed() {
       "audioCompGain",
       "showRemaining",
       "streamBadge",
+      "audioSpeed",
+      "forceRate",
       "keyboard",
       "keymap",
       "speedPresets",
@@ -112,6 +114,9 @@ function loadSpeed() {
       // user turned it off) is still respected.
       S.showRemaining = result.showRemaining !== false;
       S.streamBadge = result.streamBadge !== false;
+      // Opt-in (default off): explicit `true` required.
+      S.audioSpeedEnabled = result.audioSpeed === true;
+      S.forceRate = result.forceRate === true;
       S.keyboardEnabled = result.keyboard !== false;
       S.keymap = normalizeKeymap(result.keymap);
       S.presets = presetFractions(result.speedPresets);
@@ -191,14 +196,39 @@ for (const ev of ["play", "loadedmetadata"]) {
   document.addEventListener(
     ev,
     (e) => {
-      if (!(e.target instanceof HTMLVideoElement)) return;
+      if (!(e.target instanceof HTMLMediaElement)) return;
       if (!ctxValid()) return;
       applyAll();
       controlLive();
+      // Surface the badge whenever playback starts (covers autoplay pages where
+      // the user never moves the pointer over the video). updateTimeBadge mounts
+      // it if needed; flashBadge reveals it and resumes the usual auto-hide.
+      if (e.type === "play") {
+        updateTimeBadge();
+        flashBadge();
+      }
     },
     true,
   );
 }
+
+// Hard-capture mode (opt-in, default off): swallow the page's ratechange in the
+// capture phase so site scripts never see — and can't undo — our speed, then
+// re-assert it ourselves (the swallow also pre-empts the per-element reapply
+// listeners). Skipped entirely when off, so normal behaviour is unchanged.
+document.addEventListener(
+  "ratechange",
+  (e) => {
+    if (!S.forceRate) return;
+    const t = e.target;
+    if (!(t instanceof HTMLMediaElement)) return;
+    if (t instanceof HTMLAudioElement && !S.audioSpeedEnabled) return; // not ours to control
+    e.stopImmediatePropagation();
+    if (!ctxValid()) return;
+    reassertRate(t);
+  },
+  true,
+);
 
 // Watch for videos added later (SPA navigation, lazy players). Chat-heavy pages
 // mutate constantly, so coalesce a burst into a single rAF pass — and never re-run
@@ -264,6 +294,12 @@ api.storage.onChanged.addListener((changes, area) => {
     updateTimeBadge(); // re-syncs the pin + forces visibility when pinned
     flashBadge(); // when unpinned, resumes the auto-hide countdown
   }
+  if (changes.audioSpeed) {
+    S.audioSpeedEnabled = changes.audioSpeed.newValue === true;
+    if (S.audioSpeedEnabled) applyAll();
+    else resetAudios(); // turned off — hand the <audio> elements back to the page
+  }
+  if (changes.forceRate) S.forceRate = changes.forceRate.newValue === true;
   if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   if (changes.keymap) S.keymap = normalizeKeymap(changes.keymap.newValue);
   if (changes.speedPresets) S.presets = presetFractions(changes.speedPresets.newValue);

@@ -46,6 +46,7 @@ function effectiveDuration(video: HTMLVideoElement): number {
 
 let badgeHost: HTMLDivElement | null = null; // shadow host (light DOM) we re-parent + mark
 let timeBadgeEl: HTMLDivElement | null = null;
+let badgeDotEl: HTMLElement | null = null; // video/stream indicator dot (left of the speed)
 let badgeTextEl: HTMLSpanElement | null = null; // holds the speed/time text (so the pin stays put)
 let badgePinEl: HTMLSpanElement | null = null;
 let timeBadgeHideTimer: Timer | undefined;
@@ -199,7 +200,10 @@ function renderBadge(v: HTMLVideoElement): void {
   if (!dragging) positionBadge(el, v);
   const speed = v.playbackRate || S.currentSpeed || 1;
   const sp = Math.round(speed * 100) / 100;
-  if (onStreamPage()) {
+  const stream = onStreamPage();
+  // Red dot = live stream (matches the toolbar's red icon), blue = a regular video.
+  if (badgeDotEl) badgeDotEl.style.background = stream ? "#ff453a" : "#0a84ff";
+  if (stream) {
     // Live: remaining time is meaningless (no end). Show a single value — the
     // latency to the broadcaster where the site exposes it (Twitch/YouTube),
     // otherwise the seconds buffered ahead, which is the same lag-behind-live.
@@ -274,6 +278,7 @@ export function updateTimeBadge(): void {
     const refs = mountBadge(); // React renders the badge into a shadow root
     badgeHost = refs.host;
     el = refs.el;
+    badgeDotEl = refs.dotEl;
     badgeTextEl = refs.textEl;
     badgePinEl = refs.pinEl;
     timeBadgeEl = el;

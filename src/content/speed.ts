@@ -5,7 +5,7 @@ import { channelKeys } from "./channel.js";
 import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
-import { collectVideos, seenVideos } from "./videos.js";
+import { collectVideos, collectAudios, seenVideos, seenAudios } from "./videos.js";
 import { isLive, probeLive, onStreamPage, trackDvr, resetDvr } from "./live/detection.js";
 import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
@@ -96,22 +96,41 @@ export function resetScope(scope: SpeedScope): void {
   });
 }
 
+// Apply the current speed to one media element. Keeps pitch natural and seeds
+// defaultPlaybackRate so a freshly-loaded source starts at the right rate (no 1×
+// flash before the reactive re-apply). Only writes playbackRate when it actually
+// differs — applyAll runs often (1s tick + every MutationObserver pass), and a
+// redundant write restarts the audio time-stretcher and glitches sound.
+function setMediaRate(media: HTMLMediaElement): void {
+  try {
+    if (media.preservesPitch === false) media.preservesPitch = true;
+    if (Math.abs(media.defaultPlaybackRate - S.currentSpeed) > 0.001)
+      media.defaultPlaybackRate = S.currentSpeed;
+    if (Math.abs(media.playbackRate - S.currentSpeed) > 0.001) media.playbackRate = S.currentSpeed;
+  } catch (e) {
+    /* some players reject rate before metadata is ready */
+  }
+}
+
+// Re-assert our rate on a single element. Backs the hard-capture handler
+// (index.ts), which swallows the page's ratechange before the per-element
+// listeners below can fire, so it has to re-apply here. Live videos are owned by
+// controlLive; audios only when the opt-in toggle is on.
+export function reassertRate(media: HTMLMediaElement): void {
+  if (media instanceof HTMLVideoElement) {
+    if (isLive(media)) return;
+    setMediaRate(media);
+  } else if (S.audioSpeedEnabled) {
+    setMediaRate(media);
+  }
+}
+
 function applyToVideo(video: HTMLVideoElement): void {
   // A live video's rate is owned by controlLive (live/sync.ts). applyAll runs
   // per mutation pass (≈frame rate on chat-heavy pages), so countering the
   // player's own rate writes here flips the rate twice within a frame — every
   // flip restarts the audio time-stretcher with an audible click.
-  if (!isLive(video)) {
-    try {
-      // Only set when it actually differs — applyAll runs often (1s tick + every
-      // MutationObserver pass). Re-assigning playbackRate each time restarts the
-      // audio time-stretcher and glitches sound during sped-up playback.
-      if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001)
-        video.playbackRate = S.currentSpeed;
-    } catch (e) {
-      /* some players reject rate before metadata is ready */
-    }
-  }
+  if (!isLive(video)) setMediaRate(video);
 
   if (seenVideos.has(video)) return;
   seenVideos.add(video);
@@ -120,11 +139,7 @@ function applyToVideo(video: HTMLVideoElement): void {
     // On live streams the rate is governed by controlLive's tick; don't fight the
     // player's own latency control here, or the tug-of-war drops frames.
     if (isLive(video)) return;
-    if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001) {
-      try {
-        video.playbackRate = S.currentSpeed;
-      } catch (e) {}
-    }
+    setMediaRate(video);
   };
   video.addEventListener("play", reapply);
   video.addEventListener("loadeddata", reapply);
@@ -142,11 +157,33 @@ function applyToVideo(video: HTMLVideoElement): void {
   video.addEventListener("timeupdate", controlLive);
 }
 
+// <audio> never gets a badge, live-sync, or the compressor — just the rate.
+function applyToAudio(audio: HTMLAudioElement): void {
+  setMediaRate(audio);
+  if (seenAudios.has(audio)) return;
+  seenAudios.add(audio);
+  const reapply = () => setMediaRate(audio);
+  audio.addEventListener("play", reapply);
+  audio.addEventListener("loadeddata", reapply);
+  audio.addEventListener("ratechange", reapply);
+}
+
+// Reset every <audio> back to normal speed — used when the toggle is turned off.
+export function resetAudios(): void {
+  for (const a of collectAudios()) {
+    try {
+      a.defaultPlaybackRate = 1;
+      a.playbackRate = 1;
+    } catch (e) {}
+  }
+}
+
 export function applyAll(): void {
   const videos = collectVideos();
   videos.forEach(applyToVideo);
   videos.forEach(probeLive); // sample media edge for generic live detection
   applyAudioComp(videos);
+  if (S.audioSpeedEnabled) collectAudios().forEach(applyToAudio);
   updateBadge();
 }
 

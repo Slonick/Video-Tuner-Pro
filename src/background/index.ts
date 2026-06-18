@@ -4,6 +4,8 @@
 //   • the icon's play triangle is white normally, red on a live stream
 //     (we swap between the white and red icon PNGs);
 //   • no video / navigation -> default icon, no badge.
+import { STORE, whenReady } from "../shared/store.js";
+
 const api = typeof browser !== "undefined" ? browser : chrome;
 
 const DEFAULT_ICON = {
@@ -82,6 +84,25 @@ if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
         }
       }),
     );
+  });
+}
+
+// First-run seeding: persist the shipped global defaults — playback speed 100%
+// and the live-sync allowed delay (5s) — so the "global" scope is a real, saved
+// value instead of an implicit code fallback. Routed through STORE so each key
+// lands in the area its category syncs to, and only written when absent so it
+// never clobbers an existing (or already-synced) value. syncTargetGlobal also
+// defers to the legacy `liveSyncTarget` global, which loadSpeed still honours.
+if (api.runtime && api.runtime.onInstalled) {
+  api.runtime.onInstalled.addListener(() => {
+    whenReady(() => {
+      STORE.get(["globalSpeed", "syncTargetGlobal", "liveSyncTarget"], (r) => {
+        const seed: Record<string, unknown> = {};
+        if (r.globalSpeed == null) seed.globalSpeed = 1.0; // 100%
+        if (r.syncTargetGlobal == null && r.liveSyncTarget == null) seed.syncTargetGlobal = 5; // seconds
+        if (Object.keys(seed).length) STORE.set(seed);
+      });
+    });
   });
 }
 
