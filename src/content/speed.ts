@@ -168,6 +168,27 @@ function applyToAudio(audio: HTMLAudioElement): void {
   audio.addEventListener("ratechange", reapply);
 }
 
+// Bridge the desired audio rate to the MAIN-world hook (audio-inject.ts), which
+// owns detached media (e.g. SoundCloud's `new Audio()`) the isolated world can't
+// reach. Present only while the toggle is on; its removal tells the page world to
+// hand those elements back at 1×. Written only on an actual change so the page-
+// world attribute observer doesn't churn on every tick.
+const AUDIO_RATE_ATTR = "data-vtp-audiorate";
+function publishAudioRate(): void {
+  try {
+    const root = document.documentElement;
+    if (!root) return;
+    if (S.audioSpeedEnabled) {
+      const v = String(S.currentSpeed);
+      if (root.getAttribute(AUDIO_RATE_ATTR) !== v) root.setAttribute(AUDIO_RATE_ATTR, v);
+    } else if (root.hasAttribute(AUDIO_RATE_ATTR)) {
+      root.removeAttribute(AUDIO_RATE_ATTR);
+    }
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 // Reset every <audio> back to normal speed — used when the toggle is turned off.
 export function resetAudios(): void {
   for (const a of collectAudios()) {
@@ -176,6 +197,7 @@ export function resetAudios(): void {
       a.playbackRate = 1;
     } catch (e) {}
   }
+  publishAudioRate(); // toggle is off now — clear the bridge so the page world resets too
 }
 
 export function applyAll(): void {
@@ -184,6 +206,7 @@ export function applyAll(): void {
   videos.forEach(probeLive); // sample media edge for generic live detection
   applyAudioComp(videos);
   if (S.audioSpeedEnabled) collectAudios().forEach(applyToAudio);
+  publishAudioRate(); // keep the MAIN-world bridge in step with the toggle + speed
   updateBadge();
 }
 
