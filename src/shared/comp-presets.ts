@@ -127,7 +127,12 @@ function capPins(list: CompPreset[]): CompPreset[] {
 function migrateOld(obj: Record<string, unknown>): CompPreset[] {
   return COMP_PRESET_DEFAULTS.map((def, i) => {
     const stored = obj[OLD_ORDER[i]] as (Partial<CompParams> & { name?: unknown }) | undefined;
-    return { ...coerceParams(stored, def), name: cleanName(stored?.name), nameKey: def.nameKey, pin: true };
+    return {
+      ...coerceParams(stored, def),
+      name: cleanName(stored?.name),
+      nameKey: def.nameKey,
+      pin: true,
+    };
   });
 }
 

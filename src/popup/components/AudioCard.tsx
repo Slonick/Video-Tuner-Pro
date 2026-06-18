@@ -118,7 +118,10 @@ export function AudioCard({ audio: a, translating }: Props) {
   };
 
   return (
-    <div ref={sectionRef} className={"sync-section audio-section" + (translating ? " audio-locked" : "")}>
+    <div
+      ref={sectionRef}
+      className={"sync-section audio-section" + (translating ? " audio-locked" : "")}
+    >
       <div className="sec-head">
         <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
           <span className="sec-text">
@@ -168,7 +171,9 @@ export function AudioCard({ audio: a, translating }: Props) {
               key={i}
               type="button"
               className={
-                "btn-preset" + (quick.has(i) ? "" : " extra") + (a.activePreset === i ? " active" : "")
+                "btn-preset" +
+                (quick.has(i) ? "" : " extra") +
+                (a.activePreset === i ? " active" : "")
               }
               data-preset={i}
               onClick={() => a.applyPreset(i)}

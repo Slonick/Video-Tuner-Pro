@@ -212,10 +212,7 @@ export function Presets() {
                 <span>{msg("audioGain") || "Make-up gain"}</span>
                 <span className="preset-gain-ctrl">
                   {cur.gain != null && <b className="opt-param-val">{cur.gain} dB</b>}
-                  <Switch
-                    checked={cur.gain != null}
-                    onChange={(on) => togglePresetGain(i, on)}
-                  />
+                  <Switch checked={cur.gain != null} onChange={(on) => togglePresetGain(i, on)} />
                 </span>
               </div>
               {cur.gain != null && (

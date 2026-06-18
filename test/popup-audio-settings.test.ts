@@ -161,7 +161,10 @@ describe("compressor preset gain routing", () => {
     await mountApp({
       settings: {
         audioCompGain: 3,
-        compPresets: [P({ name: "A", gain: 8, pin: true }), P({ name: "B", threshold: -22, pin: true })],
+        compPresets: [
+          P({ name: "A", gain: 8, pin: true }),
+          P({ name: "B", threshold: -22, pin: true }),
+        ],
       },
     });
     expect((byId("acGain") as HTMLInputElement).value).toBe("3"); // global to start

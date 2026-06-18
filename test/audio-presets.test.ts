@@ -52,7 +52,15 @@ describe("normalizeCompPresets", () => {
 
   it("validates a stored list: clamps params, coerces pin, drops empty names", () => {
     const out = normalizeCompPresets([
-      { threshold: -40, knee: 99, ratio: 8, attack: 0.01, release: 0.5, name: "  Speech  ", pin: 1 },
+      {
+        threshold: -40,
+        knee: 99,
+        ratio: 8,
+        attack: 0.01,
+        release: 0.5,
+        name: "  Speech  ",
+        pin: 1,
+      },
       { threshold: -20, knee: 10, ratio: 4, attack: 0, release: 0.3, name: "   ", pin: false },
     ]);
     expect(out).toHaveLength(2);
