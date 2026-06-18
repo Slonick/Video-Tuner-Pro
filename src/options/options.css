@@ -503,14 +503,14 @@ body {
 }
 
 /* --- Speed preset editor -------------------------------------------------- */
-.speed-preset-grid {
+.preset-rows {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
   margin-top: 14px;
 }
 
-.speed-preset-field {
+.preset-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -519,14 +519,38 @@ body {
   border-radius: 8px;
 }
 
-.speed-preset-field > span:first-child {
+/* Pin toggle: accent + solid when pinned, dim otherwise. */
+.preset-pin {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
   color: var(--muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+  cursor: pointer;
+
+  &.is-pinned {
+    color: var(--accent);
+    opacity: 1;
+  }
+
+  &:hover:not(:disabled):not(.is-pinned) {
+    opacity: 0.85;
+  }
+
+  &:disabled {
+    opacity: 0.2;
+    cursor: default;
+  }
 }
 
-.speed-preset-field input {
-  width: 100%;
+.preset-row input {
+  flex: 1 1 auto;
   min-width: 0;
   padding: 5px 6px;
   border: 1px solid var(--track);
@@ -538,6 +562,14 @@ body {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  -moz-appearance: textfield;
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
   &:focus {
     outline: 2px solid var(--accent);
@@ -545,7 +577,37 @@ body {
   }
 }
 
-.speed-preset-pct {
+.preset-pct {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Compact key-cap inside a preset row — the action-keys editor's .key-cap is too
+   wide to sit next to the value field. */
+.preset-row .preset-key {
+  flex: 0 0 auto;
+  min-width: 52px;
+  padding: 5px 8px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.preset-remove {
+  flex: 0 0 auto;
+  width: 26px;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: #ff3b30;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
 }

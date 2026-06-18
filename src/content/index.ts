@@ -5,7 +5,7 @@ import { STORE, OUR_AREAS, whenReady } from "./platform/storage.js";
 import { clamp, clampTarget, clampNum } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { resolveSpeed, resolveSyncTarget } from "./core/resolve.js";
-import { presetFractions } from "../shared/presets.js";
+import { normalizePresetSet, normalizeSpeedStep, normalizeHoldSpeed } from "../shared/presets.js";
 import { normalizeKeymap } from "../shared/keymap.js";
 import { S } from "./state.js";
 import { applyAll, reassertRate, resetAudios } from "./speed.js";
@@ -124,6 +124,9 @@ function loadSpeed() {
       "keyboard",
       "keymap",
       "speedPresets",
+      "presetKeys",
+      "speedStep",
+      "holdSpeed",
     ],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
@@ -140,7 +143,11 @@ function loadSpeed() {
       S.forceRate = result.forceRate === true;
       S.keyboardEnabled = result.keyboard !== false;
       S.keymap = normalizeKeymap(result.keymap);
-      S.presets = presetFractions(result.speedPresets);
+      const ps = normalizePresetSet(result.speedPresets, result.presetKeys);
+      S.presets = ps.presets.map((p) => p / 100);
+      S.presetKeys = ps.keys;
+      S.speedStep = normalizeSpeedStep(result.speedStep) / 100;
+      S.holdSpeed = normalizeHoldSpeed(result.holdSpeed) / 100;
       S.liveSyncEnabled = result.liveSync !== false;
       // Allowed delay resolves by scope: channel > site > global > 5s. The legacy
       // `liveSyncTarget` acts as the old global fallback.
@@ -365,7 +372,16 @@ api.storage.onChanged.addListener((changes, area) => {
   if (changes.forceRate) S.forceRate = changes.forceRate.newValue === true;
   if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   if (changes.keymap) S.keymap = normalizeKeymap(changes.keymap.newValue);
-  if (changes.speedPresets) S.presets = presetFractions(changes.speedPresets.newValue);
+  if (changes.speedPresets || changes.presetKeys) {
+    // Both arrays sort together, so re-read both and recompute the pair set.
+    STORE.get(["speedPresets", "presetKeys"], (r) => {
+      const ps = normalizePresetSet(r.speedPresets, r.presetKeys);
+      S.presets = ps.presets.map((p) => p / 100);
+      S.presetKeys = ps.keys;
+    });
+  }
+  if (changes.speedStep) S.speedStep = normalizeSpeedStep(changes.speedStep.newValue) / 100;
+  if (changes.holdSpeed) S.holdSpeed = normalizeHoldSpeed(changes.holdSpeed.newValue) / 100;
   let audioChanged = false;
   if (changes.audioComp) {
     S.audioCompEnabled = !!changes.audioComp.newValue;

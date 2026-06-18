@@ -17,9 +17,14 @@ export const KEY_CATEGORY: Record<string, Category> = {
   globalSpeed: "speeds",
   domains: "speeds",
   channels: "speeds",
-  // Editable preset values + the configurable max-speed ceiling.
+  // Editable preset values + the configurable max-speed ceiling, the per-press
+  // step size, and the hold-key's temporary speed.
   speedPresets: "speeds",
+  presetKeys: "speeds",
+  presetPins: "speeds",
   speedMax: "speeds",
+  speedStep: "speeds",
+  holdSpeed: "speeds",
   // Live-sync: the on/off toggle and the allowed-delay, saved per scope.
   liveSync: "delays",
   liveSyncTarget: "delays", // legacy global fallback

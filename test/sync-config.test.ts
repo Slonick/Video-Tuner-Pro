@@ -22,6 +22,8 @@ describe("categoryOf", () => {
     expect(categoryOf("theme")).toBe("general");
     expect(categoryOf("speedPresets")).toBe("speeds");
     expect(categoryOf("speedMax")).toBe("speeds");
+    expect(categoryOf("speedStep")).toBe("speeds");
+    expect(categoryOf("holdSpeed")).toBe("speeds");
   });
   it("falls back to general for unknown keys", () => {
     expect(categoryOf("somethingNew")).toBe("general");

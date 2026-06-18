@@ -36,3 +36,21 @@ test("the badge reflects a speed change", async ({ page, serviceWorker }) => {
   await page.mouse.move(320, 180);
   await expect.poll(async () => (await badge(page))?.text).toMatch(/^2×/);
 });
+
+test("the badge stays visible while the hold key is pressed", async ({ page, serviceWorker }) => {
+  await setStorage(serviceWorker, { showRemaining: true });
+  await page.goto("/");
+  await page.locator("#v").click();
+  await page.evaluate(() => (document.getElementById("v") as HTMLVideoElement).play().catch(() => {}));
+  await page.waitForFunction(() => {
+    const v = document.getElementById("v") as HTMLVideoElement;
+    return v && isFinite(v.duration) && v.duration > 0;
+  });
+  await page.keyboard.down("KeyF"); // hold → 2×, badge revealed
+  await expect.poll(async () => (await badge(page))?.text).toMatch(/^2×/);
+  // Past the 2.6s auto-hide window it must still be visible (the hold pins it).
+  await page.waitForTimeout(3000);
+  expect((await badge(page))?.opacity).toBe("1");
+  await page.keyboard.up("KeyF"); // release → resumes auto-hide
+  await expect.poll(async () => (await badge(page))?.opacity).toBe("0");
+});

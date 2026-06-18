@@ -219,10 +219,11 @@
   display: block;
 }
 
-/* Shift+N shortcut hint, in the button's corner. Only shown once the grid is
-   expanded — collapsed, four presets are hidden and the numbering would gap. */
+/* Per-preset hotkey hint, in the button's corner (the label already includes any
+   ⇧/⌃/⌥). Only shown once the grid is expanded — collapsed, most presets are
+   hidden. Presets with no assigned key carry no data-key, so no hint. */
 .btn-speed[data-key]::before {
-  content: "⇧" attr(data-key);
+  content: attr(data-key);
   position: absolute;
   top: 0;
   right: 0;

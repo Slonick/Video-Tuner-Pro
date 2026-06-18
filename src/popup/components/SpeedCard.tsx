@@ -70,6 +70,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
   };
 
   const percent = Math.round(s.speed.v * 100);
+  const stepPct = Math.round(s.speedStep * 100);
 
   return (
     <div
@@ -106,7 +107,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
             id="speedDown"
             aria-label="Slower"
             title={msg("tipSlower")}
-            onClick={() => s.nudge(-0.05)}
+            onClick={() => s.nudge(-s.speedStep)}
           >
             <MinusIcon />
           </button>
@@ -117,7 +118,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
             id="speedUp"
             aria-label="Faster"
             title={msg("tipFaster")}
-            onClick={() => s.nudge(0.05)}
+            onClick={() => s.nudge(s.speedStep)}
           >
             <PlusIcon />
           </button>
@@ -149,6 +150,8 @@ export function SpeedCard({ speed: s, domain }: Props) {
 
       <PresetGrid
         presets={s.presets}
+        presetKeys={s.presetKeys}
+        pinned={s.pinned}
         activePercent={percent}
         gridRef={gridRef}
         onPick={s.setSpeed}
@@ -208,22 +211,22 @@ export function SpeedCard({ speed: s, domain }: Props) {
                 <span className="kbd-g">
                   <kbd>A</kbd>
                   <span>{msg("kbdSlower")}</span>
-                  <span className="amt">−5%</span>
+                  <span className="amt">−{stepPct}%</span>
                 </span>
                 <span className="kbd-g">
                   <kbd>⇧</kbd>
                   <kbd>A</kbd>
-                  <span className="amt">−10%</span>
+                  <span className="amt">−{stepPct * 2}%</span>
                 </span>
                 <span className="kbd-g">
                   <kbd>D</kbd>
                   <span>{msg("kbdFaster")}</span>
-                  <span className="amt">+5%</span>
+                  <span className="amt">+{stepPct}%</span>
                 </span>
                 <span className="kbd-g">
                   <kbd>⇧</kbd>
                   <kbd>D</kbd>
-                  <span className="amt">+10%</span>
+                  <span className="amt">+{stepPct * 2}%</span>
                 </span>
                 <span className="kbd-g">
                   <kbd>R</kbd>

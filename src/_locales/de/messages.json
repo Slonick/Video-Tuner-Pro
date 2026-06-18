@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "Sprache" },
   "langSystem": { "message": "System" },
   "optPresetsTitle": { "message": "Geschwindigkeits-Voreinstellungen" },
-  "optPresetsDesc": { "message": "Die acht Werte hinter dem Raster im Popup und den Kürzeln Shift+1–8 (25–300%)." },
+  "optPresetsDesc": { "message": "Die Werte hinter dem Popup-Raster. Füge welche hinzu oder entferne sie, gib jedem ein Tastenkürzel und hefte bis zu vier an, damit sie im eingeklappten Popup erscheinen." },
   "optResetDefaults": { "message": "Auf Standard zurücksetzen" },
   "optCompPresetsTitle": { "message": "Kompressor-Presets" },
   "optCompPresetsDesc": { "message": "Passe die Ein-Klick-Profile des Audiokompressors an — benenne sie um und ändere ihre Werte (Make-up-Gain bleibt manuell)." },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "Erlaubter Live-sync-Rückstand, pro Seite und Kanal gespeichert." },
   "catAudioDesc": { "message": "Kompressor an/aus, Voreinstellung und Pegel." },
   "catShortcutsDesc": { "message": "Deine eigenen Tasten für langsamer, schneller und zurücksetzen." },
-  "catGeneralDesc": { "message": "Design, Sprache, Badge im Video und weitere Schalter." }
+  "catGeneralDesc": { "message": "Design, Sprache, Badge im Video und weitere Schalter." },
+  "optKeyToggle": { "message": "Tempo ⇄ 1× umschalten" },
+  "optKeyHold": { "message": "Halten für schnelles Tempo" },
+  "optMaxSpeed": { "message": "Maximale Geschwindigkeit" },
+  "optStepLabel": { "message": "Geschwindigkeitsschritt" },
+  "optHoldSpeed": { "message": "Halte-Geschwindigkeit" },
+  "optPresetKeyHint": { "message": "Tastenkürzel zuweisen (Rücktaste löscht)" },
+  "optPresetPinHint": { "message": "An die eingeklappte Schnellzeile anheften (bis zu 4)" },
+  "optPresetAdd": { "message": "Preset hinzufügen" },
+  "optPresetRemove": { "message": "Preset entfernen" }
 }

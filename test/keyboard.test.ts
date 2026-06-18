@@ -98,4 +98,21 @@ describe("keyboard shortcuts", () => {
     press("KeyD");
     expect(m.setSpeed).not.toHaveBeenCalled();
   });
+
+  it("a preset's assigned chord jumps to that preset speed", () => {
+    S.presets = [1.25, 2.0];
+    S.presetKeys = ["S+Digit1", "KeyG"];
+    press("KeyG");
+    expect(m.setSpeed).toHaveBeenCalledWith(2.0, false, true);
+    press("Digit1", { shiftKey: true });
+    expect(m.setSpeed).toHaveBeenCalledWith(1.25, false, true);
+  });
+
+  it("ignores a preset chord whose modifiers don't match exactly", () => {
+    S.presets = [1.25, 2.0];
+    S.presetKeys = ["S+Digit1", "KeyG"];
+    press("Digit1"); // no Shift — the spec needs it
+    press("KeyG", { ctrlKey: true }); // extra Ctrl — spec is bare
+    expect(m.setSpeed).not.toHaveBeenCalled();
+  });
 });

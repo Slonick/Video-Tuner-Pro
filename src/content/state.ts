@@ -2,6 +2,8 @@
 // reassign an imported binding, so the values that several modules both read and
 // write live on this single object (loadSpeed/onChanged set them, the speed/live/
 // audio/badge modules read — and a couple write — them).
+import { DEFAULT_PRESETS, DEFAULT_PRESET_KEYS } from "../shared/presets.js";
+
 export const S = {
   currentSpeed: 1.0,
   // The user's intended speed for NON-live playback (restored when a page turns
@@ -23,15 +25,30 @@ export const S = {
   forceRate: false,
   // Keyboard shortcuts (S/D/R/Z) for playback speed
   keyboardEnabled: true,
-  // Editable speed presets, as playback-rate fractions, for the Shift+1…8 keys —
-  // mirrors the popup's preset grid (single source: storage key "speedPresets").
-  presets: [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5] as number[],
-  // Remappable shortcut keys (e.code values) for slower / faster / reset.
-  keymap: { slower: "KeyA", faster: "KeyD", reset: "KeyR" } as {
+  // Editable speed presets, as playback-rate fractions — mirrors the popup's
+  // preset grid (single source: storage key "speedPresets"). Each preset's hotkey
+  // chord lives at the same index in presetKeys (storage key "presetKeys"); the
+  // two stay sorted together so a key follows its speed.
+  presets: DEFAULT_PRESETS.map((p) => p / 100) as number[],
+  presetKeys: [...DEFAULT_PRESET_KEYS] as (string | null)[],
+  // Remappable shortcut keys (e.code values) for slower / faster / reset /
+  // toggle (last speed ⇄ 1×) / hold (temporary speed while pressed).
+  keymap: { slower: "KeyA", faster: "KeyD", reset: "KeyR", toggle: "KeyS", hold: "KeyF" } as {
     slower: string;
     faster: string;
     reset: string;
+    toggle: string;
+    hold: string;
   },
+  // How much one slower/faster press changes the speed (fraction; Shift doubles).
+  speedStep: 0.05,
+  // The speed the hold key applies while pressed (fraction).
+  holdSpeed: 2.0,
+  // The last non-1× speed, remembered so `toggle` can restore it.
+  toggleMemory: null as number | null,
+  // Hold-key bookkeeping: whether it's down, and the speed to restore on release.
+  holdActive: false,
+  holdPrev: 1.0,
   liveSyncTarget: 5, // seconds of allowed lag behind the live edge (1–30)
   // On-video badge: speed + real remaining time (VODs)
   showRemaining: false,

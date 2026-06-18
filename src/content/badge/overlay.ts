@@ -227,7 +227,9 @@ export function flashBadge(): void {
   timeBadgeEl.style.opacity = "1";
   timeBadgeEl.style.pointerEvents = "auto"; // grabbable while shown
   clearTimeout(timeBadgeHideTimer);
-  if (S.badgePinned) return; // pinned → stays visible, never schedule a fade-out
+  // Pinned, or holding the temporary-speed key → stay visible (the held speed is
+  // shown live in the badge); the keyup's setSpeed re-flashes to resume auto-hide.
+  if (S.badgePinned || S.holdActive) return;
   timeBadgeHideTimer = setTimeout(() => {
     if (!timeBadgeEl || dragging) return; // never fade out mid-drag
     timeBadgeEl.style.opacity = "0";

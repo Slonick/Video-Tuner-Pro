@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "Langue" },
   "langSystem": { "message": "Système" },
   "optPresetsTitle": { "message": "Préréglages de vitesse" },
-  "optPresetsDesc": { "message": "Les huit valeurs de la grille du popup et des raccourcis Shift+1–8 (25–300%)." },
+  "optPresetsDesc": { "message": "Les valeurs de la grille du popup. Ajoutez-en ou supprimez-en, attribuez un raccourci à chacune et épinglez-en jusqu’à quatre pour les afficher dans le popup réduit." },
   "optResetDefaults": { "message": "Rétablir les valeurs par défaut" },
   "optCompPresetsTitle": { "message": "Préréglages du compresseur" },
   "optCompPresetsDesc": { "message": "Ajustez les profils en un clic du compresseur audio — renommez-les et modifiez leurs valeurs (le gain de compensation reste manuel)." },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "Retard Live-sync autorisé, enregistré pour chaque site et chaîne." },
   "catAudioDesc": { "message": "Compression activée/désactivée, préréglage et niveaux." },
   "catShortcutsDesc": { "message": "Vos touches personnalisées pour ralentir, accélérer et réinitialiser." },
-  "catGeneralDesc": { "message": "Thème, langue, badge sur la vidéo et autres options." }
+  "catGeneralDesc": { "message": "Thème, langue, badge sur la vidéo et autres options." },
+  "optKeyToggle": { "message": "Basculer la vitesse ⇄ 1×" },
+  "optKeyHold": { "message": "Maintenir pour accélérer" },
+  "optMaxSpeed": { "message": "Vitesse maximale" },
+  "optStepLabel": { "message": "Pas de vitesse" },
+  "optHoldSpeed": { "message": "Vitesse maintenue" },
+  "optPresetKeyHint": { "message": "Attribuer un raccourci (Retour arrière pour effacer)" },
+  "optPresetPinHint": { "message": "Épingler à la rangée rapide réduite (jusqu’à 4)" },
+  "optPresetAdd": { "message": "Ajouter un préréglage" },
+  "optPresetRemove": { "message": "Supprimer le préréglage" }
 }

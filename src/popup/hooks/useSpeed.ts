@@ -5,7 +5,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { clamp } from "../core/clamp.js";
-import { normalizePresets, normalizeSpeedMax, SPEED_MAX_DEFAULT } from "../../shared/presets.js";
+import {
+  normalizePresets,
+  normalizePresetSet,
+  normalizeSpeedMax,
+  normalizeSpeedStep,
+  SPEED_MAX_DEFAULT,
+  STEP_DEFAULT,
+} from "../../shared/presets.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
 import { useScopeSelection } from "./useScopeSelection.js";
@@ -26,8 +33,11 @@ interface SpeedValue {
 
 export interface UseSpeed {
   speed: SpeedValue;
-  presets: number[]; // editable percents, sorted (the grid + Shift+N hotkeys)
+  presets: number[]; // editable percents, sorted (the grid + per-preset hotkeys)
+  presetKeys: (string | null)[]; // hotkey chord per preset, aligned with `presets`
+  pinned: boolean[]; // which presets show in the collapsed quick row, aligned with `presets`
   speedMax: number; // configurable upper bound for the slider (percent)
+  speedStep: number; // per ± tap / keyboard step, as a fraction (e.g. 0.05)
   live: boolean;
   channel: string | null;
   channelName: string;
@@ -60,7 +70,14 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
 
   const [speed, setSpeedState] = useState<SpeedValue>({ v: 1, animate: false });
   const [presets, setPresets] = useState<number[]>(() => normalizePresets(undefined));
+  const [presetKeys, setPresetKeys] = useState<(string | null)[]>(
+    () => normalizePresetSet(undefined, undefined).keys,
+  );
+  const [pinned, setPinned] = useState<boolean[]>(
+    () => normalizePresetSet(undefined, undefined).pinned,
+  );
   const [speedMax, setSpeedMax] = useState<number>(SPEED_MAX_DEFAULT);
+  const [speedStep, setSpeedStep] = useState<number>(STEP_DEFAULT / 100);
   const [live, setLive] = useState(false);
   // Synchronous mirror so back-to-back nudges / a save right after one see the
   // latest value (no re-render between them).
@@ -183,9 +200,13 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   // Initial load: editable presets, then the page's resolved speed (or storage).
   useEffect(() => {
     if (!tab) return;
-    STORE.get(["speedPresets", "speedMax"], (r) => {
-      setPresets(normalizePresets(r.speedPresets));
+    STORE.get(["speedPresets", "presetKeys", "presetPins", "speedMax", "speedStep"], (r) => {
+      const set = normalizePresetSet(r.speedPresets, r.presetKeys, r.presetPins);
+      setPresets(set.presets);
+      setPresetKeys(set.keys);
+      setPinned(set.pinned);
       setSpeedMax(normalizeSpeedMax(r.speedMax));
+      setSpeedStep(normalizeSpeedStep(r.speedStep) / 100);
     });
     let resolved = false;
     if (hasTab) {
@@ -236,7 +257,10 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   return {
     speed,
     presets,
+    presetKeys,
+    pinned,
     speedMax,
+    speedStep,
     live,
     channel: sc.channel,
     channelName: sc.channelName,

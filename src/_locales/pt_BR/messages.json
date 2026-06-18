@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "Idioma" },
   "langSystem": { "message": "Sistema" },
   "optPresetsTitle": { "message": "Predefinições de velocidade" },
-  "optPresetsDesc": { "message": "Os oito valores por trás da grade do popup e dos atalhos Shift+1–8 (25–300%)." },
+  "optPresetsDesc": { "message": "Os valores por trás da grade do popup. Adicione ou remova-os, dê um atalho a cada um e fixe até quatro para aparecerem no popup recolhido." },
   "optResetDefaults": { "message": "Restaurar padrões" },
   "optCompPresetsTitle": { "message": "Predefinições do compressor" },
   "optCompPresetsDesc": { "message": "Ajuste os perfis de um toque do compressor de áudio — renomeie-os e altere seus valores (o ganho de make-up continua manual)." },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "Atraso permitido do live-sync, salvo para cada site e canal." },
   "catAudioDesc": { "message": "Compressor ligado/desligado, predefinição e níveis." },
   "catShortcutsDesc": { "message": "Suas teclas para diminuir, aumentar e redefinir." },
-  "catGeneralDesc": { "message": "Tema, idioma, indicador no vídeo e outras opções." }
+  "catGeneralDesc": { "message": "Tema, idioma, indicador no vídeo e outras opções." },
+  "optKeyToggle": { "message": "Alternar velocidade ⇄ 1×" },
+  "optKeyHold": { "message": "Segurar para acelerar" },
+  "optMaxSpeed": { "message": "Velocidade máxima" },
+  "optStepLabel": { "message": "Passo de velocidade" },
+  "optHoldSpeed": { "message": "Velocidade ao segurar" },
+  "optPresetKeyHint": { "message": "Atribuir um atalho (Backspace limpa)" },
+  "optPresetPinHint": { "message": "Fixar na linha rápida recolhida (até 4)" },
+  "optPresetAdd": { "message": "Adicionar preset" },
+  "optPresetRemove": { "message": "Remover preset" }
 }
