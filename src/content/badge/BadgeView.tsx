@@ -30,6 +30,20 @@ const BADGE_STYLE: CSSProperties = {
   backdropFilter: "blur(3px)",
 };
 
+// Small dot left of the speed: its colour says whether the value that follows is
+// for a live stream (latency/buffer) or a regular video (remaining time). The
+// colour is set imperatively in overlay.ts; kept a non-<span> so the badge's text
+// stays the first/only <span> the tests and queries reach for.
+const DOT_STYLE: CSSProperties = {
+  display: "inline-block",
+  width: "7px",
+  height: "7px",
+  borderRadius: "50%",
+  marginRight: "6px",
+  flexShrink: 0,
+  background: "#0a84ff",
+};
+
 const PIN_STYLE: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -44,13 +58,15 @@ const PIN_STYLE: CSSProperties = {
 
 interface Props {
   divRef: (n: HTMLDivElement | null) => void;
+  dotRef: (n: HTMLElement | null) => void;
   textRef: (n: HTMLSpanElement | null) => void;
   pinRef: (n: HTMLSpanElement | null) => void;
 }
 
-function Badge({ divRef, textRef, pinRef }: Props) {
+function Badge({ divRef, dotRef, textRef, pinRef }: Props) {
   return (
     <div ref={divRef} style={BADGE_STYLE}>
+      <i ref={dotRef} style={DOT_STYLE} aria-hidden="true"></i>
       <span ref={textRef}></span>
       <span ref={pinRef} role="button" style={PIN_STYLE}>
         <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
@@ -64,6 +80,7 @@ function Badge({ divRef, textRef, pinRef }: Props) {
 export interface BadgeRefs {
   host: HTMLDivElement; // shadow host (light DOM) — re-parented + marked for cleanup
   el: HTMLDivElement; // the badge itself (inside the shadow root)
+  dotEl: HTMLElement; // video/stream indicator dot
   textEl: HTMLSpanElement; // speed/time text
   pinEl: HTMLSpanElement; // pin button
 }
@@ -78,6 +95,7 @@ export function mountBadge(): BadgeRefs {
   const shadow = host.attachShadow({ mode: "open" });
 
   let el: HTMLDivElement | null = null;
+  let dotEl: HTMLElement | null = null;
   let textEl: HTMLSpanElement | null = null;
   let pinEl: HTMLSpanElement | null = null;
   flushSync(() =>
@@ -85,6 +103,9 @@ export function mountBadge(): BadgeRefs {
       <Badge
         divRef={(n) => {
           el = n;
+        }}
+        dotRef={(n) => {
+          dotEl = n;
         }}
         textRef={(n) => {
           textEl = n;
@@ -95,5 +116,5 @@ export function mountBadge(): BadgeRefs {
       />,
     ),
   );
-  return { host, el: el!, textEl: textEl!, pinEl: pinEl! };
+  return { host, el: el!, dotEl: dotEl!, textEl: textEl!, pinEl: pinEl! };
 }

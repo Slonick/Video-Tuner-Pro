@@ -195,6 +195,13 @@ for (const ev of ["play", "loadedmetadata"]) {
       if (!ctxValid()) return;
       applyAll();
       controlLive();
+      // Surface the badge whenever playback starts (covers autoplay pages where
+      // the user never moves the pointer over the video). updateTimeBadge mounts
+      // it if needed; flashBadge reveals it and resumes the usual auto-hide.
+      if (e.type === "play") {
+        updateTimeBadge();
+        flashBadge();
+      }
     },
     true,
   );
