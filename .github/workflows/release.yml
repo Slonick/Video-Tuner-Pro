@@ -16,8 +16,19 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build & attach packages
+  # Full CI gate (lint, then unit + e2e) reused verbatim from ci.yml. Nothing
+  # builds or publishes unless it passes.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # Target-independent gate, run once (not per target): manifest/locale JSON is
+  # well-formed, every locale defines the same keys as English, and the store-
+  # facing strings fit the stricter of each store's caps — name ≤ 50 (Firefox
+  # AMO; Chrome allows 75) and description ≤ 132 (Chrome). Exceeding either gets
+  # the upload rejected, so fail here before building or publishing anything.
+  validate:
+    name: Validate manifest & locales
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -26,22 +37,47 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate JSON and locales
+      - name: Validate JSON, locale keys, and store length caps
         run: |
           for f in src/manifest.json src/_locales/*/messages.json; do
             node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || { echo "Invalid JSON: $f"; exit 1; }
           done
-          # Every locale must define the same keys as the English base.
+          # Every locale must define the same keys as the English base, and the
+          # __MSG_-resolved manifest name/description must fit the store caps.
           node -e '
             const fs = require("fs");
+            const CAPS = { extName: 50, extDescription: 132 };
             const base = Object.keys(JSON.parse(fs.readFileSync("src/_locales/en/messages.json"))).sort();
+            let bad = false;
             for (const d of fs.readdirSync("src/_locales")) {
-              const k = Object.keys(JSON.parse(fs.readFileSync("src/_locales/" + d + "/messages.json"))).sort();
-              const miss = base.filter((x) => !k.includes(x));
-              if (miss.length) { console.error(d + " missing keys: " + miss.join(", ")); process.exit(1); }
+              const msgs = JSON.parse(fs.readFileSync("src/_locales/" + d + "/messages.json"));
+              const miss = base.filter((x) => !Object.keys(msgs).includes(x));
+              if (miss.length) { console.error(d + " missing keys: " + miss.join(", ")); bad = true; }
+              for (const [key, cap] of Object.entries(CAPS)) {
+                const len = (msgs[key] && msgs[key].message || "").length;
+                if (len > cap) { console.error(d + "/" + key + ": " + len + " chars (max " + cap + ")"); bad = true; }
+              }
             }
-            console.log("All locales consistent");
+            if (bad) process.exit(1);
+            console.log("Locales consistent; store length caps OK");
           '
+
+  build:
+    name: Build & publish ${{ matrix.target }}
+    needs: [ci, validate]
+    runs-on: ubuntu-latest
+    # Chrome and Firefox run as independent parallel jobs. fail-fast: false so a
+    # failure publishing one store never cancels the other mid-flight.
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [chrome, firefox]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
       - name: Read version from manifest
         id: meta
@@ -50,33 +86,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check and test
-        run: |
-          npm run check
-          npm test
+      - name: Build ${{ matrix.target }} (bundled + minified)
+        run: node build.mjs --target=${{ matrix.target }}
 
-      - name: Build (bundled + minified, per target)
-        run: npm run build
+      - name: Package ${{ matrix.target }} zip
+        run: cd dist/${{ matrix.target }} && zip -rq "../../video-tuner-pro-${{ matrix.target }}-v${{ steps.meta.outputs.version }}.zip" . && cd ../..
 
-      - name: Package Chrome and Firefox zips
-        run: |
-          cd dist/chrome && zip -rq "../../video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" . && cd ../..
-          cd dist/firefox && zip -rq "../../video-tuner-pro-firefox-v${{ steps.meta.outputs.version }}.zip" . && cd ../..
-
-      - name: Upload packages as workflow artifacts
+      - name: Upload package as workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: extension-packages
-          path: video-tuner-pro-*.zip
+          name: extension-package-${{ matrix.target }}
+          path: video-tuner-pro-${{ matrix.target }}-*.zip
 
-      - name: Attach packages to the release
+      - name: Attach package to the release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" video-tuner-pro-*.zip --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" video-tuner-pro-${{ matrix.target }}-*.zip --clobber
 
       - name: Publish to Chrome Web Store
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' && matrix.target == 'chrome'
         env:
           EXTENSION_ID: ichlipldofdemkhlhnoekfkpfejfanno
           CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
@@ -85,7 +114,7 @@ jobs:
         run: npx chrome-webstore-upload-cli@3 upload --source "video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" --auto-publish
 
       - name: Publish to Firefox Add-ons
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' && matrix.target == 'firefox'
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}

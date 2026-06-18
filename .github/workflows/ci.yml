@@ -12,6 +12,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call: # reused by release.yml as the pre-publish gate
 
 permissions:
   contents: read

@@ -1,0 +1,22 @@
+version: 2
+
+# Security-only policy. Dependabot raises PRs for *vulnerable* dependencies once
+# the repository's "Dependabot security updates" setting is enabled
+# (Settings → Code security → Dependabot security updates). Those security PRs are
+# NOT affected by the limit below.
+#
+# Routine version-bump PRs are intentionally disabled here:
+# `open-pull-requests-limit: 0` stops Dependabot opening version-update PRs for
+# each ecosystem — so the only PRs you get are security fixes.
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0

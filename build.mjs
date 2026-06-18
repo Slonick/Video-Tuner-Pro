@@ -5,8 +5,9 @@
 // manifest is emitted per-target (Chrome: service worker, Firefox: event-page
 // scripts + gecko keys).
 //
-//   node build.mjs            production build → dist/chrome + dist/firefox
-//   node build.mjs --watch    dev build of dist/chrome only, rebuilt on change
+//   node build.mjs              production build → dist/chrome + dist/firefox
+//   node build.mjs --target=X   production build of a single target (chrome|firefox)
+//   node build.mjs --watch      dev build of dist/chrome only, rebuilt on change
 import { build, context } from "esbuild";
 import { bundle as bundleCss } from "lightningcss";
 import { rmSync, mkdirSync, cpSync, readFileSync, writeFileSync, watch } from "node:fs";
@@ -14,7 +15,14 @@ import { join } from "node:path";
 
 const SRC = "src";
 const DEV = process.argv.includes("--watch");
-const TARGETS = DEV ? ["chrome"] : ["chrome", "firefox"];
+const ALL_TARGETS = ["chrome", "firefox"];
+// --target=<name> builds a single target (used by the per-target release matrix).
+const ONLY = process.argv.find((a) => a.startsWith("--target="))?.split("=")[1];
+if (ONLY && !ALL_TARGETS.includes(ONLY)) {
+  console.error(`Unknown --target=${ONLY} (expected ${ALL_TARGETS.join(" or ")})`);
+  process.exit(1);
+}
+const TARGETS = ONLY ? [ONLY] : DEV ? ["chrome"] : ALL_TARGETS;
 
 const baseManifest = JSON.parse(readFileSync(join(SRC, "manifest.json"), "utf8"));
 

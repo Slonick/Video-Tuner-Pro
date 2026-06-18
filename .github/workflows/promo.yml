@@ -1,12 +1,15 @@
 name: Generate promo images
 
-# Run on demand (Actions tab → "Generate promo images" → Run workflow), separate
-# from the release build so it can churn in parallel. Renders the localized store
-# promo images for every locale × state and opens a PR with the changes — so it
-# works with branch protection (no direct push / no bypass needed). Review the
-# PR's images and merge.
+# Renders the localized store promo images for every locale × state and opens a PR
+# with the changes (so it works with branch protection — no direct push needed;
+# review the PR's images and merge). Runs on demand (Actions tab → "Generate promo
+# images" → Run workflow) and automatically after a successful release, so the
+# store assets are regenerated to match what was just published.
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build release packages"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -14,6 +17,11 @@ permissions:
 
 jobs:
   promo:
+    # Manual runs always; auto-runs only after a release-triggered build succeeded.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'release') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
