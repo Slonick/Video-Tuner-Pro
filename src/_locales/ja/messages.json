@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "言語" },
   "langSystem": { "message": "システム" },
   "optPresetsTitle": { "message": "速度プリセット" },
-  "optPresetsDesc": { "message": "ポップアップのグリッドと Shift+1–8 ショートカットの背後にある8つの値（25–300%）。" },
+  "optPresetsDesc": { "message": "ポップアップのグリッドの値です。追加・削除でき、それぞれにショートカットを割り当て、最大4つをピン留めして折りたたみ時のポップアップに表示できます。" },
   "optResetDefaults": { "message": "初期設定に戻す" },
   "optCompPresetsTitle": { "message": "コンプレッサーのプリセット" },
   "optCompPresetsDesc": { "message": "オーディオコンプレッサーのワンタップ・プロファイルを調整します。名前を変更し、値を変更できます（メイクアップゲインは手動のままです）。" },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "サイトとチャンネルごとに保存した許容ライブ同期遅延。" },
   "catAudioDesc": { "message": "コンプレッサーのオン／オフ、プリセットとレベル。" },
   "catShortcutsDesc": { "message": "遅く・速く・リセット用のカスタムキー。" },
-  "catGeneralDesc": { "message": "テーマ、言語、動画上のバッジなどの設定。" }
+  "catGeneralDesc": { "message": "テーマ、言語、動画上のバッジなどの設定。" },
+  "optKeyToggle": { "message": "速度 ⇄ 1× を切り替え" },
+  "optKeyHold": { "message": "押している間だけ高速化" },
+  "optMaxSpeed": { "message": "最高速度" },
+  "optStepLabel": { "message": "速度ステップ" },
+  "optHoldSpeed": { "message": "ホールド速度" },
+  "optPresetKeyHint": { "message": "ショートカットを割り当て（Backspace で消去）" },
+  "optPresetPinHint": { "message": "折りたたみ時のクイック行にピン留め（最大4つ）" },
+  "optPresetAdd": { "message": "プリセットを追加" },
+  "optPresetRemove": { "message": "プリセットを削除" }
 }

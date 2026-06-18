@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "Мова" },
   "langSystem": { "message": "Системна" },
   "optPresetsTitle": { "message": "Пресети швидкості" },
-  "optPresetsDesc": { "message": "Вісім значень для сітки у спливному вікні та гарячих клавіш Shift+1–8 (25–300%)." },
+  "optPresetsDesc": { "message": "Значення для сітки в попапі. Додавайте чи видаляйте їх, призначайте клавіші та закріплюйте до чотирьох, щоб вони показувалися у згорнутому попапі." },
   "optResetDefaults": { "message": "Скинути до типових" },
   "optCompPresetsTitle": { "message": "Пресети компресора" },
   "optCompPresetsDesc": { "message": "Налаштуйте профілі компресора звуку в один дотик — перейменуйте їх і змініть значення (make-up gain лишається ручним)." },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "Допустиме відставання Live-sync, збережене для кожного сайту й каналу." },
   "catAudioDesc": { "message": "Компресор увімк./вимк., пресет і рівні." },
   "catShortcutsDesc": { "message": "Ваші клавіші для зменшення, збільшення та скидання." },
-  "catGeneralDesc": { "message": "Тема, мова, значок на відео та інші перемикачі." }
+  "catGeneralDesc": { "message": "Тема, мова, значок на відео та інші перемикачі." },
+  "optKeyToggle": { "message": "Перемикати швидкість ⇄ 1×" },
+  "optKeyHold": { "message": "Утримуйте для швидкого темпу" },
+  "optMaxSpeed": { "message": "Максимальна швидкість" },
+  "optStepLabel": { "message": "Крок швидкості" },
+  "optHoldSpeed": { "message": "Швидкість утримання" },
+  "optPresetKeyHint": { "message": "Призначити клавішу (Backspace — очистити)" },
+  "optPresetPinHint": { "message": "Закріпити у згорнутому швидкому ряду (до 4)" },
+  "optPresetAdd": { "message": "Додати пресет" },
+  "optPresetRemove": { "message": "Видалити пресет" }
 }

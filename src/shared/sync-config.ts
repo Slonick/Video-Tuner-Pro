@@ -20,6 +20,8 @@ export const KEY_CATEGORY: Record<string, Category> = {
   // Editable preset values + the configurable max-speed ceiling, the per-press
   // step size, and the hold-key's temporary speed.
   speedPresets: "speeds",
+  presetKeys: "speeds",
+  presetPins: "speeds",
   speedMax: "speeds",
   speedStep: "speeds",
   holdSpeed: "speeds",

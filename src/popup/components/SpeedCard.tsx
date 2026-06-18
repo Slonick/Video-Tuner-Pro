@@ -150,6 +150,8 @@ export function SpeedCard({ speed: s, domain }: Props) {
 
       <PresetGrid
         presets={s.presets}
+        presetKeys={s.presetKeys}
+        pinned={s.pinned}
         activePercent={percent}
         gridRef={gridRef}
         onPick={s.setSpeed}

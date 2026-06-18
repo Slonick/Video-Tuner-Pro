@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "भाषा" },
   "langSystem": { "message": "सिस्टम" },
   "optPresetsTitle": { "message": "गति प्रीसेट" },
-  "optPresetsDesc": { "message": "पॉपअप ग्रिड और Shift+1–8 शॉर्टकट के पीछे के आठ मान (25–300%)।" },
+  "optPresetsDesc": { "message": "पॉपअप ग्रिड के पीछे के मान। इन्हें जोड़ें या हटाएँ, हर एक को हॉटकी दें, और संक्षिप्त पॉपअप में दिखाने के लिए चार तक पिन करें।" },
   "optResetDefaults": { "message": "डिफ़ॉल्ट पर रीसेट करें" },
   "optCompPresetsTitle": { "message": "कंप्रेसर प्रीसेट" },
   "optCompPresetsDesc": { "message": "ऑडियो कंप्रेसर के वन-टैप प्रोफ़ाइल समायोजित करें — उनका नाम बदलें और मान बदलें (मेक-अप गेन मैनुअल रहता है)।" },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "अनुमत लाइव-सिंक देरी, हर साइट और चैनल के लिए सहेजी गई।" },
   "catAudioDesc": { "message": "कंप्रेसर चालू/बंद, प्रीसेट और स्तर।" },
   "catShortcutsDesc": { "message": "धीमा, तेज़ और रीसेट के लिए आपकी कस्टम कुंजियाँ।" },
-  "catGeneralDesc": { "message": "थीम, भाषा, वीडियो पर बैज और अन्य टॉगल।" }
+  "catGeneralDesc": { "message": "थीम, भाषा, वीडियो पर बैज और अन्य टॉगल।" },
+  "optKeyToggle": { "message": "गति ⇄ 1× टॉगल करें" },
+  "optKeyHold": { "message": "तेज़ गति के लिए दबाए रखें" },
+  "optMaxSpeed": { "message": "अधिकतम गति" },
+  "optStepLabel": { "message": "गति चरण" },
+  "optHoldSpeed": { "message": "होल्ड गति" },
+  "optPresetKeyHint": { "message": "हॉटकी असाइन करें (Backspace से साफ़ करें)" },
+  "optPresetPinHint": { "message": "संक्षिप्त त्वरित पंक्ति में पिन करें (4 तक)" },
+  "optPresetAdd": { "message": "प्रीसेट जोड़ें" },
+  "optPresetRemove": { "message": "प्रीसेट हटाएँ" }
 }

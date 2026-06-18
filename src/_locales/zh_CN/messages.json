@@ -77,7 +77,7 @@
   "optLangLabel": { "message": "语言" },
   "langSystem": { "message": "跟随系统" },
   "optPresetsTitle": { "message": "速度预设" },
-  "optPresetsDesc": { "message": "弹窗网格和 Shift+1–8 快捷键背后的八个数值 (25–300%)。" },
+  "optPresetsDesc": { "message": "弹窗网格背后的数值。可添加或删除，为每个分配快捷键，并固定最多四个以在折叠的弹窗中显示。" },
   "optResetDefaults": { "message": "恢复默认值" },
   "optCompPresetsTitle": { "message": "压缩器预设" },
   "optCompPresetsDesc": { "message": "调整音频压缩器的一键配置——可重命名并修改其数值（增益补偿仍为手动）。" },
@@ -111,5 +111,14 @@
   "catDelaysDesc": { "message": "允许的 Live-sync 延迟，按网站和频道分别保存。" },
   "catAudioDesc": { "message": "压缩器开关、预设和电平。" },
   "catShortcutsDesc": { "message": "你自定义的减速、加速和重置按键。" },
-  "catGeneralDesc": { "message": "主题、语言、视频上的徽章及其他开关。" }
+  "catGeneralDesc": { "message": "主题、语言、视频上的徽章及其他开关。" },
+  "optKeyToggle": { "message": "切换速度 ⇄ 1×" },
+  "optKeyHold": { "message": "按住以加速" },
+  "optMaxSpeed": { "message": "最高速度" },
+  "optStepLabel": { "message": "速度步长" },
+  "optHoldSpeed": { "message": "按住速度" },
+  "optPresetKeyHint": { "message": "分配快捷键（Backspace 清除）" },
+  "optPresetPinHint": { "message": "固定到折叠的快捷行（最多 4 个）" },
+  "optPresetAdd": { "message": "添加预设" },
+  "optPresetRemove": { "message": "删除预设" }
 }
