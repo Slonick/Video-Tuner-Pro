@@ -7,6 +7,7 @@ import { whenReady } from "../shared/store.js";
 import { initTheme } from "../shared/theme.js";
 import { General } from "./sections/General.js";
 import { Keys } from "./sections/Keys.js";
+import { SpeedPresets } from "./sections/SpeedPresets.js";
 import { Presets } from "./sections/Presets.js";
 import { Saved } from "./sections/Saved.js";
 import { Sync } from "./sections/Sync.js";
@@ -23,6 +24,7 @@ function Options() {
       </header>
       <General />
       <Keys />
+      <SpeedPresets />
       <Presets />
       <Saved />
       <Sync />

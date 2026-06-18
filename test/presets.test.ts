@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   normalizePresets,
+  normalizeSpeedMax,
   presetFractions,
   DEFAULT_PRESETS,
   PRESET_COUNT,
@@ -22,13 +23,14 @@ describe("normalizePresets", () => {
     expect(out).toHaveLength(PRESET_COUNT);
     expect([...out]).toEqual([...out].sort((a, b) => a - b));
   });
-  it("clamps to the slider range and snaps to the 5% step", () => {
+  it("clamps to the allowed range and snaps to the 5% step", () => {
     const out = normalizePresets([5, 9999, 142, 143]);
     expect(Math.min(...out)).toBeGreaterThanOrEqual(25);
-    expect(Math.max(...out)).toBeLessThanOrEqual(300);
+    expect(Math.max(...out)).toBeLessThanOrEqual(1600);
     expect(out.every((v) => v % 5 === 0)).toBe(true);
     expect(out).toContain(140); // 142 → 140
     expect(out).toContain(145); // 143 → 145
+    expect(out).toContain(1600); // 9999 → 1600 (absolute ceiling)
   });
   it("fills missing slots from the defaults at that index", () => {
     const out = normalizePresets([60]); // only one provided
@@ -38,6 +40,19 @@ describe("normalizePresets", () => {
   it("presetFractions divides by 100", () => {
     expect(presetFractions([100, 200])).toContain(1);
     expect(presetFractions([100, 200])).toContain(2);
+  });
+});
+
+describe("normalizeSpeedMax", () => {
+  it("defaults to 500% for missing / invalid input", () => {
+    expect(normalizeSpeedMax(undefined)).toBe(500);
+    expect(normalizeSpeedMax("nope")).toBe(500);
+  });
+  it("clamps to [100, 1600] and snaps to the 25% step", () => {
+    expect(normalizeSpeedMax(10)).toBe(100); // below floor
+    expect(normalizeSpeedMax(99999)).toBe(1600); // above ceiling
+    expect(normalizeSpeedMax(400)).toBe(400);
+    expect(normalizeSpeedMax(513)).toBe(525); // 513 → nearest 25-step
   });
 });
 

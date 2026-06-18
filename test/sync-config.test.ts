@@ -20,11 +20,12 @@ describe("categoryOf", () => {
     expect(categoryOf("audioCompRatio")).toBe("audio");
     expect(categoryOf("keymap")).toBe("shortcuts");
     expect(categoryOf("theme")).toBe("general");
+    expect(categoryOf("speedPresets")).toBe("speeds");
+    expect(categoryOf("speedMax")).toBe("speeds");
   });
   it("falls back to general for unknown keys", () => {
     expect(categoryOf("somethingNew")).toBe("general");
     expect(categoryOf("badgePos")).toBe("general");
-    expect(categoryOf("speedPresets")).toBe("general"); // presets are no longer a category
   });
 });
 

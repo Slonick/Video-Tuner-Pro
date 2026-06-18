@@ -36,7 +36,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
     const readout = readoutRef.current;
     if (!slider || !readout) return;
     const percent = Math.round(s.speed.v * 100);
-    const target = Math.min(300, Math.max(25, percent));
+    const target = Math.min(s.speedMax, Math.max(25, percent));
     if (s.speed.animate) {
       const from = parseInt(readout.textContent || "", 10) || percent;
       tweenNumber(readout, from, percent, (v) => Math.round(v) + "%");
@@ -45,7 +45,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
       slider.value = String(target);
       readout.textContent = percent + "%";
     }
-  }, [s.speed]);
+  }, [s.speed, s.speedMax]);
 
   // Slider input previews continuously (debounced send); release applies at once.
   // Native listeners (not React's conflated onChange) keep input vs change distinct.
@@ -142,7 +142,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
         className="speed-slider"
         id="speedSlider"
         min="25"
-        max="300"
+        max={s.speedMax}
         step="5"
         defaultValue="100"
       />
