@@ -84,6 +84,23 @@ describe("popup preset quick row + extras (speed parity)", () => {
     expect(btns.some((b) => b.classList.contains("extra"))).toBe(false);
   });
 
+  it("sizes the grid columns to the visible count (no empty trailing cell)", async () => {
+    await mountApp({
+      settings: {
+        compPresets: ["A", "B", "C"].map((name) => P({ name, pin: false })),
+      },
+    });
+    const grid = document.querySelector<HTMLElement>(".preset-grid")!;
+    expect(grid.style.gridTemplateColumns).toBe("repeat(3, 1fr)"); // 3 presets → 3 columns
+  });
+
+  it("caps the grid at 4 columns when there are more than four", async () => {
+    const presets = Array.from({ length: 6 }, (_, i) => P({ name: `P${i}`, pin: i < 2 }));
+    await mountApp({ settings: { compPresets: presets } });
+    const grid = document.querySelector<HTMLElement>(".preset-grid")!;
+    expect(grid.style.gridTemplateColumns).toBe("repeat(4, 1fr)");
+  });
+
   it("applies the preset at its full-list index, not its visible position", async () => {
     await mountApp({
       settings: {

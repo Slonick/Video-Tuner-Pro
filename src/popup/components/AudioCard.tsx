@@ -165,7 +165,14 @@ export function AudioCard({ audio: a, translating }: Props) {
       </div>
 
       <div className="preset-block">
-        <div className="preset-grid" ref={presetGridRef}>
+        {/* Columns track the visible (quick) count so fewer than four presets fill
+            the width with no empty trailing cell; expanded, the extras wrap into
+            these same columns. */}
+        <div
+          className="preset-grid"
+          ref={presetGridRef}
+          style={{ gridTemplateColumns: `repeat(${quick.size}, 1fr)` }}
+        >
           {a.presets.map((p, i) => (
             <button
               key={i}
