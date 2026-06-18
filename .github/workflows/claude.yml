@@ -27,7 +27,7 @@ jobs:
       issues: write
       id-token: write # claude-code-action exchanges an OIDC token for its GitHub token
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
