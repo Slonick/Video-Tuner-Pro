@@ -3,16 +3,26 @@
 // under storage key "keymap". Pure + unit-tested; shared by the content listener
 // and the options-page editor.
 
-export type Action = "slower" | "faster" | "reset";
-export const ACTIONS: Action[] = ["slower", "faster", "reset"];
+export type Action = "slower" | "faster" | "reset" | "toggle" | "hold";
+export const ACTIONS: Action[] = ["slower", "faster", "reset", "toggle", "hold"];
 
 export interface Keymap {
   slower: string;
   faster: string;
   reset: string;
+  // Toggle between the last non-1× speed and 1× (a quick "back to normal").
+  toggle: string;
+  // Hold for a temporary speed (S.holdSpeed) while pressed; release restores it.
+  hold: string;
 }
 
-export const DEFAULT_KEYMAP: Keymap = { slower: "KeyA", faster: "KeyD", reset: "KeyR" };
+export const DEFAULT_KEYMAP: Keymap = {
+  slower: "KeyA",
+  faster: "KeyD",
+  reset: "KeyR",
+  toggle: "KeyS",
+  hold: "KeyF",
+};
 
 // A code is bindable if it's a plain letter/digit position — enough to avoid
 // capturing modifier-only or navigation keys while keeping the UI simple.

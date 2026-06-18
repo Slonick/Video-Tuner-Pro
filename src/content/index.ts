@@ -5,7 +5,7 @@ import { STORE, OUR_AREAS, whenReady } from "./platform/storage.js";
 import { clamp, clampTarget, clampNum } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { resolveSpeed, resolveSyncTarget } from "./core/resolve.js";
-import { presetFractions } from "../shared/presets.js";
+import { presetFractions, normalizeSpeedStep, normalizeHoldSpeed } from "../shared/presets.js";
 import { normalizeKeymap } from "../shared/keymap.js";
 import { S } from "./state.js";
 import { applyAll, reassertRate, resetAudios } from "./speed.js";
@@ -103,6 +103,8 @@ function loadSpeed() {
       "keyboard",
       "keymap",
       "speedPresets",
+      "speedStep",
+      "holdSpeed",
     ],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
@@ -120,6 +122,8 @@ function loadSpeed() {
       S.keyboardEnabled = result.keyboard !== false;
       S.keymap = normalizeKeymap(result.keymap);
       S.presets = presetFractions(result.speedPresets);
+      S.speedStep = normalizeSpeedStep(result.speedStep) / 100;
+      S.holdSpeed = normalizeHoldSpeed(result.holdSpeed) / 100;
       S.liveSyncEnabled = result.liveSync !== false;
       // Allowed delay resolves by scope: channel > site > global > 5s. The legacy
       // `liveSyncTarget` acts as the old global fallback.
@@ -303,6 +307,8 @@ api.storage.onChanged.addListener((changes, area) => {
   if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   if (changes.keymap) S.keymap = normalizeKeymap(changes.keymap.newValue);
   if (changes.speedPresets) S.presets = presetFractions(changes.speedPresets.newValue);
+  if (changes.speedStep) S.speedStep = normalizeSpeedStep(changes.speedStep.newValue) / 100;
+  if (changes.holdSpeed) S.holdSpeed = normalizeHoldSpeed(changes.holdSpeed.newValue) / 100;
   let audioChanged = false;
   if (changes.audioComp) {
     S.audioCompEnabled = !!changes.audioComp.newValue;

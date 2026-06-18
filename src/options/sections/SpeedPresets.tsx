@@ -1,19 +1,26 @@
-// Speed-preset editor: set the eight values behind the popup grid + Shift+1…8
-// hotkeys, and the configurable max-speed ceiling the slider exposes. Persisted
-// under "speedPresets" (integer percents) and "speedMax"; the popup + content
-// script read both. Mirrors the compressor preset editor's load/persist/reset.
+// Speed-preset editor: the eight values behind the popup grid + Shift+1…8
+// hotkeys, the configurable max-speed ceiling the slider exposes, the per-press
+// step size, and the hold-key's temporary speed. Persisted under "speedPresets"
+// (integer percents), "speedMax", "speedStep" and "holdSpeed"; the popup +
+// content script read them. Mirrors the compressor preset editor.
 import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
 import {
   normalizePresets,
   normalizeSpeedMax,
+  normalizeSpeedStep,
+  normalizeHoldSpeed,
   DEFAULT_PRESETS,
   PRESET_MIN,
   PRESET_MAX,
   SPEED_MAX_DEFAULT,
   SPEED_MAX_MIN,
   SPEED_MAX_STEP,
+  STEP_DEFAULT,
+  STEP_MIN,
+  STEP_MAX,
+  HOLD_SPEED_DEFAULT,
 } from "../../shared/presets.js";
 
 const snap = (v: number) => Math.round(v / 5) * 5;
@@ -21,16 +28,20 @@ const snap = (v: number) => Math.round(v / 5) * 5;
 export function SpeedPresets() {
   const [presets, setPresets] = useState<number[] | null>(null);
   const [speedMax, setSpeedMax] = useState<number>(SPEED_MAX_DEFAULT);
+  const [speedStep, setSpeedStep] = useState<number>(STEP_DEFAULT);
+  const [holdSpeed, setHoldSpeed] = useState<number>(HOLD_SPEED_DEFAULT);
   // Raw text per field so a value can be typed freely; the committed (clamped)
   // value lands on blur. Mirrors the compressor editor's name-input handling.
   const [fields, setFields] = useState<string[]>([]);
 
   useEffect(() => {
-    STORE.get(["speedPresets", "speedMax"], (r) => {
+    STORE.get(["speedPresets", "speedMax", "speedStep", "holdSpeed"], (r) => {
       const p = normalizePresets(r.speedPresets);
       setPresets(p);
       setFields(p.map(String));
       setSpeedMax(normalizeSpeedMax(r.speedMax));
+      setSpeedStep(normalizeSpeedStep(r.speedStep));
+      setHoldSpeed(normalizeHoldSpeed(r.holdSpeed));
     });
   }, []);
 
@@ -39,12 +50,26 @@ export function SpeedPresets() {
   const setMax = (raw: number) => {
     const next = normalizeSpeedMax(raw);
     setSpeedMax(next);
-    // Pull any preset above the new ceiling back into range so the grid + slider
-    // stay consistent.
+    // Pull any preset / hold speed above the new ceiling back into range so the
+    // grid + slider stay consistent.
     const clamped = presets.map((p) => Math.min(next, p));
+    const hold = Math.min(holdSpeed, next);
     setPresets(clamped);
     setFields(clamped.map(String));
-    STORE.set({ speedMax: next, speedPresets: clamped });
+    setHoldSpeed(hold);
+    STORE.set({ speedMax: next, speedPresets: clamped, holdSpeed: hold });
+  };
+
+  const setStep = (raw: number) => {
+    const v = normalizeSpeedStep(raw);
+    setSpeedStep(v);
+    STORE.set({ speedStep: v });
+  };
+
+  const setHold = (raw: number) => {
+    const v = Math.min(speedMax, normalizeHoldSpeed(raw));
+    setHoldSpeed(v);
+    STORE.set({ holdSpeed: v });
   };
 
   const commitField = (i: number) => {
@@ -65,7 +90,9 @@ export function SpeedPresets() {
     setPresets([...DEFAULT_PRESETS]);
     setFields(DEFAULT_PRESETS.map(String));
     setSpeedMax(SPEED_MAX_DEFAULT);
-    STORE.remove(["speedPresets", "speedMax"]);
+    setSpeedStep(STEP_DEFAULT);
+    setHoldSpeed(HOLD_SPEED_DEFAULT);
+    STORE.remove(["speedPresets", "speedMax", "speedStep", "holdSpeed"]);
   };
 
   return (
@@ -86,6 +113,38 @@ export function SpeedPresets() {
           step={SPEED_MAX_STEP}
           value={speedMax}
           onChange={(e) => setMax(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="opt-param">
+        <div className="opt-param-row">
+          <span>{msg("optStepLabel") || "Speed step"}</span>
+          <b className="opt-param-val">{speedStep}%</b>
+        </div>
+        <input
+          type="range"
+          className="opt-slider"
+          min={STEP_MIN}
+          max={STEP_MAX}
+          step={1}
+          value={speedStep}
+          onChange={(e) => setStep(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="opt-param">
+        <div className="opt-param-row">
+          <span>{msg("optHoldSpeed") || "Hold speed"}</span>
+          <b className="opt-param-val">{holdSpeed}%</b>
+        </div>
+        <input
+          type="range"
+          className="opt-slider"
+          min={PRESET_MIN}
+          max={speedMax}
+          step={5}
+          value={holdSpeed}
+          onChange={(e) => setHold(Number(e.target.value))}
         />
       </div>
 

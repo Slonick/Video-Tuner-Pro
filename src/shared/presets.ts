@@ -22,6 +22,17 @@ export const SPEED_MAX_DEFAULT = 500;
 export const SPEED_MAX_MIN = 100;
 export const SPEED_MAX_STEP = 25;
 
+// How much one slower/faster press (or popup ± tap) changes the speed, in
+// percent. Stored under "speedStep"; Shift doubles it. The popup + content
+// script divide by 100 to a fraction.
+export const STEP_DEFAULT = 5;
+export const STEP_MIN = 1;
+export const STEP_MAX = 50;
+
+// The temporary speed the "hold" key applies while pressed. Stored under
+// "holdSpeed" (integer percent); default 200% (2×).
+export const HOLD_SPEED_DEFAULT = 200;
+
 function clampPct(v: number, fallback: number): number {
   if (!Number.isFinite(v)) return fallback;
   const stepped = Math.round(v / STEP) * STEP;
@@ -34,6 +45,21 @@ export function normalizeSpeedMax(raw: unknown): number {
   if (!Number.isFinite(n)) return SPEED_MAX_DEFAULT;
   const stepped = Math.round(n / SPEED_MAX_STEP) * SPEED_MAX_STEP;
   return Math.min(PRESET_MAX, Math.max(SPEED_MAX_MIN, stepped));
+}
+
+// Coerce a stored speed-step value into the allowed range (default 5%).
+export function normalizeSpeedStep(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return STEP_DEFAULT;
+  return Math.min(STEP_MAX, Math.max(STEP_MIN, Math.round(n)));
+}
+
+// Coerce a stored hold-speed value into the preset range (default 200%, snap 5%).
+export function normalizeHoldSpeed(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return HOLD_SPEED_DEFAULT;
+  const stepped = Math.round(n / STEP) * STEP;
+  return Math.min(PRESET_MAX, Math.max(PRESET_MIN, stepped));
 }
 
 // Coerce stored/user input into exactly PRESET_COUNT clean, sorted percents.

@@ -18,6 +18,8 @@ const ROWS: Array<{ action: Action; labelKey: string }> = [
   { action: "slower", labelKey: "tipSlower" },
   { action: "faster", labelKey: "tipFaster" },
   { action: "reset", labelKey: "optKeyReset" },
+  { action: "toggle", labelKey: "optKeyToggle" },
+  { action: "hold", labelKey: "optKeyHold" },
 ];
 
 export function Keys() {

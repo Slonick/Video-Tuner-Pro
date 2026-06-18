@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   normalizePresets,
   normalizeSpeedMax,
+  normalizeSpeedStep,
+  normalizeHoldSpeed,
   presetFractions,
   DEFAULT_PRESETS,
   PRESET_COUNT,
@@ -56,6 +58,30 @@ describe("normalizeSpeedMax", () => {
   });
 });
 
+describe("normalizeSpeedStep", () => {
+  it("defaults to 5% for missing / invalid input", () => {
+    expect(normalizeSpeedStep(undefined)).toBe(5);
+    expect(normalizeSpeedStep("nope")).toBe(5);
+  });
+  it("clamps to [1, 50] and rounds to an integer", () => {
+    expect(normalizeSpeedStep(0)).toBe(1);
+    expect(normalizeSpeedStep(999)).toBe(50);
+    expect(normalizeSpeedStep(7.4)).toBe(7);
+  });
+});
+
+describe("normalizeHoldSpeed", () => {
+  it("defaults to 200% for missing / invalid input", () => {
+    expect(normalizeHoldSpeed(undefined)).toBe(200);
+    expect(normalizeHoldSpeed("nope")).toBe(200);
+  });
+  it("clamps to [25, 1600] and snaps to the 5% step", () => {
+    expect(normalizeHoldSpeed(10)).toBe(25);
+    expect(normalizeHoldSpeed(99999)).toBe(1600);
+    expect(normalizeHoldSpeed(143)).toBe(145);
+  });
+});
+
 describe("normalizeKeymap", () => {
   it("defaults missing/invalid bindings", () => {
     expect(normalizeKeymap(undefined)).toEqual(DEFAULT_KEYMAP);
@@ -63,6 +89,7 @@ describe("normalizeKeymap", () => {
   });
   it("accepts valid bindable codes", () => {
     expect(normalizeKeymap({ slower: "KeyJ", faster: "KeyK", reset: "Digit0" })).toEqual({
+      ...DEFAULT_KEYMAP,
       slower: "KeyJ",
       faster: "KeyK",
       reset: "Digit0",

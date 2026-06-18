@@ -5,7 +5,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { clamp } from "../core/clamp.js";
-import { normalizePresets, normalizeSpeedMax, SPEED_MAX_DEFAULT } from "../../shared/presets.js";
+import {
+  normalizePresets,
+  normalizeSpeedMax,
+  normalizeSpeedStep,
+  SPEED_MAX_DEFAULT,
+  STEP_DEFAULT,
+} from "../../shared/presets.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
 import { useScopeSelection } from "./useScopeSelection.js";
@@ -28,6 +34,7 @@ export interface UseSpeed {
   speed: SpeedValue;
   presets: number[]; // editable percents, sorted (the grid + Shift+N hotkeys)
   speedMax: number; // configurable upper bound for the slider (percent)
+  speedStep: number; // per ± tap / keyboard step, as a fraction (e.g. 0.05)
   live: boolean;
   channel: string | null;
   channelName: string;
@@ -61,6 +68,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   const [speed, setSpeedState] = useState<SpeedValue>({ v: 1, animate: false });
   const [presets, setPresets] = useState<number[]>(() => normalizePresets(undefined));
   const [speedMax, setSpeedMax] = useState<number>(SPEED_MAX_DEFAULT);
+  const [speedStep, setSpeedStep] = useState<number>(STEP_DEFAULT / 100);
   const [live, setLive] = useState(false);
   // Synchronous mirror so back-to-back nudges / a save right after one see the
   // latest value (no re-render between them).
@@ -183,9 +191,10 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   // Initial load: editable presets, then the page's resolved speed (or storage).
   useEffect(() => {
     if (!tab) return;
-    STORE.get(["speedPresets", "speedMax"], (r) => {
+    STORE.get(["speedPresets", "speedMax", "speedStep"], (r) => {
       setPresets(normalizePresets(r.speedPresets));
       setSpeedMax(normalizeSpeedMax(r.speedMax));
+      setSpeedStep(normalizeSpeedStep(r.speedStep) / 100);
     });
     let resolved = false;
     if (hasTab) {
@@ -237,6 +246,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     speed,
     presets,
     speedMax,
+    speedStep,
     live,
     channel: sc.channel,
     channelName: sc.channelName,
