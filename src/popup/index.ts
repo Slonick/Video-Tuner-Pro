@@ -14,6 +14,9 @@ initTheme();
 localize();
 byId("extVersion").textContent = "v" + api.runtime.getManifest().version;
 
+// Gear button → open the full settings (options) page in a tab.
+byId("openOptions").addEventListener("click", () => api.runtime.openOptionsPage());
+
 // Wait for the selective-sync config so each setting is read from the area it
 // actually lives in (an opted-out category is in local, not sync), then apply the
 // saved language before building anything that renders localized text.
