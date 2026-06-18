@@ -16,16 +16,30 @@ import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
+import {
+  collectVideos,
+  beginTracking,
+  stopTracking,
+  reconcile,
+  ingestMutations,
+} from "./videos.js";
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
 import { currentChannel, channelKeys } from "./channel.js";
 
-let liveTick: ReturnType<typeof setInterval> | null = null;
+let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
 let lastChannel: string | null = null; // re-resolve speed when the YouTube channel changes
+
+// Background-tick cadence: 1s while the page has a video, backing off toward 5s on
+// pages with none so idle tabs stop walking the DOM every second. Media events and
+// the tab regaining focus snap it back to TICK_MIN.
+const TICK_MIN = 1000;
+const TICK_MAX = 5000;
+let tickInterval = TICK_MIN;
 
 // After an extension reload this script is re-injected into the already-open tab
 // (see background/index.ts). A previous instance may have left its on-video badge
@@ -38,21 +52,28 @@ try {
   /* ignore */
 }
 
-// The extension context dies on reload/update; shut down cleanly when it does.
-// Exported so live.js can call it without a circular value dependency.
-export function teardown() {
-  if (liveTick) {
-    clearInterval(liveTick);
+// Stop every recurring timer (background tick + graph samplers). Used both on
+// teardown and when the tab goes to the background.
+function stopTimers() {
+  if (liveTick != null) {
+    clearTimeout(liveTick);
     liveTick = null;
   }
-  if (audioSampler) {
+  if (audioSampler != null) {
     clearInterval(audioSampler);
     audioSampler = null;
   }
-  if (bufferSampler) {
+  if (bufferSampler != null) {
     clearInterval(bufferSampler);
     bufferSampler = null;
   }
+}
+
+// The extension context dies on reload/update; shut down cleanly when it does.
+// Exported so live.js can call it without a circular value dependency.
+export function teardown() {
+  stopTimers();
+  stopTracking();
   try {
     observer.disconnect();
   } catch (e) {
@@ -171,23 +192,61 @@ function reresolve() {
 whenReady(loadSpeed);
 
 // Steady background tick: re-apply speed (catches videos created inside shadow
-// roots, where document mutations don't fire) and drive live-sync.
-liveTick = setInterval(() => {
+// roots, where document mutations don't fire) and drive live-sync. Self-reschedules
+// so the cadence can back off on pages with no media.
+function tick() {
   if (!ctxValid()) {
     teardown();
     return;
   } // orphaned after a reload — stop the dead instance
+  reconcile(); // pick up videos the incremental observer can't see (shadow DOM)
   applyAll();
   controlLive();
   updateTimeBadge();
   if (currentChannel() !== lastChannel) reresolve();
-}, 1000);
+  // Back off the cadence when the page has no video (collectVideos is cached —
+  // applyAll already walked the DOM this turn, so this is free). Any video keeps
+  // it at TICK_MIN; a media event or focus regain resets it via wake().
+  tickInterval = collectVideos().length ? TICK_MIN : Math.min(TICK_MAX, tickInterval * 2);
+  liveTick = setTimeout(tick, tickInterval);
+}
 
-// Background graph samplers (pre-fill the popup's audio/latency graphs). The
-// sample bodies live in their modules (unit-tested); only the scheduling lives
-// here, in the browser-wired entry point.
-audioSampler = setInterval(recordAudioSample, A_HIST_MS);
-bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
+// Start the recurring timers (background tick + graph samplers). `immediate` ticks
+// right away to catch up after the tab regains focus. Background graph samplers
+// pre-fill the popup's audio/latency graphs; their sample bodies live in their
+// modules (unit-tested), only the scheduling lives here in the browser-wired entry.
+function startTimers(immediate = false) {
+  if (liveTick == null) liveTick = setTimeout(tick, immediate ? 0 : tickInterval);
+  if (audioSampler == null) audioSampler = setInterval(recordAudioSample, A_HIST_MS);
+  if (bufferSampler == null) bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
+}
+
+// A media event or the tab regaining focus: drop back to the fast cadence and
+// re-tick promptly instead of waiting out a backed-off interval. No-op while
+// hidden (timers stopped) — visibilitychange restarts them.
+function wake() {
+  tickInterval = TICK_MIN;
+  if (liveTick != null) {
+    clearTimeout(liveTick);
+    liveTick = setTimeout(tick, 0);
+  }
+}
+
+// Don't burn CPU on hidden tabs: stop the timers in the background, restart (and
+// immediately catch up) when the tab is shown again.
+document.addEventListener("visibilitychange", () => {
+  if (!ctxValid()) {
+    teardown();
+    return;
+  }
+  if (document.hidden) stopTimers();
+  else {
+    tickInterval = TICK_MIN;
+    startTimers(true);
+  }
+});
+
+if (!document.hidden) startTimers();
 
 // Apply the speed the moment ANY video starts up — a second player added to the
 // page would otherwise wait for the next tick/mutation pass and could begin at
@@ -198,6 +257,7 @@ for (const ev of ["play", "loadedmetadata"]) {
     (e) => {
       if (!(e.target instanceof HTMLMediaElement)) return;
       if (!ctxValid()) return;
+      wake(); // media showed up — reset any no-video backoff to the fast cadence
       applyAll();
       controlLive();
       // Surface the badge whenever playback starts (covers autoplay pages where
@@ -230,14 +290,16 @@ document.addEventListener(
   true,
 );
 
-// Watch for videos added later (SPA navigation, lazy players). Chat-heavy pages
-// mutate constantly, so coalesce a burst into a single rAF pass — and never re-run
-// for our own indicator writes.
+// Watch for videos added later (SPA navigation, lazy players). Each burst updates
+// the tracked-media set incrementally (ingestMutations — bounded by what changed,
+// not the whole DOM) and coalesces a single rAF re-apply. Our own indicator writes
+// never re-trigger the re-apply.
 const observer = new MutationObserver((mutations) => {
   if (!ctxValid()) {
     teardown();
     return;
   }
+  ingestMutations(mutations);
   if (observerScheduled) return;
   if (mutations.every((m) => ownsBadgeNode(m.target))) return;
   observerScheduled = true;
@@ -249,6 +311,7 @@ const observer = new MutationObserver((mutations) => {
 });
 function startObserver() {
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  beginTracking(); // trust the incremental set from here on; seed it with what's present
 }
 if (document.documentElement) {
   startObserver();

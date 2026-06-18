@@ -47,10 +47,13 @@ export function audioLevels(): AudioLevels {
 // setInterval at the entry point) leaves this unit-testable.
 export function recordAudioSample(): void {
   if (!ctxValid()) return;
+  // No running AudioContext means no media has been routed yet — skip the
+  // full-document walk that primaryVideo() does until there's actually a graph.
+  const ctx = audioContext();
+  if (!ctx || ctx.state !== "running") return;
   const v = primaryVideo();
   const g = v ? audioGraphs.get(v) : null;
-  const ctx = audioContext();
-  if (!g || !g.analyserIn || !ctx || ctx.state !== "running") return;
+  if (!g || !g.analyserIn) return;
   const inDb = analyserDb(g.analyserIn);
   audioLevelHist.push({ in: inDb, out: audioOutDb(g, inDb) });
   while (audioLevelHist.length > A_HIST_MAX) audioLevelHist.shift();
