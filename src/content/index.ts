@@ -16,13 +16,7 @@ import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
-import {
-  collectVideos,
-  beginTracking,
-  stopTracking,
-  reconcile,
-  ingestMutations,
-} from "./videos.js";
+import { collectVideos, startTracking, stopTracking, reconcile } from "./videos.js";
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
@@ -40,6 +34,12 @@ let lastChannel: string | null = null; // re-resolve speed when the YouTube chan
 const TICK_MIN = 1000;
 const TICK_MAX = 5000;
 let tickInterval = TICK_MIN;
+
+// reconcile() is a full shadow-piercing walk; the observer already tracks media
+// incrementally, so this only needs to run as a rare backstop (the one case the
+// observer can't see: a shadow root attached to an already-present element).
+const RECONCILE_MS = 8000;
+let lastReconcileAt = 0;
 
 // After an extension reload this script is re-injected into the already-open tab
 // (see background/index.ts). A previous instance may have left its on-video badge
@@ -73,12 +73,7 @@ function stopTimers() {
 // Exported so live.js can call it without a circular value dependency.
 export function teardown() {
   stopTimers();
-  stopTracking();
-  try {
-    observer.disconnect();
-  } catch (e) {
-    /* ignore */
-  }
+  stopTracking(); // disconnects the media-registry observer
 }
 
 // Resolve the page's speed by priority: per-channel > per-site > global > 100%.
@@ -198,22 +193,26 @@ function reresolve() {
 // the area it actually lives in (an opted-out category is in local, not sync).
 whenReady(loadSpeed);
 
-// Steady background tick: re-apply speed (catches videos created inside shadow
-// roots, where document mutations don't fire) and drive live-sync. Self-reschedules
-// so the cadence can back off on pages with no media.
+// Steady background tick: re-assert speed and drive live-sync (a backstop — most
+// re-applies are now event-driven). Self-reschedules so the cadence can back off on
+// pages with no media. A full reconcile() runs only every RECONCILE_MS, not per tick.
 function tick() {
   if (!ctxValid()) {
     teardown();
     return;
   } // orphaned after a reload — stop the dead instance
-  reconcile(); // pick up videos the incremental observer can't see (shadow DOM)
+  const now = Date.now();
+  if (now - lastReconcileAt >= RECONCILE_MS) {
+    lastReconcileAt = now;
+    reconcile(); // rare backstop for shadow roots attached to pre-existing elements
+  }
   applyAll();
   controlLive();
   updateTimeBadge();
   if (currentChannel() !== lastChannel) reresolve();
-  // Back off the cadence when the page has no video (collectVideos is cached —
-  // applyAll already walked the DOM this turn, so this is free). Any video keeps
-  // it at TICK_MIN; a media event or focus regain resets it via wake().
+  // Back off the cadence when the page has no video (collectVideos reads the tracked
+  // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
+  // resets it via wake().
   tickInterval = collectVideos().length ? TICK_MIN : Math.min(TICK_MAX, tickInterval * 2);
   liveTick = setTimeout(tick, tickInterval);
 }
@@ -297,28 +296,34 @@ document.addEventListener(
   true,
 );
 
-// Watch for videos added later (SPA navigation, lazy players). Each burst updates
-// the tracked-media set incrementally (ingestMutations — bounded by what changed,
-// not the whole DOM) and coalesces a single rAF re-apply. Our own indicator writes
-// never re-trigger the re-apply.
-const observer = new MutationObserver((mutations) => {
-  if (!ctxValid()) {
-    teardown();
-    return;
-  }
-  ingestMutations(mutations);
+// Coalesce a re-apply into a single rAF pass — the registry calls this only when a
+// mutation actually added media (new/lazy player, SPA navigation), so chat/feed
+// churn no longer drives needless applyAll passes.
+function scheduleReapply() {
   if (observerScheduled) return;
-  if (mutations.every((m) => ownsBadgeNode(m.target))) return;
   observerScheduled = true;
   requestAnimationFrame(() => {
     observerScheduled = false;
+    if (!ctxValid()) {
+      teardown();
+      return;
+    }
     applyAll();
     controlLive();
   });
-});
+}
+
+// Watch for videos added later (SPA navigation, lazy players, in-shadow swaps). The
+// registry owns the MutationObserver: it maintains the tracked-media set
+// incrementally (bounded by what changed) and observes media-bearing shadow roots,
+// calling scheduleReapply only when media changed. ownsBadgeNode keeps our own badge
+// shadow root from being observed (its writes would otherwise feed back in).
 function startObserver() {
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  beginTracking(); // trust the incremental set from here on; seed it with what's present
+  startTracking({
+    onMediaChange: scheduleReapply,
+    onContextDead: teardown,
+    isOwnNode: ownsBadgeNode,
+  });
 }
 if (document.documentElement) {
   startObserver();
