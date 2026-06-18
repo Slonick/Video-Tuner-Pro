@@ -1,7 +1,8 @@
 # Contributing to Video Tuner Pro
 
 Thanks for taking the time to contribute! Video Tuner Pro is a cross-browser
-Manifest V3 extension written in strict TypeScript.
+Manifest V3 extension written in strict TypeScript, with the popup and options
+UI built in React.
 
 ## Getting started
 
@@ -20,11 +21,15 @@ Then load the unpacked extension in your browser:
 
 ## Before you open a PR
 
-These run on every PR and block the merge if they fail, so please run them first:
+CI runs these in order on every PR — `lint` → `unit` → `e2e` — and blocks the
+merge if any fail, so please run them first (a Claude code review runs last):
 
 ```sh
-npm run check      # TypeScript type-check (tsc --noEmit)
-npm test           # unit tests (Vitest)
+npm run format:check   # Prettier formatting   (npm run format to fix)
+npm run lint           # ESLint                (npm run lint:fix to fix)
+npm run check          # TypeScript type-check (tsc --noEmit)
+npm test               # unit tests (Vitest)
+npm run test:e2e       # end-to-end (Playwright) — builds, then drives real Chromium
 ```
 
 ## Pull requests
