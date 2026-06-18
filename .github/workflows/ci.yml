@@ -109,6 +109,15 @@ jobs:
 
       - run: npm ci
 
+      # Cache the downloaded browser binaries (~/.cache/ms-playwright). On a hit
+      # the install below skips the Chromium download and only re-runs the apt
+      # system deps. Keyed on the lockfile so a Playwright bump refetches.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install Playwright Chromium + system deps
         run: npx playwright install --with-deps chromium
 
