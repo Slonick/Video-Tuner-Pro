@@ -210,52 +210,54 @@ export function SpeedPresets() {
       <h2>{msg("optPresetsTitle") || "Speed presets"}</h2>
       <p className="card-desc">{msg("optPresetsDesc")}</p>
 
-      <div className="opt-param">
-        <div className="opt-param-row">
-          <span>{msg("optMaxSpeed") || "Maximum speed"}</span>
-          <b className="opt-param-val">{speedMax}%</b>
+      <div className="opt-params-grid">
+        <div className="opt-param">
+          <div className="opt-param-row">
+            <span>{msg("optMaxSpeed") || "Maximum speed"}</span>
+            <b className="opt-param-val">{speedMax}%</b>
+          </div>
+          <input
+            type="range"
+            className="opt-slider"
+            min={SPEED_MAX_MIN}
+            max={PRESET_MAX}
+            step={SPEED_MAX_STEP}
+            value={speedMax}
+            onChange={(e) => setMax(Number(e.target.value))}
+          />
         </div>
-        <input
-          type="range"
-          className="opt-slider"
-          min={SPEED_MAX_MIN}
-          max={PRESET_MAX}
-          step={SPEED_MAX_STEP}
-          value={speedMax}
-          onChange={(e) => setMax(Number(e.target.value))}
-        />
-      </div>
 
-      <div className="opt-param">
-        <div className="opt-param-row">
-          <span>{msg("optStepLabel") || "Speed step"}</span>
-          <b className="opt-param-val">{speedStep}%</b>
+        <div className="opt-param">
+          <div className="opt-param-row">
+            <span>{msg("optStepLabel") || "Speed step"}</span>
+            <b className="opt-param-val">{speedStep}%</b>
+          </div>
+          <input
+            type="range"
+            className="opt-slider"
+            min={STEP_MIN}
+            max={STEP_MAX}
+            step={1}
+            value={speedStep}
+            onChange={(e) => setStep(Number(e.target.value))}
+          />
         </div>
-        <input
-          type="range"
-          className="opt-slider"
-          min={STEP_MIN}
-          max={STEP_MAX}
-          step={1}
-          value={speedStep}
-          onChange={(e) => setStep(Number(e.target.value))}
-        />
-      </div>
 
-      <div className="opt-param">
-        <div className="opt-param-row">
-          <span>{msg("optHoldSpeed") || "Hold speed"}</span>
-          <b className="opt-param-val">{holdSpeed}%</b>
+        <div className="opt-param">
+          <div className="opt-param-row">
+            <span>{msg("optHoldSpeed") || "Hold speed"}</span>
+            <b className="opt-param-val">{holdSpeed}%</b>
+          </div>
+          <input
+            type="range"
+            className="opt-slider"
+            min={PRESET_MIN}
+            max={speedMax}
+            step={5}
+            value={holdSpeed}
+            onChange={(e) => setHold(Number(e.target.value))}
+          />
         </div>
-        <input
-          type="range"
-          className="opt-slider"
-          min={PRESET_MIN}
-          max={speedMax}
-          step={5}
-          value={holdSpeed}
-          onChange={(e) => setHold(Number(e.target.value))}
-        />
       </div>
 
       <div className="preset-rows">

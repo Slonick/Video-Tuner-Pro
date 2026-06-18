@@ -6,12 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { clampNum } from "../core/clamp.js";
 import {
-  resolvePresets,
+  normalizeCompPresets,
   compToStorage,
   type CompParams,
-  type PresetName,
-  type ResolvedPreset,
-  type StoredPresets,
+  type CompPreset,
 } from "../../shared/comp-presets.js";
 
 const EQ = (a: number, b: number) => Math.abs(a - b) < 1e-6;
@@ -30,20 +28,18 @@ export interface UseAudioCompressor {
   setEnabled: (on: boolean) => void;
   comp: CompState;
   gain: number;
-  presets: Record<PresetName, ResolvedPreset>;
-  activePreset: PresetName | null;
+  presets: CompPreset[];
+  activePreset: number | null;
   setParam: (key: keyof CompParams, value: number) => void;
   setGain: (value: number) => void;
-  applyPreset: (name: PresetName) => void;
+  applyPreset: (index: number) => void;
 }
 
 export function useAudioCompressor(): UseAudioCompressor {
   const [enabled, setEnabledState] = useState(true);
   const [comp, setComp] = useState<CompState>({ values: DEFAULTS, animate: false });
   const [gain, setGainState] = useState(0);
-  const [presets, setPresets] = useState<Record<PresetName, ResolvedPreset>>(() =>
-    resolvePresets(undefined),
-  );
+  const [presets, setPresets] = useState<CompPreset[]>(() => normalizeCompPresets(undefined));
 
   const pending = useRef<Record<string, unknown>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -69,17 +65,43 @@ export function useAudioCompressor(): UseAudioCompressor {
     [saveAudio],
   );
 
+  // Which preset (if any) the current comp values match — lights its button.
+  // Gain is intentionally excluded from the match so editing a preset's gain
+  // doesn't deactivate it.
+  const activePreset = useMemo<number | null>(() => {
+    const v = comp.values;
+    const i = presets.findIndex(
+      (p) =>
+        EQ(v.threshold, p.threshold) &&
+        EQ(v.knee, p.knee) &&
+        EQ(v.ratio, p.ratio) &&
+        EQ(v.attack, p.attack) &&
+        EQ(v.release, p.release),
+    );
+    return i === -1 ? null : i;
+  }, [comp.values, presets]);
+
+  // The gain slider edits the active preset's own gain when it has one (persist
+  // into compPresets), otherwise the global make-up gain. Either way the live
+  // value (audioCompGain) is what the content script applies.
   const setGain = useCallback(
     (value: number) => {
       setGainState(value);
-      saveAudio({ audioCompGain: value });
+      if (activePreset != null && presets[activePreset]?.gain != null) {
+        const next = presets.map((p, j) => (j === activePreset ? { ...p, gain: value } : p));
+        setPresets(next);
+        saveAudio({ compPresets: next, audioCompGain: value });
+      } else {
+        saveAudio({ audioCompGain: value });
+      }
     },
-    [saveAudio],
+    [activePreset, presets, saveAudio],
   );
 
   const applyPreset = useCallback(
-    (name: PresetName) => {
-      const p = presets[name];
+    (index: number) => {
+      const p = presets[index];
+      if (!p) return;
       const values: CompParams = {
         threshold: p.threshold,
         knee: p.knee,
@@ -89,26 +111,17 @@ export function useAudioCompressor(): UseAudioCompressor {
       };
       setComp({ values, animate: true });
       setEnabledState(true);
-      saveAudio({ ...compToStorage(values), audioComp: true });
+      // A preset with its own gain sets the live gain too; one without leaves the
+      // current (global) gain untouched.
+      const extra: Record<string, unknown> = {};
+      if (p.gain != null) {
+        setGainState(p.gain);
+        extra.audioCompGain = p.gain;
+      }
+      saveAudio({ ...compToStorage(values), audioComp: true, ...extra });
     },
     [presets, saveAudio],
   );
-
-  // Which preset (if any) the current comp values match — lights its button.
-  const activePreset = useMemo<PresetName | null>(() => {
-    const v = comp.values;
-    const match = (Object.keys(presets) as PresetName[]).find((name) => {
-      const p = presets[name];
-      return (
-        EQ(v.threshold, p.threshold) &&
-        EQ(v.knee, p.knee) &&
-        EQ(v.ratio, p.ratio) &&
-        EQ(v.attack, p.attack) &&
-        EQ(v.release, p.release)
-      );
-    });
-    return match ?? null;
-  }, [comp.values, presets]);
 
   useEffect(() => {
     STORE.get(
@@ -136,9 +149,7 @@ export function useAudioCompressor(): UseAudioCompressor {
         setGainState(clampNum(r.audioCompGain, 0, 24, 0));
       },
     );
-    STORE.get(["compPresets"], (r) =>
-      setPresets(resolvePresets(r.compPresets as StoredPresets | undefined)),
-    );
+    STORE.get(["compPresets"], (r) => setPresets(normalizeCompPresets(r.compPresets)));
   }, []);
 
   return { enabled, setEnabled, comp, gain, presets, activePreset, setParam, setGain, applyPreset };

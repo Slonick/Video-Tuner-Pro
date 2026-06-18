@@ -1,17 +1,25 @@
-// Compressor preset editor: rename each one-tap profile and tune its values with
-// the same sliders as the popup. Persisted under "compPresets"; the popup reads
-// it to label + apply the buttons. Make-up gain is excluded. Mirrors presets.ts.
+// Compressor preset editor: a variable-length list (1…COMP_MAX_PRESETS) of
+// one-tap profiles. Each can be renamed, tuned with the same sliders as the
+// popup, given an optional make-up-gain override, pinned (pinned ones — up to
+// COMP_QUICK_COUNT — are the popup's buttons), removed, and new ones added.
+// Persisted under "compPresets" as a list; the global make-up gain lives under
+// "audioCompGain". The popup reads both to label, show, and apply the buttons.
 import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Switch } from "../../ui/Switch.js";
 import {
-  COMP_PRESET_DEFAULTS,
-  PRESET_ORDER,
-  resolvePresets,
+  COMP_MIN_PRESETS,
+  COMP_MAX_PRESETS,
+  COMP_QUICK_COUNT,
+  GAIN_MIN,
+  GAIN_MAX,
+  GAIN_STEP,
+  GAIN_DEFAULT,
+  coerceGain,
+  normalizeCompPresets,
   type CompParams,
-  type PresetName,
-  type ResolvedPreset,
-  type StoredPresets,
+  type CompPreset,
 } from "../../shared/comp-presets.js";
 
 const PARAMS: {
@@ -43,48 +51,89 @@ const PARAMS: {
   },
 ];
 
-const defaultName = (name: PresetName) =>
-  msg("preset" + name[0].toUpperCase() + name.slice(1)) || name;
+// Params a freshly-added preset starts from (the balanced "voice" defaults).
+const NEW_PRESET: CompParams = { threshold: -60, knee: 30, ratio: 10, attack: 0, release: 1 };
+
+// The label a preset falls back to when it has no custom name: its localized
+// default (the shipped three) or a generic "Preset N".
+const fallbackLabel = (p: CompPreset, i: number) =>
+  p.nameKey ? msg(p.nameKey) || "" : msg("optCompPresetName", String(i + 1)) || `Preset ${i + 1}`;
+
+// Pushpin glyph (monochrome, inherits color) for the pin toggle.
+const PinIcon = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+    <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+  </svg>
+);
 
 export function Presets() {
-  const [resolved, setResolved] = useState<Record<PresetName, ResolvedPreset> | null>(null);
-  // Raw, untrimmed text in each name field — so spaces can be typed freely; the
-  // persisted name is trim()|undefined (empty falls back to the localized default).
-  const [names, setNames] = useState<Record<PresetName, string>>({} as Record<PresetName, string>);
+  const [presets, setPresets] = useState<CompPreset[] | null>(null);
+  // Raw, untrimmed name text per row — so spaces type freely; the persisted name
+  // is trim()|undefined (empty falls back to the localized/generic default).
+  const [names, setNames] = useState<string[]>([]);
+  const [globalGain, setGlobalGain] = useState(GAIN_DEFAULT);
 
   useEffect(() => {
-    STORE.get(["compPresets"], (r) => {
-      const res = resolvePresets(r.compPresets as StoredPresets | undefined);
-      setResolved(res);
-      const n = {} as Record<PresetName, string>;
-      for (const k of PRESET_ORDER) n[k] = res[k].name ?? defaultName(k);
-      setNames(n);
+    STORE.get(["compPresets", "audioCompGain"], (r) => {
+      const list = normalizeCompPresets(r.compPresets);
+      setPresets(list);
+      setNames(list.map((p) => p.name ?? ""));
+      setGlobalGain(coerceGain(r.audioCompGain) ?? GAIN_DEFAULT);
     });
   }, []);
 
-  if (!resolved) return null;
+  if (!presets) return null;
 
-  const persist = (next: Record<PresetName, ResolvedPreset>) => {
-    setResolved(next);
+  const pinnedCount = presets.filter((p) => p.pin).length;
+
+  const persist = (next: CompPreset[]) => {
+    setPresets(next);
     STORE.set({ compPresets: next });
   };
 
-  const setName = (name: PresetName, raw: string) => {
-    setNames({ ...names, [name]: raw });
-    persist({ ...resolved, [name]: { ...resolved[name], name: raw.trim() || undefined } });
+  const setName = (i: number, raw: string) => {
+    setNames(names.map((n, j) => (j === i ? raw : n)));
+    persist(presets.map((p, j) => (j === i ? { ...p, name: raw.trim() || undefined } : p)));
   };
-  const setParam = (name: PresetName, key: keyof CompParams, v: number) => {
-    persist({ ...resolved, [name]: { ...resolved[name], [key]: v } });
+
+  const setParam = (i: number, key: keyof CompParams, v: number) => {
+    persist(presets.map((p, j) => (j === i ? { ...p, [key]: v } : p)));
   };
+
+  const setGlobal = (v: number) => {
+    setGlobalGain(v);
+    STORE.set({ audioCompGain: v });
+  };
+
+  // Toggle a preset's gain override on (seeded from the global gain) or off.
+  const togglePresetGain = (i: number, on: boolean) => {
+    persist(presets.map((p, j) => (j === i ? { ...p, gain: on ? globalGain : undefined } : p)));
+  };
+  const setPresetGain = (i: number, v: number) => {
+    persist(presets.map((p, j) => (j === i ? { ...p, gain: v } : p)));
+  };
+
+  const togglePin = (i: number) => {
+    if (!presets[i].pin && pinnedCount >= COMP_QUICK_COUNT) return; // only this many fit the popup
+    persist(presets.map((p, j) => (j === i ? { ...p, pin: !p.pin } : p)));
+  };
+
+  const addPreset = () => {
+    if (presets.length >= COMP_MAX_PRESETS) return;
+    setNames([...names, ""]);
+    persist([...presets, { ...NEW_PRESET, pin: false }]);
+  };
+
+  const removePreset = (i: number) => {
+    if (presets.length <= COMP_MIN_PRESETS) return;
+    setNames(names.filter((_, j) => j !== i));
+    persist(presets.filter((_, j) => j !== i));
+  };
+
   const resetDefaults = () => {
-    const next = {} as Record<PresetName, ResolvedPreset>;
-    const n = {} as Record<PresetName, string>;
-    for (const name of PRESET_ORDER) {
-      next[name] = { ...COMP_PRESET_DEFAULTS[name] };
-      n[name] = defaultName(name);
-    }
-    setResolved(next);
-    setNames(n);
+    const list = normalizeCompPresets(undefined);
+    setPresets(list);
+    setNames(list.map((p) => p.name ?? ""));
     STORE.remove(["compPresets"]);
   };
 
@@ -92,40 +141,104 @@ export function Presets() {
     <section className="card">
       <h2>{msg("optCompPresetsTitle") || "Compressor presets"}</h2>
       <p className="card-desc">{msg("optCompPresetsDesc")}</p>
-      <div id="presetEditors">
-        {PRESET_ORDER.map((name) => {
-          const cur = resolved[name];
-          return (
-            <div className="preset-editor" key={name}>
+
+      <div className="opt-param">
+        <div className="opt-param-row">
+          <span>{msg("optGlobalGain") || "Global gain"}</span>
+          <b className="opt-param-val">{globalGain} dB</b>
+        </div>
+        <input
+          type="range"
+          className="opt-slider"
+          min={GAIN_MIN}
+          max={GAIN_MAX}
+          step={GAIN_STEP}
+          value={globalGain}
+          onChange={(e) => setGlobal(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="comp-preset-grid" id="presetEditors">
+        {presets.map((cur, i) => (
+          <div className="preset-editor" key={i}>
+            <div className="preset-editor-head">
+              <button
+                type="button"
+                className={"preset-pin" + (cur.pin ? " is-pinned" : "")}
+                title={msg("optCompPresetPin") || "Show in the popup"}
+                aria-pressed={cur.pin}
+                disabled={!cur.pin && pinnedCount >= COMP_QUICK_COUNT}
+                onClick={() => togglePin(i)}
+              >
+                <PinIcon />
+              </button>
               <input
                 type="text"
                 className="preset-name-input"
                 maxLength={24}
-                value={names[name] ?? ""}
-                onChange={(e) => setName(name, e.target.value)}
+                placeholder={fallbackLabel(cur, i)}
+                value={names[i] ?? ""}
+                onChange={(e) => setName(i, e.target.value)}
               />
-              {PARAMS.map((p) => (
-                <div className="opt-param" key={p.key}>
-                  <div className="opt-param-row">
-                    <span>{msg(p.label)}</span>
-                    <b className="opt-param-val">{p.fmt(cur[p.key])}</b>
-                  </div>
-                  <input
-                    type="range"
-                    className="opt-slider"
-                    min={p.min}
-                    max={p.max}
-                    step={p.step}
-                    value={cur[p.key]}
-                    onChange={(e) => setParam(name, p.key, Number(e.target.value))}
-                  />
-                </div>
-              ))}
+              <button
+                type="button"
+                className="preset-remove"
+                title={msg("optPresetRemove") || "Remove preset"}
+                disabled={presets.length <= COMP_MIN_PRESETS}
+                onClick={() => removePreset(i)}
+              >
+                ✕
+              </button>
             </div>
-          );
-        })}
+            {PARAMS.map((p) => (
+              <div className="opt-param" key={p.key}>
+                <div className="opt-param-row">
+                  <span>{msg(p.label)}</span>
+                  <b className="opt-param-val">{p.fmt(cur[p.key])}</b>
+                </div>
+                <input
+                  type="range"
+                  className="opt-slider"
+                  min={p.min}
+                  max={p.max}
+                  step={p.step}
+                  value={cur[p.key]}
+                  onChange={(e) => setParam(i, p.key, Number(e.target.value))}
+                />
+              </div>
+            ))}
+            <div className="opt-param">
+              <div className="opt-param-row">
+                <span>{msg("audioGain") || "Make-up gain"}</span>
+                <span className="preset-gain-ctrl">
+                  {cur.gain != null && <b className="opt-param-val">{cur.gain} dB</b>}
+                  <Switch checked={cur.gain != null} onChange={(on) => togglePresetGain(i, on)} />
+                </span>
+              </div>
+              {cur.gain != null && (
+                <input
+                  type="range"
+                  className="opt-slider"
+                  min={GAIN_MIN}
+                  max={GAIN_MAX}
+                  step={GAIN_STEP}
+                  value={cur.gain}
+                  onChange={(e) => setPresetGain(i, Number(e.target.value))}
+                />
+              )}
+            </div>
+          </div>
+        ))}
       </div>
       <div className="card-actions">
+        <button
+          type="button"
+          className="btn-action btn-default"
+          disabled={presets.length >= COMP_MAX_PRESETS}
+          onClick={addPreset}
+        >
+          {msg("optPresetAdd") || "Add preset"}
+        </button>
         <button type="button" className="btn-action btn-reset" onClick={resetDefaults}>
           {msg("optResetDefaults") || "Reset to defaults"}
         </button>

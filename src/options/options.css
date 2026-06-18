@@ -11,8 +11,41 @@ body {
 }
 
 .wrap {
-  max-width: 640px;
+  max-width: 1200px;
   margin: 0 auto;
+}
+
+/* --- Dashboard grid ------------------------------------------------------- */
+/* Bootstrap-style 12-column responsive grid. Cards declare a span (.opt-col-6 /
+   -12); each row's columns stretch to equal height. Collapses to one column on
+   narrow viewports. */
+.opt-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+}
+
+.opt-col {
+  display: flex;
+}
+
+.opt-col > .card {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.opt-col-6 {
+  grid-column: span 6;
+}
+.opt-col-12 {
+  grid-column: span 12;
+}
+
+@media (max-width: 860px) {
+  .opt-col-6,
+  .opt-col-12 {
+    grid-column: span 12;
+  }
 }
 
 /* --- Header --------------------------------------------------------------- */
@@ -423,6 +456,19 @@ body {
 }
 
 /* --- Compressor preset editor --------------------------------------------- */
+/* The editors tile across the full-width card; the grid gap spaces them, so the
+   stacked-sibling margin is dropped inside it. */
+.comp-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.comp-preset-grid .preset-editor + .preset-editor {
+  margin-top: 0;
+}
+
 .preset-editor {
   padding: 14px;
   border: 1px solid var(--seg);
@@ -431,6 +477,27 @@ body {
   & + .preset-editor {
     margin-top: 12px;
   }
+}
+
+/* Name field flanked by the pin toggle (left) and remove (right). */
+.preset-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.preset-editor-head .preset-name-input {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* The make-up-gain value + its enable switch, right-aligned in the param row. */
+.preset-gain-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .preset-name-input {
@@ -453,6 +520,27 @@ body {
 
 .opt-param + .opt-param {
   margin-top: 10px;
+}
+
+/* Three speed sliders side by side on the full-width card; gap replaces the
+   stacked margin, so neutralise the adjacency rule inside the grid. */
+.opt-params-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 20px;
+}
+
+.opt-params-grid .opt-param + .opt-param {
+  margin-top: 0;
+}
+
+@media (max-width: 720px) {
+  .opt-params-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .opt-params-grid .opt-param + .opt-param {
+    margin-top: 10px;
+  }
 }
 
 .opt-param-row {
@@ -505,9 +593,21 @@ body {
 /* --- Speed preset editor -------------------------------------------------- */
 .preset-rows {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px 10px;
   margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .preset-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .preset-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .preset-row {

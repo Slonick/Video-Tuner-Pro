@@ -158,22 +158,27 @@
   }
 }
 
-/* Compressor presets — one-tap profile buttons at the top of the audio body. */
-.preset-row {
-  position: relative;
+/* Compressor presets — one-tap profiles with the same look + expand behaviour as
+   the speed presets: pinned ones form the collapsed quick row; the rest are
+   "extra", revealed (FLIP-animated) when the audio card opens. */
+.preset-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 3px;
   padding: 3px;
-  margin-bottom: 0;
   border: 1px solid var(--track);
   border-radius: 9px;
 }
 
-/* Filled cells with the pill riding above them — matches the scope picker. */
+.preset-grid .extra {
+  display: none;
+}
+.audio-section:has(.sync-body.open) .preset-grid .extra {
+  display: block;
+}
+
+/* Filled cells, the active one accent-filled — matches .btn-speed. */
 .btn-preset {
-  position: relative;
-  z-index: 1;
   padding: 6px 0;
   border: none;
   border-radius: 6px;
@@ -191,11 +196,8 @@
     background: var(--track);
   }
 
-  /* Lit (via the sliding pill) when the current values match this profile —
-       active goes transparent + above the pill so the label stays on top. */
   &.active {
-    z-index: 3;
-    background: transparent;
+    background: var(--accent);
     color: #fff;
     font-weight: 600;
   }
