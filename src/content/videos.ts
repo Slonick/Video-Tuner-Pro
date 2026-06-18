@@ -1,22 +1,23 @@
 export const seenVideos = new WeakSet<HTMLVideoElement>();
+export const seenAudios = new WeakSet<HTMLAudioElement>();
 
-// Collect every <video> on the page, piercing OPEN shadow roots. Some players
-// (e.g. Boosty) render the <video> inside a shadow DOM, where a plain
-// document.querySelectorAll("video") can't reach it.
-export function collectVideos(): HTMLVideoElement[] {
-  const acc: HTMLVideoElement[] = [];
-  const seen = new Set<HTMLVideoElement>();
+// Collect every element matching `selector`, piercing OPEN shadow roots. Some
+// players (e.g. Boosty) render the media inside a shadow DOM, where a plain
+// document.querySelectorAll() can't reach it.
+function collect<T extends Element>(selector: string): T[] {
+  const acc: T[] = [];
+  const seen = new Set<T>();
   const scan = (root: ParentNode): void => {
-    let vids: NodeListOf<HTMLVideoElement>;
+    let hits: NodeListOf<T>;
     try {
-      vids = root.querySelectorAll("video");
+      hits = root.querySelectorAll<T>(selector);
     } catch (e) {
       return;
     }
-    for (const v of vids) {
-      if (!seen.has(v)) {
-        seen.add(v);
-        acc.push(v);
+    for (const h of hits) {
+      if (!seen.has(h)) {
+        seen.add(h);
+        acc.push(h);
       }
     }
     let all: NodeListOf<Element>;
@@ -31,6 +32,15 @@ export function collectVideos(): HTMLVideoElement[] {
   };
   scan(document);
   return acc;
+}
+
+export function collectVideos(): HTMLVideoElement[] {
+  return collect<HTMLVideoElement>("video");
+}
+
+// Only walked when the opt-in "speed up audio" toggle is on — see applyAll.
+export function collectAudios(): HTMLAudioElement[] {
+  return collect<HTMLAudioElement>("audio");
 }
 
 // Largest playing video — what the overlay/badge anchors to.

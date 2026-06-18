@@ -14,6 +14,13 @@ export const S = {
   // the popup to preselect. Mirrors speedScope.
   targetScope: null as "channel" | "site" | "global" | null,
   liveSyncEnabled: false,
+  // Opt-in: also control the playback rate of bare <audio> elements (podcasts,
+  // SoundCloud, etc.), not just <video>.
+  audioSpeedEnabled: false,
+  // Opt-in "hard capture": swallow the page's own ratechange events so a site
+  // can't observe or undo our speed, then re-assert it. Off by default — it hides
+  // the rate from site players that legitimately reflect it in their UI.
+  forceRate: false,
   // Keyboard shortcuts (S/D/R/Z) for playback speed
   keyboardEnabled: true,
   // Editable speed presets, as playback-rate fractions, for the Shift+1…8 keys —
