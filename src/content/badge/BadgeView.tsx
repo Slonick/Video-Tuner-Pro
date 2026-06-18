@@ -30,18 +30,18 @@ const BADGE_STYLE: CSSProperties = {
   backdropFilter: "blur(3px)",
 };
 
-// Small dot left of the speed: its colour says whether the value that follows is
-// for a live stream (latency/buffer) or a regular video (remaining time). The
-// colour is set imperatively in overlay.ts; kept a non-<span> so the badge's text
-// stays the first/only <span> the tests and queries reach for.
+// Small red dot left of the speed, shown only on live streams (the value that
+// follows is latency/buffer); a regular video shows remaining time and no dot.
+// Visibility is toggled imperatively in overlay.ts; kept a non-<span> so the
+// badge's text stays the first/only <span> the tests and queries reach for.
 const DOT_STYLE: CSSProperties = {
-  display: "inline-block",
+  display: "none",
   width: "7px",
   height: "7px",
   borderRadius: "50%",
   marginRight: "6px",
   flexShrink: 0,
-  background: "#0a84ff",
+  background: "#ff453a",
 };
 
 const PIN_STYLE: CSSProperties = {

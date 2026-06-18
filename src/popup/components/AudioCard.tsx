@@ -2,9 +2,9 @@
 // row is a self-contained ParamSlider (owns its thumb tween). The audio canvas
 // (#audioMeter) is driven by useGraphs at the app level; `translating` (VOT active)
 // locks the card.
-import { useLayoutEffect, useRef } from "react";
+import { useRef } from "react";
 import { STORE } from "../platform/storage.js";
-import { movePill } from "../core/seg-pill.js";
+import { quickPresetIndices } from "../../shared/presets.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
 import { InfoTip } from "./InfoTip.js";
@@ -12,9 +12,10 @@ import { ParamSlider } from "./ParamSlider.js";
 import { WarnIcon, ChevronIcon } from "../icons.js";
 import { useExpand } from "../hooks/useExpand.js";
 import type { UseAudioCompressor } from "../hooks/useAudioCompressor.js";
-import { PRESET_ORDER, type CompParams, type PresetName } from "../../shared/comp-presets.js";
+import { type CompParams, type CompPreset } from "../../shared/comp-presets.js";
 
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+const presetLabel = (p: CompPreset, i: number) =>
+  p.name || (p.nameKey ? msg(p.nameKey) : msg("optCompPresetName", String(i + 1)));
 const dB = (n: number) => n + " dB";
 const ms = (n: number) => Math.round(n * 1000) + " ms";
 
@@ -95,12 +96,16 @@ interface Props {
 
 export function AudioCard({ audio: a, translating }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null);
-  const presetRowRef = useRef<HTMLDivElement>(null);
-  const { open, toggle, setOpen, bodyRef, onBodyTransitionEnd } = useExpand(sectionRef);
+  const presetGridRef = useRef<HTMLDivElement>(null);
+  const { open, toggle, setOpen, bodyRef, onBodyTransitionEnd } = useExpand(
+    sectionRef,
+    presetGridRef,
+  );
 
-  useLayoutEffect(() => {
-    movePill(presetRowRef.current);
-  }, [a.activePreset]);
+  // Same model as the speed presets: pinned presets (filled to 4 with the lowest
+  // unpinned) form the collapsed quick row; the rest are "extra", revealed when
+  // the card expands.
+  const quick = new Set(quickPresetIndices(a.presets.map((p) => p.pin)));
 
   const onToggle = (on: boolean) => {
     a.setEnabled(on);
@@ -113,7 +118,7 @@ export function AudioCard({ audio: a, translating }: Props) {
   };
 
   return (
-    <div ref={sectionRef} className={"sync-section" + (translating ? " audio-locked" : "")}>
+    <div ref={sectionRef} className={"sync-section audio-section" + (translating ? " audio-locked" : "")}>
       <div className="sec-head">
         <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
           <span className="sec-text">
@@ -157,17 +162,18 @@ export function AudioCard({ audio: a, translating }: Props) {
       </div>
 
       <div className="preset-block">
-        <div className="preset-row" ref={presetRowRef}>
-          <span className="seg-pill" aria-hidden="true"></span>
-          {PRESET_ORDER.map((name: PresetName) => (
+        <div className="preset-grid" ref={presetGridRef}>
+          {a.presets.map((p, i) => (
             <button
-              key={name}
+              key={i}
               type="button"
-              className={"btn-preset" + (a.activePreset === name ? " active" : "")}
-              data-preset={name}
-              onClick={() => a.applyPreset(name)}
+              className={
+                "btn-preset" + (quick.has(i) ? "" : " extra") + (a.activePreset === i ? " active" : "")
+              }
+              data-preset={i}
+              onClick={() => a.applyPreset(i)}
             >
-              {a.presets[name].name || msg("preset" + cap(name))}
+              {presetLabel(p, i)}
             </button>
           ))}
         </div>

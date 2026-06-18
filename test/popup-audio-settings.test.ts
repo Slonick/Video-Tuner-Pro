@@ -41,12 +41,64 @@ describe("compressor preset leaves make-up gain untouched", () => {
     await mountApp({});
     (byId("audioCompToggle") as HTMLInputElement).checked = false;
     (byId("acGain") as HTMLInputElement).value = "18";
-    document.querySelector<HTMLElement>('.btn-preset[data-preset="movie"]')!.click();
+    document.querySelector<HTMLElement>('.btn-preset[data-preset="2"]')!.click(); // Movie
     await flush();
     expect((byId("acThreshold") as HTMLInputElement).value).toBe("-28");
     expect((byId("acRatio") as HTMLInputElement).value).toBe("8");
     expect((byId("acGain") as HTMLInputElement).value).toBe("18"); // manual control preserved
     expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe("popup preset quick row + extras (speed parity)", () => {
+  const P = (over: Record<string, unknown>) => ({
+    threshold: -50,
+    knee: 20,
+    ratio: 5,
+    attack: 0,
+    release: 0.3,
+    ...over,
+  });
+
+  it("renders every preset; pins fill the quick row to 4, the rest are extra", async () => {
+    const presets = Array.from({ length: 6 }, (_, i) =>
+      P({ name: `P${i}`, pin: i === 0 || i === 5 }),
+    );
+    await mountApp({ settings: { compPresets: presets } });
+    const btns = [...document.querySelectorAll<HTMLElement>(".btn-preset")];
+    expect(btns).toHaveLength(6); // all presets present in the DOM
+    const extras = btns
+      .filter((b) => b.classList.contains("extra"))
+      .map((b) => b.getAttribute("data-preset"))
+      .sort();
+    // pinned {0,5} + the two lowest unpinned {1,2} fill the quick four → {3,4} extra.
+    expect(extras).toEqual(["3", "4"]);
+  });
+
+  it("marks no preset extra when there are 4 or fewer", async () => {
+    await mountApp({
+      settings: { compPresets: [P({ name: "A", pin: false }), P({ name: "B", pin: false })] },
+    });
+    const btns = [...document.querySelectorAll<HTMLElement>(".btn-preset")];
+    expect(btns).toHaveLength(2);
+    expect(btns.some((b) => b.classList.contains("extra"))).toBe(false);
+  });
+
+  it("applies the preset at its full-list index, not its visible position", async () => {
+    await mountApp({
+      settings: {
+        compPresets: [
+          P({ name: "A", pin: false }),
+          P({ name: "B", threshold: -22, ratio: 7, pin: true }),
+        ],
+      },
+    });
+    const b = document.querySelector<HTMLElement>('.btn-preset[data-preset="1"]')!;
+    expect(b.textContent).toBe("B");
+    b.click();
+    await flush();
+    expect((byId("acThreshold") as HTMLInputElement).value).toBe("-22");
+    expect((byId("acRatio") as HTMLInputElement).value).toBe("7");
   });
 });
 
@@ -90,5 +142,64 @@ describe("slider + toggle persistence", () => {
     (byId("audioCompToggle") as HTMLInputElement).click(); // on → off
     await flush();
     expect(saved().audioComp).toBe(false);
+  });
+});
+
+describe("compressor preset gain routing", () => {
+  const P = (over: Record<string, unknown>) => ({
+    threshold: -50,
+    knee: 20,
+    ratio: 5,
+    attack: 0,
+    release: 0.3,
+    ...over,
+  });
+  const click = (i: number) =>
+    document.querySelector<HTMLElement>(`.btn-preset[data-preset="${i}"]`)!.click();
+
+  it("applying a preset with its own gain sets the gain; one without leaves it", async () => {
+    await mountApp({
+      settings: {
+        audioCompGain: 3,
+        compPresets: [P({ name: "A", gain: 8, pin: true }), P({ name: "B", threshold: -22, pin: true })],
+      },
+    });
+    expect((byId("acGain") as HTMLInputElement).value).toBe("3"); // global to start
+    click(1); // B has no gain → unchanged
+    await flush();
+    expect((byId("acGain") as HTMLInputElement).value).toBe("3");
+    click(0); // A carries gain 8
+    await flush();
+    expect((byId("acGain") as HTMLInputElement).value).toBe("8");
+  });
+
+  it("the slider edits the active preset's own gain, not the global", async () => {
+    const { saved } = await mountApp({
+      settings: { compPresets: [P({ name: "A", threshold: -22, ratio: 7, gain: 6, pin: true })] },
+    });
+    click(0);
+    await flush();
+    const g = byId("acGain") as HTMLInputElement;
+    g.value = "10";
+    g.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(420);
+    const s = saved();
+    expect(s.audioCompGain).toBe(10); // applied live
+    expect((s.compPresets as Array<{ gain?: number }>)[0].gain).toBe(10); // persisted on the preset
+  });
+
+  it("the slider edits the global gain when the active preset has none", async () => {
+    const { saved } = await mountApp({
+      settings: { compPresets: [P({ name: "A", threshold: -22, ratio: 7, pin: true })] },
+    });
+    click(0);
+    await flush();
+    const g = byId("acGain") as HTMLInputElement;
+    g.value = "9";
+    g.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(420);
+    const s = saved();
+    expect(s.audioCompGain).toBe(9);
+    expect((s.compPresets as Array<{ gain?: number }>)[0].gain).toBeUndefined(); // preset untouched
   });
 });

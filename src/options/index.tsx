@@ -22,12 +22,26 @@ function Options() {
         </h1>
         <span className="opt-subtitle">{msg("optHeader") || "Settings"}</span>
       </header>
-      <General />
-      <Keys />
-      <SpeedPresets />
-      <Presets />
-      <Saved />
-      <Sync />
+      <div className="opt-grid">
+        <div className="opt-col opt-col-6">
+          <General />
+        </div>
+        <div className="opt-col opt-col-6">
+          <Keys />
+        </div>
+        <div className="opt-col opt-col-12">
+          <SpeedPresets />
+        </div>
+        <div className="opt-col opt-col-12">
+          <Presets />
+        </div>
+        <div className="opt-col opt-col-6">
+          <Sync />
+        </div>
+        <div className="opt-col opt-col-6">
+          <Saved />
+        </div>
+      </div>
     </main>
   );
 }

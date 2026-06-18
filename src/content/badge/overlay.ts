@@ -201,8 +201,9 @@ function renderBadge(v: HTMLVideoElement): void {
   const speed = v.playbackRate || S.currentSpeed || 1;
   const sp = Math.round(speed * 100) / 100;
   const stream = onStreamPage();
-  // Red dot = live stream (matches the toolbar's red icon), blue = a regular video.
-  if (badgeDotEl) badgeDotEl.style.background = stream ? "#ff453a" : "#0a84ff";
+  // Red dot marks a live stream (matches the toolbar's red icon); a regular video
+  // shows no dot at all.
+  if (badgeDotEl) badgeDotEl.style.display = stream ? "inline-block" : "none";
   if (stream) {
     // Live: remaining time is meaningless (no end). Show a single value — the
     // latency to the broadcaster where the site exposes it (Twitch/YouTube),
