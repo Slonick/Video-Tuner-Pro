@@ -45,6 +45,7 @@ const jsEntries = {
   "popup/popup": join(SRC, "popup/index.tsx"),
   "options/options": join(SRC, "options/index.tsx"),
   inject: join(SRC, "content/inject.ts"),   // MAIN-world Twitch/YouTube latency probe
+  "audio-inject": join(SRC, "content/audio-inject.ts"), // MAIN-world detached-<audio> rate bridge
 };
 
 // HTML/CSS page bundles: each <dir>/<name>.html links a bundled <name>.js/.css.
