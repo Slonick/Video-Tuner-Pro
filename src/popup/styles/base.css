@@ -70,3 +70,42 @@ body {
         }
     }
 }
+
+/* Settings (gear) + Ko-fi grouped at the top-right. */
+.header-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Gear button → opens the options page. Same muted/faint treatment as the Ko-fi
+   cup so the two sit together quietly. */
+.icon-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.12s;
+
+    & svg {
+        display: block;
+        width: 19px;
+        height: 19px;
+        pointer-events: none;
+    }
+
+    &:hover,
+    &:focus-visible {
+        opacity: 1;
+        outline: none;
+    }
+}
