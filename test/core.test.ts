@@ -24,13 +24,13 @@ describe("clamp", () => {
     expect(clampNum("x", 0, 10, 3)).toBe(3);
   });
   it("resolveTarget → per-site value, else legacy, else 5 (all clamped)", () => {
-    expect(resolveTarget({ "a.com": 10 }, "a.com")).toBe(10);   // per-site wins
+    expect(resolveTarget({ "a.com": 10 }, "a.com")).toBe(10); // per-site wins
     expect(resolveTarget({ "a.com": 10 }, "b.com", 8)).toBe(8); // unset domain → legacy
-    expect(resolveTarget({}, "a.com", 8)).toBe(8);              // empty map → legacy
-    expect(resolveTarget({}, "a.com")).toBe(5);                 // nothing → default
-    expect(resolveTarget(undefined, "a.com")).toBe(5);          // no map at all
-    expect(resolveTarget({ "a.com": 99 }, "a.com")).toBe(30);   // clamped to the cap
-    expect(resolveTarget({ "a.com": 0 }, "a.com")).toBe(1);     // clamped to the floor
+    expect(resolveTarget({}, "a.com", 8)).toBe(8); // empty map → legacy
+    expect(resolveTarget({}, "a.com")).toBe(5); // nothing → default
+    expect(resolveTarget(undefined, "a.com")).toBe(5); // no map at all
+    expect(resolveTarget({ "a.com": 99 }, "a.com")).toBe(30); // clamped to the cap
+    expect(resolveTarget({ "a.com": 0 }, "a.com")).toBe(1); // clamped to the floor
   });
 });
 
@@ -51,9 +51,15 @@ describe("normalizeHost (content == popup)", () => {
 
 describe("debounce", () => {
   it("fires once with the latest args after the delay", async () => {
-    let calls = 0, lastArg = 0;
-    const fn = debounce((n: number) => { calls++; lastArg = n; }, 20);
-    fn(1); fn(2); fn(3);
+    let calls = 0,
+      lastArg = 0;
+    const fn = debounce((n: number) => {
+      calls++;
+      lastArg = n;
+    }, 20);
+    fn(1);
+    fn(2);
+    fn(3);
     expect(calls).toBe(0);
     await new Promise((r) => setTimeout(r, 40));
     expect(calls).toBe(1);

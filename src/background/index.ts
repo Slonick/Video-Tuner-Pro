@@ -4,19 +4,19 @@
 //   • the icon's play triangle is white normally, red on a live stream
 //     (we swap between the white and red icon PNGs);
 //   • no video / navigation -> default icon, no badge.
-const api = (typeof browser !== "undefined") ? browser : chrome;
+const api = typeof browser !== "undefined" ? browser : chrome;
 
 const DEFAULT_ICON = {
   16: "icons/icon-16.png",
   32: "icons/icon-32.png",
   48: "icons/icon-48.png",
-  128: "icons/icon-128.png"
+  128: "icons/icon-128.png",
 };
 const RED_ICON = {
   16: "icons/icon-red-16.png",
   32: "icons/icon-red-32.png",
   48: "icons/icon-red-48.png",
-  128: "icons/icon-red-128.png"
+  128: "icons/icon-red-128.png",
 };
 
 // On Chrome MV3 these action APIs return a Promise that rejects asynchronously
@@ -26,7 +26,9 @@ function call(fn: () => unknown): void {
   try {
     const r = fn() as { catch?: (cb: () => void) => void } | undefined;
     if (r && typeof r.catch === "function") r.catch(() => {});
-  } catch (e) { /* tab gone */ }
+  } catch (e) {
+    /* tab gone */
+  }
 }
 
 function reset(tabId?: number): void {
@@ -37,7 +39,10 @@ function reset(tabId?: number): void {
 api.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.action !== "icon" || !sender.tab) return;
   const tabId = sender.tab.id;
-  if (msg.clear) { reset(tabId); return; }
+  if (msg.clear) {
+    reset(tabId);
+    return;
+  }
   call(() => api.action.setBadgeText({ text: msg.text || "", tabId }));
   call(() => api.action.setBadgeBackgroundColor({ color: "#0a84ff", tabId }));
   if (api.action.setBadgeTextColor) {
@@ -64,15 +69,19 @@ if (api.tabs && api.tabs.onUpdated) {
 // instance tears itself down on its next tick.)
 if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
   api.runtime.onInstalled.addListener(() => {
-    call(() => api.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
-      for (const tab of tabs || []) {
-        if (tab.id == null) continue;
-        call(() => api.scripting.executeScript({
-          target: { tabId: tab.id as number, allFrames: true },
-          files: ["content.js"],
-        }));
-      }
-    }));
+    call(() =>
+      api.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
+        for (const tab of tabs || []) {
+          if (tab.id == null) continue;
+          call(() =>
+            api.scripting.executeScript({
+              target: { tabId: tab.id as number, allFrames: true },
+              files: ["content.js"],
+            }),
+          );
+        }
+      }),
+    );
   });
 }
 
@@ -82,16 +91,13 @@ if (api.runtime && api.runtime.onInstalled && api.storage && api.storage.sync) {
   api.runtime.onInstalled.addListener(() => {
     api.storage.sync.get(["domains", "liveSync"], (s) => {
       if (s && (s.domains || s.liveSync != null)) return; // already synced
-      api.storage.local.get(
-        ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"],
-        (l) => {
-          const copy: Record<string, unknown> = {};
-          for (const k of ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"]) {
-            if (l[k] !== undefined) copy[k] = l[k];
-          }
-          if (Object.keys(copy).length) api.storage.sync.set(copy);
+      api.storage.local.get(["domains", "liveSync", "liveSyncTarget", "liveSyncMax"], (l) => {
+        const copy: Record<string, unknown> = {};
+        for (const k of ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"]) {
+          if (l[k] !== undefined) copy[k] = l[k];
         }
-      );
+        if (Object.keys(copy).length) api.storage.sync.set(copy);
+      });
     });
   });
 }

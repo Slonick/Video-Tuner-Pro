@@ -8,25 +8,25 @@
    padding, the expand chevron); only the live-locked state — manual controls
    disabled on a live stream — is specific to it. */
 .speed-section.locked {
-    /* Super theater still works on a YouTube live stream, so its row stays
+  /* Super theater still works on a YouTube live stream, so its row stays
        active; the speed-affecting controls and the (no-op on a stream) on-video
        / keyboard rows dim like the buttons. */
-    .speed-slider,
-    .buttons-grid,
-    .quick-actions,
-    .speed-quick .spin,
-    .speed-body .extra-row:not(#superTheaterRow) {
-        opacity: 0.4;
-        pointer-events: none;
-        filter: grayscale(0.3);
-    }
+  .speed-slider,
+  .buttons-grid,
+  .quick-actions,
+  .speed-quick .spin,
+  .speed-body .extra-row:not(#superTheaterRow) {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(0.3);
+  }
 }
 
 /* Off YouTube, Super theater does nothing either — so dim it with the rest. */
 .speed-section.locked:not(.is-youtube) .speed-body #superTheaterRow {
-    opacity: 0.4;
-    pointer-events: none;
-    filter: grayscale(0.3);
+  opacity: 0.4;
+  pointer-events: none;
+  filter: grayscale(0.3);
 }
 
 /* --- Header: domain title + a gray scope subtitle (just "Site", or — on a
@@ -34,128 +34,130 @@
    an ellipsis so a long host/channel never reflows the header. ------------- */
 .current-domain,
 #speedScope {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- Header: the quick −/value/+ cluster on the right -------------------- */
 .speed-quick {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Thin separator between the −/+ nudges and the ⟲ reset-to-saved button. */
 .speed-quick-div {
-    flex: 0 0 auto;
-    width: 1px;
-    height: 18px;
-    background: var(--track);
+  flex: 0 0 auto;
+  width: 1px;
+  height: 18px;
+  background: var(--track);
 }
 
 .speed-pct {
-    min-width: 44px;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    text-align: center;
+  min-width: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: center;
 }
 
 /* On a live stream the ⚠ sits to the right of the domain+channel block, centred
    across both lines (via .sec-main's align-items). The text column clips on its
    own, so a long domain or channel never crowds the badge out. */
 #liveWarn {
-    flex: 0 0 auto;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-left: 3px;
+
+  & svg {
     width: 18px;
     height: 18px;
-    margin-left: 3px;
-
-    & svg {
-        width: 18px;
-        height: 18px;
-    }
+  }
 }
 
 /* The live note is anchored to the header (so it spans the card width), and
    revealed when the ⚠ next to the domain is hovered or focused. */
 .tip.live-note {
-    left: 0;
-    right: 0;
-    top: calc(100% + 8px);
-    bottom: auto;
-    background: var(--warn-bg);
-    color: var(--warn-text);
-    border: 1px solid var(--warn-line);
-    transform: translateY(-4px);
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  bottom: auto;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border: 1px solid var(--warn-line);
+  transform: translateY(-4px);
 }
 .sec-head:has(#liveWarn:hover) .live-note,
 .sec-head:has(#liveWarn:focus-visible) .live-note {
-    opacity: 1;
-    transform: translateY(0);
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .spin {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border: none;
-    border-radius: 7px;
-    background: var(--seg);
-    color: var(--text);
-    cursor: pointer;
-    transition: background 0.12s, filter 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 7px;
+  background: var(--seg);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    filter 0.12s;
 
-    & svg {
-        width: 16px;
-        height: 16px;
-    }
+  & svg {
+    width: 16px;
+    height: 16px;
+  }
 
-    &:hover {
-        background: var(--track);
-    }
+  &:hover {
+    background: var(--track);
+  }
 
-    &:active {
-        filter: brightness(0.95);
-    }
+  &:active {
+    filter: brightness(0.95);
+  }
 }
 
 /* --- Slider -------------------------------------------------------------- */
 .speed-slider {
-    width: 100%;
-    height: 4px;
-    margin: 0 0 12px;
-    border-radius: 2px;
-    background: var(--track);
-    outline: none;
+  width: 100%;
+  height: 4px;
+  margin: 0 0 12px;
+  border-radius: 2px;
+  background: var(--track);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+
+  &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
 
-    &::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        cursor: pointer;
-        box-shadow: 0 1px 3px var(--shadow);
-    }
-
-    &::-moz-range-thumb {
-        width: 18px;
-        height: 18px;
-        border: none;
-        border-radius: 50%;
-        background: #fff;
-        cursor: pointer;
-        box-shadow: 0 1px 3px var(--shadow);
-    }
+  &::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
 }
 
 /* Tick marks on the SPEED slider only (25–300%, range 275): every 50% →
@@ -164,202 +166,223 @@
    centered) so the marks line up with the thumb at each value. A tick every
    50/275 = 18.1818% of that inner width, centred at 9.0909% (the 50% pos). */
 #speedSlider {
-    background-image: repeating-linear-gradient(to right,
-        transparent 0, transparent calc(9.0909% - 0.75px),
-        var(--muted) calc(9.0909% - 0.75px), var(--muted) calc(9.0909% + 0.75px),
-        transparent calc(9.0909% + 0.75px), transparent 18.1818%);
-    background-size: calc(100% - 18px) 100%;
-    background-position: center;
-    background-repeat: no-repeat;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(9.0909% - 0.75px),
+    var(--muted) calc(9.0909% - 0.75px),
+    var(--muted) calc(9.0909% + 0.75px),
+    transparent calc(9.0909% + 0.75px),
+    transparent 18.1818%
+  );
+  background-size: calc(100% - 18px) 100%;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* Tick marks on the buffer slider (1–30 s, range 29): every 5 s →
    5/10/15/20/25/30. A tick every 5/29 = 17.2414% of the thumb's travel, the
    first centred at (5−1)/29 = 13.7931% (the 5 s pos). */
 #syncTarget {
-    background-image: repeating-linear-gradient(to right,
-        transparent 0, transparent calc(13.7931% - 0.75px),
-        var(--muted) calc(13.7931% - 0.75px), var(--muted) calc(13.7931% + 0.75px),
-        transparent calc(13.7931% + 0.75px), transparent 17.2414%);
-    background-size: calc(100% - 18px) 100%;
-    background-position: center;
-    background-repeat: no-repeat;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(13.7931% - 0.75px),
+    var(--muted) calc(13.7931% - 0.75px),
+    var(--muted) calc(13.7931% + 0.75px),
+    transparent calc(13.7931% + 0.75px),
+    transparent 17.2414%
+  );
+  background-size: calc(100% - 18px) 100%;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* --- Preset buttons — active one filled with the accent. ----------------- */
 .buttons-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 3px;
-    padding: 3px;
-    margin-bottom: 8px;
-    border: 1px solid var(--track);
-    border-radius: 9px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 8px;
+  border: 1px solid var(--track);
+  border-radius: 9px;
 }
 
 /* Collapsed hides the extra presets so the four quick ones form a single row;
    expanding reveals all eight. The move/enter is animated in JS (FLIP), see
    flipPresetGrid in sections.ts. */
 .presetgrid .extra {
-    display: none;
+  display: none;
 }
 .speed-section:has(.speed-body.open) .presetgrid .extra {
-    display: block;
+  display: block;
 }
 
 /* Shift+N shortcut hint, in the button's corner. Only shown once the grid is
    expanded — collapsed, four presets are hidden and the numbering would gap. */
 .btn-speed[data-key]::before {
-    content: "⇧" attr(data-key);
-    position: absolute;
-    top: 0;
-    right: 0;
-    padding: 1px 4px;
-    /* Flush into the corner: top-right matches the button's 6px round, inner corner tucked. */
-    border-radius: 0 6px 0 4px;
-    font-size: 9px;
-    font-weight: 600;
-    line-height: 1.2;
-    /* Inactive button → badge wears the active (accent) look, and vice versa. */
-    background: var(--accent);
-    color: #fff;
-    /* Hidden by default; fades + grows out of the corner when shown (see below). */
-    opacity: 0;
-    transform: translateY(-2px) scale(0.8);
-    transform-origin: top right;
-    pointer-events: none;
-    transition: opacity 0.16s ease, transform 0.16s ease, background 0.12s, color 0.12s;
+  content: "⇧" attr(data-key);
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 1px 4px;
+  /* Flush into the corner: top-right matches the button's 6px round, inner corner tucked. */
+  border-radius: 0 6px 0 4px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+  /* Inactive button → badge wears the active (accent) look, and vice versa. */
+  background: var(--accent);
+  color: #fff;
+  /* Hidden by default; fades + grows out of the corner when shown (see below). */
+  opacity: 0;
+  transform: translateY(-2px) scale(0.8);
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    background 0.12s,
+    color 0.12s;
 }
 .btn-speed.active[data-key]::before {
-    background: var(--seg);
-    color: var(--text);
+  background: var(--seg);
+  color: var(--text);
 }
 .speed-section:has(.speed-body.open):has(#kbdToggle:checked) .btn-speed[data-key]::before {
-    opacity: 1;
-    transform: none;
+  opacity: 1;
+  transform: none;
 }
 /* Nudge the (centered) label left so the corner badge doesn't sit over it. */
 .speed-section:has(.speed-body.open):has(#kbdToggle:checked) .btn-speed[data-key] {
-    padding-right: 20px;
+  padding-right: 20px;
 }
 
 /* Slider, preset grid and Reset / Remember are always visible (change or save a
    speed without expanding); the collapsible body below holds only the toggles. */
 .speed-section > .speed-slider {
-    margin: 10px 0 8px;
+  margin: 10px 0 8px;
 }
 /* Extra gap below the actions only when the body is open — it separates them
    from the toggle rows. Collapsed, the bottom gap is just the card's 12px
    padding, uniform with the other cards. */
 .speed-section > .quick-actions {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 .speed-section:has(.speed-body.open) > .quick-actions {
-    margin-bottom: 12px;
+  margin-bottom: 12px;
 }
 
 .btn-speed {
-    position: relative;
-    padding: 6px 0;
-    border: none;
-    border-radius: 6px;
-    background: var(--seg);
-    color: var(--text);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s, filter 0.12s, padding 0.16s ease;
+  position: relative;
+  padding: 6px 0;
+  border: none;
+  border-radius: 6px;
+  background: var(--seg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    filter 0.12s,
+    padding 0.16s ease;
 
-    &:hover:not(.active) {
-        background: var(--track);
-    }
+  &:hover:not(.active) {
+    background: var(--track);
+  }
 
-    &.active {
-        background: var(--accent);
-        color: #fff;
-        font-weight: 600;
-
-        &:hover {
-            filter: brightness(1.05);
-        }
-    }
-}
-
-/* --- Quick actions: scope picker + Reset / Remember ---------------------- */
-.quick-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-/* The buffer scope is a labelled group box — "Save for" sits in the border
-   (native <legend>), framing the segmented control inside. */
-.scope-group {
-    margin: 0;               /* spacing comes from the surrounding flex gap */
-    padding: 7px 8px 8px;
-    border: 1px solid var(--track);
-    border-radius: 9px;
-    min-inline-size: auto;   /* override the fieldset default */
-}
-.scope-group legend {
-    padding: 0 5px;
-    margin-left: 2px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--muted);
-}
-/* The group box already frames it — drop the segmented control's own border. */
-.scope-group .scope-seg {
-    border: none;
-    padding: 0;
-}
-
-/* "Allowed delay" row: label on the left, a −/value/+ cluster on the right
-   (reusing .speed-quick / .spin from the speed header). */
-.sync-delay-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 8px;
-    font-size: 12px;
-    color: var(--text);
-}
-.sync-val {
-    min-width: 36px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-}
-
-.btn-action {
-    padding: 7px;
-    border: none;
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    /* background/color animate so the green "Saved" flash fades in and out. */
-    transition: background 0.2s, color 0.2s, filter 0.12s;
-}
-
-.btn-reset {
-    background: var(--seg);
-
-    &:hover {
-        filter: brightness(0.96);
-    }
-}
-
-.btn-default {
+  &.active {
     background: var(--accent);
     color: #fff;
     font-weight: 600;
 
     &:hover {
-        filter: brightness(1.05);
+      filter: brightness(1.05);
     }
+  }
+}
+
+/* --- Quick actions: scope picker + Reset / Remember ---------------------- */
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* The buffer scope is a labelled group box — "Save for" sits in the border
+   (native <legend>), framing the segmented control inside. */
+.scope-group {
+  margin: 0; /* spacing comes from the surrounding flex gap */
+  padding: 7px 8px 8px;
+  border: 1px solid var(--track);
+  border-radius: 9px;
+  min-inline-size: auto; /* override the fieldset default */
+}
+.scope-group legend {
+  padding: 0 5px;
+  margin-left: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+/* The group box already frames it — drop the segmented control's own border. */
+.scope-group .scope-seg {
+  border: none;
+  padding: 0;
+}
+
+/* "Allowed delay" row: label on the left, a −/value/+ cluster on the right
+   (reusing .speed-quick / .spin from the speed header). */
+.sync-delay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+.sync-val {
+  min-width: 36px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.btn-action {
+  padding: 7px;
+  border: none;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  /* background/color animate so the green "Saved" flash fades in and out. */
+  transition:
+    background 0.2s,
+    color 0.2s,
+    filter 0.12s;
+}
+
+.btn-reset {
+  background: var(--seg);
+
+  &:hover {
+    filter: brightness(0.96);
+  }
+}
+
+.btn-default {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+
+  &:hover {
+    filter: brightness(1.05);
+  }
 }
 
 /* Scope picker: Global / Site / Channel as a segmented control — a bordered
@@ -368,125 +391,132 @@
    only on a YouTube watch page (.has-channel, set by the popup); the row is then
    three columns. */
 .scope-seg {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3px;
-    padding: 3px;
-    border: 1px solid var(--track);
-    border-radius: 9px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--track);
+  border-radius: 9px;
 }
 .scope-seg.has-channel {
-    grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
 }
 /* Filled cells; the pill rides ABOVE them (z 2) so it stays visible while it
    slides, and the active cell sits ABOVE the pill (z 3) — transparent, so the
    pill shows through with the label on top. */
 .scope-opt {
-    position: relative;
-    z-index: 1;
-    padding: 6px 0;
-    border: none;
-    border-radius: 6px;
-    background: var(--seg);
-    color: var(--text);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s, filter 0.12s;
+  position: relative;
+  z-index: 1;
+  padding: 6px 0;
+  border: none;
+  border-radius: 6px;
+  background: var(--seg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    filter 0.12s;
 
-    &:hover:not(.active) {
-        background: var(--track);
-    }
+  &:hover:not(.active) {
+    background: var(--track);
+  }
 
-    &.active {
-        z-index: 3;
-        background: transparent;
-        color: #fff;
-        font-weight: 600;
-    }
+  &.active {
+    z-index: 3;
+    background: transparent;
+    color: #fff;
+    font-weight: 600;
+  }
 }
 
 /* Corner dot marking a scope whose slot holds a saved speed. Accent on a filled
    cell; white when active (it then sits on the accent pill). */
 .scope-opt.has-saved::after {
-    content: "";
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 .scope-opt.has-saved.active::after {
-    background: #fff;
+  background: #fff;
 }
 
 /* Sliding selection pill shared by the segmented groups (scope, audio presets):
    rides over the filled cells (z 2) and glides to the active cell. Positioned/
    sized in JS (movePill) by measuring the active button's box. */
 .seg-pill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    z-index: 2;
-    border-radius: 6px;
-    background: var(--accent);
-    opacity: 0;
-    pointer-events: none;
-    transition: transform 0.2s ease, width 0.2s ease, height 0.2s ease, opacity 0.15s;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  border-radius: 6px;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.2s ease,
+    width 0.2s ease,
+    height 0.2s ease,
+    opacity 0.15s;
 }
 @media (prefers-reduced-motion: reduce) {
-    .seg-pill {
-        transition: opacity 0.15s;
-    }
+  .seg-pill {
+    transition: opacity 0.15s;
+  }
 }
 .scope-channel {
-    display: none;
+  display: none;
 }
 .scope-seg.has-channel .scope-channel {
-    display: block;
+  display: block;
 }
 
 .action-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 /* Inline toggle: show speed + remaining time on the video. */
 .extra-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 12px;
-    font-size: 12px;
-    color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text);
 }
 
 /* A toggle row whose label carries an info (i) tooltip — group the label + icon
    and make the row the positioning context so the tip anchors to it. */
 .extra-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 #superTheaterRow {
-    position: relative;
+  position: relative;
 }
 
 /* The speed body is open by default, so trim its vertical chrome (the section's
    12px top margin / 16px bottom padding) to keep the popup from scrolling on
    open — Chrome caps popup height at ~600px. */
 .speed-body.sync-body.open {
-    margin-top: 8px;
-    padding-bottom: 8px;
+  margin-top: 8px;
+  padding-bottom: 8px;
 }
 .speed-body .extra-row {
-    margin-top: 8px;
+  margin-top: 8px;
 }
 
 /* Shortcut keycaps inside the Keyboard-shortcuts info tooltip. The tooltip
@@ -495,32 +525,32 @@
    Shift form — so the Shift chips line up under each other regardless of the
    (varying-width) labels in the first column. */
 .kbd-tip {
-    display: grid;
-    grid-template-columns: max-content max-content;
-    align-items: center;
-    justify-content: start;
-    gap: 7px 16px;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: center;
+  justify-content: start;
+  gap: 7px 16px;
 }
 .kbd-tip .kbd-g {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .kbd-tip .amt {
-    opacity: 0.8;
+  opacity: 0.8;
 }
 .kbd-tip kbd {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    border-radius: 4px;
-    background: rgba(128, 128, 128, 0.3);
-    color: inherit;
-    font-family: inherit;
-    font-size: 10px;
-    font-weight: 600;
-    line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.3);
+  color: inherit;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
 }

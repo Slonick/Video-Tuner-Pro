@@ -4,13 +4,20 @@ import { drawAudio } from "./audio-meter.js";
 import { drawBuffer } from "./latency-graph.js";
 import { startPoll } from "./poll.js";
 
-export function setupGraphs(): void {
+// Drive the audio + buffer canvases. `getTabId` supplies the tab to poll (the
+// popup resolves it asynchronously); `onTranslating` reports VOT state up to React
+// so the audio card can lock itself. Returns a teardown that stops the rAF + poll.
+export function setupGraphs(
+  getTabId: () => number | null,
+  onTranslating: (on: boolean) => void,
+): () => void {
   const aCanvas = document.getElementById("audioMeter") as HTMLCanvasElement | null;
   const bCanvas = document.getElementById("bufferMeter") as HTMLCanvasElement | null;
   const acx = aCanvas ? aCanvas.getContext("2d") : null;
   const bcx = bCanvas ? bCanvas.getContext("2d") : null;
-  if (!aCanvas || !acx || !bCanvas || !bcx) return;
+  if (!aCanvas || !acx || !bCanvas || !bcx) return () => {};
   const g = createGraphState(aCanvas, acx, bCanvas, bcx);
+  let raf = 0;
 
   function frame(): void {
     const t = now();
@@ -22,15 +29,20 @@ export function setupGraphs(): void {
       g.audioHist.push({ t, in: g.cur.in, out: g.cur.out });
       while (g.audioHist.length && t - g.audioHist[0].t > A_WINDOW + 200) g.audioHist.shift();
     } else if (g.audioHist.length) {
-      g.audioHist.length = 0; g.audioInShown = g.audioOutShown = null;
+      g.audioHist.length = 0;
+      g.audioInShown = g.audioOutShown = null;
     }
     // Same for the buffer: ease toward the latest poll reading and record a point
     // every frame, so the live (right) edge advances smoothly. The poll only fires
     // ~13×/s, which otherwise makes the leading edge step.
     if (g.bufLive && g.bufSmooth != null) {
       g.bufCur = g.bufCur == null ? g.bufSmooth : g.bufCur + (g.bufSmooth - g.bufCur) * 0.3;
-      g.bufCurAhead = g.bufAheadSmooth == null ? null
-        : g.bufCurAhead == null ? g.bufAheadSmooth : g.bufCurAhead + (g.bufAheadSmooth - g.bufCurAhead) * 0.3;
+      g.bufCurAhead =
+        g.bufAheadSmooth == null
+          ? null
+          : g.bufCurAhead == null
+            ? g.bufAheadSmooth
+            : g.bufCurAhead + (g.bufAheadSmooth - g.bufCurAhead) * 0.3;
       g.bufHist.push({ t, v: g.bufCur, a: g.bufCurAhead });
       while (g.bufHist.length && t - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
     } else {
@@ -38,9 +50,13 @@ export function setupGraphs(): void {
     }
     drawAudio(g, t);
     drawBuffer(g, t);
-    requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
   }
 
-  startPoll(g);
-  requestAnimationFrame(frame);
+  const stopPoll = startPoll(g, getTabId, onTranslating);
+  raf = requestAnimationFrame(frame);
+  return () => {
+    cancelAnimationFrame(raf);
+    stopPoll();
+  };
 }

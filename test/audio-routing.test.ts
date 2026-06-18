@@ -17,20 +17,51 @@ class FakeAudioContext {
   currentTime = 0;
   destination = {};
   throwOnSource = false;
-  constructor() { lastCtx = this; }
-  addEventListener() {}
-  resume() { return Promise.resolve(); }
-  createMediaElementSource() { if (this.throwOnSource) throw new Error("already captured"); return { connect() {} }; }
-  createDynamicsCompressor() {
-    return { threshold: new FakeParam(), knee: new FakeParam(), ratio: new FakeParam(),
-             attack: new FakeParam(), release: new FakeParam(), reduction: 0, connect() {} };
+  constructor() {
+    lastCtx = this;
   }
-  createGain() { return { gain: new FakeParam(), connect() {} }; }
-  createAnalyser() { return { fftSize: 0, smoothingTimeConstant: 0, connect() {}, getFloatTimeDomainData() {} }; }
+  addEventListener() {}
+  resume() {
+    return Promise.resolve();
+  }
+  createMediaElementSource() {
+    if (this.throwOnSource) throw new Error("already captured");
+    return { connect() {} };
+  }
+  createDynamicsCompressor() {
+    return {
+      threshold: new FakeParam(),
+      knee: new FakeParam(),
+      ratio: new FakeParam(),
+      attack: new FakeParam(),
+      release: new FakeParam(),
+      reduction: 0,
+      connect() {},
+    };
+  }
+  createGain() {
+    return { gain: new FakeParam(), connect() {} };
+  }
+  createAnalyser() {
+    return { fftSize: 0, smoothingTimeConstant: 0, connect() {}, getFloatTimeDomainData() {} };
+  }
 }
 
-type VidProps = Partial<{ srcObject: unknown; currentSrc: string; src: string; crossOrigin: string }>;
-const vid = (p: VidProps = {}) => ({ addEventListener() {}, srcObject: null, currentSrc: "", src: "", crossOrigin: null, ...p } as unknown as HTMLVideoElement);
+type VidProps = Partial<{
+  srcObject: unknown;
+  currentSrc: string;
+  src: string;
+  crossOrigin: string;
+}>;
+const vid = (p: VidProps = {}) =>
+  ({
+    addEventListener() {},
+    srcObject: null,
+    currentSrc: "",
+    src: "",
+    crossOrigin: null,
+    ...p,
+  }) as unknown as HTMLVideoElement;
 
 async function load() {
   vi.resetModules();
@@ -39,8 +70,13 @@ async function load() {
   return import("../src/content/audio/routing.js");
 }
 
-beforeEach(() => { lastCtx = null; document.body.innerHTML = ""; });
-afterEach(() => { delete (globalThis as unknown as { AudioContext?: unknown }).AudioContext; });
+beforeEach(() => {
+  lastCtx = null;
+  document.body.innerHTML = "";
+});
+afterEach(() => {
+  delete (globalThis as unknown as { AudioContext?: unknown }).AudioContext;
+});
 
 describe("setupGraph source gating (canRouteAudio)", () => {
   it("routes a MediaStream source (srcObject)", async () => {
@@ -66,7 +102,9 @@ describe("setupGraph source gating (canRouteAudio)", () => {
 
   it("routes a cross-origin source that opted in via crossorigin", async () => {
     const { setupGraph } = await load();
-    expect(setupGraph(vid({ src: "https://cdn.example.com/v.mp4", crossOrigin: "anonymous" }))).not.toBeNull();
+    expect(
+      setupGraph(vid({ src: "https://cdn.example.com/v.mp4", crossOrigin: "anonymous" })),
+    ).not.toBeNull();
   });
 
   it("skips a source-less video (src may still be loading)", async () => {
@@ -78,7 +116,9 @@ describe("setupGraph source gating (canRouteAudio)", () => {
   it("yields (skips) while a VOT translation is actively playing", async () => {
     const host = document.createElement("vot-shadow-host");
     const sr = host.attachShadow({ mode: "open" });
-    const b = document.createElement("button"); b.setAttribute("data-status", "success"); sr.appendChild(b);
+    const b = document.createElement("button");
+    b.setAttribute("data-status", "success");
+    sr.appendChild(b);
     document.body.appendChild(host);
     const { setupGraph, lastSkip } = await load();
     expect(setupGraph(vid({ srcObject: {} }))).toBeNull(); // even a safe source is left alone
@@ -97,7 +137,7 @@ describe("setupGraph context & exclusivity", () => {
 
   it("skips with 'suspended' when the context isn't running yet", async () => {
     const { setupGraph, lastSkip } = await load();
-    setupGraph(vid({ srcObject: {} }));   // creates the context
+    setupGraph(vid({ srcObject: {} })); // creates the context
     lastCtx!.state = "suspended";
     expect(setupGraph(vid({ srcObject: {} }))).toBeNull();
     expect(lastSkip()).toBe("suspended");
@@ -105,7 +145,7 @@ describe("setupGraph context & exclusivity", () => {
 
   it("bans a video whose element is already captured by another graph ('inuse')", async () => {
     const { setupGraph, lastSkip } = await load();
-    setupGraph(vid({ srcObject: {} }));   // creates the context
+    setupGraph(vid({ srcObject: {} })); // creates the context
     lastCtx!.throwOnSource = true;
     const v = vid({ srcObject: {} });
     expect(setupGraph(v)).toBeNull();

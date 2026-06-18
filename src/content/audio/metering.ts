@@ -18,7 +18,7 @@ function analyserDb(an: AnalyserNode): number {
 }
 
 function audioOutDb(g: AudioGraph, inDb: number): number {
-  const reduction = (g.comp && typeof g.comp.reduction === "number") ? g.comp.reduction : 0;
+  const reduction = g.comp && typeof g.comp.reduction === "number" ? g.comp.reduction : 0;
   return deriveOutDb(inDb, reduction);
 }
 
@@ -37,7 +37,7 @@ export function audioLevels(): AudioLevels {
     in: inDb,
     out: audioOutDb(g, inDb),
     threshold: S.audioCompThreshold,
-    translation: translationActive(),  // a voice-over translator is playing → compression is paused
+    translation: translationActive(), // a voice-over translator is playing → compression is paused
   };
 }
 

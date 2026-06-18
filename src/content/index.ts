@@ -17,30 +17,47 @@ import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
 import "./messaging.js"; // registers the popup message handler
-import "./keyboard.js";  // registers the keyboard-shortcut listener
-import "./theater.js";   // applies the YouTube "super theater" layout when enabled
+import "./keyboard.js"; // registers the keyboard-shortcut listener
+import "./theater.js"; // applies the YouTube "super theater" layout when enabled
 import { currentChannel, channelKeys } from "./channel.js";
 
 let liveTick: ReturnType<typeof setInterval> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
-let lastChannel: string | null = null;   // re-resolve speed when the YouTube channel changes
+let lastChannel: string | null = null; // re-resolve speed when the YouTube channel changes
 
 // After an extension reload this script is re-injected into the already-open tab
 // (see background/index.ts). A previous instance may have left its on-video badge
 // in the DOM — remove it so we don't end up with two. (Removing it is also a DOM
 // mutation, which makes the old instance's observer notice the dead context and
 // tear itself down.)
-try { document.querySelectorAll("[data-vtp-badge]").forEach((n) => n.remove()); } catch (e) { /* ignore */ }
+try {
+  document.querySelectorAll("[data-vtp-badge]").forEach((n) => n.remove());
+} catch (e) {
+  /* ignore */
+}
 
 // The extension context dies on reload/update; shut down cleanly when it does.
 // Exported so live.js can call it without a circular value dependency.
 export function teardown() {
-  if (liveTick) { clearInterval(liveTick); liveTick = null; }
-  if (audioSampler) { clearInterval(audioSampler); audioSampler = null; }
-  if (bufferSampler) { clearInterval(bufferSampler); bufferSampler = null; }
-  try { observer.disconnect(); } catch (e) { /* ignore */ }
+  if (liveTick) {
+    clearInterval(liveTick);
+    liveTick = null;
+  }
+  if (audioSampler) {
+    clearInterval(audioSampler);
+    audioSampler = null;
+  }
+  if (bufferSampler) {
+    clearInterval(bufferSampler);
+    bufferSampler = null;
+  }
+  try {
+    observer.disconnect();
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 // Resolve the page's speed by priority: per-channel > per-site > global > 100%.
@@ -61,11 +78,30 @@ function applyResolved(
 function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
-    ["domains", "channels", "globalSpeed", "liveSync", "liveSyncTarget", "syncTargets",
-     "syncTargetChannels", "syncTargetGlobal", "badgePos", "badgePinned",
-     "audioComp", "audioCompThreshold", "audioCompKnee", "audioCompRatio",
-     "audioCompAttack", "audioCompRelease", "audioCompGain", "showRemaining", "streamBadge",
-     "keyboard", "keymap", "speedPresets"],
+    [
+      "domains",
+      "channels",
+      "globalSpeed",
+      "liveSync",
+      "liveSyncTarget",
+      "syncTargets",
+      "syncTargetChannels",
+      "syncTargetGlobal",
+      "badgePos",
+      "badgePinned",
+      "audioComp",
+      "audioCompThreshold",
+      "audioCompKnee",
+      "audioCompRatio",
+      "audioCompAttack",
+      "audioCompRelease",
+      "audioCompGain",
+      "showRemaining",
+      "streamBadge",
+      "keyboard",
+      "keymap",
+      "speedPresets",
+    ],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
       const channels = (result.channels || {}) as Record<string, number>;
@@ -83,10 +119,12 @@ function loadSpeed() {
       // Allowed delay resolves by scope: channel > site > global > 5s. The legacy
       // `liveSyncTarget` acts as the old global fallback.
       const rt = resolveSyncTarget(
-        channelKeys(), getDomain(),
+        channelKeys(),
+        getDomain(),
         (result.syncTargets || {}) as Record<string, number>,
         (result.syncTargetChannels || {}) as Record<string, number>,
-        (result.syncTargetGlobal ?? result.liveSyncTarget) as number | undefined);
+        (result.syncTargetGlobal ?? result.liveSyncTarget) as number | undefined,
+      );
       S.targetScope = rt.scope;
       S.liveSyncTarget = clampTarget(rt.target);
       S.audioCompEnabled = result.audioComp !== false;
@@ -101,7 +139,7 @@ function loadSpeed() {
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
       updateTimeBadge();
-    }
+    },
   );
 }
 
@@ -114,12 +152,13 @@ function reresolve() {
     applyResolved(
       (r.domains || {}) as Record<string, number>,
       (r.channels || {}) as Record<string, number>,
-      r.globalSpeed as number | undefined);
+      r.globalSpeed as number | undefined,
+    );
     applyAll();
     controlLive();
     updateTimeBadge();
   });
-  applyResolvedTargetFromStore();   // the channel changed — its allowed-delay may differ
+  applyResolvedTargetFromStore(); // the channel changed — its allowed-delay may differ
 }
 
 // Wait for the selective-sync config so the first resolve reads each setting from
@@ -129,8 +168,13 @@ whenReady(loadSpeed);
 // Steady background tick: re-apply speed (catches videos created inside shadow
 // roots, where document mutations don't fire) and drive live-sync.
 liveTick = setInterval(() => {
-  if (!ctxValid()) { teardown(); return; }   // orphaned after a reload — stop the dead instance
-  applyAll(); controlLive(); updateTimeBadge();
+  if (!ctxValid()) {
+    teardown();
+    return;
+  } // orphaned after a reload — stop the dead instance
+  applyAll();
+  controlLive();
+  updateTimeBadge();
   if (currentChannel() !== lastChannel) reresolve();
 }, 1000);
 
@@ -144,19 +188,26 @@ bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
 // page would otherwise wait for the next tick/mutation pass and could begin at
 // 1×. Media events don't bubble, but a capture-phase listener still sees them.
 for (const ev of ["play", "loadedmetadata"]) {
-  document.addEventListener(ev, (e) => {
-    if (!(e.target instanceof HTMLVideoElement)) return;
-    if (!ctxValid()) return;
-    applyAll();
-    controlLive();
-  }, true);
+  document.addEventListener(
+    ev,
+    (e) => {
+      if (!(e.target instanceof HTMLVideoElement)) return;
+      if (!ctxValid()) return;
+      applyAll();
+      controlLive();
+    },
+    true,
+  );
 }
 
 // Watch for videos added later (SPA navigation, lazy players). Chat-heavy pages
 // mutate constantly, so coalesce a burst into a single rAF pass — and never re-run
 // for our own indicator writes.
 const observer = new MutationObserver((mutations) => {
-  if (!ctxValid()) { teardown(); return; }
+  if (!ctxValid()) {
+    teardown();
+    return;
+  }
   if (observerScheduled) return;
   if (mutations.every((m) => ownsBadgeNode(m.target))) return;
   observerScheduled = true;
@@ -181,15 +232,29 @@ api.storage.onChanged.addListener((changes, area) => {
   if (changes.liveSync) S.liveSyncEnabled = !!changes.liveSync.newValue;
   // Any allowed-delay scope key changed → re-resolve the chain (also re-runs
   // controlLive). The legacy liveSyncTarget is folded in as the old global.
-  if (changes.syncTargets || changes.syncTargetChannels || changes.syncTargetGlobal || changes.liveSyncTarget) {
+  if (
+    changes.syncTargets ||
+    changes.syncTargetChannels ||
+    changes.syncTargetGlobal ||
+    changes.liveSyncTarget
+  ) {
     applyResolvedTargetFromStore();
   } else if (changes.liveSync) {
     controlLive();
   }
-  if (changes.showRemaining) { S.showRemaining = !!changes.showRemaining.newValue; updateTimeBadge(); flashBadge(); }
-  if (changes.streamBadge) { S.streamBadge = !!changes.streamBadge.newValue; updateTimeBadge(); flashBadge(); }
+  if (changes.showRemaining) {
+    S.showRemaining = !!changes.showRemaining.newValue;
+    updateTimeBadge();
+    flashBadge();
+  }
+  if (changes.streamBadge) {
+    S.streamBadge = !!changes.streamBadge.newValue;
+    updateTimeBadge();
+    flashBadge();
+  }
   if (changes.badgePos) {
-    const map = (changes.badgePos.newValue as Record<string, { fx: number; fy: number }> | undefined) || {};
+    const map =
+      (changes.badgePos.newValue as Record<string, { fx: number; fy: number }> | undefined) || {};
     S.badgePos = map[getDomain()] || null;
     updateTimeBadge();
   }
@@ -197,19 +262,40 @@ api.storage.onChanged.addListener((changes, area) => {
     const map = (changes.badgePinned.newValue as Record<string, boolean> | undefined) || {};
     S.badgePinned = map[getDomain()] === true;
     updateTimeBadge(); // re-syncs the pin + forces visibility when pinned
-    flashBadge();      // when unpinned, resumes the auto-hide countdown
+    flashBadge(); // when unpinned, resumes the auto-hide countdown
   }
   if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
   if (changes.keymap) S.keymap = normalizeKeymap(changes.keymap.newValue);
   if (changes.speedPresets) S.presets = presetFractions(changes.speedPresets.newValue);
   let audioChanged = false;
-  if (changes.audioComp) { S.audioCompEnabled = !!changes.audioComp.newValue; audioChanged = true; }
-  if (changes.audioCompThreshold) { S.audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60); audioChanged = true; }
-  if (changes.audioCompKnee) { S.audioCompKnee = clampNum(changes.audioCompKnee.newValue, 0, 40, 30); audioChanged = true; }
-  if (changes.audioCompRatio) { S.audioCompRatio = clampNum(changes.audioCompRatio.newValue, 1, 20, 10); audioChanged = true; }
-  if (changes.audioCompAttack) { S.audioCompAttack = clampNum(changes.audioCompAttack.newValue, 0, 1, 0); audioChanged = true; }
-  if (changes.audioCompRelease) { S.audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 1); audioChanged = true; }
-  if (changes.audioCompGain) { S.audioCompGain = clampNum(changes.audioCompGain.newValue, 0, 24, 0); audioChanged = true; }
+  if (changes.audioComp) {
+    S.audioCompEnabled = !!changes.audioComp.newValue;
+    audioChanged = true;
+  }
+  if (changes.audioCompThreshold) {
+    S.audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60);
+    audioChanged = true;
+  }
+  if (changes.audioCompKnee) {
+    S.audioCompKnee = clampNum(changes.audioCompKnee.newValue, 0, 40, 30);
+    audioChanged = true;
+  }
+  if (changes.audioCompRatio) {
+    S.audioCompRatio = clampNum(changes.audioCompRatio.newValue, 1, 20, 10);
+    audioChanged = true;
+  }
+  if (changes.audioCompAttack) {
+    S.audioCompAttack = clampNum(changes.audioCompAttack.newValue, 0, 1, 0);
+    audioChanged = true;
+  }
+  if (changes.audioCompRelease) {
+    S.audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 1);
+    audioChanged = true;
+  }
+  if (changes.audioCompGain) {
+    S.audioCompGain = clampNum(changes.audioCompGain.newValue, 0, 24, 0);
+    audioChanged = true;
+  }
   if (audioChanged) {
     // On a toggle flip, retry a few times so it engages even if the video/context
     // wasn't ready; a param tweak just re-applies once.

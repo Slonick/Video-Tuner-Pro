@@ -16,13 +16,21 @@ const h = vi.hoisted(() => ({
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: h.ctxValid }));
 vi.mock("../src/content/speed.js", () => ({ applyAll: h.applyAll }));
 vi.mock("../src/content/index.js", () => ({ teardown: h.teardown }));
-vi.mock("../src/content/live/detection.js", () => ({ liveVideo: h.liveVideo, onStreamPage: h.onStreamPage }));
-vi.mock("../src/content/live/metrics.js", () => ({ forwardBuffer: h.forwardBuffer, streamLatency: h.streamLatency }));
+vi.mock("../src/content/live/detection.js", () => ({
+  liveVideo: h.liveVideo,
+  onStreamPage: h.onStreamPage,
+}));
+vi.mock("../src/content/live/metrics.js", () => ({
+  forwardBuffer: h.forwardBuffer,
+  streamLatency: h.streamLatency,
+}));
 
 import { S } from "../src/content/state.js";
 import { controlLive } from "../src/content/live/sync.js";
 
-function fakeVideo(props: Partial<{ playbackRate: number; paused: boolean; preservesPitch: boolean }> = {}) {
+function fakeVideo(
+  props: Partial<{ playbackRate: number; paused: boolean; preservesPitch: boolean }> = {},
+) {
   return { playbackRate: 1.0, paused: false, preservesPitch: true, ...props } as HTMLVideoElement;
 }
 
@@ -33,13 +41,25 @@ beforeEach(() => {
   vi.useFakeTimers();
   T += 1_000_000;
   vi.setSystemTime(T);
-  for (const k of ["ctxValid", "applyAll", "teardown", "liveVideo", "onStreamPage", "forwardBuffer", "streamLatency"] as const) h[k].mockClear();
+  for (const k of [
+    "ctxValid",
+    "applyAll",
+    "teardown",
+    "liveVideo",
+    "onStreamPage",
+    "forwardBuffer",
+    "streamLatency",
+  ] as const)
+    h[k].mockClear();
   h.ctxValid.mockReturnValue(true);
   h.liveVideo.mockReturnValue(null);
   h.onStreamPage.mockReturnValue(false);
   h.forwardBuffer.mockReturnValue(10);
   h.streamLatency.mockReturnValue(null);
-  S.currentSpeed = 1.0; S.userSpeed = 1.0; S.liveSyncEnabled = false; S.liveSyncTarget = 5;
+  S.currentSpeed = 1.0;
+  S.userSpeed = 1.0;
+  S.liveSyncEnabled = false;
+  S.liveSyncTarget = 5;
 });
 afterEach(() => vi.useRealTimers());
 
@@ -63,7 +83,8 @@ describe("controlLive dispatch", () => {
   });
 
   it("restores the user's non-live speed once a page proves not to be a stream", () => {
-    S.currentSpeed = 1.5; S.userSpeed = 1.2;
+    S.currentSpeed = 1.5;
+    S.userSpeed = 1.2;
     h.liveVideo.mockReturnValue(null);
     h.onStreamPage.mockReturnValue(false);
     controlLive();
@@ -72,7 +93,8 @@ describe("controlLive dispatch", () => {
   });
 
   it("holds during the sticky stream window (onStreamPage) without restoring", () => {
-    S.currentSpeed = 1.5; S.userSpeed = 1.2;
+    S.currentSpeed = 1.5;
+    S.userSpeed = 1.2;
     h.liveVideo.mockReturnValue(null);
     h.onStreamPage.mockReturnValue(true);
     controlLive();
@@ -125,15 +147,15 @@ describe("setLiveRate anti-click re-assert", () => {
     S.liveSyncEnabled = false;
     h.liveVideo.mockReturnValue(v);
 
-    controlLive();                 // decision changes 1.3→1.0, writes immediately
+    controlLive(); // decision changes 1.3→1.0, writes immediately
     expect(v.playbackRate).toBe(1.0);
 
-    v.playbackRate = 1.05;         // the site's own latency manager nudges it
-    vi.setSystemTime(T + 300);     // <1s since our write
-    controlLive();                 // decision unchanged → don't fight it yet
+    v.playbackRate = 1.05; // the site's own latency manager nudges it
+    vi.setSystemTime(T + 300); // <1s since our write
+    controlLive(); // decision unchanged → don't fight it yet
     expect(v.playbackRate).toBe(1.05);
 
-    vi.setSystemTime(T + 1300);    // >1s → re-assert
+    vi.setSystemTime(T + 1300); // >1s → re-assert
     controlLive();
     expect(v.playbackRate).toBe(1.0);
   });

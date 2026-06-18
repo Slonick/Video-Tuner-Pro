@@ -9,7 +9,7 @@ import { teardown } from "../index.js";
 import { liveVideo, onStreamPage } from "./detection.js";
 import { forwardBuffer, streamLatency } from "./metrics.js";
 
-let lastDropped = 0;    // dropped-frame counter from the previous tick
+let lastDropped = 0; // dropped-frame counter from the previous tick
 let lastControlAt = 0;
 
 // Net video frames dropped since the previous call (decoder/network can't keep up).
@@ -20,7 +20,9 @@ function droppedFramesDelta(video: HTMLVideoElement): number {
     const delta = total - lastDropped;
     lastDropped = total;
     return delta > 0 ? delta : 0;
-  } catch (e) { return 0; }
+  } catch (e) {
+    return 0;
+  }
 }
 
 // Pitch stays preserved during catch-up (the gentle ≤125% ramp keeps stretch
@@ -29,7 +31,9 @@ function droppedFramesDelta(video: HTMLVideoElement): number {
 function applyPitchMode(video: HTMLVideoElement): void {
   try {
     if (video.preservesPitch === false) video.preservesPitch = true;
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 // A live video's playbackRate is written ONLY here (applyAll skips live
@@ -42,14 +46,21 @@ function setLiveRate(video: HTMLVideoElement, rate: number, decisionChanged: boo
   const now = Date.now();
   if (!decisionChanged && now - lastRateAssertAt < 1000) return;
   lastRateAssertAt = now;
-  try { video.playbackRate = rate; } catch (e) { /* ignore */ }
+  try {
+    video.playbackRate = rate;
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 // Dispatcher: on a live stream, speed is controlled ONLY here. Sync OFF → hold
 // 100%. Sync ON → auto catch-up. Throttled: the indicator writes to the DOM,
 // which re-triggers the observer.
 export function controlLive(): void {
-  if (!ctxValid()) { teardown(); return; }
+  if (!ctxValid()) {
+    teardown();
+    return;
+  }
   const now = Date.now();
   if (now - lastControlAt < 250) return;
   lastControlAt = now;
@@ -97,7 +108,7 @@ function runLiveSync(video: HTMLVideoElement): void {
   // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
   // Ignore drops briefly after our own rate writes and below a real burst.
   const rawDropped = droppedFramesDelta(video);
-  const dropped = (Date.now() - lastRateAssertAt < 1500 || rawDropped < 3) ? 0 : rawDropped;
+  const dropped = Date.now() - lastRateAssertAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
   const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
 
   const desired = decideCatchupSpeed({ buffer, latency: lat, dropped, target });

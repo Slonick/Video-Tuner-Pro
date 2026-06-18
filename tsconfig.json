@@ -6,6 +6,9 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["chrome"],
 
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+
     "strict": true,
     "noUnusedLocals": true,
     "noImplicitReturns": true,
@@ -18,5 +21,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"]
 }

@@ -8,11 +8,26 @@ export function collectVideos(): HTMLVideoElement[] {
   const seen = new Set<HTMLVideoElement>();
   const scan = (root: ParentNode): void => {
     let vids: NodeListOf<HTMLVideoElement>;
-    try { vids = root.querySelectorAll("video"); } catch (e) { return; }
-    for (const v of vids) { if (!seen.has(v)) { seen.add(v); acc.push(v); } }
+    try {
+      vids = root.querySelectorAll("video");
+    } catch (e) {
+      return;
+    }
+    for (const v of vids) {
+      if (!seen.has(v)) {
+        seen.add(v);
+        acc.push(v);
+      }
+    }
     let all: NodeListOf<Element>;
-    try { all = root.querySelectorAll("*"); } catch (e) { return; }
-    for (const el of all) { if (el.shadowRoot) scan(el.shadowRoot); }
+    try {
+      all = root.querySelectorAll("*");
+    } catch (e) {
+      return;
+    }
+    for (const el of all) {
+      if (el.shadowRoot) scan(el.shadowRoot);
+    }
   };
   scan(document);
   return acc;
@@ -20,12 +35,16 @@ export function collectVideos(): HTMLVideoElement[] {
 
 // Largest playing video — what the overlay/badge anchors to.
 export function primaryVideo(): HTMLVideoElement | null {
-  let best: HTMLVideoElement | null = null, bestScore = -1;
+  let best: HTMLVideoElement | null = null,
+    bestScore = -1;
   for (const v of collectVideos()) {
     const r = v.getBoundingClientRect();
     if (r.width < 40 || r.height < 40) continue;
     const score = (v.paused ? 0 : 1e9) + r.width * r.height;
-    if (score > bestScore) { bestScore = score; best = v; }
+    if (score > bestScore) {
+      bestScore = score;
+      best = v;
+    }
   }
   return best;
 }

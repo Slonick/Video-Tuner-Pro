@@ -15,8 +15,8 @@ import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 
-const STEP = 0.05;       // slower / faster
-const BIG_STEP = 0.10;   // Shift + slower / faster
+const STEP = 0.05; // slower / faster
+const BIG_STEP = 0.1; // Shift + slower / faster
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
 function deepActive(): Element | null {
@@ -27,25 +27,38 @@ function deepActive(): Element | null {
 function typingIn(el: EventTarget | null): boolean {
   const t = el as HTMLElement | null;
   if (!t || !t.tagName) return false;
-  return t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable === true;
+  return (
+    t.tagName === "INPUT" ||
+    t.tagName === "TEXTAREA" ||
+    t.tagName === "SELECT" ||
+    t.isContentEditable === true
+  );
 }
 
-document.addEventListener("keydown", (e) => {
-  if (!S.keyboardEnabled || !ctxValid()) return;
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const { slower, faster, reset } = S.keymap;
-  // Shift+1 … Shift+8 → a preset speed; undefined for any other digit / no Shift.
-  const preset = e.shiftKey && e.code.startsWith("Digit") ? S.presets[Number(e.code.slice(5)) - 1] : undefined;
-  if (e.code !== slower && e.code !== faster && e.code !== reset && preset === undefined) return;
-  // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
-  const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
-  if (typingIn(target) || typingIn(deepActive())) return;
-  if (!primaryVideo()) return;   // nothing to act on — leave the key to the page
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (!S.keyboardEnabled || !ctxValid()) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const { slower, faster, reset } = S.keymap;
+    // Shift+1 … Shift+8 → a preset speed; undefined for any other digit / no Shift.
+    const preset =
+      e.shiftKey && e.code.startsWith("Digit") ? S.presets[Number(e.code.slice(5)) - 1] : undefined;
+    if (e.code !== slower && e.code !== faster && e.code !== reset && preset === undefined) return;
+    // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
+    const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
+    if (typingIn(target) || typingIn(deepActive())) return;
+    if (!primaryVideo()) return; // nothing to act on — leave the key to the page
 
-  e.preventDefault();
-  if (preset !== undefined) { setSpeed(preset, false, true); return; }
-  const step = e.shiftKey ? BIG_STEP : STEP;
-  if (e.code === faster) setSpeed(S.currentSpeed + step, false, true);
-  else if (e.code === slower) setSpeed(S.currentSpeed - step, false, true);
-  else if (e.code === reset) resetToSaved();
-}, true);
+    e.preventDefault();
+    if (preset !== undefined) {
+      setSpeed(preset, false, true);
+      return;
+    }
+    const step = e.shiftKey ? BIG_STEP : STEP;
+    if (e.code === faster) setSpeed(S.currentSpeed + step, false, true);
+    else if (e.code === slower) setSpeed(S.currentSpeed - step, false, true);
+    else if (e.code === reset) resetToSaved();
+  },
+  true,
+);

@@ -4,28 +4,49 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // speed.ts owns the per-site / per-channel persistence (with the top-frame write
 // guards) and setSpeed. Mock the video/live/audio/badge plumbing so we test the
 // real persistence + clamp + fallback logic against the in-memory chrome storage.
-const h = vi.hoisted(() => ({ keys: [] as string[], videos: [] as HTMLVideoElement[], live: false }));
+const h = vi.hoisted(() => ({
+  keys: [] as string[],
+  videos: [] as HTMLVideoElement[],
+  live: false,
+}));
 vi.mock("../src/content/channel.js", () => ({ channelKeys: () => h.keys }));
-vi.mock("../src/content/videos.js", () => ({ collectVideos: () => h.videos, seenVideos: new WeakSet() }));
+vi.mock("../src/content/videos.js", () => ({
+  collectVideos: () => h.videos,
+  seenVideos: new WeakSet(),
+}));
 vi.mock("../src/content/live/detection.js", () => ({
-  isLive: () => h.live, probeLive: vi.fn(), onStreamPage: () => h_onStream(),
-  trackDvr: vi.fn(), resetDvr: vi.fn(),
+  isLive: () => h.live,
+  probeLive: vi.fn(),
+  onStreamPage: () => h_onStream(),
+  trackDvr: vi.fn(),
+  resetDvr: vi.fn(),
 }));
 vi.mock("../src/content/live/sync.js", () => ({ controlLive: vi.fn() }));
 vi.mock("../src/content/audio/compressor.js", () => ({ applyAudioComp: vi.fn() }));
 vi.mock("../src/content/badge/icon.js", () => ({ updateBadge: vi.fn() }));
-vi.mock("../src/content/badge/overlay.js", () => ({ updateTimeBadge: vi.fn(), flashBadge: vi.fn() }));
+vi.mock("../src/content/badge/overlay.js", () => ({
+  updateTimeBadge: vi.fn(),
+  flashBadge: vi.fn(),
+}));
 
 let onStream = false;
 const h_onStream = () => onStream;
 
 import { S } from "../src/content/state.js";
 import { STORE } from "../src/content/platform/storage.js";
-import { persistDomainSpeed, persistChannelSpeed, persistGlobalSpeed, resetScope, setSpeed } from "../src/content/speed.js";
+import {
+  persistDomainSpeed,
+  persistChannelSpeed,
+  persistGlobalSpeed,
+  resetScope,
+  setSpeed,
+} from "../src/content/speed.js";
 
 const get = (keys: string[]): Record<string, unknown> => {
   let out: Record<string, unknown> = {};
-  STORE.get(keys, (r) => { out = r; });
+  STORE.get(keys, (r) => {
+    out = r;
+  });
   return out;
 };
 
@@ -36,7 +57,8 @@ beforeEach(() => {
   h.videos = [];
   h.live = false;
   onStream = false;
-  S.currentSpeed = 1.0; S.userSpeed = 1.0;
+  S.currentSpeed = 1.0;
+  S.userSpeed = 1.0;
   // jsdom: window is its own top frame by default.
 });
 
@@ -44,7 +66,11 @@ const fakeVideo = (rate: number) =>
   ({ playbackRate: rate, addEventListener: vi.fn() }) as unknown as HTMLVideoElement;
 afterEach(() => {
   // Restore the top-frame identity if a test overrode it.
-  try { Object.defineProperty(window, "top", { value: window, configurable: true }); } catch (e) { /* ignore */ }
+  try {
+    Object.defineProperty(window, "top", { value: window, configurable: true });
+  } catch (e) {
+    /* ignore */
+  }
 });
 
 describe("persistDomainSpeed", () => {
@@ -131,7 +157,7 @@ describe("resetScope", () => {
 
 describe("setSpeed", () => {
   it("clamps the value and records it as the intended non-live speed", () => {
-    setSpeed(99);                       // far above the cap
+    setSpeed(99); // far above the cap
     expect(S.currentSpeed).toBe(S.userSpeed);
     expect(S.currentSpeed).toBeLessThanOrEqual(16);
     expect(S.currentSpeed).toBeGreaterThan(1);
@@ -157,8 +183,13 @@ describe("setSpeed", () => {
 
 describe("dead extension context — never writes", () => {
   let savedId: unknown;
-  beforeEach(() => { savedId = globalThis.chrome.runtime.id; (globalThis.chrome.runtime as { id?: unknown }).id = undefined; });
-  afterEach(() => { (globalThis.chrome.runtime as { id?: unknown }).id = savedId; });
+  beforeEach(() => {
+    savedId = globalThis.chrome.runtime.id;
+    (globalThis.chrome.runtime as { id?: unknown }).id = undefined;
+  });
+  afterEach(() => {
+    (globalThis.chrome.runtime as { id?: unknown }).id = savedId;
+  });
 
   it("persistDomainSpeed bails when the context is gone", () => {
     persistDomainSpeed(1.5);
@@ -188,13 +219,20 @@ describe("applyToVideo (via applyAll)", () => {
   });
 
   it("does NOT re-assign playbackRate when it already matches (avoids the audio glitch)", () => {
-    let writes = 0, current = 1.5;
+    let writes = 0,
+      current = 1.5;
     const v = { addEventListener: vi.fn() } as unknown as HTMLVideoElement;
-    Object.defineProperty(v, "playbackRate", { get: () => current, set: (x: number) => { writes++; current = x; } });
+    Object.defineProperty(v, "playbackRate", {
+      get: () => current,
+      set: (x: number) => {
+        writes++;
+        current = x;
+      },
+    });
     h.videos = [v];
-    setSpeed(1.5);            // equal → no write
+    setSpeed(1.5); // equal → no write
     expect(writes).toBe(0);
-    setSpeed(1.6);            // differs → one write
+    setSpeed(1.6); // differs → one write
     expect(writes).toBe(1);
     expect(current).toBeCloseTo(1.6, 5);
   });
@@ -214,6 +252,8 @@ describe("applyToVideo (via applyAll)", () => {
     const callsAfterFirst = (v.addEventListener as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(callsAfterFirst).toBeGreaterThan(0);
     setSpeed(1.6); // same video again — seenVideos guard prevents re-wiring
-    expect((v.addEventListener as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
+    expect((v.addEventListener as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+      callsAfterFirst,
+    );
   });
 });

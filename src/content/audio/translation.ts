@@ -12,7 +12,9 @@ export function translationActive(): boolean {
     const host = document.querySelector("vot-shadow-host");
     const sr = host && host.shadowRoot;
     return !!(sr && sr.querySelector('[data-status="success"]'));
-  } catch (e) { return false; }
+  } catch (e) {
+    return false;
+  }
 }
 
 export function compOn(): boolean {

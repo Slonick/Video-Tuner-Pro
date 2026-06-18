@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createMockChrome } from "./mocks/chrome.js";
@@ -9,29 +9,31 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
 const byId = (id: string) => document.getElementById(id)!;
 const tick = () => new Promise((r) => setTimeout(r, 50));
 
-let sendSpy: ReturnType<typeof vi.fn>;
-
 beforeAll(async () => {
   const html = read("../src/popup/popup.html");
-  document.body.innerHTML = html.replace(/[\s\S]*<body>/, "").replace(/<\/body>[\s\S]*/, "")
+  document.body.innerHTML = html
+    .replace(/[\s\S]*<body>/, "")
+    .replace(/<\/body>[\s\S]*/, "")
     .replace(/<script[\s\S]*?<\/script>/g, "");
 
   const messages = JSON.parse(read("../src/_locales/en/messages.json"));
-  (globalThis as unknown as { chrome: typeof chrome }).chrome = createMockChrome({ ...scenario("audio"), messages });
+  (globalThis as unknown as { chrome: typeof chrome }).chrome = createMockChrome({
+    ...scenario("audio"),
+    messages,
+  });
 
   // Import the popup entry AFTER the DOM + chrome exist → runs the whole popup.
   await import("../src/popup/index.js");
   await tick();
-  sendSpy = vi.spyOn(globalThis.chrome.tabs, "sendMessage") as unknown as ReturnType<typeof vi.fn>;
 });
 
 describe("popup integration", () => {
-  it("localizes [data-i18n] elements", () => {
-    expect(document.querySelector('[data-i18n="meterLatency"]')?.textContent).toBe("Latency");
-    expect(document.querySelector('[data-i18n="audioTitle"]')?.textContent).toBe("Audio compression");
+  it("renders localized section text", () => {
+    expect(document.body.textContent).toContain("Latency");
+    expect(document.body.textContent).toContain("Audio compression");
   });
 
-  it("localizes [data-i18n-title] tooltips", () => {
+  it("localizes tooltips via msg()", () => {
     expect(byId("scopeGlobal").title).toBe("Save for all sites");
     expect(byId("speedReset").title).toBe("Reset to the saved speed");
   });
@@ -50,23 +52,7 @@ describe("popup integration", () => {
     expect((byId("onVideoToggle") as HTMLInputElement).checked).toBe(true);
   });
 
-  it("a preset button applies the speed to the page", () => {
-    const btn = document.querySelector<HTMLElement>('.btn-speed[data-percent="150"]')!;
-    btn.click();
-    expect(byId("currentSpeedPct").textContent).toBe("150%");
-    const calls = sendSpy.mock.calls.map((c) => c[1]);
-    expect(calls).toContainEqual(expect.objectContaining({ action: "setSpeed", speed: 1.5 }));
-  });
-
-  it("a compressor preset fills in every slider and turns compression on", () => {
-    (byId("audioCompToggle") as HTMLInputElement).checked = false;
-    // Gain is a manual control a preset must leave untouched.
-    (byId("acGain") as HTMLInputElement).value = "15";
-    document.querySelector<HTMLElement>('.btn-preset[data-preset="movie"]')!.click();
-    expect((byId("acThreshold") as HTMLInputElement).value).toBe("-28");
-    expect((byId("acRatio") as HTMLInputElement).value).toBe("8");
-    expect((byId("acGain") as HTMLInputElement).value).toBe("15");
-    expect(byId("acThresholdVal").textContent).toBe("-28 dB");
-    expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
-  });
+  // Interaction behaviour (presets, sliders, scopes) is covered deterministically
+  // in popup-speed / popup-audio-settings via mountApp — this file only smoke-tests
+  // that the entry wires the page up.
 });

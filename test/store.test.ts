@@ -10,18 +10,26 @@ function makeChrome() {
     get(keys: string | string[] | null, cb: (items: Record<string, unknown>) => void) {
       let out: Record<string, unknown> = {};
       if (keys == null) out = { ...backing };
-      else for (const k of (typeof keys === "string" ? [keys] : keys)) if (k in backing) out[k] = backing[k];
+      else
+        for (const k of typeof keys === "string" ? [keys] : keys)
+          if (k in backing) out[k] = backing[k];
       cb(out);
     },
     set(obj: Record<string, unknown>, cb?: () => void) {
       const changes: Record<string, { newValue?: unknown }> = {};
-      for (const k of Object.keys(obj)) { backing[k] = obj[k]; changes[k] = { newValue: obj[k] }; }
+      for (const k of Object.keys(obj)) {
+        backing[k] = obj[k];
+        changes[k] = { newValue: obj[k] };
+      }
       cb?.();
       listeners.forEach((l) => l(changes, name));
     },
     remove(keys: string | string[], cb?: () => void) {
       const changes: Record<string, { newValue?: unknown }> = {};
-      for (const k of (Array.isArray(keys) ? keys : [keys])) { delete backing[k]; changes[k] = {}; }
+      for (const k of Array.isArray(keys) ? keys : [keys]) {
+        delete backing[k];
+        changes[k] = {};
+      }
       cb?.();
       listeners.forEach((l) => l(changes, name));
     },
@@ -32,7 +40,10 @@ function makeChrome() {
       storage: {
         sync: area(sync, "sync"),
         local: area(local, "local"),
-        onChanged: { addListener: (l: (c: Record<string, { newValue?: unknown }>, a: string) => void) => listeners.push(l) },
+        onChanged: {
+          addListener: (l: (c: Record<string, { newValue?: unknown }>, a: string) => void) =>
+            listeners.push(l),
+        },
       },
     } as unknown as typeof chrome,
   };
@@ -47,7 +58,9 @@ async function freshStore(c: typeof chrome) {
 
 describe("routed STORE", () => {
   let env: ReturnType<typeof makeChrome>;
-  beforeEach(() => { env = makeChrome(); });
+  beforeEach(() => {
+    env = makeChrome();
+  });
 
   it("routes everything to sync by default", async () => {
     const { STORE } = await freshStore(env.chrome);
@@ -60,14 +73,18 @@ describe("routed STORE", () => {
     const { STORE } = await freshStore(env.chrome);
     STORE.set({ globalSpeed: 2 });
     let got: Record<string, unknown> = {};
-    STORE.get(["globalSpeed", "audioComp"], (r) => { got = r; });
+    STORE.get(["globalSpeed", "audioComp"], (r) => {
+      got = r;
+    });
     expect(got).toEqual({ globalSpeed: 2 });
   });
 
   it("whenReady fires after the config has loaded", async () => {
     const { whenReady } = await freshStore(env.chrome);
     let fired = false;
-    whenReady(() => { fired = true; });
+    whenReady(() => {
+      fired = true;
+    });
     expect(fired).toBe(true); // mock get is synchronous → ready by now
   });
 
@@ -77,7 +94,9 @@ describe("routed STORE", () => {
     env.backing.local.globalSpeed = 1.5; // speeds opted out → lives in local
     const { STORE } = await freshStore(env.chrome);
     let all: Record<string, unknown> = {};
-    STORE.get(null, (r) => { all = r; });
+    STORE.get(null, (r) => {
+      all = r;
+    });
     expect(all.audioComp).toBe(true);
     expect(all.globalSpeed).toBe(1.5);
   });
@@ -111,7 +130,7 @@ describe("master sync switch", () => {
   it("defaults on; turning it off moves every synced category to local", async () => {
     const env = makeChrome();
     env.backing.sync.globalSpeed = 1.75; // speeds
-    env.backing.sync.audioComp = true;   // audio
+    env.backing.sync.audioComp = true; // audio
     const { getSyncMaster, setMasterSync } = await freshStore(env.chrome);
     expect(getSyncMaster()).toBe(true);
 
@@ -133,22 +152,24 @@ describe("master sync switch", () => {
     expect(env.backing.sync).toEqual({});
     // Reads come back from local.
     let got: Record<string, unknown> = {};
-    STORE.get(["globalSpeed", "audioComp"], (r) => { got = r; });
+    STORE.get(["globalSpeed", "audioComp"], (r) => {
+      got = r;
+    });
     expect(got).toEqual({ globalSpeed: 2, audioComp: true });
   });
 
   it("turning it back on restores synced categories to sync, leaving opted-out ones local", async () => {
     const env = makeChrome();
     env.backing.local.syncMaster = false;
-    env.backing.local.syncCategories = { speeds: false };  // speeds opted out
-    env.backing.local.globalSpeed = 1.5;  // speeds → stays local
-    env.backing.local.audioComp = true;   // audio synced-pref, local while master off
+    env.backing.local.syncCategories = { speeds: false }; // speeds opted out
+    env.backing.local.globalSpeed = 1.5; // speeds → stays local
+    env.backing.local.audioComp = true; // audio synced-pref, local while master off
     const { setMasterSync } = await freshStore(env.chrome);
 
     setMasterSync(true);
-    expect(env.backing.sync.audioComp).toBe(true);       // pulled up
+    expect(env.backing.sync.audioComp).toBe(true); // pulled up
     expect(env.backing.local.audioComp).toBeUndefined();
-    expect(env.backing.local.globalSpeed).toBe(1.5);     // opted-out stays put
+    expect(env.backing.local.globalSpeed).toBe(1.5); // opted-out stays put
     expect(env.backing.sync.globalSpeed).toBeUndefined();
     expect(env.backing.local.syncMaster).toBe(true);
   });
@@ -164,8 +185,8 @@ describe("master sync switch", () => {
     expect(getSyncConfig()).toMatchObject({ audio: true, speeds: false }); // prefs untouched
     setMasterSync(true);
     expect(getSyncConfig()).toMatchObject({ audio: true, speeds: false });
-    expect(env.backing.sync.audioComp).toBe(true);    // back in sync
-    expect(env.backing.local.globalSpeed).toBe(1.5);  // still local
+    expect(env.backing.sync.audioComp).toBe(true); // back in sync
+    expect(env.backing.local.globalSpeed).toBe(1.5); // still local
   });
 
   it("while master is off, toggling a category only records intent (no migration)", async () => {
@@ -175,9 +196,9 @@ describe("master sync switch", () => {
     const { setCategorySync, getSyncConfig } = await freshStore(env.chrome);
 
     setCategorySync("audio", false);
-    expect(env.backing.local.audioComp).toBe(true);        // unchanged — already local
+    expect(env.backing.local.audioComp).toBe(true); // unchanged — already local
     expect(env.backing.sync.audioComp).toBeUndefined();
-    expect(getSyncConfig().audio).toBe(false);             // preference recorded
+    expect(getSyncConfig().audio).toBe(false); // preference recorded
     expect((env.backing.local.syncCategories as Record<string, boolean>).audio).toBe(false);
   });
 
@@ -186,7 +207,7 @@ describe("master sync switch", () => {
     env.backing.sync.globalSpeed = 2;
     const { setMasterSync } = await freshStore(env.chrome);
     setMasterSync(true); // already on
-    expect(env.backing.sync.globalSpeed).toBe(2);   // unmoved
+    expect(env.backing.sync.globalSpeed).toBe(2); // unmoved
     expect(env.backing.local.syncMaster).toBe(true); // recorded
   });
 
@@ -198,7 +219,9 @@ describe("master sync switch", () => {
     env.chrome.storage.local.set({ syncMaster: false });
     // The router now reads speeds from local (where the value isn't) instead of sync.
     let got: Record<string, unknown> = {};
-    STORE.get(["globalSpeed"], (r) => { got = r; });
+    STORE.get(["globalSpeed"], (r) => {
+      got = r;
+    });
     expect(got.globalSpeed).toBeUndefined();
   });
 });

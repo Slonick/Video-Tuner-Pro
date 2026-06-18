@@ -7,8 +7,8 @@ export interface CompParams {
   threshold: number;
   knee: number;
   ratio: number;
-  attack: number;   // seconds
-  release: number;  // seconds
+  attack: number; // seconds
+  release: number; // seconds
 }
 
 export type PresetName = "voice" | "night" | "movie";
@@ -28,11 +28,15 @@ export const COMP_PRESET_DEFAULTS: Record<PresetName, CompParams> = {
 export type StoredPreset = Partial<CompParams> & { name?: string };
 export type StoredPresets = Partial<Record<PresetName, StoredPreset>>;
 
-export interface ResolvedPreset extends CompParams { name?: string }
+export interface ResolvedPreset extends CompParams {
+  name?: string;
+}
 
 // Merge the stored overrides onto the defaults. `name` stays undefined unless the
 // user set one — callers fill the localized default ("Voice"/"Night"/"Movie").
-export function resolvePresets(stored: StoredPresets | undefined): Record<PresetName, ResolvedPreset> {
+export function resolvePresets(
+  stored: StoredPresets | undefined,
+): Record<PresetName, ResolvedPreset> {
   const out = {} as Record<PresetName, ResolvedPreset>;
   for (const k of PRESET_ORDER) out[k] = { ...COMP_PRESET_DEFAULTS[k], ...(stored?.[k] || {}) };
   return out;

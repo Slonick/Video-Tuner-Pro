@@ -3,7 +3,14 @@
 import { S } from "../state.js";
 import { collectVideos, primaryVideo } from "../videos.js";
 import { compOn } from "./translation.js";
-import { audioContext, audioGraphs, setupGraph, hookAudioGesture, resumeAudioCtx, lastSkip } from "./routing.js";
+import {
+  audioContext,
+  audioGraphs,
+  setupGraph,
+  hookAudioGesture,
+  resumeAudioCtx,
+  lastSkip,
+} from "./routing.js";
 import type { AudioGraph } from "./types.js";
 
 // Ramp an AudioParam toward a value instead of assigning .value directly (an
@@ -15,7 +22,9 @@ function rampParam(param: AudioParam, value: number): void {
     param.cancelScheduledValues(t);
     param.setTargetAtTime(value, t, 0.02);
   } catch (e) {
-    try { param.value = value; } catch (_) {}
+    try {
+      param.value = value;
+    } catch (_) {}
   }
 }
 
@@ -34,13 +43,21 @@ function applyGraphParams(g: AudioGraph): void {
     rampParam(g.comp.attack, on ? S.audioCompAttack : 0.003);
     rampParam(g.comp.release, on ? S.audioCompRelease : 0.25);
     rampParam(g.gain.gain, on ? Math.pow(10, S.audioCompGain / 20) : 1);
-  } catch (e) { /* node detached */ }
+  } catch (e) {
+    /* node detached */
+  }
 }
 
-export function applyAudioComp(videos?: HTMLVideoElement[]): { engaged: number; skipped: number; reason: string | null } {
+export function applyAudioComp(videos?: HTMLVideoElement[]): {
+  engaged: number;
+  skipped: number;
+  reason: string | null;
+} {
   const list = videos || collectVideos();
   const primary = primaryVideo();
-  let engaged = 0, skipped = 0, reason: string | null = null;
+  let engaged = 0,
+    skipped = 0,
+    reason: string | null = null;
   for (const v of list) {
     let g: AudioGraph | null | undefined = audioGraphs.get(v);
     if (!g) {
@@ -61,6 +78,9 @@ export function applyAudioComp(videos?: HTMLVideoElement[]): { engaged: number; 
   }
   // Always allow the context to resume on a user gesture, so metering works even
   // with compression off.
-  if (primary) { hookAudioGesture(); resumeAudioCtx(); }
+  if (primary) {
+    hookAudioGesture();
+    resumeAudioCtx();
+  }
   return { engaged, skipped, reason };
 }

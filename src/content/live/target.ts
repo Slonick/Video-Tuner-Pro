@@ -11,7 +11,7 @@ import { S } from "../state.js";
 import { controlLive } from "./sync.js";
 
 export function persistSiteTarget(target: number): void {
-  if (!ctxValid() || window.top !== window) return;   // top frame only — see speed.ts
+  if (!ctxValid() || window.top !== window) return; // top frame only — see speed.ts
   STORE.get(["syncTargets"], (r) => {
     const t = (r.syncTargets || {}) as Record<string, number>;
     t[getDomain()] = target;
@@ -42,7 +42,13 @@ function applyResolvedTarget(
   channelTargets: Record<string, number>,
   globalTarget: number | undefined,
 ): void {
-  const r = resolveSyncTarget(channelKeys(), getDomain(), siteTargets, channelTargets, globalTarget);
+  const r = resolveSyncTarget(
+    channelKeys(),
+    getDomain(),
+    siteTargets,
+    channelTargets,
+    globalTarget,
+  );
   S.targetScope = r.scope;
   S.liveSyncTarget = clampTarget(r.target);
   controlLive();
@@ -55,7 +61,8 @@ export function applyResolvedTargetFromStore(): void {
     applyResolvedTarget(
       (r.syncTargets || {}) as Record<string, number>,
       (r.syncTargetChannels || {}) as Record<string, number>,
-      (r.syncTargetGlobal ?? r.liveSyncTarget) as number | undefined);   // legacy liveSyncTarget = old global
+      (r.syncTargetGlobal ?? r.liveSyncTarget) as number | undefined,
+    ); // legacy liveSyncTarget = old global
   });
 }
 
@@ -76,7 +83,7 @@ export function resetTargetScope(scope: TargetScope): void {
       STORE.set({ syncTargets: site });
     } else if (scope === "global") {
       global = undefined;
-      STORE.remove(["syncTargetGlobal", "liveSyncTarget"]);   // clear the new + legacy global
+      STORE.remove(["syncTargetGlobal", "liveSyncTarget"]); // clear the new + legacy global
     } else {
       return;
     }

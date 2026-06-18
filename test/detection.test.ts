@@ -23,7 +23,9 @@ describe("isLive", () => {
 });
 
 describe("isLive (player-published data-vtp-live flag)", () => {
-  afterEach(() => { document.documentElement.removeAttribute("data-vtp-live"); });
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-vtp-live");
+  });
 
   it("flag '1' → live, even with a finite duration", () => {
     document.documentElement.setAttribute("data-vtp-live", "1");
@@ -36,8 +38,13 @@ describe("isLive (player-published data-vtp-live flag)", () => {
 });
 
 describe("isLive (live signals are scoped to the video's own player)", () => {
-  beforeEach(() => { vi.stubGlobal("location", { hostname: "www.youtube.com" }); });
-  afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = ""; });
+  beforeEach(() => {
+    vi.stubGlobal("location", { hostname: "www.youtube.com" });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = "";
+  });
 
   // A Short (or any inline preview) sits in its own .html5-video-player while a
   // stale watch player left over from a previous live stream lingers elsewhere in
@@ -54,14 +61,22 @@ describe("isLive (live signals are scoped to the video's own player)", () => {
 });
 
 describe("probeLive (generic real-time-edge detection)", () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("marks a video live after a few real-time-rate growth samples", () => {
     let edge = 10;
-    const v = vid({ buffered: { length: 1, start: () => 0, end: () => edge } as unknown as TimeRanges });
-    probeLive(v);                       // seed sample
-    for (let i = 1; i <= 4; i++) {       // edge grows ~1× real time (0.5s per 0.5s)
+    const v = vid({
+      buffered: { length: 1, start: () => 0, end: () => edge } as unknown as TimeRanges,
+    });
+    probeLive(v); // seed sample
+    for (let i = 1; i <= 4; i++) {
+      // edge grows ~1× real time (0.5s per 0.5s)
       vi.setSystemTime(i * 500);
       edge += 0.5;
       probeLive(v);
@@ -70,9 +85,14 @@ describe("probeLive (generic real-time-edge detection)", () => {
   });
 
   it("does NOT mark a VOD (edge already far ahead, no real-time growth) live", () => {
-    const v = vid({ buffered: { length: 1, start: () => 0, end: () => 1000 } as unknown as TimeRanges });
+    const v = vid({
+      buffered: { length: 1, start: () => 0, end: () => 1000 } as unknown as TimeRanges,
+    });
     probeLive(v);
-    for (let i = 1; i <= 4; i++) { vi.setSystemTime(i * 500); probeLive(v); } // flat edge
+    for (let i = 1; i <= 4; i++) {
+      vi.setSystemTime(i * 500);
+      probeLive(v);
+    } // flat edge
     expect(isLive(v)).toBe(false);
   });
 });

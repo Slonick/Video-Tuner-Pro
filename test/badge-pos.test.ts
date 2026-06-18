@@ -25,7 +25,8 @@ describe("badgeFraction", () => {
   });
 
   it("a zero-size video gives 0,0 (no divide-by-zero)", () => {
-    expect(badgeFraction({ left: 0, top: 0, ...badge }, { left: 0, top: 0, width: 0, height: 0 }))
-      .toEqual({ fx: 0, fy: 0 });
+    expect(
+      badgeFraction({ left: 0, top: 0, ...badge }, { left: 0, top: 0, width: 0, height: 0 }),
+    ).toEqual({ fx: 0, fy: 0 });
   });
 });

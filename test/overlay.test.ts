@@ -13,23 +13,52 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => h.primary }));
 vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream }));
-vi.mock("../src/content/live/metrics.js", () => ({ forwardBuffer: () => h.buffer, streamLatency: () => h.latency }));
+vi.mock("../src/content/live/metrics.js", () => ({
+  forwardBuffer: () => h.buffer,
+  streamLatency: () => h.latency,
+}));
 vi.mock("../src/content/live/catchup.js", () => ({ catchupBufferLimited: () => h.limited }));
 
 import { S } from "../src/content/state.js";
 import { updateTimeBadge, ownsBadgeNode } from "../src/content/badge/overlay.js";
 
 function fakeVideo(rect: Partial<DOMRect> = {}) {
-  const r = { left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360, ...rect } as DOMRect;
-  return { duration: 120, currentTime: 60, playbackRate: 1, getBoundingClientRect: () => r } as unknown as HTMLVideoElement;
+  const r = {
+    left: 0,
+    top: 0,
+    width: 640,
+    height: 360,
+    right: 640,
+    bottom: 360,
+    ...rect,
+  } as DOMRect;
+  return {
+    duration: 120,
+    currentTime: 60,
+    playbackRate: 1,
+    getBoundingClientRect: () => r,
+  } as unknown as HTMLVideoElement;
 }
-const badgeEl = () => document.body.querySelector("div");
+// The badge now renders inside a shadow root on a marked host in the light DOM.
+const badgeEl = () =>
+  (document
+    .querySelector("[data-vtp-badge]")
+    ?.shadowRoot?.querySelector("div") as HTMLElement | null) ?? null;
 const badgeText = () => badgeEl()?.querySelector("span")?.textContent;
 
 beforeEach(() => {
-  h.primary = null; h.onStream = false; h.latency = null; h.buffer = 0; h.limited = false;
-  S.showRemaining = true; S.streamBadge = true; S.badgePos = null; S.badgePinned = false;
-  S.currentSpeed = 1; S.liveSyncEnabled = false; S.liveSyncTarget = 5;
+  h.primary = null;
+  h.onStream = false;
+  h.latency = null;
+  h.buffer = 0;
+  h.limited = false;
+  S.showRemaining = true;
+  S.streamBadge = true;
+  S.badgePos = null;
+  S.badgePinned = false;
+  S.currentSpeed = 1;
+  S.liveSyncEnabled = false;
+  S.liveSyncTarget = 5;
 });
 
 describe("updateTimeBadge — visibility", () => {
@@ -42,7 +71,9 @@ describe("updateTimeBadge — visibility", () => {
   });
 
   it("hides on a live stream when the stream badge is disabled", () => {
-    h.onStream = true; h.latency = 3; h.buffer = 5;
+    h.onStream = true;
+    h.latency = 3;
+    h.buffer = 5;
     S.streamBadge = false;
     h.primary = fakeVideo();
     updateTimeBadge();
@@ -61,7 +92,7 @@ describe("updateTimeBadge — visibility", () => {
 
 describe("updateTimeBadge — VOD rendering", () => {
   it("shows speed and the real remaining time (scaled by speed)", () => {
-    h.primary = fakeVideo();           // 120s total, at 60s, 1× → 60s left
+    h.primary = fakeVideo(); // 120s total, at 60s, 1× → 60s left
     updateTimeBadge();
     expect(badgeText()).toBe("1× · 1:00");
   });
@@ -77,14 +108,18 @@ describe("updateTimeBadge — VOD rendering", () => {
 
 describe("updateTimeBadge — live rendering", () => {
   it("shows the latency alone when the site exposes it (no buffer parenthetical)", () => {
-    h.onStream = true; h.latency = 3; h.buffer = 5;
+    h.onStream = true;
+    h.latency = 3;
+    h.buffer = 5;
     h.primary = fakeVideo();
     updateTimeBadge();
     expect(badgeText()).toBe("1× · 3.00s");
   });
 
   it("shows just the buffered-ahead seconds when there is no site latency", () => {
-    h.onStream = true; h.latency = null; h.buffer = 4;
+    h.onStream = true;
+    h.latency = null;
+    h.buffer = 4;
     h.primary = fakeVideo();
     updateTimeBadge();
     expect(badgeText()).toBe("1× · 4.00s");
@@ -92,7 +127,10 @@ describe("updateTimeBadge — live rendering", () => {
 
   it("appends a ⚠ when behind with a buffer too thin to catch up (sync on)", () => {
     S.liveSyncEnabled = true;
-    h.onStream = true; h.latency = 12; h.buffer = 1; h.limited = true;
+    h.onStream = true;
+    h.latency = 12;
+    h.buffer = 1;
+    h.limited = true;
     h.primary = fakeVideo();
     updateTimeBadge();
     expect(badgeText()).toContain("⚠");
@@ -104,8 +142,8 @@ describe("updateTimeBadge — positioning", () => {
     h.primary = fakeVideo();
     updateTimeBadge();
     const el = badgeEl() as HTMLElement;
-    expect(el.style.left).toBe("10px");   // max(10, 640*0.012)
-    expect(el.style.top).toBe("14px");    // max(10, 360*0.04)
+    expect(el.style.left).toBe("10px"); // max(10, 640*0.012)
+    expect(el.style.top).toBe("14px"); // max(10, 360*0.04)
   });
 
   it("honors a saved per-site fraction of the video frame", () => {
@@ -113,8 +151,8 @@ describe("updateTimeBadge — positioning", () => {
     h.primary = fakeVideo();
     updateTimeBadge();
     const el = badgeEl() as HTMLElement;
-    expect(el.style.left).toBe("320px");  // 0 + 0.5 * 640
-    expect(el.style.top).toBe("180px");   // 0 + 0.5 * 360
+    expect(el.style.left).toBe("320px"); // 0 + 0.5 * 640
+    expect(el.style.top).toBe("180px"); // 0 + 0.5 * 360
   });
 });
 
@@ -141,7 +179,17 @@ describe("badge drag", () => {
     updateTimeBadge();
     const el = badgeEl() as HTMLElement;
     // Land the badge at the centre of the 640x360 frame.
-    el.getBoundingClientRect = () => ({ left: 320, top: 180, width: 0, height: 0, right: 320, bottom: 180, x: 320, y: 180, toJSON() {} });
+    el.getBoundingClientRect = () => ({
+      left: 320,
+      top: 180,
+      width: 0,
+      height: 0,
+      right: 320,
+      bottom: 180,
+      x: 320,
+      y: 180,
+      toJSON() {},
+    });
     fire(el, "pointerdown", { clientX: 10, clientY: 10 });
     fire(el, "pointermove", { clientX: 330, clientY: 190 });
     fire(el, "pointerup", { clientX: 330, clientY: 190 });

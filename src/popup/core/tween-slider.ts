@@ -4,7 +4,10 @@
 // catch up. `step="any"` during the run lets it move between steps (the native
 // step would snap every frame); the original step is restored at the end. A new
 // tween on the same slider cancels the previous one. Honours reduced motion.
-interface Tween { raf: number; step: string; }
+interface Tween {
+  raf: number;
+  step: string;
+}
 const running = new WeakMap<HTMLInputElement, Tween>();
 
 const DUR = 200;

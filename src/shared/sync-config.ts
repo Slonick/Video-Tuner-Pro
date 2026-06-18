@@ -19,8 +19,8 @@ export const KEY_CATEGORY: Record<string, Category> = {
   channels: "speeds",
   // Live-sync: the on/off toggle and the allowed-delay, saved per scope.
   liveSync: "delays",
-  liveSyncTarget: "delays",   // legacy global fallback
-  liveSyncMax: "delays",      // legacy
+  liveSyncTarget: "delays", // legacy global fallback
+  liveSyncMax: "delays", // legacy
   syncTargetGlobal: "delays",
   syncTargets: "delays",
   syncTargetChannels: "delays",
@@ -61,10 +61,18 @@ export const DEFAULT_MASTER = true;
 // users (and a fresh install) keep cross-device sync until they opt out.
 export type SyncConfig = Record<Category, boolean>;
 export const DEFAULT_SYNC: SyncConfig = {
-  speeds: true, delays: true, audio: true, shortcuts: true, general: true,
+  speeds: true,
+  delays: true,
+  audio: true,
+  shortcuts: true,
+  general: true,
 };
 export const ALL_LOCAL: SyncConfig = {
-  speeds: false, delays: false, audio: false, shortcuts: false, general: false,
+  speeds: false,
+  delays: false,
+  audio: false,
+  shortcuts: false,
+  general: false,
 };
 
 // The config the router actually uses: the per-category preferences when the
@@ -78,10 +86,13 @@ export function categoryOf(key: string): Category {
 }
 
 // Keys grouped by category — derived once from KEY_CATEGORY.
-export const KEYS_BY_CATEGORY: Record<Category, string[]> = CATEGORIES.reduce((acc, c) => {
-  acc[c] = Object.keys(KEY_CATEGORY).filter((k) => KEY_CATEGORY[k] === c);
-  return acc;
-}, {} as Record<Category, string[]>);
+export const KEYS_BY_CATEGORY: Record<Category, string[]> = CATEGORIES.reduce(
+  (acc, c) => {
+    acc[c] = Object.keys(KEY_CATEGORY).filter((k) => KEY_CATEGORY[k] === c);
+    return acc;
+  },
+  {} as Record<Category, string[]>,
+);
 
 // Coerce a stored (possibly partial / legacy) map into a full config — every
 // category present, missing ones defaulting to synced.
@@ -105,7 +116,10 @@ export function areaForKey(key: string, cfg: SyncConfig): "sync" | "local" {
 }
 
 // Split a key list into the two storage areas they currently route to.
-export function groupKeysByArea(keys: string[], cfg: SyncConfig): { sync: string[]; local: string[] } {
+export function groupKeysByArea(
+  keys: string[],
+  cfg: SyncConfig,
+): { sync: string[]; local: string[] } {
   const out: { sync: string[]; local: string[] } = { sync: [], local: [] };
   for (const k of keys) out[areaForKey(k, cfg)].push(k);
   return out;

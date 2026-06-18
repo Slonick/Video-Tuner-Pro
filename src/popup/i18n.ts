@@ -23,7 +23,11 @@ const MESSAGES = { en, ru, de, es, fr, hi, ja, pt_BR, uk, zh_CN } as Record<Loca
 // Guarded — getUILanguage exists in every real extension context, but a dead
 // context (or a test harness without it) shouldn't throw at module load.
 function uiLanguage(): string {
-  try { return api.i18n.getUILanguage(); } catch { return "en"; }
+  try {
+    return api.i18n.getUILanguage();
+  } catch {
+    return "en";
+  }
 }
 
 let active: Bundle = MESSAGES[resolveLocale("system", uiLanguage())];

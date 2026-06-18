@@ -4,108 +4,108 @@
    ============================================================ */
 
 body {
-    width: 340px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 10px;
+  width: 340px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 10px;
 }
 
 .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 8px;
+
+  h1 {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 2px 8px;
-
-    h1 {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        font-weight: 600;
-    }
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
 }
 
 .version {
-    font-size: 9px;
-    font-weight: 500;
-    color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .pro-badge {
-    color: #fff;
-    background: var(--accent);
-    padding: 2px 5px;
-    border-radius: 4px;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    line-height: 1;
+  color: #fff;
+  background: var(--accent);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1;
 }
 
 /* Ko-fi cup in the popup's top-right corner → opens the support page. Muted and
    faint so it doesn't compete with the title; full strength on hover, where the
    heart alone picks up the Ko-fi brand red (the cup stays monochrome). */
 .kofi {
-    flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    color: var(--muted);
-    opacity: 0.5;
-    transition: opacity 0.12s;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  opacity: 0.5;
+  transition: opacity 0.12s;
 
-    & svg {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
+  & svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+
+    .heart {
+      fill: #ff5e5b;
     }
-
-    &:hover,
-    &:focus-visible {
-        opacity: 1;
-
-        .heart {
-            fill: #ff5e5b;
-        }
-    }
+  }
 }
 
 /* Settings (gear) + Ko-fi grouped at the top-right. */
 .header-actions {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Gear button → opens the options page. Same muted/faint treatment as the Ko-fi
    cup so the two sit together quietly. */
 .icon-btn {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--muted);
-    opacity: 0.5;
-    cursor: pointer;
-    transition: opacity 0.12s;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.12s;
 
-    & svg {
-        display: block;
-        width: 19px;
-        height: 19px;
-        pointer-events: none;
-    }
+  & svg {
+    display: block;
+    width: 19px;
+    height: 19px;
+    pointer-events: none;
+  }
 
-    &:hover,
-    &:focus-visible {
-        opacity: 1;
-        outline: none;
-    }
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    outline: none;
+  }
 }

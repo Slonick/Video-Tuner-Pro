@@ -1,10 +1,16 @@
-import { MIN_FORWARD_BUFFER, MAX_BUFFER_RESERVE, CATCHUP_MAX, CATCHUP_STEP_LAG, CATCHUP_START } from "../core/constants.js";
+import {
+  MIN_FORWARD_BUFFER,
+  MAX_BUFFER_RESERVE,
+  CATCHUP_MAX,
+  CATCHUP_STEP_LAG,
+  CATCHUP_START,
+} from "../core/constants.js";
 
 export interface CatchupInput {
   buffer: number;
   latency: number | null;
   dropped: number;
-  target: number;          // already floored at MIN_FORWARD_BUFFER
+  target: number; // already floored at MIN_FORWARD_BUFFER
 }
 
 // The buffer level catch-up must never drain below. With a real
@@ -39,7 +45,11 @@ export function decideCatchupSpeed(o: CatchupInput): number {
 // True when we're clearly behind the live edge but the buffer is too thin to
 // catch up at all (not even the smallest 5% step) — latency will stay high
 // until the buffer refills, which the UI warns about.
-export function catchupBufferLimited(latency: number | null, buffer: number, target: number): boolean {
+export function catchupBufferLimited(
+  latency: number | null,
+  buffer: number,
+  target: number,
+): boolean {
   const lag = latency != null ? latency : buffer;
   return lag > target + CATCHUP_START && buffer < catchupBufferFloor(latency, target) + 0.05;
 }

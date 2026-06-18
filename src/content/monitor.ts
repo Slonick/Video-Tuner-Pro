@@ -21,7 +21,7 @@ export interface MonitorData {
 }
 
 export function monitorData(): MonitorData {
-  applyAudioComp();                 // make sure the meter graph is engaged
+  applyAudioComp(); // make sure the meter graph is engaged
   const v = primaryVideo();
   const live = onStreamPage();
   // The live graph plots latency-to-broadcaster where the site exposes it
@@ -36,15 +36,16 @@ export function monitorData(): MonitorData {
     const fb = forwardBuffer(v);
     lag = l != null ? l : fb;
     if (l != null) bufAhead = fb;
-    limited = S.liveSyncEnabled
-      && catchupBufferLimited(l, fb, Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER));
+    limited =
+      S.liveSyncEnabled &&
+      catchupBufferLimited(l, fb, Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER));
   }
   return {
     audio: audioLevels(),
     buffer: lag,
     bufferAhead: bufAhead,
     bufLimited: limited,
-    bitrate: (v && live) ? streamBitrate(v) : null,
+    bitrate: v && live ? streamBitrate(v) : null,
     target: S.liveSyncTarget,
     live,
     hasVideo: !!v,

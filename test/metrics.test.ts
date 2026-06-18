@@ -17,7 +17,17 @@ describe("forwardBuffer", () => {
     expect(forwardBuffer(fakeVideo([[0, 30]], 10))).toBe(20);
   });
   it("picks the range containing currentTime", () => {
-    expect(forwardBuffer(fakeVideo([[0, 5], [50, 80]], 60))).toBe(20);
+    expect(
+      forwardBuffer(
+        fakeVideo(
+          [
+            [0, 5],
+            [50, 80],
+          ],
+          60,
+        ),
+      ),
+    ).toBe(20);
   });
   it("returns 0 when currentTime is in no range", () => {
     expect(forwardBuffer(fakeVideo([[0, 5]], 40))).toBe(0);

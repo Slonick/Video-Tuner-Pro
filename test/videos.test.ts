@@ -6,13 +6,25 @@ import { collectVideos, primaryVideo } from "../src/content/videos.js";
 // a zero-size rect and no real playback).
 function vid(width: number, height: number, paused: boolean): HTMLVideoElement {
   const v = document.createElement("video");
-  v.getBoundingClientRect = () => ({ width, height, left: 0, top: 0, right: width, bottom: height, x: 0, y: 0, toJSON() {} });
+  v.getBoundingClientRect = () => ({
+    width,
+    height,
+    left: 0,
+    top: 0,
+    right: width,
+    bottom: height,
+    x: 0,
+    y: 0,
+    toJSON() {},
+  });
   Object.defineProperty(v, "paused", { value: paused, configurable: true });
   document.body.appendChild(v);
   return v;
 }
 
-beforeEach(() => { document.body.innerHTML = ""; });
+beforeEach(() => {
+  document.body.innerHTML = "";
+});
 
 describe("collectVideos", () => {
   it("finds plain videos in the document", () => {

@@ -8,12 +8,15 @@ import { primaryVideo } from "../videos.js";
 import { onStreamPage } from "../live/detection.js";
 import { catchupBufferLimited } from "../live/catchup.js";
 import { forwardBuffer, streamLatency } from "../live/metrics.js";
+import { mountBadge } from "./BadgeView.js";
 
 type Timer = ReturnType<typeof setTimeout>;
 
 export function fmtTime(s: number): string {
   s = Math.max(0, Math.round(s));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const h = Math.floor(s / 3600),
+    m = Math.floor((s % 3600) / 60),
+    sec = s % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
   return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
@@ -22,7 +25,7 @@ export function fmtTime(s: number): string {
 export function parseClock(t: string | null): number {
   const m = String(t).match(/(\d+):(\d{2})(?::(\d{2}))?/);
   if (!m) return 0;
-  return m[3] != null ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
+  return m[3] != null ? +m[1] * 3600 + +m[2] * 60 + +m[3] : +m[1] * 60 + +m[2];
 }
 
 // Effective content duration. SponsorBlock (when "show duration after skips" is
@@ -31,24 +34,34 @@ export function parseClock(t: string | null): number {
 function effectiveDuration(video: HTMLVideoElement): number {
   try {
     const el = document.getElementById("sponsorBlockDurationAfterSkips");
-    if (el) { const s = parseClock(el.textContent); if (s > 0) return s; }
-  } catch (e) { /* ignore */ }
+    if (el) {
+      const s = parseClock(el.textContent);
+      if (s > 0) return s;
+    }
+  } catch (e) {
+    /* ignore */
+  }
   return video.duration;
 }
 
+let badgeHost: HTMLDivElement | null = null; // shadow host (light DOM) we re-parent + mark
 let timeBadgeEl: HTMLDivElement | null = null;
-let badgeTextEl: HTMLSpanElement | null = null;   // holds the speed/time text (so the pin stays put)
+let badgeTextEl: HTMLSpanElement | null = null; // holds the speed/time text (so the pin stays put)
 let badgePinEl: HTMLSpanElement | null = null;
 let timeBadgeHideTimer: Timer | undefined;
-let badgeVideo: HTMLVideoElement | null = null;   // cached primary video so mousemove stays cheap
+let badgeVideo: HTMLVideoElement | null = null; // cached primary video so mousemove stays cheap
 let badgeMoveHooked = false;
 let dragging = false;
-let dragDX = 0, dragDY = 0;
+let dragDX = 0,
+  dragDY = 0;
 
-// True if a node is inside our own badge — the observer ignores our writes (and
-// the rapid position updates during a drag) so they don't re-trigger applyAll.
+// True if a node is our badge — the observer ignores our writes so they don't
+// re-trigger applyAll. The badge itself lives in a shadow root (its mutations are
+// invisible to the light-DOM observer anyway); this covers the host node we add.
 export function ownsBadgeNode(node: Node | null): boolean {
-  return !!(timeBadgeEl && node && timeBadgeEl.contains(node));
+  if (!node) return false;
+  if (timeBadgeEl && timeBadgeEl.contains(node)) return true;
+  return !!(badgeHost && (badgeHost === node || badgeHost.contains(node)));
 }
 
 // Place the badge at its saved per-site fraction of the video, or the default
@@ -87,7 +100,8 @@ function saveBadgePinned(on: boolean): void {
   if (!ctxValid()) return;
   STORE.get(["badgePinned"], (r) => {
     const map = (r.badgePinned || {}) as Record<string, boolean>;
-    if (on) map[getDomain()] = true; else delete map[getDomain()];
+    if (on) map[getDomain()] = true;
+    else delete map[getDomain()];
     STORE.set({ badgePinned: map });
   });
 }
@@ -107,7 +121,10 @@ function togglePin(): void {
   setPinVisual(on);
   if (on) {
     clearTimeout(timeBadgeHideTimer);
-    if (timeBadgeEl) { timeBadgeEl.style.opacity = "1"; timeBadgeEl.style.pointerEvents = "auto"; }
+    if (timeBadgeEl) {
+      timeBadgeEl.style.opacity = "1";
+      timeBadgeEl.style.pointerEvents = "auto";
+    }
   } else {
     flashBadge(); // resume the auto-hide countdown
   }
@@ -115,22 +132,15 @@ function togglePin(): void {
 }
 
 // The pin is a child of the draggable badge, so swallow the events that would
-// otherwise start a drag / trigger the position-reset dblclick.
-function buildPin(): HTMLSpanElement {
-  const pin = document.createElement("span");
-  pin.setAttribute("role", "button");
-  pin.style.cssText = [
-    "display:inline-flex", "align-items:center", "justify-content:center",
-    "width:15px", "height:15px", "margin:-2px -3px -2px 3px", "cursor:pointer",
-    "color:#fff", "transition:opacity .15s,transform .15s"
-  ].join(";");
-  pin.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">'
-    + '<path d="M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/>'
-    + "</svg>";
+// otherwise start a drag / trigger the position-reset dblclick. Wired as native
+// listeners (not React handlers) so they fire before the badge's own listeners.
+function hookPin(pin: HTMLElement): void {
   pin.addEventListener("pointerdown", (e) => e.stopPropagation());
   pin.addEventListener("dblclick", (e) => e.stopPropagation());
-  pin.addEventListener("click", (e) => { e.stopPropagation(); togglePin(); });
-  return pin;
+  pin.addEventListener("click", (e) => {
+    e.stopPropagation();
+    togglePin();
+  });
 }
 
 // Drag the badge anywhere over the video; the drop point is stored as a fraction
@@ -141,7 +151,11 @@ function hookBadgeDrag(el: HTMLElement): void {
     if (e.button !== 0) return;
     dragging = true;
     moved = false;
-    try { el.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch (x) {
+      /* ignore */
+    }
     el.style.cursor = "grabbing";
     const r = el.getBoundingClientRect();
     dragDX = e.clientX - r.left;
@@ -220,17 +234,22 @@ export function flashBadge(): void {
 function hookBadgeMouse(): void {
   if (badgeMoveHooked) return;
   badgeMoveHooked = true;
-  document.addEventListener("mousemove", (e) => {
-    const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
-    const bv = badgeVideo;
-    if (!enabled || !timeBadgeEl || !bv) return;
-    const r = bv.getBoundingClientRect();
-    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
-    // Only reveal the badge here — content is re-rendered by the 1s tick
-    // (updateTimeBadge). Rendering per mousemove made the continuous buffer
-    // value flicker at pointer-event rate.
-    flashBadge();
-  }, { passive: true });
+  document.addEventListener(
+    "mousemove",
+    (e) => {
+      const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
+      const bv = badgeVideo;
+      if (!enabled || !timeBadgeEl || !bv) return;
+      const r = bv.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+        return;
+      // Only reveal the badge here — content is re-rendered by the 1s tick
+      // (updateTimeBadge). Rendering per mousemove made the continuous buffer
+      // value flicker at pointer-event rate.
+      flashBadge();
+    },
+    { passive: true },
+  );
 }
 
 // Keep the badge's content/position fresh (called every tick). Visibility is
@@ -252,31 +271,28 @@ export function updateTimeBadge(): void {
   hookBadgeMouse();
   let el = timeBadgeEl;
   if (!el) {
-    el = document.createElement("div");
-    el.setAttribute("data-vtp-badge", "");   // marker so a re-injected instance can remove a leftover badge
-    el.style.cssText = [
-      "position:fixed", "z-index:2147483646", "pointer-events:none", "cursor:grab",
-      "touch-action:none", "user-select:none",
-      "display:flex", "align-items:center",
-      "font:600 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
-      "color:#fff", "background:rgba(0,0,0,0.55)", "padding:5px 9px",
-      "border-radius:6px", "white-space:nowrap", "opacity:0", "transition:opacity .25s",
-      "-webkit-backdrop-filter:blur(3px)", "backdrop-filter:blur(3px)"
-    ].join(";");
-    badgeTextEl = document.createElement("span");
-    badgePinEl = buildPin();
-    setPinVisual(S.badgePinned);
-    el.append(badgeTextEl, badgePinEl);
+    const refs = mountBadge(); // React renders the badge into a shadow root
+    badgeHost = refs.host;
+    el = refs.el;
+    badgeTextEl = refs.textEl;
+    badgePinEl = refs.pinEl;
     timeBadgeEl = el;
+    setPinVisual(S.badgePinned);
     hookBadgeDrag(el);
+    hookPin(badgePinEl);
   }
+  // Position is fixed (viewport-relative), but in fullscreen only descendants of
+  // the fullscreen element paint — so re-parent the shadow host into it.
   const fsEl = document.fullscreenElement;
-  const host: Element = (fsEl && fsEl.tagName !== "VIDEO") ? fsEl : document.body;
-  if (el.parentNode !== host) host.appendChild(el);
+  const host: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
+  if (badgeHost && badgeHost.parentNode !== host) host.appendChild(badgeHost);
   el.style.display = "flex";
   renderBadge(v);
   // Pinned: keep it shown regardless of mouse movement, and reflect the state on
   // the pin (covers cross-tab changes pushed in via onChanged → updateTimeBadge).
   setPinVisual(S.badgePinned);
-  if (S.badgePinned) { el.style.opacity = "1"; el.style.pointerEvents = "auto"; }
+  if (S.badgePinned) {
+    el.style.opacity = "1";
+    el.style.pointerEvents = "auto";
+  }
 }

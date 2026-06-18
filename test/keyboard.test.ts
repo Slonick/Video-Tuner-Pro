@@ -10,14 +10,18 @@ const m = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed, resetToSaved: m.resetToSaved }));
-vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => (m.hasVideo ? ({} as HTMLVideoElement) : null) }));
+vi.mock("../src/content/videos.js", () => ({
+  primaryVideo: () => (m.hasVideo ? ({} as HTMLVideoElement) : null),
+}));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
 
 import { S } from "../src/content/state.js";
 import "../src/content/keyboard.js"; // registers the keydown listener on import
 
 function press(code: string, init: KeyboardEventInit = {}): void {
-  document.dispatchEvent(new KeyboardEvent("keydown", { code, bubbles: true, cancelable: true, ...init }));
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { code, bubbles: true, cancelable: true, ...init }),
+  );
 }
 
 describe("keyboard shortcuts", () => {
@@ -83,7 +87,9 @@ describe("keyboard shortcuts", () => {
   it("ignores shortcuts while typing in a field", () => {
     const input = document.createElement("input");
     document.body.appendChild(input);
-    input.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD", bubbles: true, cancelable: true }));
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { code: "KeyD", bubbles: true, cancelable: true }),
+    );
     expect(m.setSpeed).not.toHaveBeenCalled();
   });
 

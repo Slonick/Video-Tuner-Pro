@@ -26,13 +26,16 @@ export default defineConfig({
         "src/background/**",
         "src/content/index.ts",
         "src/content/inject.ts",
-        "src/popup/index.ts",
         // Options page — browser-wired DOM glue; its pure logic lives in
         // src/shared (presets / keymap / sync-config) and is unit-tested there.
         "src/options/**",
-        // Canvas drawing & DOM animation — low ROI / brittle to unit-test.
+        // Canvas drawing & DOM animation — low ROI / brittle to unit-test. The
+        // React UI (.tsx) isn't measured at all (include is *.ts); these are the
+        // .ts animation/canvas-bridge helpers behind it.
         "src/popup/graphs/**",
-        "src/popup/sections.ts",
+        "src/popup/lib/section-anim.ts", // FLIP + scroll-reveal (the old sections.ts)
+        "src/popup/hooks/useExpand.ts", // expand/collapse + FLIP orchestration
+        "src/popup/hooks/useGraphs.ts", // canvas-meter bridge into graphs/**
         "src/content/badge/icon.ts",
       ],
       reporter: ["text", "text-summary", "html", "json-summary"],

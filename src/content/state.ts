@@ -20,8 +20,12 @@ export const S = {
   // mirrors the popup's preset grid (single source: storage key "speedPresets").
   presets: [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5] as number[],
   // Remappable shortcut keys (e.code values) for slower / faster / reset.
-  keymap: { slower: "KeyA", faster: "KeyD", reset: "KeyR" } as { slower: string; faster: string; reset: string },
-  liveSyncTarget: 5,        // seconds of allowed lag behind the live edge (1–30)
+  keymap: { slower: "KeyA", faster: "KeyD", reset: "KeyR" } as {
+    slower: string;
+    faster: string;
+    reset: string;
+  },
+  liveSyncTarget: 5, // seconds of allowed lag behind the live edge (1–30)
   // On-video badge: speed + real remaining time (VODs)
   showRemaining: false,
   // On-video badge on live streams: speed + buffered-ahead seconds
@@ -33,10 +37,10 @@ export const S = {
   badgePinned: false,
   // Audio compression (raw DynamicsCompressor parameters)
   audioCompEnabled: false,
-  audioCompThreshold: -60,  // dB, -100…0
-  audioCompKnee: 30,        // dB, 0…40
-  audioCompRatio: 10,       // x:1, 1…20
-  audioCompAttack: 0,       // s, 0…1
-  audioCompRelease: 1,      // s, 0…1
-  audioCompGain: 0,         // make-up gain in dB, 0…24
+  audioCompThreshold: -60, // dB, -100…0
+  audioCompKnee: 30, // dB, 0…40
+  audioCompRatio: 10, // x:1, 1…20
+  audioCompAttack: 0, // s, 0…1
+  audioCompRelease: 1, // s, 0…1
+  audioCompGain: 0, // make-up gain in dB, 0…24
 };

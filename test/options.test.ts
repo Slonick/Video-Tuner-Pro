@@ -12,23 +12,36 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
 const byId = (id: string) => document.getElementById(id) as HTMLElement;
 const messages = JSON.parse(read("../src/_locales/en/messages.json"));
 
+// The page renders with React, which flushes its work asynchronously; let pending
+// renders settle before reading the DOM. (Storage writes are synchronous, so a
+// value assertion right after an interaction still holds — this is for the markup.)
+export const flush = () => new Promise<void>((r) => setTimeout(r));
+
 async function mount(settings: Record<string, unknown>) {
   document.body.innerHTML = read("../src/options/options.html")
-    .replace(/[\s\S]*<body>/, "").replace(/<\/body>[\s\S]*/, "").replace(/<script[\s\S]*?<\/script>/g, "");
-  (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome =
-    createMockChrome({ messages, settings });
+    .replace(/[\s\S]*<body>/, "")
+    .replace(/<\/body>[\s\S]*/, "")
+    .replace(/<script[\s\S]*?<\/script>/g, "");
+  (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = createMockChrome(
+    { messages, settings },
+  );
   (globalThis as unknown as { browser?: unknown }).browser = undefined;
   vi.resetModules();
   await import("../src/options/index.js");
+  await flush();
   // Read storage back through the same mock the page wrote to.
   return (keys: string[]) => {
     let out: Record<string, unknown> = {};
-    (globalThis.chrome.storage.local as chrome.storage.StorageArea).get(keys, (r) => { out = r; });
+    (globalThis.chrome.storage.local as chrome.storage.StorageArea).get(keys, (r) => {
+      out = r;
+    });
     return out;
   };
 }
 
-beforeEach(() => { document.body.innerHTML = ""; });
+beforeEach(() => {
+  document.body.innerHTML = "";
+});
 
 describe("sync category controls", () => {
   it("renders a switch per category, reflecting the saved config", async () => {
@@ -42,8 +55,8 @@ describe("sync category controls", () => {
   it("toggling a category persists the choice", async () => {
     const get = await mount({});
     const inputs = document.querySelectorAll<HTMLInputElement>("#syncRows input");
-    inputs[0].checked = false;            // speeds is the first row
-    inputs[0].dispatchEvent(new Event("change"));
+    inputs[0].click(); // speeds is the first row, toggles it off
+    await flush();
     expect((get(["syncCategories"]).syncCategories as Record<string, boolean>).speeds).toBe(false);
   });
 });
@@ -52,7 +65,9 @@ describe("keyboard remap", () => {
   it("captures a new key for an action", async () => {
     const get = await mount({});
     byId("keySlower").click(); // enter capture
+    await flush();
     document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyJ" }));
+    await flush();
     expect((get(["keymap"]).keymap as Record<string, string>).slower).toBe("KeyJ");
     expect(byId("keySlower").textContent).toBe("J");
   });
@@ -86,8 +101,14 @@ describe("saved values manager", () => {
 describe("backup", () => {
   it("export gathers settings without the device-only sync meta", async () => {
     const calls: Blob[] = [];
-    (globalThis.URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b: Blob) => { calls.push(b); return "blob:x"; };
-    (globalThis.URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
+    (globalThis.URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (
+      b: Blob,
+    ) => {
+      calls.push(b);
+      return "blob:x";
+    };
+    (globalThis.URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL =
+      () => {};
     await mount({ globalSpeed: 1.5, syncCategories: { speeds: false } });
     byId("exportBtn").click();
     expect(calls).toHaveLength(1);

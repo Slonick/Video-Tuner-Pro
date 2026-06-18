@@ -14,15 +14,13 @@ afterEach(() => {
 describe("currentChannel (stable per-channel key)", () => {
   it("reads the @handle from the owner link on a watch page", () => {
     at("www.youtube.com", "/watch");
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
     expect(currentChannel()).toBe("@WGC098");
   });
 
   it("reads the /channel/UC… id when there's no handle", () => {
     at("www.youtube.com", "/watch");
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/channel/UCabc_123">Name</a></ytd-video-owner-renderer>`;
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/channel/UCabc_123">Name</a></ytd-video-owner-renderer>`;
     expect(currentChannel()).toBe("channel/UCabc_123");
   });
 
@@ -31,8 +29,7 @@ describe("currentChannel (stable per-channel key)", () => {
     // link. The key must be deterministic (was flipping with DOM order), so the
     // id wins — but both forms are returned so a speed saved under either matches.
     at("www.youtube.com", "/watch");
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer>
+    document.body.innerHTML = `<ytd-video-owner-renderer>
          <a class="yt-simple-endpoint" href="/@WGC098">WGC</a>
          <ytd-channel-name><a class="yt-simple-endpoint" href="/channel/UCabc_123">WGC</a></ytd-channel-name>
        </ytd-video-owner-renderer>`;
@@ -46,9 +43,8 @@ describe("currentChannel (stable per-channel key)", () => {
   });
 
   it("does not read YouTube owner links off YouTube", () => {
-    at("www.twitch.tv", "/directory");     // reserved → not a Twitch channel page
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
+    at("www.twitch.tv", "/directory"); // reserved → not a Twitch channel page
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
     expect(currentChannel()).toBeNull();
   });
 
@@ -61,12 +57,12 @@ describe("currentChannel (stable per-channel key)", () => {
   it("ignores Twitch reserved routes (and a VOD with no channel rendered yet)", () => {
     at("www.twitch.tv", "/directory");
     expect(channelKeys()).toEqual([]);
-    at("www.twitch.tv", "/videos/2795588124");   // channel link not in DOM yet
+    at("www.twitch.tv", "/videos/2795588124"); // channel link not in DOM yet
     expect(channelKeys()).toEqual([]);
   });
 
   it("resolves a Twitch VOD (/videos/<id>) from the channel link in the DOM", () => {
-    at("www.twitch.tv", "/videos/2795588124");        // no channel in the URL
+    at("www.twitch.tv", "/videos/2795588124"); // no channel in the URL
     document.body.innerHTML = `<a data-a-target="video-info-channel-name" href="/Inkmate03">Inkmate</a>`;
     expect(currentChannel()).toBe("twitch:inkmate03");
   });
@@ -86,7 +82,7 @@ describe("currentChannel (stable per-channel key)", () => {
   it("reads the Kick login on live and record pages, ignoring reserved routes", () => {
     at("kick.com", "/xQc");
     expect(currentChannel()).toBe("kick:xqc");
-    at("kick.com", "/inkmate03/videos/4592c135");      // record page → first segment
+    at("kick.com", "/inkmate03/videos/4592c135"); // record page → first segment
     expect(currentChannel()).toBe("kick:inkmate03");
     at("kick.com", "/browse");
     expect(channelKeys()).toEqual([]);
@@ -95,7 +91,7 @@ describe("currentChannel (stable per-channel key)", () => {
   it("reads the VK Video Live login on live and deep record/playlist pages", () => {
     at("live.vkvideo.ru", "/Kuplinov");
     expect(currentChannel()).toBe("vkvideo:kuplinov");
-    at("live.vkvideo.ru", "/lasqa/playlist/d39213db/video/8ef5ff0f");  // deep VOD path
+    at("live.vkvideo.ru", "/lasqa/playlist/d39213db/video/8ef5ff0f"); // deep VOD path
     expect(currentChannel()).toBe("vkvideo:lasqa");
   });
 
@@ -111,14 +107,13 @@ describe("currentChannel (stable per-channel key)", () => {
     expect(currentChannel()).toBe("tiktok:charli");
     at("www.tiktok.com", "/@charli/live");
     expect(currentChannel()).toBe("tiktok:charli");
-    at("www.tiktok.com", "/live");           // directory, not a /@handle
+    at("www.tiktok.com", "/live"); // directory, not a /@handle
     expect(channelKeys()).toEqual([]);
   });
 
   it("is null off a /watch page (home, channel page, search…)", () => {
     at("www.youtube.com", "/results");
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@WGC098">WGC</a></ytd-video-owner-renderer>`;
     expect(currentChannel()).toBeNull();
   });
 
@@ -130,14 +125,12 @@ describe("currentChannel (stable per-channel key)", () => {
 
 describe("currentChannelName (display name for the header)", () => {
   it("returns the channel's display name", () => {
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer><ytd-channel-name><a href="/@WGC098">WGC</a></ytd-channel-name></ytd-video-owner-renderer>`;
+    document.body.innerHTML = `<ytd-video-owner-renderer><ytd-channel-name><a href="/@WGC098">WGC</a></ytd-channel-name></ytd-video-owner-renderer>`;
     expect(currentChannelName()).toBe("WGC");
   });
 
   it("skips a candidate that is just the @handle", () => {
-    document.body.innerHTML =
-      `<ytd-video-owner-renderer><ytd-channel-name><a href="/@WGC098">@WGC098</a></ytd-channel-name></ytd-video-owner-renderer>`;
+    document.body.innerHTML = `<ytd-video-owner-renderer><ytd-channel-name><a href="/@WGC098">@WGC098</a></ytd-channel-name></ytd-video-owner-renderer>`;
     expect(currentChannelName()).toBe("");
   });
 

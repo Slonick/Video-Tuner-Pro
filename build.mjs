@@ -34,8 +34,8 @@ function manifestFor(target) {
 const jsEntries = {
   content: join(SRC, "content/index.ts"),
   background: join(SRC, "background/index.ts"),
-  "popup/popup": join(SRC, "popup/index.ts"),
-  "options/options": join(SRC, "options/index.ts"),
+  "popup/popup": join(SRC, "popup/index.tsx"),
+  "options/options": join(SRC, "options/index.tsx"),
   inject: join(SRC, "content/inject.ts"),   // MAIN-world Twitch/YouTube latency probe
 };
 
@@ -92,6 +92,7 @@ async function buildTarget(target) {
     bundle: true,
     format: "iife",
     target: "es2022",
+    jsx: "automatic",      // React 17+ automatic runtime — no `import React` needed
     minify: !DEV,
     sourcemap: DEV ? "inline" : false,
     legalComments: "none",

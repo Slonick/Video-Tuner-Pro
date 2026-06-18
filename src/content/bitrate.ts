@@ -32,7 +32,10 @@ export function streamBitrate(v: HTMLVideoElement | null): number | null {
 // entry schedules it every BUF_HIST_MS; the body stays here so it's unit-testable.
 export function recordBufferSample(): void {
   if (!ctxValid()) return;
-  if (!onStreamPage()) { if (bufferLevelHist.length) bufferLevelHist.length = 0; return; }
+  if (!onStreamPage()) {
+    if (bufferLevelHist.length) bufferLevelHist.length = 0;
+    return;
+  }
   const lv = liveVideo();
   if (!lv) return;
   const l = streamLatency();

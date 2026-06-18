@@ -11,13 +11,19 @@ vi.mock("../src/content/live/sync.js", () => ({ controlLive: vi.fn() }));
 import { S } from "../src/content/state.js";
 import { STORE } from "../src/content/platform/storage.js";
 import {
-  persistSiteTarget, persistChannelTarget, persistGlobalTarget,
-  resetTargetScope, setTarget, applyResolvedTargetFromStore,
+  persistSiteTarget,
+  persistChannelTarget,
+  persistGlobalTarget,
+  resetTargetScope,
+  setTarget,
+  applyResolvedTargetFromStore,
 } from "../src/content/live/target.js";
 
 const get = (keys: string[]): Record<string, unknown> => {
   let out: Record<string, unknown> = {};
-  STORE.get(keys, (r) => { out = r; });
+  STORE.get(keys, (r) => {
+    out = r;
+  });
   return out;
 };
 
@@ -25,10 +31,15 @@ beforeEach(() => {
   STORE.set({ syncTargets: {}, syncTargetChannels: {} });
   STORE.remove(["syncTargetGlobal", "liveSyncTarget"]);
   h.keys = [];
-  S.liveSyncTarget = 5; S.targetScope = null;
+  S.liveSyncTarget = 5;
+  S.targetScope = null;
 });
 afterEach(() => {
-  try { Object.defineProperty(window, "top", { value: window, configurable: true }); } catch (e) { /* ignore */ }
+  try {
+    Object.defineProperty(window, "top", { value: window, configurable: true });
+  } catch (e) {
+    /* ignore */
+  }
 });
 
 describe("persistSiteTarget", () => {
@@ -94,9 +105,9 @@ describe("resetTargetScope", () => {
 
 describe("setTarget (live preview)", () => {
   it("clamps and sets the live target without persisting", () => {
-    setTarget(0);            // floored to 1
+    setTarget(0); // floored to 1
     expect(S.liveSyncTarget).toBe(1);
-    setTarget(99);           // capped at 30
+    setTarget(99); // capped at 30
     expect(S.liveSyncTarget).toBe(30);
     expect(get(["syncTargets"]).syncTargets).toEqual({}); // nothing written
   });
@@ -104,7 +115,11 @@ describe("setTarget (live preview)", () => {
 
 describe("applyResolvedTargetFromStore", () => {
   it("resolves the chain from storage (channel wins)", () => {
-    STORE.set({ syncTargetChannels: { UC1: 3 }, syncTargets: { localhost: 8 }, syncTargetGlobal: 12 });
+    STORE.set({
+      syncTargetChannels: { UC1: 3 },
+      syncTargets: { localhost: 8 },
+      syncTargetGlobal: 12,
+    });
     h.keys = ["UC1"];
     applyResolvedTargetFromStore();
     expect(S.liveSyncTarget).toBe(3);
@@ -121,8 +136,13 @@ describe("applyResolvedTargetFromStore", () => {
 
 describe("dead extension context — never writes", () => {
   let savedId: unknown;
-  beforeEach(() => { savedId = globalThis.chrome.runtime.id; (globalThis.chrome.runtime as { id?: unknown }).id = undefined; });
-  afterEach(() => { (globalThis.chrome.runtime as { id?: unknown }).id = savedId; });
+  beforeEach(() => {
+    savedId = globalThis.chrome.runtime.id;
+    (globalThis.chrome.runtime as { id?: unknown }).id = undefined;
+  });
+  afterEach(() => {
+    (globalThis.chrome.runtime as { id?: unknown }).id = savedId;
+  });
 
   it("persistSiteTarget bails", () => {
     persistSiteTarget(8);

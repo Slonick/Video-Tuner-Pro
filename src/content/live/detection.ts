@@ -1,6 +1,6 @@
 import { collectVideos } from "../videos.js";
 
-let liveSeenAt = 0;     // timestamp of the last live <video> we saw (sticky detection)
+let liveSeenAt = 0; // timestamp of the last live <video> we saw (sticky detection)
 
 function isYouTube(): boolean {
   return /(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname);
@@ -23,7 +23,9 @@ let lastMediaTime = 0;
 // (it carries `ytp-live-badge-is-livehead` only when playback sits at the edge).
 export function trackDvr(video: HTMLVideoElement): void {
   if (!isYouTube() || document.documentElement.getAttribute("data-vtp-live") !== "1") {
-    dvrMode = false; lastMediaTime = 0; return;
+    dvrMode = false;
+    lastMediaTime = 0;
+    return;
   }
   const t = video.currentTime;
   const badge = document.querySelector<HTMLElement>(".ytp-live-badge");
@@ -33,7 +35,10 @@ export function trackDvr(video: HTMLVideoElement): void {
 }
 
 // New content (SPA navigation, quality reload) starts at the live edge.
-export function resetDvr(): void { dvrMode = false; lastMediaTime = 0; }
+export function resetDvr(): void {
+  dvrMode = false;
+  lastMediaTime = 0;
+}
 
 export function isLive(video: HTMLVideoElement): boolean {
   // The MAIN-world probe (inject.ts) publishes the player's own live flag
@@ -58,8 +63,9 @@ export function isLive(video: HTMLVideoElement): boolean {
     // document — a stale watch player left over from a previous live stream
     // still carries ytp-live classes and a badge, and a global query would let
     // those leak onto an unrelated (e.g. inline-preview) video.
-    const player = (video.closest && video.closest(".html5-video-player")) ||
-                   document.querySelector(".html5-video-player");
+    const player =
+      (video.closest && video.closest(".html5-video-player")) ||
+      document.querySelector(".html5-video-player");
     if (player) {
       if (player.classList.contains("ytp-live")) return true;
       if (player.querySelector(".ytp-time-display.ytp-live")) return true;
@@ -78,36 +84,58 @@ export function isLive(video: HTMLVideoElement): boolean {
 // Live content can only be fetched at ~1x real time; a VOD exposes its whole
 // length immediately and buffers ahead faster than real time. So we sample the
 // furthest known media position and call it live when it advances at roughly 1x.
-interface LiveProbe { lastEnd: number; lastT: number; lastGrow: number; hits: number; live: boolean; }
+interface LiveProbe {
+  lastEnd: number;
+  lastT: number;
+  lastGrow: number;
+  hits: number;
+  live: boolean;
+}
 const liveProbe = new WeakMap<HTMLVideoElement, LiveProbe>();
 
 function streamEnd(v: HTMLVideoElement): number {
   let end = 0;
   try {
     const sk = v.seekable; // some players (Twitch) report a huge sentinel here
-    if (sk && sk.length) { const e = sk.end(sk.length - 1); if (isFinite(e) && e < 1e7) end = Math.max(end, e); }
+    if (sk && sk.length) {
+      const e = sk.end(sk.length - 1);
+      if (isFinite(e) && e < 1e7) end = Math.max(end, e);
+    }
     const bf = v.buffered;
     if (bf && bf.length) end = Math.max(end, bf.end(bf.length - 1));
     if (isFinite(v.duration) && v.duration < 1e7) end = Math.max(end, v.duration);
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
   return end;
 }
 
 export function probeLive(v: HTMLVideoElement): void {
   if (!v) return;
   const t = Date.now();
-  if (v.duration === Infinity) { liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, hits: 0, live: true }); return; }
+  if (v.duration === Infinity) {
+    liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, hits: 0, live: true });
+    return;
+  }
   const end = streamEnd(v);
-  let s = liveProbe.get(v);
-  if (!s) { liveProbe.set(v, { lastEnd: end, lastT: t, lastGrow: 0, hits: 0, live: false }); return; }
+  const s = liveProbe.get(v);
+  if (!s) {
+    liveProbe.set(v, { lastEnd: end, lastT: t, lastGrow: 0, hits: 0, live: false });
+    return;
+  }
   const dT = (t - s.lastT) / 1000;
   if (dT < 0.4) return; // need spacing between samples for a stable rate
   const rate = (end - s.lastEnd) / dT;
-  s.lastEnd = end; s.lastT = t;
+  s.lastEnd = end;
+  s.lastT = t;
   // Real-time growth (~1x) = a live edge; VOD is either flat (~0) or bursty (>>1).
-  if (rate > 0.3 && rate < 1.7) { s.hits++; if (s.hits >= 3) s.lastGrow = t; }
-  else { s.hits = 0; }
-  s.live = s.lastGrow > 0 && (t - s.lastGrow) < 8000; // sticky through brief stalls
+  if (rate > 0.3 && rate < 1.7) {
+    s.hits++;
+    if (s.hits >= 3) s.lastGrow = t;
+  } else {
+    s.hits = 0;
+  }
+  s.live = s.lastGrow > 0 && t - s.lastGrow < 8000; // sticky through brief stalls
 }
 
 // Pick the main live <video>: prefer the one that's actually playing and largest,
@@ -119,7 +147,10 @@ export function liveVideo(): HTMLVideoElement | null {
     if (!isLive(v)) continue;
     const r = v.getBoundingClientRect();
     const score = (v.paused ? 0 : 1e9) + r.width * r.height;
-    if (score > bestScore) { bestScore = score; best = v; }
+    if (score > bestScore) {
+      bestScore = score;
+      best = v;
+    }
   }
   if (best) liveSeenAt = Date.now();
   return best;
@@ -129,5 +160,5 @@ export function liveVideo(): HTMLVideoElement | null {
 // flickers (quality switches momentarily report a finite duration on Twitch).
 export function onStreamPage(): boolean {
   if (dvrMode) return false; // scrubbed back into the DVR buffer — treat as a recording
-  return !!liveVideo() || (Date.now() - liveSeenAt < 6000);
+  return !!liveVideo() || Date.now() - liveSeenAt < 6000;
 }

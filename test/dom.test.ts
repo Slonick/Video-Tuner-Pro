@@ -3,7 +3,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { streamLatency } from "../src/content/live/metrics.js";
 
 describe("streamLatency (reads data-vtp-latency)", () => {
-  beforeEach(() => { document.documentElement.removeAttribute("data-vtp-latency"); });
+  beforeEach(() => {
+    document.documentElement.removeAttribute("data-vtp-latency");
+  });
 
   it("is null when the attribute is absent", () => {
     expect(streamLatency()).toBeNull();

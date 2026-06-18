@@ -5,165 +5,169 @@
    ============================================================ */
 
 .sync-section {
-    position: relative;
-    background: var(--surface);
-    border-radius: 10px;
-    padding: 10px;
-    margin-bottom: 10px;
+  position: relative;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
 
-    /* Last card: no extra margin so the bottom edge gap equals the body's
+  /* Last card: no extra margin so the bottom edge gap equals the body's
        10px padding — uniform with the top and sides. */
-    &:last-of-type {
-        margin-bottom: 0;
-    }
+  &:last-of-type {
+    margin-bottom: 0;
+  }
 
-    /* Dimmed/locked while a voice-over translation is playing — the compressor
+  /* Dimmed/locked while a voice-over translation is playing — the compressor
        yields to it, like manual speed yields to Live-sync. */
-    &.audio-locked {
-        .meter,
-        .sync-body,
-        .switch {
-            opacity: 0.4;
-            pointer-events: none;
-            filter: grayscale(0.3);
-        }
+  &.audio-locked {
+    .meter,
+    .sync-body,
+    .switch {
+      opacity: 0.4;
+      pointer-events: none;
+      filter: grayscale(0.3);
     }
+  }
 }
 
 /* --- Title row + info tooltip -------------------------------------------- */
 .sec-title-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .info {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+  cursor: help;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--accent);
+    outline: none;
+  }
+
+  svg {
+    display: block;
     width: 15px;
     height: 15px;
-    color: var(--muted);
-    cursor: help;
+  }
+
+  /* Reveal the section's hint on hover/focus. */
+  &:hover .tip,
+  &:focus-visible .tip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Flipped below the section when there isn't room above (JS toggles it). */
+  &.tip-below .tip {
+    bottom: auto;
+    top: calc(100% + 8px);
+    transform: translateY(-4px);
+  }
+
+  &.tip-below:hover .tip,
+  &.tip-below:focus-visible .tip {
+    transform: translateY(0);
+  }
+
+  /* Warning variant (live stream / active translation): amber, and its tooltip
+       is pinned below so it can't get clipped at the top of the popup. */
+  &.warn {
+    color: #ff9f0a;
+    align-self: center;
 
     &:hover,
     &:focus-visible {
-        color: var(--accent);
-        outline: none;
+      color: #e8900a;
     }
 
-    svg {
-        display: block;
-        width: 15px;
-        height: 15px;
+    .tip {
+      left: 0;
+      right: 0;
+      top: calc(100% + 8px);
+      bottom: auto;
+      width: auto;
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      border: 1px solid var(--warn-line);
+      transform: translateY(-4px);
     }
 
-    /* Reveal the section's hint on hover/focus. */
     &:hover .tip,
     &:focus-visible .tip {
-        opacity: 1;
-        transform: translateY(0);
+      transform: translateY(0);
     }
-
-    /* Flipped below the section when there isn't room above (JS toggles it). */
-    &.tip-below .tip {
-        bottom: auto;
-        top: calc(100% + 8px);
-        transform: translateY(-4px);
-    }
-
-    &.tip-below:hover .tip,
-    &.tip-below:focus-visible .tip {
-        transform: translateY(0);
-    }
-
-    /* Warning variant (live stream / active translation): amber, and its tooltip
-       is pinned below so it can't get clipped at the top of the popup. */
-    &.warn {
-        color: #ff9f0a;
-        align-self: center;
-
-        &:hover,
-        &:focus-visible {
-            color: #e8900a;
-        }
-
-        .tip {
-            left: 0;
-            right: 0;
-            top: calc(100% + 8px);
-            bottom: auto;
-            width: auto;
-            background: var(--warn-bg);
-            color: var(--warn-text);
-            border: 1px solid var(--warn-line);
-            transform: translateY(-4px);
-        }
-
-        &:hover .tip,
-        &:focus-visible .tip {
-            transform: translateY(0);
-        }
-    }
+  }
 }
 
 /* Base tooltip — kept top-level (specificity 0,1,0) so the .info-scoped rules
    above can override it; nesting it under .info would raise its specificity. */
 .tip {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: calc(100% + 8px);
-    z-index: 30;
-    padding: 9px 11px;
-    border-radius: 9px;
-    background: var(--tip-bg);
-    color: var(--tip-text);
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1.45;
-    text-align: left;
-    box-shadow: 0 8px 22px var(--shadow);
-    opacity: 0;
-    transform: translateY(4px);
-    pointer-events: none;
-    transition: opacity 0.15s, transform 0.15s;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--tip-bg);
+  color: var(--tip-text);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: 0 8px 22px var(--shadow);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 
 /* --- Expand chevron ------------------------------------------------------ */
 /* Hover affordance: a small chevron fades in at the card's bottom — points
    down on a collapsed block (will expand), up on an open one (will collapse). */
 .expand-hint {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    height: 18px;
-    padding-bottom: 3px;
-    border-radius: 0 0 10px 10px;
-    background: linear-gradient(to bottom, transparent, var(--hint-fade));
-    opacity: 0;
-    cursor: pointer;
-    pointer-events: auto;
-    transition: opacity 0.18s;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 18px;
+  padding-bottom: 3px;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(to bottom, transparent, var(--hint-fade));
+  opacity: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.18s;
 
-    svg {
-        width: 12px;
-        height: 12px;
-        color: var(--muted);
-        transition: transform 0.18s, color 0.15s;
-    }
+  svg {
+    width: 12px;
+    height: 12px;
+    color: var(--muted);
+    transition:
+      transform 0.18s,
+      color 0.15s;
+  }
 
-    /* Hover feedback: brighten + grow the chevron. */
-    &:hover svg {
-        color: var(--text);
-        transform: scale(1.25);
-    }
+  /* Hover feedback: brighten + grow the chevron. */
+  &:hover svg {
+    color: var(--text);
+    transform: scale(1.25);
+  }
 }
 
 /* Visible when hovering the header (or the strip itself), or when open. Open
@@ -172,136 +176,139 @@
 .sec-head:hover ~ .expand-hint,
 .expand-hint:hover,
 .sync-body.open ~ .expand-hint {
-    opacity: 1;
+  opacity: 1;
 }
 
 .sync-body.open ~ .expand-hint svg {
-    transform: rotate(180deg);
+  transform: rotate(180deg);
 }
 
 .sync-body.open ~ .expand-hint:hover svg {
-    transform: rotate(180deg) scale(1.25);
+  transform: rotate(180deg) scale(1.25);
 }
 
 /* --- Header row + on/off switch ------------------------------------------ */
 /* The title area expands/collapses the body; the switch toggles on/off. */
 .sec-head {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .sec-main {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--text);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .sec-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 
-    strong {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text);
-    }
+  strong {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
 }
 
 .switch-sub {
-    margin-top: 2px;
-    font-size: 11px;
-    color: var(--muted);
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .switch {
-    flex: 0 0 auto;
-    cursor: pointer;
+  flex: 0 0 auto;
+  cursor: pointer;
 }
 
 .switch-input {
-    position: absolute;
-    width: 0;
-    height: 0;
-    opacity: 0;
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
 
-    &:checked + .switch-track {
-        background: var(--accent);
+  &:checked + .switch-track {
+    background: var(--accent);
 
-        .switch-knob {
-            transform: translateX(16px);
-        }
+    .switch-knob {
+      transform: translateX(16px);
     }
+  }
 }
 
 .switch-track {
-    position: relative;
-    display: block;
-    width: 40px;
-    height: 24px;
-    border-radius: 12px;
-    background: var(--track);
-    transition: background 0.2s;
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--track);
+  transition: background 0.2s;
 }
 
 .switch-knob {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 2px var(--shadow);
-    transition: transform 0.2s;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition: transform 0.2s;
 }
 
 /* --- Collapsible body ---------------------------------------------------- */
 /* Collapses unless expanded — independent of the on/off switch. */
 .sync-body {
-    max-height: 0;
-    margin-top: 0;
-    opacity: 0;
-    overflow: hidden;
-    pointer-events: none;
-    transition: max-height 0.28s ease, opacity 0.2s, margin-top 0.2s;
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    max-height 0.28s ease,
+    opacity 0.2s,
+    margin-top 0.2s;
 
-    /* padding-bottom only when open — keeps the bottom chevron clear of the
+  /* padding-bottom only when open — keeps the bottom chevron clear of the
        last control; collapsed blocks stay visually untouched. */
-    &.open {
-        max-height: 560px;
-        margin-top: 12px;
-        padding-bottom: 16px;
-        opacity: 1;
-        pointer-events: auto;
-    }
+  &.open {
+    max-height: 560px;
+    margin-top: 12px;
+    padding-bottom: 16px;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .sync-label {
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: var(--muted);
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
 
-    b {
-        color: var(--text);
-    }
+  b {
+    color: var(--text);
+  }
 }
 
 .sync-hint {
-    margin-top: 4px;
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--muted);
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
 }

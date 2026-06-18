@@ -5,14 +5,18 @@ import { createMockChrome } from "./mocks/chrome.js";
 // Fresh theme module over a fresh chrome mock (so the routed STORE re-inits and
 // reads the seeded settings).
 async function fresh(settings: Record<string, unknown> = {}) {
-  (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = createMockChrome({ settings });
+  (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = createMockChrome(
+    { settings },
+  );
   (globalThis as unknown as { browser?: unknown }).browser = undefined;
   vi.resetModules();
   return import("../src/shared/theme.js");
 }
 
 describe("theme", () => {
-  beforeEach(() => { document.documentElement.removeAttribute("data-theme"); });
+  beforeEach(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
 
   it("applyTheme sets data-theme for explicit themes and clears it for system", async () => {
     const { applyTheme } = await fresh();
@@ -41,7 +45,9 @@ describe("theme", () => {
     setTheme("light");
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
     let got: Record<string, unknown> = {};
-    (globalThis.chrome.storage.sync as chrome.storage.StorageArea).get(["theme"], (r) => { got = r; });
+    (globalThis.chrome.storage.sync as chrome.storage.StorageArea).get(["theme"], (r) => {
+      got = r;
+    });
     expect(got.theme).toBe("light");
   });
 });

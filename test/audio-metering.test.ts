@@ -20,7 +20,12 @@ vi.mock("../src/content/audio/routing.js", () => ({
 }));
 
 import { S } from "../src/content/state.js";
-import { audioLevels, recordAudioSample, audioLevelHist, A_HIST_MS } from "../src/content/audio/metering.js";
+import {
+  audioLevels,
+  recordAudioSample,
+  audioLevelHist,
+  A_HIST_MS,
+} from "../src/content/audio/metering.js";
 
 // rms 0.5 over the buffer → ~-6.02 dB (matches levels.test.ts).
 function makeGraph(reduction: number) {
@@ -28,7 +33,9 @@ function makeGraph(reduction: number) {
     comp: { reduction },
     analyserIn: {
       fftSize: 8,
-      getFloatTimeDomainData(buf: Float32Array) { buf.fill(0.5); },
+      getFloatTimeDomainData(buf: Float32Array) {
+        buf.fill(0.5);
+      },
     },
   };
 }
@@ -44,7 +51,6 @@ beforeEach(() => {
 });
 
 describe("audioLevels", () => {
-
   it("inactive when there is no primary video", () => {
     expect(audioLevels()).toEqual({ active: false, enabled: true, translation: false });
   });
@@ -66,7 +72,7 @@ describe("audioLevels", () => {
     const r = audioLevels();
     expect(r.active).toBe(true);
     expect(r.in).toBeCloseTo(-6.02, 1);
-    expect(r.out).toBeCloseTo(-9.02, 1);     // input + 3 dB reduction, no make-up
+    expect(r.out).toBeCloseTo(-9.02, 1); // input + 3 dB reduction, no make-up
     expect(r.threshold).toBe(-30);
   });
 
@@ -104,20 +110,25 @@ describe("audioLevels", () => {
 describe("recordAudioSample", () => {
   it("does nothing without a running context", () => {
     const v = {} as HTMLVideoElement;
-    m.primary = v; m.graphs.set(v, makeGraph(-3)); m.ctx = { state: "suspended" };
+    m.primary = v;
+    m.graphs.set(v, makeGraph(-3));
+    m.ctx = { state: "suspended" };
     recordAudioSample();
     expect(audioLevelHist.length).toBe(0);
   });
 
   it("does nothing when there's no graph", () => {
-    m.primary = {} as HTMLVideoElement; m.ctx = { state: "running" };
+    m.primary = {} as HTMLVideoElement;
+    m.ctx = { state: "running" };
     recordAudioSample();
     expect(audioLevelHist.length).toBe(0);
   });
 
   it("appends an in/out sample when a graph runs", () => {
     const v = {} as HTMLVideoElement;
-    m.primary = v; m.graphs.set(v, makeGraph(-3)); m.ctx = { state: "running" };
+    m.primary = v;
+    m.graphs.set(v, makeGraph(-3));
+    m.ctx = { state: "running" };
     recordAudioSample();
     expect(audioLevelHist.length).toBe(1);
     expect(audioLevelHist[0].in).toBeCloseTo(-6.02, 1);
@@ -126,7 +137,9 @@ describe("recordAudioSample", () => {
 
   it("caps the history at 48 samples (drops the oldest)", () => {
     const v = {} as HTMLVideoElement;
-    m.primary = v; m.graphs.set(v, makeGraph(0)); m.ctx = { state: "running" };
+    m.primary = v;
+    m.graphs.set(v, makeGraph(0));
+    m.ctx = { state: "running" };
     for (let i = 0; i < 60; i++) recordAudioSample();
     expect(audioLevelHist.length).toBe(48);
   });

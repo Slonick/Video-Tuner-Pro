@@ -23,7 +23,9 @@ describe("i18n", () => {
   });
 
   it("returns '' instead of throwing when the context is dead", () => {
-    vi.spyOn(globalThis.chrome.i18n, "getMessage").mockImplementation(() => { throw new Error("context invalidated"); });
+    vi.spyOn(globalThis.chrome.i18n, "getMessage").mockImplementation(() => {
+      throw new Error("context invalidated");
+    });
     expect(i18n("greeting")).toBe("");
   });
 });

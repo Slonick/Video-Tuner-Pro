@@ -11,7 +11,8 @@ export function engageAudio(attempt = 0): void {
   if (!S.audioCompEnabled) return;
   const res = applyAudioComp();
   if (res.engaged > 0 || res.reason === "inuse") return; // engaged, or can't (already in use)
-  if (attempt < 6) { // ~3s of retries while it loads / resumes
+  if (attempt < 6) {
+    // ~3s of retries while it loads / resumes
     retryTimer = setTimeout(() => engageAudio(attempt + 1), 500);
   }
 }

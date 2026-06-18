@@ -65,7 +65,8 @@ export function resetToSaved(): void {
     applyResolvedNow(
       (result.channels || {}) as Record<string, number>,
       (result.domains || {}) as Record<string, number>,
-      result.globalSpeed as number | undefined);
+      result.globalSpeed as number | undefined,
+    );
   });
 }
 
@@ -105,8 +106,11 @@ function applyToVideo(video: HTMLVideoElement): void {
       // Only set when it actually differs — applyAll runs often (1s tick + every
       // MutationObserver pass). Re-assigning playbackRate each time restarts the
       // audio time-stretcher and glitches sound during sped-up playback.
-      if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001) video.playbackRate = S.currentSpeed;
-    } catch (e) { /* some players reject rate before metadata is ready */ }
+      if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001)
+        video.playbackRate = S.currentSpeed;
+    } catch (e) {
+      /* some players reject rate before metadata is ready */
+    }
   }
 
   if (seenVideos.has(video)) return;
@@ -117,7 +121,9 @@ function applyToVideo(video: HTMLVideoElement): void {
     // player's own latency control here, or the tug-of-war drops frames.
     if (isLive(video)) return;
     if (Math.abs(video.playbackRate - S.currentSpeed) > 0.001) {
-      try { video.playbackRate = S.currentSpeed; } catch (e) {}
+      try {
+        video.playbackRate = S.currentSpeed;
+      } catch (e) {}
     }
   };
   video.addEventListener("play", reapply);
@@ -151,5 +157,6 @@ export function setSpeed(speed: number, persist?: boolean, manual?: boolean): vo
   S.userSpeed = S.currentSpeed; // remember it as the intended non-live speed
   applyAll();
   if (persist) persistDomainSpeed(S.currentSpeed);
-  updateTimeBadge(); flashBadge(); // the badge flashes the new speed as feedback
+  updateTimeBadge();
+  flashBadge(); // the badge flashes the new speed as feedback
 }

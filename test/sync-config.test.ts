@@ -1,8 +1,16 @@
 import { describe, it, expect } from "vitest";
 import {
-  CATEGORIES, KEY_CATEGORY, KEYS_BY_CATEGORY, categoryOf, normalizeConfig,
-  areaForCategory, areaForKey, groupKeysByArea, DEFAULT_SYNC,
-  ALL_LOCAL, effectiveConfig,
+  CATEGORIES,
+  KEY_CATEGORY,
+  KEYS_BY_CATEGORY,
+  categoryOf,
+  normalizeConfig,
+  areaForCategory,
+  areaForKey,
+  groupKeysByArea,
+  DEFAULT_SYNC,
+  ALL_LOCAL,
+  effectiveConfig,
 } from "../src/shared/sync-config.js";
 
 describe("categoryOf", () => {
@@ -35,9 +43,7 @@ describe("effectiveConfig", () => {
 
   it("forces every category local when the master switch is off", () => {
     expect(effectiveConfig({ ...DEFAULT_SYNC }, false)).toEqual(ALL_LOCAL);
-    expect(ALL_LOCAL).toEqual(
-      CATEGORIES.reduce((a, c) => ({ ...a, [c]: false }), {}),
-    );
+    expect(ALL_LOCAL).toEqual(CATEGORIES.reduce((a, c) => ({ ...a, [c]: false }), {}));
   });
 
   it("does not mutate its input", () => {

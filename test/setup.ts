@@ -21,6 +21,8 @@ if (typeof window !== "undefined" && !window.matchMedia) {
     removeEventListener() {},
     addListener() {},
     removeListener() {},
-    dispatchEvent() { return false; },
+    dispatchEvent() {
+      return false;
+    },
   })) as typeof window.matchMedia;
 }

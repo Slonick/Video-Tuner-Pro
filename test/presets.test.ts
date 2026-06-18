@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { normalizePresets, presetFractions, DEFAULT_PRESETS, PRESET_COUNT } from "../src/shared/presets.js";
-import { normalizeKeymap, isBindableCode, codeLabel, DEFAULT_KEYMAP } from "../src/shared/keymap.js";
+import {
+  normalizePresets,
+  presetFractions,
+  DEFAULT_PRESETS,
+  PRESET_COUNT,
+} from "../src/shared/presets.js";
+import {
+  normalizeKeymap,
+  isBindableCode,
+  codeLabel,
+  DEFAULT_KEYMAP,
+} from "../src/shared/keymap.js";
 
 describe("normalizePresets", () => {
   it("returns the defaults, sorted, for empty/invalid input", () => {
@@ -37,8 +47,11 @@ describe("normalizeKeymap", () => {
     expect(normalizeKeymap({ slower: "Shift", faster: 42 })).toEqual(DEFAULT_KEYMAP);
   });
   it("accepts valid bindable codes", () => {
-    expect(normalizeKeymap({ slower: "KeyJ", faster: "KeyK", reset: "Digit0" }))
-      .toEqual({ slower: "KeyJ", faster: "KeyK", reset: "Digit0" });
+    expect(normalizeKeymap({ slower: "KeyJ", faster: "KeyK", reset: "Digit0" })).toEqual({
+      slower: "KeyJ",
+      faster: "KeyK",
+      reset: "Digit0",
+    });
   });
   it("drops a duplicate binding back to its default", () => {
     const km = normalizeKeymap({ slower: "KeyZ", faster: "KeyZ" });

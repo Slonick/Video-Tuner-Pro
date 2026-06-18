@@ -24,14 +24,19 @@
         const l = pl.getLiveLatency();
         if (typeof l === "number" && isFinite(l) && l > 0) return l;
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      /* ignore */
+    }
     try {
       if (typeof pl.getStatistics === "function") {
         const s = pl.getStatistics();
-        const l = s && (s.hlsLatencyBroadcaster != null ? s.hlsLatencyBroadcaster : s.broadcasterLatency);
+        const l =
+          s && (s.hlsLatencyBroadcaster != null ? s.hlsLatencyBroadcaster : s.broadcasterLatency);
         if (typeof l === "number" && isFinite(l) && l > 0) return l;
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      /* ignore */
+    }
     return null;
   }
 
@@ -48,7 +53,11 @@
             for (let i = 0; i < 60 && f; i++) {
               const p = f.memoizedProps || (f.stateNode && f.stateNode.props);
               const inst = p && (p.mediaPlayerInstance || p.player);
-              if (inst && (typeof inst.getLiveLatency === "function" || typeof inst.getStatistics === "function")) {
+              if (
+                inst &&
+                (typeof inst.getLiveLatency === "function" ||
+                  typeof inst.getStatistics === "function")
+              ) {
                 return inst;
               }
               f = f.return;
@@ -64,7 +73,10 @@
   let twitchPlayer: any = null;
   function twitchLatency(): number | null {
     let lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
-    if (lat == null) { twitchPlayer = findTwitchPlayer(); lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null; }
+    if (lat == null) {
+      twitchPlayer = findTwitchPlayer();
+      lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
+    }
     return lat;
   }
 
@@ -76,8 +88,13 @@
   // walking the React fiber tree from the video/player. Best-effort: any failure
   // just leaves the attribute unset and the badge falls back to buffered-ahead.
   function isHls(o: any): boolean {
-    return o && typeof o.latency === "number" &&
-      (o.media instanceof HTMLMediaElement || typeof o.attachMedia === "function" || typeof o.recoverMediaError === "function");
+    return (
+      o &&
+      typeof o.latency === "number" &&
+      (o.media instanceof HTMLMediaElement ||
+        typeof o.attachMedia === "function" ||
+        typeof o.recoverMediaError === "function")
+    );
   }
   function findHls(): any {
     const roots = document.querySelectorAll("video, .video-player, [class*='player']");
@@ -89,7 +106,10 @@
             let f: any = cur[k];
             for (let i = 0; i < 60 && f; i++) {
               const p = f.memoizedProps || (f.stateNode && f.stateNode.props);
-              if (p) for (const pk in p) { if (isHls(p[pk])) return p[pk]; }
+              if (p)
+                for (const pk in p) {
+                  if (isHls(p[pk])) return p[pk];
+                }
               const s = f.memoizedState;
               if (s && isHls(s.hls)) return s.hls;
               f = f.return;
@@ -107,7 +127,9 @@
       if (!isHls(hlsInst)) hlsInst = findHls();
       const l = hlsInst ? hlsInst.latency : null;
       return typeof l === "number" && isFinite(l) && l > 0 ? l : null;
-    } catch (e) { return null; }
+    } catch (e) {
+      return null;
+    }
   }
 
   function youtubePlayer(): any {
@@ -135,19 +157,25 @@
     try {
       const yp: any = youtubePlayer();
       if (!yp || typeof yp.getVideoData !== "function") return null;
-      if (yp.classList && (yp.classList.contains("ad-showing") || yp.classList.contains("ad-interrupting"))) return null;
+      if (
+        yp.classList &&
+        (yp.classList.contains("ad-showing") || yp.classList.contains("ad-interrupting"))
+      )
+        return null;
       const vd = yp.getVideoData();
       if (!vd || typeof vd.isLive !== "boolean") return null;
       if (vd.isLive) return true;
       const st = typeof yp.getPlayerState === "function" ? yp.getPlayerState() : null;
-      return (st === 1 || st === 2 || st === 3) ? false : null; // playing/paused/buffering
-    } catch (e) { return null; }
+      return st === 1 || st === 2 || st === 3 ? false : null; // playing/paused/buffering
+    } catch (e) {
+      return null;
+    }
   }
 
   // YouTube's #movie_player exposes "Live Latency" via getStatsForNerds(); a live
   // stream's distance behind the seekable edge is the same thing as a fallback
   // (guarded so it never fires on VODs).
-  let statsLatRaw = "";       // last raw stats value, to spot a frozen readout
+  let statsLatRaw = ""; // last raw stats value, to spot a frozen readout
   let statsLatChangedAt = 0;
   function youtubeLatency(): number | null {
     try {
@@ -160,12 +188,18 @@
         // Several keys match /latency/ (live_latency, live_latency_style:
         // "display:none", live_latency_samples) in no guaranteed order — prefer
         // the exact key, then take the first one that parses to a number.
-        const keys = ["live_latency", ...Object.keys(s).filter((k) => k !== "live_latency" && /latency/i.test(k))];
+        const keys = [
+          "live_latency",
+          ...Object.keys(s).filter((k) => k !== "live_latency" && /latency/i.test(k)),
+        ];
         for (const k of keys) {
           const raw = s[k] == null ? "" : String(s[k]);
           const n = parseFloat(raw.replace(",", "."));
           if (!(isFinite(n) && n > 0)) continue;
-          if (raw !== statsLatRaw) { statsLatRaw = raw; statsLatChangedAt = Date.now(); }
+          if (raw !== statsLatRaw) {
+            statsLatRaw = raw;
+            statsLatChangedAt = Date.now();
+          }
           statsLat = n;
           break;
         }
@@ -180,7 +214,9 @@
         if (isFinite(d) && d > 0) return d;
       }
       return statsLat; // a stale reading still beats nothing
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      /* ignore */
+    }
     return null;
   }
 
@@ -195,7 +231,9 @@
       const live = youtubeIsLive();
       if (live != null) root.setAttribute(LIVE_ATTR, live ? "1" : "0");
       else if (root.hasAttribute(LIVE_ATTR)) root.removeAttribute(LIVE_ATTR);
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   setInterval(tick, 1000);

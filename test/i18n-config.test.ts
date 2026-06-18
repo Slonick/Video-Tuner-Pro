@@ -31,7 +31,8 @@ describe("resolveLocale", () => {
 
 describe("language preference storage", () => {
   async function fresh(settings: Record<string, unknown> = {}) {
-    (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = createMockChrome({ settings });
+    (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome =
+      createMockChrome({ settings });
     (globalThis as unknown as { browser?: unknown }).browser = undefined;
     vi.resetModules();
     return import("../src/shared/i18n-config.js");
@@ -40,7 +41,9 @@ describe("language preference storage", () => {
   it("getLang defaults to system when nothing is saved", async () => {
     const { getLang } = await fresh({});
     let lang: string | undefined;
-    getLang((l) => { lang = l; });
+    getLang((l) => {
+      lang = l;
+    });
     expect(lang).toBe("system");
   });
 
@@ -48,7 +51,9 @@ describe("language preference storage", () => {
     const { getLang, setLang } = await fresh({});
     setLang("ja");
     let lang: string | undefined;
-    getLang((l) => { lang = l; });
+    getLang((l) => {
+      lang = l;
+    });
     expect(lang).toBe("ja");
   });
 });

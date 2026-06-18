@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // messaging.ts registers one runtime.onMessage listener at import. Capture it via
 // a mocked api, then invoke each action and assert the right speed.ts call + the
 // reply payload, including the video-frame vs top-frame fallback.
 const h = vi.hoisted(() => ({
-  listener: null as null | ((req: unknown, sender: unknown, send: (r?: unknown) => void) => boolean),
+  listener: null as
+    | null
+    | ((req: unknown, sender: unknown, send: (r?: unknown) => void) => boolean),
   hasVideo: true,
   onStream: false,
   channel: "UCabc" as string | null,
@@ -13,41 +15,70 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/content/platform/browser.js", () => ({
-  api: { runtime: { onMessage: { addListener: (fn: typeof h.listener) => { h.listener = fn; } } } },
+  api: {
+    runtime: {
+      onMessage: {
+        addListener: (fn: typeof h.listener) => {
+          h.listener = fn;
+        },
+      },
+    },
+  },
 }));
 vi.mock("../src/content/channel.js", () => ({
-  currentChannel: () => h.channel, currentChannelName: () => h.channelName,
+  currentChannel: () => h.channel,
+  currentChannelName: () => h.channelName,
 }));
 vi.mock("../src/content/videos.js", () => ({ collectVideos: () => (h.hasVideo ? [{}] : []) }));
 vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream }));
 const speed = vi.hoisted(() => ({
-  setSpeed: vi.fn(), persistDomainSpeed: vi.fn(), persistChannelSpeed: vi.fn(),
-  persistGlobalSpeed: vi.fn(), resetScope: vi.fn(),
+  setSpeed: vi.fn(),
+  persistDomainSpeed: vi.fn(),
+  persistChannelSpeed: vi.fn(),
+  persistGlobalSpeed: vi.fn(),
+  resetScope: vi.fn(),
 }));
 vi.mock("../src/content/speed.js", () => speed);
 const target = vi.hoisted(() => ({
-  setTarget: vi.fn(), persistSiteTarget: vi.fn(), persistChannelTarget: vi.fn(),
-  persistGlobalTarget: vi.fn(), resetTargetScope: vi.fn(),
+  setTarget: vi.fn(),
+  persistSiteTarget: vi.fn(),
+  persistChannelTarget: vi.fn(),
+  persistGlobalTarget: vi.fn(),
+  resetTargetScope: vi.fn(),
 }));
 vi.mock("../src/content/live/target.js", () => target);
 vi.mock("../src/content/monitor.js", () => ({ monitorData: () => ({ mock: "monitor" }) }));
-vi.mock("../src/content/audio/metering.js", () => ({ audioLevelHist: [{ in: -10, out: -12 }], A_HIST_MS: 150 }));
+vi.mock("../src/content/audio/metering.js", () => ({
+  audioLevelHist: [{ in: -10, out: -12 }],
+  A_HIST_MS: 150,
+}));
 vi.mock("../src/content/bitrate.js", () => ({ bufferLevelHist: [] }));
 
 import { S } from "../src/content/state.js";
 import "../src/content/messaging.js";
 
 function send(req: unknown): { ret: boolean; resp: unknown; called: boolean } {
-  let resp: unknown, called = false;
-  const ret = h.listener!(req, {}, (r?: unknown) => { called = true; resp = r; });
+  let resp: unknown,
+    called = false;
+  const ret = h.listener!(req, {}, (r?: unknown) => {
+    called = true;
+    resp = r;
+  });
   return { ret, resp, called };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.hasVideo = true; h.onStream = false; h.channel = "UCabc"; h.channelName = "Cool Channel";
+  h.hasVideo = true;
+  h.onStream = false;
+  h.channel = "UCabc";
+  h.channelName = "Cool Channel";
   S.currentSpeed = 1.0;
-  try { Object.defineProperty(window, "top", { value: window, configurable: true }); } catch (e) { /* ignore */ }
+  try {
+    Object.defineProperty(window, "top", { value: window, configurable: true });
+  } catch (e) {
+    /* ignore */
+  }
 });
 
 describe("setSpeed action", () => {
@@ -103,7 +134,14 @@ describe("getSpeed", () => {
     S.currentSpeed = 1.25;
     S.speedScope = "channel";
     const { resp } = send({ action: "getSpeed" });
-    expect(resp).toEqual({ speed: 1.25, domain: "localhost", channel: "UCabc", channelName: "Cool Channel", scope: "channel", live: false });
+    expect(resp).toEqual({
+      speed: 1.25,
+      domain: "localhost",
+      channel: "UCabc",
+      channelName: "Cool Channel",
+      scope: "channel",
+      live: false,
+    });
   });
 });
 
@@ -132,9 +170,16 @@ describe("live-sync target by scope", () => {
   });
 
   it("getTarget returns target + scope + channel context", () => {
-    S.liveSyncTarget = 9; S.targetScope = "site";
+    S.liveSyncTarget = 9;
+    S.targetScope = "site";
     const { resp } = send({ action: "getTarget" });
-    expect(resp).toEqual({ target: 9, scope: "site", channel: "UCabc", channelName: "Cool Channel", live: false });
+    expect(resp).toEqual({
+      target: 9,
+      scope: "site",
+      channel: "UCabc",
+      channelName: "Cool Channel",
+      live: false,
+    });
   });
 });
 
@@ -144,7 +189,11 @@ describe("getMonitor / getHistory", () => {
   });
 
   it("getHistory rounds and shapes the audio/buffer history", () => {
-    const resp = send({ action: "getHistory" }).resp as { audio: number[][]; audioStep: number; buffer: number[][] };
+    const resp = send({ action: "getHistory" }).resp as {
+      audio: number[][];
+      audioStep: number;
+      buffer: number[][];
+    };
     expect(resp.audio).toEqual([[-10, -12]]);
     expect(resp.audioStep).toBe(150);
     expect(resp.buffer).toEqual([]);
@@ -179,11 +228,13 @@ describe("replyFromVideoFrame fallback", () => {
     vi.useFakeTimers();
     h.hasVideo = false; // window.top === window (top frame)
     let called = false;
-    const ret = h.listener!({ action: "getSpeed" }, {}, () => { called = true; });
+    const ret = h.listener!({ action: "getSpeed" }, {}, () => {
+      called = true;
+    });
     expect(ret).toBe(true);
-    expect(called).toBe(false);   // not yet
+    expect(called).toBe(false); // not yet
     vi.advanceTimersByTime(60);
-    expect(called).toBe(true);    // deferred reply fired
+    expect(called).toBe(true); // deferred reply fired
     vi.useRealTimers();
   });
 });

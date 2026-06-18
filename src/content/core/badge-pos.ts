@@ -1,6 +1,11 @@
 import { clampNum } from "./clamp.js";
 
-export interface Rect { left: number; top: number; width: number; height: number; }
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 // The badge's top-left as a fraction of the video frame, clamped so the whole
 // badge stays inside it. Stored per site and re-applied on every render, so the

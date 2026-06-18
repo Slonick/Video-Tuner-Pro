@@ -7,17 +7,44 @@ import { clamp, clampTarget } from "./core/clamp.js";
 import { S } from "./state.js";
 import { collectVideos } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
-import { setSpeed, persistDomainSpeed, persistChannelSpeed, persistGlobalSpeed, resetScope, resetToSaved } from "./speed.js";
-import { setTarget, persistSiteTarget, persistChannelTarget, persistGlobalTarget, resetTargetScope, applyResolvedTargetFromStore } from "./live/target.js";
+import {
+  setSpeed,
+  persistDomainSpeed,
+  persistChannelSpeed,
+  persistGlobalSpeed,
+  resetScope,
+  resetToSaved,
+} from "./speed.js";
+import {
+  setTarget,
+  persistSiteTarget,
+  persistChannelTarget,
+  persistGlobalTarget,
+  resetTargetScope,
+  applyResolvedTargetFromStore,
+} from "./live/target.js";
 import { monitorData } from "./monitor.js";
 import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
 import { bufferLevelHist } from "./bitrate.js";
 
-function replyFromVideoFrame(sendResponse: (response?: unknown) => void, build: () => unknown): boolean {
+function replyFromVideoFrame(
+  sendResponse: (response?: unknown) => void,
+  build: () => unknown,
+): boolean {
   const hasVid = collectVideos().length > 0;
-  const reply = () => { try { sendResponse(build()); } catch (e) {} };
-  if (hasVid) { reply(); return true; }
-  if (window.top === window) { setTimeout(reply, 60); return true; }
+  const reply = () => {
+    try {
+      sendResponse(build());
+    } catch (e) {}
+  };
+  if (hasVid) {
+    reply();
+    return true;
+  }
+  if (window.top === window) {
+    setTimeout(reply, 60);
+    return true;
+  }
   return false; // subframe without a video stays silent
 }
 
@@ -25,8 +52,11 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "setSpeed") {
     // Every frame applies it; only the video frame answers.
     setSpeed(request.speed, false, true);
-    return replyFromVideoFrame(sendResponse,
-      () => ({ success: true, speed: S.currentSpeed, live: onStreamPage() }));
+    return replyFromVideoFrame(sendResponse, () => ({
+      success: true,
+      speed: S.currentSpeed,
+      live: onStreamPage(),
+    }));
   }
   if (request.action === "remember") {
     const speed = typeof request.speed === "number" ? clamp(request.speed) : S.currentSpeed;
@@ -47,14 +77,19 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "getSpeed") {
-    return replyFromVideoFrame(sendResponse,
-      () => ({ speed: S.currentSpeed, domain: getDomain(), channel: currentChannel(), channelName: currentChannelName(), scope: S.speedScope, live: onStreamPage() }));
+    return replyFromVideoFrame(sendResponse, () => ({
+      speed: S.currentSpeed,
+      domain: getDomain(),
+      channel: currentChannel(),
+      channelName: currentChannelName(),
+      scope: S.speedScope,
+      live: onStreamPage(),
+    }));
   }
   // --- Live-sync allowed delay (buffer target), per scope — mirrors speed above.
   if (request.action === "setTarget") {
-    setTarget(request.target);   // live preview, no persist
-    return replyFromVideoFrame(sendResponse,
-      () => ({ success: true, target: S.liveSyncTarget }));
+    setTarget(request.target); // live preview, no persist
+    return replyFromVideoFrame(sendResponse, () => ({ success: true, target: S.liveSyncTarget }));
   }
   if (request.action === "rememberTarget") {
     const target = clampTarget(request.target);
@@ -65,18 +100,25 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "resetTarget") {
-    resetTargetScope(request.scope === "channel" || request.scope === "global" ? request.scope : "site");
+    resetTargetScope(
+      request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+    );
     sendResponse({ success: true });
     return true;
   }
   if (request.action === "resetTargetToSaved") {
-    applyResolvedTargetFromStore();   // discard the live preview, re-apply the saved delay
+    applyResolvedTargetFromStore(); // discard the live preview, re-apply the saved delay
     sendResponse({ success: true });
     return true;
   }
   if (request.action === "getTarget") {
-    return replyFromVideoFrame(sendResponse,
-      () => ({ target: S.liveSyncTarget, scope: S.targetScope, channel: currentChannel(), channelName: currentChannelName(), live: onStreamPage() }));
+    return replyFromVideoFrame(sendResponse, () => ({
+      target: S.liveSyncTarget,
+      scope: S.targetScope,
+      channel: currentChannel(),
+      channelName: currentChannelName(),
+      live: onStreamPage(),
+    }));
   }
   if (request.action === "getMonitor") {
     return replyFromVideoFrame(sendResponse, () => monitorData());

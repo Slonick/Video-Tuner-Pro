@@ -7,7 +7,9 @@ export function forwardBuffer(video: HTMLVideoElement): number {
     for (let i = 0; i < b.length; i++) {
       if (t >= b.start(i) - 0.25 && t <= b.end(i) + 0.25) return b.end(i) - t;
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
   return 0;
 }
 
@@ -21,5 +23,7 @@ export function streamLatency(): number | null {
     if (a == null) return null;
     const n = parseFloat(a);
     return isFinite(n) && n > 0 ? n : null;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }

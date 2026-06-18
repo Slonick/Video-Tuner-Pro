@@ -12,7 +12,10 @@ export function movePill(group: HTMLElement | null): void {
   const pill = group.querySelector<HTMLElement>(".seg-pill");
   if (!pill) return;
   const active = group.querySelector<HTMLElement>(".active");
-  if (!active || active.offsetWidth === 0) { pill.style.opacity = "0"; return; }
+  if (!active || active.offsetWidth === 0) {
+    pill.style.opacity = "0";
+    return;
+  }
 
   const place = (): void => {
     pill.style.opacity = "1";
@@ -28,6 +31,8 @@ export function movePill(group: HTMLElement | null): void {
     const t = pill.style.transition;
     pill.style.transition = "none";
     place();
-    requestAnimationFrame(() => { pill.style.transition = t; });
+    requestAnimationFrame(() => {
+      pill.style.transition = t;
+    });
   }
 }

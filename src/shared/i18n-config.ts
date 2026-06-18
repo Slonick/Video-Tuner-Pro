@@ -6,7 +6,7 @@ import { STORE } from "./store.js";
 
 // Selectable locales, in picker display order. Codes match the _locales folders.
 export const LOCALES = ["en", "ru", "de", "es", "fr", "hi", "ja", "pt_BR", "uk", "zh_CN"] as const;
-export type Locale = typeof LOCALES[number];
+export type Locale = (typeof LOCALES)[number];
 export type Lang = "system" | Locale;
 
 // Native names shown in the picker.

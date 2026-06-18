@@ -14,21 +14,35 @@ function flushRaf(now: number): void {
   for (const [, cb] of entries) cb(now);
 }
 function setReducedMotion(reduce: boolean): void {
-  window.matchMedia = ((q: string) => ({ matches: reduce && /prefers-reduced-motion/.test(q) })) as typeof window.matchMedia;
+  window.matchMedia = ((q: string) => ({
+    matches: reduce && /prefers-reduced-motion/.test(q),
+  })) as typeof window.matchMedia;
 }
 
 beforeEach(() => {
   rafMap = new Map();
   nextId = 1;
-  globalThis.requestAnimationFrame = ((cb: (t: number) => void) => { const id = nextId++; rafMap.set(id, cb); return id; }) as typeof requestAnimationFrame;
-  globalThis.cancelAnimationFrame = ((id: number) => { rafMap.delete(id); }) as typeof cancelAnimationFrame;
+  globalThis.requestAnimationFrame = ((cb: (t: number) => void) => {
+    const id = nextId++;
+    rafMap.set(id, cb);
+    return id;
+  }) as typeof requestAnimationFrame;
+  globalThis.cancelAnimationFrame = ((id: number) => {
+    rafMap.delete(id);
+  }) as typeof cancelAnimationFrame;
   setReducedMotion(false);
 });
-afterEach(() => { document.body.innerHTML = ""; });
+afterEach(() => {
+  document.body.innerHTML = "";
+});
 
 function makeSlider(value: string, step = "5"): HTMLInputElement {
   const s = document.createElement("input");
-  s.type = "range"; s.min = "0"; s.max = "100"; s.step = step; s.value = value;
+  s.type = "range";
+  s.min = "0";
+  s.max = "100";
+  s.step = step;
+  s.value = value;
   return s;
 }
 
@@ -36,15 +50,15 @@ describe("tweenSlider", () => {
   it("glides the value to the target across frames, then restores the step", () => {
     const s = makeSlider("0");
     tweenSlider(s, 100);
-    expect(s.step).toBe("any");          // step relaxed for smooth sub-step motion
-    flushRaf(0);                          // start frame (t = 0)
-    flushRaf(100);                        // mid (t = 0.5)
+    expect(s.step).toBe("any"); // step relaxed for smooth sub-step motion
+    flushRaf(0); // start frame (t = 0)
+    flushRaf(100); // mid (t = 0.5)
     expect(Number(s.value)).toBeGreaterThan(0);
     expect(Number(s.value)).toBeLessThan(100);
-    flushRaf(200);                        // settle (t = 1)
+    flushRaf(200); // settle (t = 1)
     expect(s.value).toBe("100");
     expect(s.step).toBe("5");
-    expect(rafMap.size).toBe(0);          // no further frames queued
+    expect(rafMap.size).toBe(0); // no further frames queued
   });
 
   it("no-ops when already at the target", () => {
@@ -66,8 +80,9 @@ describe("tweenSlider", () => {
     const s = makeSlider("0");
     tweenSlider(s, 100);
     flushRaf(0);
-    tweenSlider(s, 20);                    // restart mid-flight
-    flushRaf(0); flushRaf(200);
+    tweenSlider(s, 20); // restart mid-flight
+    flushRaf(0);
+    flushRaf(200);
     expect(s.value).toBe("20");
     expect(s.step).toBe("5");
   });
@@ -77,7 +92,9 @@ describe("tweenNumber", () => {
   it("counts the element to the target across frames", () => {
     const el = document.createElement("span");
     tweenNumber(el, 0, 100, (v) => Math.round(v) + "%");
-    flushRaf(0); flushRaf(100); flushRaf(200);
+    flushRaf(0);
+    flushRaf(100);
+    flushRaf(200);
     expect(el.textContent).toBe("100%");
   });
 
@@ -100,7 +117,8 @@ describe("tweenNumber", () => {
     tweenNumber(el, 0, 100, (v) => String(Math.round(v)));
     flushRaf(0);
     tweenNumber(el, 0, 20, (v) => String(Math.round(v)));
-    flushRaf(0); flushRaf(200);
+    flushRaf(0);
+    flushRaf(200);
     expect(el.textContent).toBe("20");
   });
 });
@@ -108,11 +126,19 @@ describe("tweenNumber", () => {
 describe("movePill", () => {
   function makeGroup(active = true): { group: HTMLElement; pill: HTMLElement } {
     const group = document.createElement("div");
-    const pill = document.createElement("span"); pill.className = "seg-pill";
-    const b1 = document.createElement("button"); b1.className = "scope-opt" + (active ? " active" : "");
-    const b2 = document.createElement("button"); b2.className = "scope-opt";
+    const pill = document.createElement("span");
+    pill.className = "seg-pill";
+    const b1 = document.createElement("button");
+    b1.className = "scope-opt" + (active ? " active" : "");
+    const b2 = document.createElement("button");
+    b2.className = "scope-opt";
     group.append(pill, b1, b2);
-    for (const [k, v] of [["offsetWidth", 50], ["offsetHeight", 24], ["offsetLeft", 3], ["offsetTop", 2]] as const) {
+    for (const [k, v] of [
+      ["offsetWidth", 50],
+      ["offsetHeight", 24],
+      ["offsetLeft", 3],
+      ["offsetTop", 2],
+    ] as const) {
       Object.defineProperty(b1, k, { value: v, configurable: true });
     }
     return { group, pill };
@@ -125,16 +151,17 @@ describe("movePill", () => {
     expect(pill.style.height).toBe("24px");
     expect(pill.style.transform).toBe("translate(3px, 2px)");
     expect(pill.style.opacity).toBe("1");
-    expect(pill.style.transition).toBe("none");   // suppressed for the first placement
+    expect(pill.style.transition).toBe("none"); // suppressed for the first placement
     flushRaf(0);
-    expect(pill.style.transition).toBe("");        // restored next frame
+    expect(pill.style.transition).toBe(""); // restored next frame
   });
 
   it("repositions directly on later calls (no transition reset)", () => {
     const { group, pill } = makeGroup();
-    movePill(group); flushRaf(0);                   // init
+    movePill(group);
+    flushRaf(0); // init
     pill.style.transition = "transform 0.2s";
-    movePill(group);                                // already inited → place() only
+    movePill(group); // already inited → place() only
     expect(pill.style.transition).toBe("transform 0.2s");
     expect(pill.style.opacity).toBe("1");
   });

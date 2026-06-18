@@ -52,8 +52,8 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
 
   it("a backward scrub → recording (not live), so manual speed applies", () => {
     setBadge(false);
-    trackDvr(vid(1000));   // establish position
-    trackDvr(vid(400));    // user presses back / drags ~600s into the buffer
+    trackDvr(vid(1000)); // establish position
+    trackDvr(vid(400)); // user presses back / drags ~600s into the buffer
     expect(isLive(vid(400))).toBe(false);
     expect(onStreamPage()).toBe(false);
   });
@@ -61,9 +61,9 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
   it("returning to the live head clears DVR mode → live again", () => {
     setBadge(false);
     trackDvr(vid(1000));
-    trackDvr(vid(400));    // scrubbed back
+    trackDvr(vid(400)); // scrubbed back
     expect(isLive(vid(400))).toBe(false);
-    setBadge(true);        // YouTube re-asserts the livehead badge at the edge
+    setBadge(true); // YouTube re-asserts the livehead badge at the edge
     trackDvr(vid(1000));
     expect(isLive(vid(1000))).toBe(true);
   });
@@ -71,11 +71,11 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
   it("new content loading (resetDvr) starts at the live edge", () => {
     setBadge(false);
     trackDvr(vid(1000));
-    trackDvr(vid(400));    // in DVR
+    trackDvr(vid(400)); // in DVR
     expect(isLive(vid(400))).toBe(false);
-    resetDvr();            // SPA navigation to a fresh stream
+    resetDvr(); // SPA navigation to a fresh stream
     setBadge(false);
-    trackDvr(vid(50));     // first sample of the new video — no false backward jump
+    trackDvr(vid(50)); // first sample of the new video — no false backward jump
     expect(isLive(vid(50))).toBe(true);
   });
 

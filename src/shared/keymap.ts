@@ -6,7 +6,11 @@
 export type Action = "slower" | "faster" | "reset";
 export const ACTIONS: Action[] = ["slower", "faster", "reset"];
 
-export interface Keymap { slower: string; faster: string; reset: string; }
+export interface Keymap {
+  slower: string;
+  faster: string;
+  reset: string;
+}
 
 export const DEFAULT_KEYMAP: Keymap = { slower: "KeyA", faster: "KeyD", reset: "KeyR" };
 
@@ -25,7 +29,7 @@ export function codeLabel(code: string): string {
 // Coerce stored/partial input into a full, valid keymap. Invalid or duplicate
 // bindings fall back to the default for that action (defaults never collide).
 export function normalizeKeymap(raw: unknown): Keymap {
-  const src = (raw && typeof raw === "object") ? raw as Record<string, unknown> : {};
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const out: Keymap = { ...DEFAULT_KEYMAP };
   const used = new Set<string>();
   for (const a of ACTIONS) {

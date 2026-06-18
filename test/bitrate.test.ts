@@ -1,19 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Controls for the live-stream sampler's data sources.
-const h = vi.hoisted(() => ({ onStream: false, live: null as unknown, latency: null as number | null, buffer: 0 }));
-vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream, liveVideo: () => h.live }));
-vi.mock("../src/content/live/metrics.js", () => ({ streamLatency: () => h.latency, forwardBuffer: () => h.buffer }));
+const h = vi.hoisted(() => ({
+  onStream: false,
+  live: null as unknown,
+  latency: null as number | null,
+  buffer: 0,
+}));
+vi.mock("../src/content/live/detection.js", () => ({
+  onStreamPage: () => h.onStream,
+  liveVideo: () => h.live,
+}));
+vi.mock("../src/content/live/metrics.js", () => ({
+  streamLatency: () => h.latency,
+  forwardBuffer: () => h.buffer,
+}));
 
 import { streamBitrate, recordBufferSample, bufferLevelHist } from "../src/content/bitrate.js";
 
 // streamBitrate estimates download rate from the decoder's byte counter over a
 // sliding window. Drive Date.now() with fake timers and feed a fake decoder.
-type Decoder = HTMLVideoElement & { webkitVideoDecodedByteCount?: number; webkitAudioDecodedByteCount?: number };
+type Decoder = HTMLVideoElement & {
+  webkitVideoDecodedByteCount?: number;
+  webkitAudioDecodedByteCount?: number;
+};
 const video = (bytes?: number): Decoder =>
-  ({ webkitVideoDecodedByteCount: bytes, webkitAudioDecodedByteCount: 0 } as Decoder);
+  ({ webkitVideoDecodedByteCount: bytes, webkitAudioDecodedByteCount: 0 }) as Decoder;
 
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0); });
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(0);
+});
 afterEach(() => vi.useRealTimers());
 
 describe("streamBitrate", () => {
@@ -39,7 +56,7 @@ describe("streamBitrate", () => {
 
   it("computes bits/s across the window once enough data exists", () => {
     const v = video(0);
-    streamBitrate(v);                       // t=0, 0 bytes
+    streamBitrate(v); // t=0, 0 bytes
     vi.setSystemTime(2000);
     v.webkitVideoDecodedByteCount = 2_000_000;
     // (2,000,000 bytes * 8) / 2s = 8,000,000 bit/s
@@ -51,17 +68,20 @@ describe("streamBitrate", () => {
     streamBitrate(v);
     vi.setSystemTime(2000);
     v.webkitVideoDecodedByteCount = 2_000_000;
-    streamBitrate(v);                       // valid reading
+    streamBitrate(v); // valid reading
     vi.setSystemTime(2500);
-    v.webkitVideoDecodedByteCount = 100;    // counter dropped → history cleared
-    expect(streamBitrate(v)).toBeNull();    // only one sample again
+    v.webkitVideoDecodedByteCount = 100; // counter dropped → history cleared
+    expect(streamBitrate(v)).toBeNull(); // only one sample again
   });
 });
 
 describe("recordBufferSample", () => {
   beforeEach(() => {
     bufferLevelHist.length = 0;
-    h.onStream = false; h.live = null; h.latency = null; h.buffer = 0;
+    h.onStream = false;
+    h.live = null;
+    h.latency = null;
+    h.buffer = 0;
   });
 
   it("clears the history and skips when off a stream page", () => {
@@ -72,25 +92,34 @@ describe("recordBufferSample", () => {
   });
 
   it("skips when there's no live video yet", () => {
-    h.onStream = true; h.live = null;
+    h.onStream = true;
+    h.live = null;
     recordBufferSample();
     expect(bufferLevelHist.length).toBe(0);
   });
 
   it("samples site latency where exposed", () => {
-    h.onStream = true; h.live = {}; h.latency = 3.5; h.buffer = 8;
+    h.onStream = true;
+    h.live = {};
+    h.latency = 3.5;
+    h.buffer = 8;
     recordBufferSample();
     expect(bufferLevelHist.at(-1)?.v).toBe(3.5);
   });
 
   it("falls back to the buffered-ahead seconds without site latency", () => {
-    h.onStream = true; h.live = {}; h.latency = null; h.buffer = 6;
+    h.onStream = true;
+    h.live = {};
+    h.latency = null;
+    h.buffer = 6;
     recordBufferSample();
     expect(bufferLevelHist.at(-1)?.v).toBe(6);
   });
 
   it("caps the history at 64 samples", () => {
-    h.onStream = true; h.live = {}; h.latency = 2;
+    h.onStream = true;
+    h.live = {};
+    h.latency = 2;
     for (let i = 0; i < 80; i++) recordBufferSample();
     expect(bufferLevelHist.length).toBe(64);
   });

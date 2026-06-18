@@ -41,10 +41,32 @@ const SITES: Site[] = [
     host: /(^|\.)twitch\.tv$/i,
     ns: "twitch",
     reserved: new Set([
-      "directory", "videos", "settings", "subscriptions", "following", "friends",
-      "inventory", "wallet", "drops", "prime", "turbo", "downloads", "jobs", "store",
-      "search", "p", "u", "team", "communities", "popout", "moderator", "payments",
-      "clips", "collections", "dashboard", "broadcast",
+      "directory",
+      "videos",
+      "settings",
+      "subscriptions",
+      "following",
+      "friends",
+      "inventory",
+      "wallet",
+      "drops",
+      "prime",
+      "turbo",
+      "downloads",
+      "jobs",
+      "store",
+      "search",
+      "p",
+      "u",
+      "team",
+      "communities",
+      "popout",
+      "moderator",
+      "payments",
+      "clips",
+      "collections",
+      "dashboard",
+      "broadcast",
     ]),
     // A VOD is /videos/<id> (no channel in the URL) — the channel link in the
     // video-info bar carries it. Best-effort hooks, then the broadcaster avatar's
@@ -55,15 +77,37 @@ const SITES: Site[] = [
       'a[data-a-target="watch-channel-name"]',
       'a[data-test-selector="video-author"]',
     ],
-    nameSel: ['[data-a-target="user-display-name"]', '[data-a-target="channel-header-display-name"]', "h1.tw-title"],
+    nameSel: [
+      '[data-a-target="user-display-name"]',
+      '[data-a-target="channel-header-display-name"]',
+      "h1.tw-title",
+    ],
   },
   {
     host: /(^|\.)kick\.com$/i,
     ns: "kick",
     reserved: new Set([
-      "browse", "categories", "category", "following", "subscriptions", "messages",
-      "search", "help", "settings", "account", "wallet", "clips", "about", "dashboard",
-      "creator", "partner", "terms", "privacy", "careers", "ranking", "store",
+      "browse",
+      "categories",
+      "category",
+      "following",
+      "subscriptions",
+      "messages",
+      "search",
+      "help",
+      "settings",
+      "account",
+      "wallet",
+      "clips",
+      "about",
+      "dashboard",
+      "creator",
+      "partner",
+      "terms",
+      "privacy",
+      "careers",
+      "ranking",
+      "store",
     ]),
     nameSel: ['[data-testid="channel-username"]'],
   },
@@ -71,8 +115,19 @@ const SITES: Site[] = [
     host: /(^|\.)vkvideo\.ru$|(^|\.)vkplay\.live$/i,
     ns: "vkvideo",
     reserved: new Set([
-      "app", "api", "search", "following", "categories", "category", "top", "about",
-      "support", "help", "settings", "feed", "promo",
+      "app",
+      "api",
+      "search",
+      "following",
+      "categories",
+      "category",
+      "top",
+      "about",
+      "support",
+      "help",
+      "settings",
+      "feed",
+      "promo",
     ]),
     nameSel: ['[class*="DisplayName"]', '[class*="channel-name"]'],
   },
@@ -80,8 +135,18 @@ const SITES: Site[] = [
     host: /(^|\.)w\.tv$/i,
     ns: "w",
     reserved: new Set([
-      "about", "search", "help", "login", "signup", "register", "terms", "privacy",
-      "settings", "browse", "categories", "category",
+      "about",
+      "search",
+      "help",
+      "login",
+      "signup",
+      "register",
+      "terms",
+      "privacy",
+      "settings",
+      "browse",
+      "categories",
+      "category",
     ]),
     nameSel: ['[class*="channel-name"]', '[class*="DisplayName"]'],
   },
@@ -114,9 +179,12 @@ function loginFromHref(href: string, site: Site): string | null {
 // isn't a channel page. The first segment is the login at any depth; reserved
 // routes return null. Twitch VODs (no channel in the URL) fall back to a DOM link.
 function siteLogin(site: Site): string | null {
-  let first = window.location.pathname.split("/").filter(Boolean)[0] || "";
+  const first = window.location.pathname.split("/").filter(Boolean)[0] || "";
   if (site.handle) {
-    if (first.startsWith("@")) { const c = clean(first.slice(1), site); if (c) return c; }
+    if (first.startsWith("@")) {
+      const c = clean(first.slice(1), site);
+      if (c) return c;
+    }
   } else if (first) {
     const c = clean(first, site);
     if (c) return c;
@@ -128,15 +196,26 @@ function siteLogin(site: Site): string | null {
     // spaces/punctuation doesn't become a bogus key.
     for (const s of site.nameSel) {
       const t = document.querySelector<HTMLElement>(s)?.textContent?.trim() || "";
-      if (/^[A-Za-z0-9_]{2,30}$/.test(t)) { const c = clean(t, site); if (c) return c; }
+      if (/^[A-Za-z0-9_]{2,30}$/.test(t)) {
+        const c = clean(t, site);
+        if (c) return c;
+      }
     }
     for (const s of site.linkSel) {
-      const lg = loginFromHref(document.querySelector<HTMLAnchorElement>(s)?.getAttribute("href") || "", site);
+      const lg = loginFromHref(
+        document.querySelector<HTMLAnchorElement>(s)?.getAttribute("href") || "",
+        site,
+      );
       if (lg) return lg;
     }
     // Fallback: the broadcaster avatar sits inside an anchor to /<login>.
-    const a = document.querySelector<HTMLElement>('img[class*="avatar" i]')?.closest<HTMLAnchorElement>('a[href^="/"]');
-    if (a) { const lg = loginFromHref(a.getAttribute("href") || "", site); if (lg) return lg; }
+    const a = document
+      .querySelector<HTMLElement>('img[class*="avatar" i]')
+      ?.closest<HTMLAnchorElement>('a[href^="/"]');
+    if (a) {
+      const lg = loginFromHref(a.getAttribute("href") || "", site);
+      if (lg) return lg;
+    }
   }
   return null;
 }
@@ -150,11 +229,18 @@ export function channelKeys(): string[] {
   const h = window.location.hostname;
   if (YT_HOST.test(h)) {
     if (window.location.pathname !== "/watch") return [];
-    let id: string | null = null, handle: string | null = null;
+    let id: string | null = null,
+      handle: string | null = null;
     for (const a of document.querySelectorAll<HTMLAnchorElement>(OWNER_SEL)) {
       const href = a.getAttribute("href") || "";
-      if (!id) { const m = href.match(/\/(channel\/UC[A-Za-z0-9_-]+)/); if (m) id = m[1]; }
-      if (!handle) { const m = href.match(/\/(@[A-Za-z0-9._-]+)/); if (m) handle = m[1]; }
+      if (!id) {
+        const m = href.match(/\/(channel\/UC[A-Za-z0-9_-]+)/);
+        if (m) id = m[1];
+      }
+      if (!handle) {
+        const m = href.match(/\/(@[A-Za-z0-9._-]+)/);
+        if (m) handle = m[1];
+      }
     }
     return [id, handle].filter((k): k is string => k != null);
   }
