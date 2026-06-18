@@ -45,6 +45,13 @@ const badgeEl = () =>
     .querySelector("[data-vtp-badge]")
     ?.shadowRoot?.querySelector("div") as HTMLElement | null) ?? null;
 const badgeText = () => badgeEl()?.querySelector("span")?.textContent;
+// "Shown" = the badge element exists AND isn't display:none. (Absent counts as
+// not shown — so a disabled badge that was never created still fails correctly if
+// a regression makes it appear.)
+const badgeShown = () => {
+  const el = badgeEl();
+  return !!el && el.style.display !== "none";
+};
 
 beforeEach(() => {
   h.primary = null;
@@ -66,8 +73,7 @@ describe("updateTimeBadge — visibility", () => {
     S.showRemaining = false;
     h.primary = fakeVideo();
     updateTimeBadge();
-    const el = badgeEl();
-    if (el) expect((el as HTMLElement).style.display).toBe("none");
+    expect(badgeShown()).toBe(false);
   });
 
   it("hides on a live stream when the stream badge is disabled", () => {
@@ -77,16 +83,14 @@ describe("updateTimeBadge — visibility", () => {
     S.streamBadge = false;
     h.primary = fakeVideo();
     updateTimeBadge();
-    const el = badgeEl();
-    if (el) expect((el as HTMLElement).style.display).toBe("none");
+    expect(badgeShown()).toBe(false);
   });
 
   it("hides a VOD badge when the video has no finite duration", () => {
     h.primary = fakeVideo({} as DOMRect);
     (h.primary as { duration: number }).duration = Infinity;
     updateTimeBadge();
-    const el = badgeEl();
-    if (el) expect((el as HTMLElement).style.display).toBe("none");
+    expect(badgeShown()).toBe(false);
   });
 });
 
