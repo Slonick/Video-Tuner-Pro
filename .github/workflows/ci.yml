@@ -1,8 +1,9 @@
 name: CI
 
-# One ordered pipeline, cheapest-first so a failure short-circuits before the
-# expensive steps run: lint → unit → e2e. On pull requests a Claude code-quality
-# review runs last, only once everything else is green.
+# lint is the cheap fast-fail gate; unit and e2e then run in parallel (both only
+# need lint), so a failure in the basics short-circuits before any tests run while
+# the two independent test layers still finish as fast as possible. On pull
+# requests a Claude code-quality review runs last, once unit AND e2e are green.
 #
 # Runs on every push to main (post-merge) and on every pull request. Enable branch
 # protection (Settings → Branches → require the "lint" / "unit" / "e2e" checks) to
@@ -90,12 +91,12 @@ jobs:
           path: coverage/
           retention-days: 14
 
-  # ── End-to-end (runs only if unit passed) ──────────────────────────────────
+  # ── End-to-end (in parallel with unit; both gated on lint) ─────────────────
   # Loads the BUILT extension into real Chromium (--headless=new, no xvfb) and
   # drives it on a local fixture page.
   e2e:
     name: e2e
-    needs: unit
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -160,12 +161,12 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
-  # ── Claude code-quality review (PRs only, last — runs only if e2e passed) ───
+  # ── Claude code-quality review (PRs only, last — runs only if unit + e2e passed) ─
   # Auth via a Claude subscription (Pro/Max) token in secret CLAUDE_CODE_OAUTH_TOKEN
   # (`claude setup-token`). Skipped on push events and on fork PRs (no secret).
   claude-review:
     name: claude-review
-    needs: e2e
+    needs: [unit, e2e]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
