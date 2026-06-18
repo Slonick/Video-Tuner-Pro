@@ -1,8 +1,9 @@
 node_modules/
 dist/
-coverage/
-test-results/
-playwright-report/
 .screenshots/
 .DS_Store
+coverage
+playwright-report
+test-results
+*.log
 *.zip
