@@ -26,7 +26,7 @@ jobs:
   # ── Static analysis (fastest gate) ─────────────────────────────────────────
   lint:
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, unraid]
     steps:
       - uses: actions/checkout@v7
 
@@ -50,7 +50,7 @@ jobs:
   unit:
     name: unit
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, unraid]
     steps:
       - uses: actions/checkout@v7
 
@@ -98,12 +98,7 @@ jobs:
   e2e:
     name: e2e
     needs: lint
-    runs-on: ubuntu-latest
-    # The official Playwright image ships Chromium + every required system lib
-    # preinstalled, so the job skips the slow "--with-deps" apt install AND the
-    # browser download (~7 min → seconds; just an image pull). Keep this tag in
-    # lockstep with @playwright/test in package.json on every Playwright bump.
-    container: mcr.microsoft.com/playwright:v1.60.0-jammy
+    runs-on: [self-hosted, unraid]
     steps:
       - uses: actions/checkout@v7
 
@@ -114,11 +109,12 @@ jobs:
 
       - run: npm ci
 
-      # Chromium is baked into the image at the matching revision; this is a
-      # no-op on a match (no --with-deps, no apt) and only fetches if the npm
-      # Playwright build ever drifts ahead of the image tag.
-      - name: Ensure Playwright Chromium
-        run: npx playwright install chromium
+      # No `container:` here — a container job inside the containerized self-hosted
+      # runner can't resolve the runner's /__e (node) bind-mount on the Docker host
+      # (DooD). Install Chromium + system deps directly on the runner instead; the
+      # long-lived runner keeps both cached across runs.
+      - name: Install Playwright Chromium + system deps
+        run: npx playwright install --with-deps chromium
 
       - name: Build the extension and run the E2E suite
         run: npm run test:e2e
@@ -177,7 +173,7 @@ jobs:
     name: claude-review
     needs: [unit, e2e]
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, unraid]
     permissions:
       contents: read
       pull-requests: write
