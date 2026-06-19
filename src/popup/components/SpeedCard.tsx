@@ -17,16 +17,24 @@ import type { UseSpeed } from "../hooks/useSpeed.js";
 interface Props {
   speed: UseSpeed;
   domain: string;
+  // Stream state, passed in so the walkthrough can present the card unlocked
+  // regardless of the actual page (it mirrors speed.live otherwise).
+  live: boolean;
+  // The walkthrough drives the card open/closed (undefined = the user controls it).
+  forceOpen?: boolean;
 }
 
-export function SpeedCard({ speed: s, domain }: Props) {
+export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLSpanElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
   // Locked on a live stream (manual speed isn't applied), so it doesn't expand
   // there either — Super theater moves to the Live-sync card, which is active then.
-  const { open, toggle } = useCardOverlay(sectionRef, slotRef, !s.live);
+  const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !live);
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen);
+  }, [forceOpen, setOpen]);
 
   const [flash, setFlash] = useState(false);
 
@@ -80,7 +88,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
         className={
           "sync-section speed-section overlay-card" +
           (open ? " is-overlay" : "") +
-          (s.live ? " locked" : "") +
+          (live ? " locked" : "") +
           (s.isYouTube ? " is-youtube" : "")
         }
       >
@@ -98,7 +106,7 @@ export function SpeedCard({ speed: s, domain }: Props) {
               className="info warn"
               id="liveWarn"
               aria-label="Live"
-              style={{ display: s.live ? "inline-flex" : "none" }}
+              style={{ display: live ? "inline-flex" : "none" }}
             >
               <WarnIcon />
             </span>

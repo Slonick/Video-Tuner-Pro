@@ -2,7 +2,7 @@
 // row is a self-contained ParamSlider (owns its thumb tween). The audio canvas
 // (#audioMeter) is driven by useGraphs at the app level; `translating` (VOT active)
 // locks the card.
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { STORE } from "../platform/storage.js";
 import { quickPresetIndices } from "../../shared/presets.js";
 import { msg } from "../i18n.js";
@@ -60,12 +60,17 @@ const ROWS: Row[] = [
 interface Props {
   audio: UseAudioCompressor;
   translating: boolean;
+  // The walkthrough drives the card open/closed (undefined = the user controls it).
+  forceOpen?: boolean;
 }
 
-export function AudioCard({ audio: a, translating }: Props) {
+export function AudioCard({ audio: a, translating, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, a.enabled && !translating);
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen);
+  }, [forceOpen, setOpen]);
 
   // Same model as the speed presets: pinned presets (filled to 4 with the lowest
   // unpinned) form the collapsed quick row; the rest are "extra", revealed when

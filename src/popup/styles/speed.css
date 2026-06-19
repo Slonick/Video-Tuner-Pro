@@ -362,9 +362,10 @@
   font-size: 12px;
   color: var(--text);
 }
-/* When the row sits right under an always-visible graph (live-sync, auto-slow),
-   give it air so it doesn't butt against the meter. */
-.meter.always + .sync-delay-row {
+/* The target/delay row sits right under the always-visible graph (it's the first
+   thing in .card-scroll, just below the meter) — give it air so the −/+/reset
+   cluster doesn't butt against the chart. */
+.card-scroll > .sync-delay-row:first-child {
   margin-top: 12px;
 }
 .sync-val {

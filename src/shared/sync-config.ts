@@ -65,6 +65,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   badgePinned: "general",
   liveSyncSeen: "general",
   audioSeen: "general",
+  popupGuideSeen: "general",
 };
 
 // Where the sync-category map itself lives — always device-local, since "what to

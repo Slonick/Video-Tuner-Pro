@@ -33,7 +33,13 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
   }
   document.body.innerHTML = '<div id="root"></div>';
 
-  const chrome = createMockChrome({ messages, tab: opts.tab, settings: opts.settings });
+  // Mark the first-open walkthrough as already seen so it doesn't render over the
+  // popup in tests (a test can re-enable it with settings.popupGuideSeen = false).
+  const chrome = createMockChrome({
+    messages,
+    tab: opts.tab,
+    settings: { popupGuideSeen: true, ...opts.settings },
+  });
   (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = chrome;
   (globalThis as unknown as { browser?: unknown }).browser = undefined;
 
@@ -68,6 +74,10 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
     await flush();
     if (sendSpy.mock.calls.some((c) => (c[1] as { action: string }).action === "getSpeed")) break;
   }
+  await flush();
+  // Belt and suspenders: if the walkthrough did render (e.g. a test enabled it),
+  // dismiss it so the assertions run against the normal popup.
+  (document.querySelector(".tour-skip") as HTMLElement | null)?.click();
   await flush();
 
   const saved = () => {

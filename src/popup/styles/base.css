@@ -56,6 +56,125 @@ body {
   background: var(--track);
 }
 
+/* ── First-open walkthrough (GuideTour) ─────────────────────────────────────
+   A full-popup layer that dims everything, spotlights one card at a time, and
+   floats a caption with Back / Next / Skip. The dim comes from the spotlight's
+   huge box-shadow, so the card inside the cut-out stays bright. */
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  animation: tour-fade 0.18s ease-out;
+}
+@keyframes tour-fade {
+  from {
+    opacity: 0;
+  }
+}
+.tour-spot {
+  position: fixed;
+  z-index: 1;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 0 9999px rgba(0, 0, 0, 0.58);
+  pointer-events: none;
+  transition:
+    top 0.25s ease,
+    left 0.25s ease,
+    width 0.25s ease,
+    height 0.25s ease;
+}
+/* Transparent click target over the spotlighted header on the "expand" step:
+   clicking it opens the card and advances the tour. */
+.tour-hotspot {
+  position: fixed;
+  z-index: 3;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+.tour-cap {
+  position: fixed;
+  z-index: 2;
+  width: 268px;
+  max-width: calc(100vw - 16px);
+  padding: 13px 14px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+}
+.tour-cap-title {
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tour-cap-desc {
+  margin: 0 0 13px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.tour-cap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tour-dots {
+  display: flex;
+  gap: 5px;
+}
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--track);
+  transition: background 0.2s;
+}
+.tour-dot.is-on {
+  background: var(--accent);
+}
+.tour-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tour-skip,
+.tour-back {
+  padding: 5px 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tour-skip:hover,
+.tour-back:hover {
+  color: var(--text);
+}
+.tour-next {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tour-next:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .header {
   display: flex;
   align-items: center;

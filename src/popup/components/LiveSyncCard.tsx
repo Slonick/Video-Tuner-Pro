@@ -1,7 +1,7 @@
 // Live-sync card. State/behaviour from useLiveSync; the allowed-delay slider +
 // readout are plain controlled state (no tween). The buffer canvas (#bufferMeter)
 // is driven by useGraphs at the app level.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
@@ -17,12 +17,17 @@ interface Props {
   // Live-sync only does anything on a live stream; off a stream the card has
   // nothing to do, so it locks (like Auto-slow locks on a stream — the mirror case).
   live: boolean;
+  // The walkthrough drives the card open/closed (undefined = the user controls it).
+  forceOpen?: boolean;
 }
 
-export function LiveSyncCard({ sync: ls, live }: Props) {
+export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, ls.enabled && live);
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen);
+  }, [forceOpen, setOpen]);
   const [flash, setFlash] = useState(false);
 
   // Auto-expand the first time live-sync is switched on, once ever.

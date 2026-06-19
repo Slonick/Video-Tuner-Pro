@@ -2,7 +2,7 @@
 // live speech graph, and an always-visible target-rate row (steppers + slider).
 // The target previews live; Save commits the {enable, target} bundle to the chosen
 // scope (channel > site > global), Reset clears it. Dynamics live in options.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
 import { InfoTip } from "./InfoTip.js";
@@ -16,12 +16,17 @@ interface Props {
   // On a live stream auto-slow yields to live-sync and never touches the rate
   // (see content/audio/autoslow.ts), so the card locks like the manual-speed one.
   live: boolean;
+  // The walkthrough drives the card open/closed (undefined = the user controls it).
+  forceOpen?: boolean;
 }
 
-export function AutoSlowCard({ autoSlow: a, live }: Props) {
+export function AutoSlowCard({ autoSlow: a, live, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const { open, toggle } = useCardOverlay(sectionRef, slotRef, a.enabled && !live);
+  const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, a.enabled && !live);
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen);
+  }, [forceOpen, setOpen]);
   const [flash, setFlash] = useState(false);
 
   const onSave = () => {
