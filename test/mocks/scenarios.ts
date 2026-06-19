@@ -67,7 +67,7 @@ const SETTINGS = {
   autoSlowGlobal: { on: true, target: 6 },
 };
 
-export type ScenarioName = "audio" | "live" | "vot" | "idle";
+export type ScenarioName = "audio" | "live" | "vot" | "idle" | "promo";
 
 // `messages` is layered in by the caller.
 export function scenario(name: ScenarioName = "audio"): MockData {
@@ -131,6 +131,33 @@ export function scenario(name: ScenarioName = "audio"): MockData {
         },
         history: { audio: [], audioStep: 150, buffer: [] },
       };
+    case "promo": {
+      // Every graph populated for the store assets. The lock states (Speed/Auto-
+      // slow dim on a stream, Live-sync off one) are neutralised in CSS by the
+      // promo renderer, so all four cards read as live with data.
+      const lat = latencyHistory();
+      return {
+        // threshold matches the Voice preset so it reads as selected.
+        settings: { ...SETTINGS, audioCompThreshold: -60 },
+        speed: { speed: 1.3, live: true, channel: "slooonick", channelName: "slooonick" },
+        monitor: {
+          audio: audioLevels(false),
+          autoSlow: autoSlow(true),
+          buffer: lat.last,
+          bitrate: 5_200_000,
+          target: 5,
+          live: true,
+          hasVideo: true,
+        },
+        history: {
+          audio: wave.audio,
+          audioStep: wave.audioStep,
+          buffer: lat.buffer,
+          autoSlow: slow.autoSlow,
+          autoSlowStep: slow.autoSlowStep,
+        },
+      };
+    }
     case "audio":
     default:
       return {

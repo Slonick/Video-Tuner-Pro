@@ -17,6 +17,8 @@ declare global {
 const name = window.__SCENARIO__ || "audio";
 const messages = window.__MESSAGES__ || {};
 const data = scenario(name);
+// Promo/screenshot renders must not show the first-open walkthrough.
+data.settings = { popupGuideSeen: true, ...data.settings };
 // Force the palette by seeding the saved theme the popup reads (initTheme), so the
 // data-theme attribute — not the OS prefers-color-scheme — decides the colours.
 const theme = window.__THEME__;

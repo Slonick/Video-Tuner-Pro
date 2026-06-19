@@ -91,6 +91,24 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
           case "setSpeed":
             cb?.({ success: true, speed: msg.speed, live: data.speed?.live ?? false });
             break;
+          case "getTarget":
+            cb?.({
+              target: data.monitor?.target ?? 5,
+              scope: "site",
+              channel: data.speed?.channel ?? null,
+              channelName: data.speed?.channelName,
+              live: data.speed?.live ?? false,
+            });
+            break;
+          case "getAutoSlow":
+            cb?.({
+              enabled: true,
+              target: 6,
+              scope: "site",
+              channel: data.speed?.channel ?? null,
+              channelName: data.speed?.channelName,
+            });
+            break;
           case "getMonitor":
             cb?.(data.monitor ?? null);
             break;

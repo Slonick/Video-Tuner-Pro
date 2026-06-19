@@ -119,7 +119,9 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   const freeze = '<style>.switch-track,.switch-knob{transition:none!important}</style>';
   const extra = freeze + (extraCss ? `<style>${extraCss}</style>` : "");
   let html = await readFile(join(DIST, "popup.html"), "utf8");
-  html = html.replace('<link rel="stylesheet" href="popup.css">', '<link rel="stylesheet" href="popup.css">' + (await themeStyle(theme)) + extra);
+  // The build emits a self-closing link tag; match it so the injected styles land.
+  const cssLink = '<link rel="stylesheet" href="popup.css" />';
+  html = html.replace(cssLink, cssLink + (await themeStyle(theme)) + extra);
   html = html.replace('<script src="popup.js"></script>', inject + '<script src="popup.js"></script>\n' + expandJs);
   // Per-render file names so concurrent renders don't clobber each other; the
   // shared popup.css/js/mock.js copies are identical for every render.
