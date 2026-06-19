@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Slider } from "../../ui/Slider.js";
 
 const clampNum = (v: unknown, lo: number, hi: number, def: number) => {
   const n = Number(v);
@@ -32,15 +33,15 @@ function Knob({ label, hint, value, display, min, max, step, id, onChange }: Kno
         <span>{label}</span>
         <b className="opt-param-val">{display}</b>
       </div>
-      <input
-        type="range"
+      <Slider
         className="opt-slider"
         id={id}
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        ariaLabel={label}
+        onChange={onChange}
       />
       <p className="opt-param-hint">{hint}</p>
     </div>

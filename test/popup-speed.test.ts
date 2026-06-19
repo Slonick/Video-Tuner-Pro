@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { mountApp, byId, flush, wait } from "./mocks/mount-popup.js";
+import { mountApp, byId, flush, wait, setSlider } from "./mocks/mount-popup.js";
 
 // Drive the speed card through the real <App/>: control the content-script replies,
 // then exercise the buttons / slider / nudge / live-lock / scope wiring via the DOM.
@@ -49,9 +49,7 @@ describe("speed buttons & readout", () => {
 describe("slider", () => {
   it("input updates the readout immediately and applies after the debounce", async () => {
     const { lastCall } = await mountApp({ tab: YT });
-    const slider = byId("speedSlider") as HTMLInputElement;
-    slider.value = "130";
-    slider.dispatchEvent(new Event("input"));
+    setSlider("speedSlider", 130, { commit: false }); // drag, not yet released
     await flush();
     expect(readout()).toBe("130%");
     await wait(220); // 160 ms debounce
@@ -60,9 +58,7 @@ describe("slider", () => {
 
   it("release (change) applies immediately", async () => {
     const { lastCall } = await mountApp({ tab: YT });
-    const slider = byId("speedSlider") as HTMLInputElement;
-    slider.value = "120";
-    slider.dispatchEvent(new Event("change"));
+    setSlider("speedSlider", 120); // drag + release
     await flush();
     expect(lastCall("setSpeed")).toMatchObject({ speed: 1.2 });
   });

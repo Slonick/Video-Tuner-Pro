@@ -4,7 +4,8 @@
 // re-render can't clobber the tweened value.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { tweenNumber } from "../core/tween-number.js";
-import { tweenSlider } from "../core/tween-slider.js";
+import { Slider } from "../../ui/Slider.js";
+import { useFlash } from "../hooks/useFlash.js";
 import { msg } from "../i18n.js";
 import { StoredToggle } from "./StoredToggle.js";
 import { InfoTip } from "./InfoTip.js";
@@ -30,7 +31,6 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLSpanElement>(null);
-  const sliderRef = useRef<HTMLInputElement>(null);
   // Locked on a live stream (manual speed isn't applied), so it doesn't expand
   // there either — Super theater moves to the Live-sync card, which is active then.
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !live);
@@ -38,54 +38,34 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
 
-  const [flash, setFlash] = useState(false);
+  const [flash, pulse] = useFlash();
   // The shortcut hints read the live keymap so they reflect any remaps.
   const [keymap, setKeymap] = useState(DEFAULT_KEYMAP);
   useEffect(() => {
     STORE.get(["keymap"], (r) => setKeymap(normalizeKeymap(r.keymap)));
   }, []);
 
-  // Glide the readout + thumb to the new speed (or snap it). No JSX text child on
-  // the readout — this owns it.
+  // Glide the readout to the new speed (or snap it). No JSX text child on the
+  // readout — this owns it. The thumb glide lives in the Slider wrapper.
   useLayoutEffect(() => {
-    const slider = sliderRef.current;
     const readout = readoutRef.current;
-    if (!slider || !readout) return;
+    if (!readout) return;
     const percent = Math.round(s.speed.v * 100);
-    const target = Math.min(s.speedMax, Math.max(25, percent));
     if (s.speed.animate) {
       const from = parseInt(readout.textContent || "", 10) || percent;
       tweenNumber(readout, from, percent, (v) => Math.round(v) + "%");
-      tweenSlider(slider, target);
     } else {
-      slider.value = String(target);
       readout.textContent = percent + "%";
     }
-  }, [s.speed, s.speedMax]);
-
-  // Slider input previews continuously (debounced send); release applies at once.
-  // Native listeners (not React's conflated onChange) keep input vs change distinct.
-  const { sliderInput, sliderCommit } = s;
-  useEffect(() => {
-    const el = sliderRef.current;
-    if (!el) return;
-    const onInput = () => sliderInput(parseFloat(el.value));
-    const onChange = () => sliderCommit(parseFloat(el.value));
-    el.addEventListener("input", onInput);
-    el.addEventListener("change", onChange);
-    return () => {
-      el.removeEventListener("input", onInput);
-      el.removeEventListener("change", onChange);
-    };
-  }, [sliderInput, sliderCommit]);
+  }, [s.speed]);
 
   const onSave = () => {
     s.save();
-    setFlash(true);
-    setTimeout(() => setFlash(false), 1500);
+    pulse();
   };
 
   const percent = Math.round(s.speed.v * 100);
+  const target = Math.min(s.speedMax, Math.max(25, percent));
   const stepPct = Math.round(s.speedStep * 100);
 
   return (
@@ -156,15 +136,17 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
         </div>
 
         <div className="card-scroll">
-          <input
-            ref={sliderRef}
-            type="range"
+          <Slider
             className="speed-slider"
             id="speedSlider"
-            min="25"
+            min={25}
             max={s.speedMax}
-            step="5"
-            defaultValue="100"
+            step={5}
+            value={target}
+            animate={s.speed.animate}
+            ariaLabel={msg("speedLabel") || "Speed"}
+            onChange={s.sliderInput}
+            onCommit={s.sliderCommit}
           />
 
           <PresetGrid

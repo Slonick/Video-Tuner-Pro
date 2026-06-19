@@ -48,13 +48,13 @@ describe("sync category controls", () => {
     await mount({ syncCategories: { speeds: false } });
     const rows = document.querySelectorAll("#syncRows .sync-cat-row");
     expect(rows).toHaveLength(5);
-    const speeds = document.querySelector<HTMLInputElement>("#syncRows .sync-cat-row input");
-    expect(speeds!.checked).toBe(false); // speeds opted out
+    const speeds = document.querySelector<HTMLElement>("#syncRows .sync-cat-row .switch");
+    expect(speeds!.getAttribute("aria-checked")).toBe("false"); // speeds opted out
   });
 
   it("toggling a category persists the choice", async () => {
     const get = await mount({});
-    const inputs = document.querySelectorAll<HTMLInputElement>("#syncRows input");
+    const inputs = document.querySelectorAll<HTMLElement>("#syncRows .switch");
     inputs[0].click(); // speeds is the first row, toggles it off
     await flush();
     expect((get(["syncCategories"]).syncCategories as Record<string, boolean>).speeds).toBe(false);

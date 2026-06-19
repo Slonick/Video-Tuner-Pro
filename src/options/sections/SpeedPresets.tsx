@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Slider } from "../../ui/Slider.js";
 import {
   normalizePresetSet,
   normalizeSpeedMax,
@@ -216,14 +217,14 @@ export function SpeedPresets() {
             <span>{msg("optMaxSpeed") || "Maximum speed"}</span>
             <b className="opt-param-val">{speedMax}%</b>
           </div>
-          <input
-            type="range"
+          <Slider
             className="opt-slider"
             min={SPEED_MAX_MIN}
             max={PRESET_MAX}
             step={SPEED_MAX_STEP}
             value={speedMax}
-            onChange={(e) => setMax(Number(e.target.value))}
+            ariaLabel={msg("optMaxSpeed") || "Maximum speed"}
+            onChange={setMax}
           />
         </div>
 
@@ -232,14 +233,14 @@ export function SpeedPresets() {
             <span>{msg("optStepLabel") || "Speed step"}</span>
             <b className="opt-param-val">{speedStep}%</b>
           </div>
-          <input
-            type="range"
+          <Slider
             className="opt-slider"
             min={STEP_MIN}
             max={STEP_MAX}
             step={1}
             value={speedStep}
-            onChange={(e) => setStep(Number(e.target.value))}
+            ariaLabel={msg("optStepLabel") || "Speed step"}
+            onChange={setStep}
           />
         </div>
 
@@ -248,14 +249,14 @@ export function SpeedPresets() {
             <span>{msg("optHoldSpeed") || "Hold speed"}</span>
             <b className="opt-param-val">{holdSpeed}%</b>
           </div>
-          <input
-            type="range"
+          <Slider
             className="opt-slider"
             min={PRESET_MIN}
             max={speedMax}
             step={5}
             value={holdSpeed}
-            onChange={(e) => setHold(Number(e.target.value))}
+            ariaLabel={msg("optHoldSpeed") || "Hold speed"}
+            onChange={setHold}
           />
         </div>
       </div>

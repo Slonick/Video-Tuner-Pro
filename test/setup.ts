@@ -10,6 +10,24 @@ if (typeof HTMLCanvasElement !== "undefined") {
   HTMLCanvasElement.prototype.getContext = (() => null) as never;
 }
 
+// jsdom has no ResizeObserver; Radix Slider (via react-use-size) needs it. A
+// no-op stub is enough — the tests don't assert on measured sizes.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+// jsdom lacks pointer capture; Radix Slider calls these when a drag is simulated.
+if (typeof Element !== "undefined") {
+  if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {};
+  if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {};
+  // Return true so Radix's pointermove/up handlers (gated on capture) run in jsdom.
+  if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => true;
+}
+
 // jsdom has no matchMedia; report "reduced motion" so slider tweens settle
 // synchronously and tests can read the final value right after an action.
 if (typeof window !== "undefined" && !window.matchMedia) {

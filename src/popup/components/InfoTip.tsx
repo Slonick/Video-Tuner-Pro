@@ -1,27 +1,14 @@
 // The little "i" info bubble (and the amber "warn" variant) with a tooltip.
-// Floating UI positions the bubble and renders it in a portal on document.body,
-// so it escapes the cards' overflow/scroll/transform clipping and flips/shifts to
-// stay in view on its own.
-import { useState, type ReactNode } from "react";
-import {
-  useFloating,
-  autoUpdate,
-  offset,
-  flip,
-  shift,
-  useHover,
-  useFocus,
-  useDismiss,
-  useRole,
-  useInteractions,
-  FloatingPortal,
-} from "@floating-ui/react";
+// Positioning, portalling and open/dismiss come from the shared Radix Tooltip;
+// this just supplies the trigger icon and the bubble's content + variant classes.
+import { type ReactNode } from "react";
+import { Tooltip } from "../../ui/Tooltip.js";
 import { InfoIcon, WarnIcon } from "../icons.js";
 
 interface Props {
   tip?: string; // simple text tooltip
   children?: ReactNode; // structured content (e.g. the keyboard hints)
-  below?: boolean; // prefer opening downward (flip still kicks in if cramped)
+  below?: boolean; // prefer opening downward (Radix still flips if cramped)
   warn?: boolean; // amber warning variant (uses WarnIcon)
   className?: string; // extra class on the bubble (e.g. "kbd-tip")
   id?: string;
@@ -29,45 +16,21 @@ interface Props {
 }
 
 export function InfoTip({ tip, children, below, warn, className, id, label }: Props) {
-  const [open, setOpen] = useState(false);
-  const { refs, floatingStyles, context } = useFloating({
-    open,
-    onOpenChange: setOpen,
-    placement: below || warn ? "bottom" : "top",
-    middleware: [offset(8), flip({ padding: 8 }), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
-  });
-  const { getReferenceProps, getFloatingProps } = useInteractions([
-    useHover(context, { move: false }),
-    useFocus(context),
-    useDismiss(context),
-    useRole(context, { role: "tooltip" }),
-  ]);
-
   return (
-    <>
-      <span
-        ref={refs.setReference}
-        className={"info" + (warn ? " warn" : "")}
-        id={id}
-        tabIndex={0}
-        aria-label={label ?? (warn ? "Warning" : "Info")}
-        {...getReferenceProps()}
-      >
-        {warn ? <WarnIcon /> : <InfoIcon />}
-      </span>
-      {open && (
-        <FloatingPortal>
-          <div
-            ref={refs.setFloating}
-            className={"tip" + (warn ? " warn" : "") + (className ? " " + className : "")}
-            style={floatingStyles}
-            {...getFloatingProps()}
-          >
-            {children ?? tip}
-          </div>
-        </FloatingPortal>
-      )}
-    </>
+    <Tooltip
+      side={below || warn ? "bottom" : "top"}
+      bubbleClassName={[warn && "warn", className].filter(Boolean).join(" ")}
+      content={children ?? tip}
+      trigger={
+        <span
+          className={"info" + (warn ? " warn" : "")}
+          id={id}
+          tabIndex={0}
+          aria-label={label ?? (warn ? "Warning" : "Info")}
+        >
+          {warn ? <WarnIcon /> : <InfoIcon />}
+        </span>
+      }
+    />
   );
 }

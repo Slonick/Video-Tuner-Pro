@@ -51,6 +51,8 @@ export function useAudioCompressor(): UseAudioCompressor {
       pending.current = {};
     }, 350);
   }, []);
+  // Clear a pending debounced save on unmount so it can't fire afterwards.
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   const setEnabled = useCallback((on: boolean) => {
     setEnabledState(on);

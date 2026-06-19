@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { mountApp, byId, flush, wait } from "./mocks/mount-popup.js";
+import { mountApp, byId, flush, wait, sliderValue, setSlider } from "./mocks/mount-popup.js";
 
 // The live-sync card via the real <App/>: the allowed delay is saved per scope
 // (channel > site > global > 5s) via messaging — dragging previews live (setTarget),
@@ -16,7 +16,7 @@ describe("loadSyncSettings", () => {
         getTarget: { target: 12, scope: "site", channel: null, channelName: "", live: false },
       },
     });
-    expect((byId("syncTarget") as HTMLInputElement).value).toBe("12");
+    expect(sliderValue("syncTarget")).toBe(12);
     expect(byId("syncTargetVal").textContent).toBe("12");
     expect(byId("syncScopeSite").classList.contains("active")).toBe(true);
   });
@@ -69,7 +69,7 @@ describe("loadSyncSettings", () => {
         getTarget: { target: 999, scope: "site", channel: null, channelName: "", live: false },
       },
     });
-    expect((byId("syncTarget") as HTMLInputElement).value).toBe("30");
+    expect(sliderValue("syncTarget")).toBe(30);
   });
 });
 
@@ -86,21 +86,19 @@ describe("toggle + slider", () => {
     const { lastCall } = await mountApp({ tab: EX });
     click("syncUp");
     await flush();
-    expect((byId("syncTarget") as HTMLInputElement).value).toBe("6");
+    expect(sliderValue("syncTarget")).toBe(6);
     expect(byId("syncTargetVal").textContent).toBe("6");
     click("syncDown");
     click("syncDown");
     await flush();
-    expect((byId("syncTarget") as HTMLInputElement).value).toBe("4");
+    expect(sliderValue("syncTarget")).toBe(4);
     await wait(220); // 160 ms preview debounce
     expect(lastCall("setTarget")).toMatchObject({ action: "setTarget", target: 4 });
   });
 
   it("the slider previews live (setTarget) without persisting", async () => {
     const { lastCall, saved } = await mountApp({ tab: EX });
-    const slider = byId("syncTarget") as HTMLInputElement;
-    slider.value = "9";
-    slider.dispatchEvent(new Event("input", { bubbles: true }));
+    setSlider("syncTarget", 9, { commit: false });
     await flush();
     expect(byId("syncTargetVal").textContent).toBe("9");
     await wait(220);
@@ -135,7 +133,7 @@ describe("save / reset by scope", () => {
     click("syncResetBtn");
     expect(lastCall("resetTarget")).toMatchObject({ action: "resetTarget", scope: "site" });
     await wait(120); // deferred getTarget
-    expect((byId("syncTarget") as HTMLInputElement).value).toBe("5");
+    expect(sliderValue("syncTarget")).toBe(5);
   });
 });
 
@@ -146,7 +144,7 @@ describe("no content script (storage fallback)", () => {
       settings: { syncTargets: { "example.com": 9 } },
       replies: { getTarget: undefined },
     });
-    expect((byId("syncTarget") as HTMLInputElement).value).toBe("9");
+    expect(sliderValue("syncTarget")).toBe(9);
     expect(byId("syncScopeSite").classList.contains("active")).toBe(true);
   });
 });

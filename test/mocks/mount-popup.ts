@@ -3,6 +3,7 @@
 // helpers to drive + inspect it. React flushes asynchronously, so callers await
 // `flush()` after mount and after interactions.
 import { type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { vi } from "vitest";
 import { createMockChrome } from "./chrome.js";
 import messages from "../../src/_locales/en/messages.json";
@@ -10,6 +11,44 @@ import messages from "../../src/_locales/en/messages.json";
 export const flush = () => new Promise<void>((r) => setTimeout(r));
 export const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export const byId = (id: string) => document.getElementById(id) as HTMLElement;
+
+// Sliders are Radix (a <span role="slider"> thumb), not <input type=range>. Read
+// the value off aria-valuenow.
+const thumbOf = (id: string) => byId(id).querySelector('[role="slider"]') as HTMLElement;
+export const sliderValue = (id: string) => Number(thumbOf(id).getAttribute("aria-valuenow"));
+
+// Drive a Radix slider to a value by faking a pointer drag: mock the geometry
+// (jsdom has none) and dispatch pointerdown→move→up at the matching x. `commit`
+// false stops before release (the "input, not yet change" case).
+export function setSlider(id: string, value: number, { commit = true }: { commit?: boolean } = {}) {
+  const root = byId(id);
+  const thumb = thumbOf(id);
+  const min = Number(thumb.getAttribute("aria-valuemin"));
+  const max = Number(thumb.getAttribute("aria-valuemax"));
+  const rect = {
+    left: 0,
+    top: 0,
+    right: 100,
+    bottom: 10,
+    width: 100,
+    height: 10,
+    x: 0,
+    y: 0,
+    toJSON() {},
+  };
+  root.getBoundingClientRect = () => rect as DOMRect;
+  root
+    .querySelectorAll("*")
+    .forEach((el) => ((el as HTMLElement).getBoundingClientRect = () => rect as DOMRect));
+  const clientX = ((value - min) / (max - min)) * rect.width;
+  const opts = { bubbles: true, button: 0, clientX, clientY: 5 };
+  // flushSync so the controlled value re-renders before the next event — else
+  // Radix's commit-on-release sees an unchanged value and skips onValueCommit.
+  flushSync(() => root.dispatchEvent(new MouseEvent("pointerdown", opts)));
+  flushSync(() => root.dispatchEvent(new MouseEvent("pointermove", opts)));
+  if (commit)
+    flushSync(() => root.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, button: 0 })));
+}
 
 interface MountOptions {
   tab?: { id: number; url: string };

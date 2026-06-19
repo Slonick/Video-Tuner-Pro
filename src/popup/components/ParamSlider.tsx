@@ -1,8 +1,7 @@
-// One compressor parameter row: label + readout + range slider. Owns its own
-// thumb tween (glide on a preset apply, snap on drag/load) via a ref, so the
-// audio card doesn't manage a ref-map. The readout is declarative.
-import { useLayoutEffect, useRef } from "react";
-import { tweenSlider } from "../core/tween-slider.js";
+// One compressor parameter row: label + readout + range slider. The thumb glide
+// (on a preset apply) and the input wiring live in the shared Slider; the readout
+// is declarative — it shows the final value while the thumb catches up.
+import { Slider } from "../../ui/Slider.js";
 
 interface Props {
   id: string; // slider id (the graph code reads its live value by id)
@@ -31,17 +30,6 @@ export function ParamSlider({
   fmt,
   onChange,
 }: Props) {
-  const ref = useRef<HTMLInputElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (animate) tweenSlider(el, value);
-    else el.value = String(value);
-  }, [value, animate]);
-
-  const handle = (e: React.SyntheticEvent<HTMLInputElement>) =>
-    onChange(Number(e.currentTarget.value));
-
   return (
     <div className="param">
       <div className="param-row">
@@ -50,16 +38,16 @@ export function ParamSlider({
           {fmt(value)}
         </b>
       </div>
-      <input
-        ref={ref}
-        type="range"
+      <Slider
         className="speed-slider"
         id={id}
         min={min}
         max={max}
         step={step}
-        onInput={handle}
-        onChange={handle}
+        value={value}
+        animate={animate}
+        ariaLabel={label}
+        onChange={onChange}
       />
       <div className="param-desc">{desc}</div>
     </div>

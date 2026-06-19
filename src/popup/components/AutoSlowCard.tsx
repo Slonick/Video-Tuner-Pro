@@ -2,9 +2,11 @@
 // live speech graph, and an always-visible target-rate row (steppers + slider).
 // The target previews live; Save commits the {enable, target} bundle to the chosen
 // scope (channel > site > global), Reset clears it. Dynamics live in options.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
+import { useFlash } from "../hooks/useFlash.js";
+import { Slider } from "../../ui/Slider.js";
 import { InfoTip } from "./InfoTip.js";
 import { ScopeSegment } from "./ScopeSegment.js";
 import { MinusIcon, PlusIcon, ResetIcon } from "../icons.js";
@@ -27,12 +29,11 @@ export function AutoSlowCard({ autoSlow: a, live, forceOpen }: Props) {
   useEffect(() => {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
-  const [flash, setFlash] = useState(false);
+  const [flash, pulse] = useFlash();
 
   const onSave = () => {
     a.save();
-    setFlash(true);
-    setTimeout(() => setFlash(false), 1500);
+    pulse();
   };
 
   return (
@@ -120,16 +121,15 @@ export function AutoSlowCard({ autoSlow: a, live, forceOpen }: Props) {
               </button>
             </div>
           </div>
-          <input
-            type="range"
+          <Slider
             className="speed-slider"
             id="autoSlowTarget"
-            min="3"
-            max="12"
-            step="0.5"
+            min={3}
+            max={12}
+            step={0.5}
             value={a.target}
-            onInput={(e) => a.setTarget(Number((e.target as HTMLInputElement).value))}
-            onChange={(e) => a.setTarget(Number(e.target.value))}
+            ariaLabel={msg("meterTarget") || "Target rate"}
+            onChange={(v) => a.setTarget(v)}
           />
 
           <div className={"sync-body" + (open ? " open" : "")} id="autoSlowBody">

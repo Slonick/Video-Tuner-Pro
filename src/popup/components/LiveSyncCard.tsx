@@ -1,10 +1,12 @@
 // Live-sync card. State/behaviour from useLiveSync; the allowed-delay slider +
 // readout are plain controlled state (no tween). The buffer canvas (#bufferMeter)
 // is driven by useGraphs at the app level.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { STORE } from "../platform/storage.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
+import { Slider } from "../../ui/Slider.js";
+import { useFlash } from "../hooks/useFlash.js";
 import { InfoTip } from "./InfoTip.js";
 import { ScopeSegment } from "./ScopeSegment.js";
 import { MinusIcon, PlusIcon, ResetIcon } from "../icons.js";
@@ -28,7 +30,7 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
   useEffect(() => {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
-  const [flash, setFlash] = useState(false);
+  const [flash, pulse] = useFlash();
 
   // Auto-expand the first time live-sync is switched on, once ever.
   const onToggle = (on: boolean) => {
@@ -43,8 +45,7 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
 
   const onSave = () => {
     ls.save();
-    setFlash(true);
-    setTimeout(() => setFlash(false), 1500);
+    pulse();
   };
 
   return (
@@ -128,16 +129,15 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
               </button>
             </div>
           </div>
-          <input
-            type="range"
+          <Slider
             className="speed-slider"
             id="syncTarget"
-            min="1"
-            max="30"
-            step="1"
+            min={1}
+            max={30}
+            step={1}
             value={ls.target}
-            onInput={(e) => ls.previewTarget(Number((e.target as HTMLInputElement).value))}
-            onChange={(e) => ls.previewTarget(Number(e.target.value))}
+            ariaLabel={msg("allowedDelayLabel") || "Allowed delay"}
+            onChange={(v) => ls.previewTarget(v)}
           />
 
           <div className={"sync-body" + (open ? " open" : "")} id="syncBody">

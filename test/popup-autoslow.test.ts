@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { mountApp, byId, flush, wait } from "./mocks/mount-popup.js";
+import { mountApp, byId, flush, wait, sliderValue, setSlider } from "./mocks/mount-popup.js";
 
 // The auto-slow card via the real <App/>: enable + target rate are saved per scope
 // (channel > site > global) via messaging — the toggle/slider preview live
 // (setAutoSlow), Save commits (rememberAutoSlow), Reset clears (resetAutoSlow).
 const EX = { id: 4, url: "https://example.com/" };
 const click = (id: string) => byId(id).click();
+// The toggle is a Radix Switch (role="switch" button), not a checkbox.
+const isOn = (id: string) => byId(id).getAttribute("aria-checked") === "true";
 const reply = (over: Record<string, unknown> = {}) => ({
   getAutoSlow: { enabled: true, target: 6, scope: "site", channel: null, ...over },
 });
@@ -14,8 +16,8 @@ const reply = (over: Record<string, unknown> = {}) => ({
 describe("auto-slow card", () => {
   it("reflects the resolved enable + target + scope from getAutoSlow", async () => {
     await mountApp({ tab: EX, replies: reply({ target: 8 }) });
-    expect((byId("autoSlowToggle") as HTMLInputElement).checked).toBe(true);
-    expect((byId("autoSlowTarget") as HTMLInputElement).value).toBe("8");
+    expect(isOn("autoSlowToggle")).toBe(true);
+    expect(sliderValue("autoSlowTarget")).toBe(8);
     expect(byId("autoScopeSite").classList.contains("active")).toBe(true);
   });
 
@@ -41,9 +43,7 @@ describe("auto-slow card", () => {
 
   it("the target slider previews live (debounced setAutoSlow)", async () => {
     const { lastCall } = await mountApp({ tab: EX, replies: reply() });
-    const s = byId("autoSlowTarget") as HTMLInputElement;
-    s.value = "9";
-    s.dispatchEvent(new Event("input", { bubbles: true }));
+    setSlider("autoSlowTarget", 9);
     await wait(220);
     expect(lastCall("setAutoSlow")).toMatchObject({ action: "setAutoSlow", target: 9 });
   });

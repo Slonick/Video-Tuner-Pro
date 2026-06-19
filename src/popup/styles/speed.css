@@ -135,36 +135,44 @@
   }
 }
 
-/* --- Slider -------------------------------------------------------------- */
+/* --- Slider (Radix Slider.Root → .slider-track / .slider-thumb) ----------
+   The 4px track centres in an 18px-tall root so the thumb has room without
+   overflowing into neighbours; Radix positions the thumb horizontally, this
+   only paints it. */
 .speed-slider {
+  position: relative;
+  display: flex;
+  align-items: center;
   width: 100%;
-  height: 4px;
+  height: 18px;
   margin: 0 0 12px;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.speed-slider .slider-track {
+  position: relative;
+  flex-grow: 1;
+  height: 4px;
   border-radius: 2px;
   background: var(--track);
+}
+
+.speed-slider .slider-thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px var(--shadow);
   outline: none;
-  -webkit-appearance: none;
-  appearance: none;
+  cursor: pointer;
 
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #fff;
-    cursor: pointer;
-    box-shadow: 0 1px 3px var(--shadow);
-  }
-
-  &::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border: none;
-    border-radius: 50%;
-    background: #fff;
-    cursor: pointer;
-    box-shadow: 0 1px 3px var(--shadow);
+  &:focus-visible {
+    box-shadow:
+      0 1px 3px var(--shadow),
+      0 0 0 3px var(--accent);
   }
 }
 
@@ -173,7 +181,7 @@
    the ones it sits on. Sized to the thumb's travel (track − 18px thumb,
    centered) so the marks line up with the thumb at each value. A tick every
    50/275 = 18.1818% of that inner width, centred at 9.0909% (the 50% pos). */
-#speedSlider {
+#speedSlider .slider-track {
   background-image: repeating-linear-gradient(
     to right,
     transparent 0,
@@ -191,7 +199,7 @@
 /* Tick marks on the buffer slider (1–30 s, range 29): every 5 s →
    5/10/15/20/25/30. A tick every 5/29 = 17.2414% of the thumb's travel, the
    first centred at (5−1)/29 = 13.7931% (the 5 s pos). */
-#syncTarget {
+#syncTarget .slider-track {
   background-image: repeating-linear-gradient(
     to right,
     transparent 0,
@@ -209,7 +217,7 @@
 /* Tick marks on the target-rate slider (3–12 syll/s, range 9): every 1 →
    a tick at 1/9 = 11.1111% of the thumb's travel, left-aligned at each step.
    (The slider still steps by 0.5 for finer control.) */
-#autoSlowTarget {
+#autoSlowTarget .slider-track {
   background-image: repeating-linear-gradient(
     to right,
     var(--muted) 0,
@@ -275,12 +283,13 @@
   background: var(--seg);
   color: var(--text);
 }
-.speed-section:has(.speed-body.open):has(#kbdToggle:checked) .btn-speed[data-key]::before {
+.speed-section:has(.speed-body.open):has(#kbdToggle[data-state="checked"])
+  .btn-speed[data-key]::before {
   opacity: 1;
   transform: none;
 }
 /* Nudge the (centered) label left so the corner badge doesn't sit over it. */
-.speed-section:has(.speed-body.open):has(#kbdToggle:checked) .btn-speed[data-key] {
+.speed-section:has(.speed-body.open):has(#kbdToggle[data-state="checked"]) .btn-speed[data-key] {
   padding-right: 20px;
 }
 
@@ -458,11 +467,16 @@
   }
 
   &.active {
-    z-index: 3;
     background: transparent;
     color: #fff;
     font-weight: 600;
   }
+}
+
+/* The label sits above the pill (an absolutely-positioned child of the cell). */
+.scope-label {
+  position: relative;
+  z-index: 1;
 }
 
 /* Corner dot marking a scope whose slot holds a saved speed. Accent on a filled
@@ -470,6 +484,7 @@
 .scope-opt.has-saved::after {
   content: "";
   position: absolute;
+  z-index: 2;
   top: 5px;
   right: 5px;
   width: 5px;
@@ -481,28 +496,16 @@
   background: #fff;
 }
 
-/* Sliding selection pill shared by the segmented groups (scope, audio presets):
-   rides over the filled cells (z 2) and glides to the active cell. Positioned/
-   sized in JS (movePill) by measuring the active button's box. */
+/* Selection pill: an absolutely-positioned child filling the active cell. It
+   glides between cells via motion.dev's shared-layout animation (layoutId), so it
+   carries no CSS transition — motion owns the movement (and reduced motion). */
 .seg-pill {
   position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 2;
+  inset: 0;
+  z-index: 0;
   border-radius: 6px;
   background: var(--accent);
-  opacity: 0;
   pointer-events: none;
-  transition:
-    transform 0.2s ease,
-    width 0.2s ease,
-    height 0.2s ease,
-    opacity 0.15s;
-}
-@media (prefers-reduced-motion: reduce) {
-  .seg-pill {
-    transition: opacity 0.15s;
-  }
 }
 .scope-channel {
   display: none;

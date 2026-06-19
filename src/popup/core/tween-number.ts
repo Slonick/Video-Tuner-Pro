@@ -1,11 +1,11 @@
 // Count a number in an element from one value to another — the readout animates
 // on its own, independent of any slider thumb. `render` turns the live value into
-// the shown text (e.g. rounding + a unit). A new tween on the same element
-// cancels the previous one. Honours reduced motion.
-const running = new WeakMap<HTMLElement, number>();
+// the shown text (e.g. rounding + a unit). Driven by motion.dev's `animate`; a new
+// tween on the same element cancels the previous one. Honours reduced motion.
+import { animate } from "motion/react";
+import type { AnimationPlaybackControls } from "motion/react";
 
-const DUR = 200;
-const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
+const running = new WeakMap<HTMLElement, AnimationPlaybackControls>();
 
 export function tweenNumber(
   el: HTMLElement,
@@ -13,26 +13,24 @@ export function tweenNumber(
   to: number,
   render: (value: number) => string,
 ): void {
-  const prev = running.get(el);
-  if (prev) cancelAnimationFrame(prev);
+  running.get(el)?.stop();
+  running.delete(el);
 
   if (from === to || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     el.textContent = render(to);
-    running.delete(el);
     return;
   }
 
-  let start: number | null = null;
-  function frame(now: number): void {
-    if (start === null) start = now;
-    const t = Math.min(1, (now - start) / DUR);
-    el.textContent = render(from + (to - from) * easeOut(t));
-    if (t < 1) {
-      running.set(el, requestAnimationFrame(frame));
-    } else {
+  const controls = animate(from, to, {
+    duration: 0.2,
+    ease: "easeOut",
+    onUpdate: (v) => {
+      el.textContent = render(v);
+    },
+    onComplete: () => {
       el.textContent = render(to);
       running.delete(el);
-    }
-  }
-  running.set(el, requestAnimationFrame(frame));
+    },
+  });
+  running.set(el, controls);
 }
