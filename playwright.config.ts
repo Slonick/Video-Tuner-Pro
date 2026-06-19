@@ -12,7 +12,10 @@ export default defineConfig({
   // Retry once on CI so a failing test re-runs WITH a trace captured.
   retries: process.env.CI ? 1 : 0,
   timeout: 30_000,
-  expect: { timeout: 7_000 },
+  // Generous on purpose: each value-poll waits for the extension to load, read
+  // chrome.storage and apply the rate — under contention on the shared CI runner
+  // that can briefly exceed a tight budget (still well inside the 30s test cap).
+  expect: { timeout: 15_000 },
   // Console list always; a self-contained HTML report on every run (open it with
   // `npx playwright show-report`); inline PR annotations when on CI.
   reporter: [

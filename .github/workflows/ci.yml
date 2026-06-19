@@ -214,3 +214,43 @@ jobs:
 
             For each critical issue give file:line, why it breaks something, and
             the fix. Be terse. When unsure whether something is critical, omit it.
+
+  # ── Claude failure triage (PRs only, runs only when unit OR e2e failed) ──────
+  # Mirror of claude-review for the red path: pulls the failing job logs and posts
+  # concrete fix suggestions. Same Claude subscription token. PR-only so it can't
+  # fire on routine branch pushes; bounded to actual red runs.
+  claude-triage:
+    name: claude-triage
+    needs: [unit, e2e]
+    if: failure() && github.event_name == 'pull_request'
+    runs-on: [self-hosted, unraid]
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read # read this run's failed-job logs via `gh run view`
+      id-token: write # claude-code-action exchanges an OIDC token for its GitHub token
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            The CI checks failed on this pull request (run id ${{ github.run_id }}).
+
+            Pull the failing logs first:
+              gh run view ${{ github.run_id }} --log-failed
+            Those are the unit (Vitest) and/or e2e (Playwright) jobs. Identify
+            which tests/checks failed and read their actual error output.
+
+            Then post ONE concise PR comment with concrete, actionable fix
+            recommendations — file:line and the change to make — for each REAL
+            failure. Judge fixes against the diff: `git diff origin/main...HEAD`.
+
+            If a failure looks like flakiness rather than a real defect (a timeout
+            that the automatic retry then passed, a value-poll that needed more
+            time, no link to the changed code), say so explicitly and recommend
+            stabilising the test instead of inventing a code fix — do NOT fabricate
+            a root cause. Be terse.
