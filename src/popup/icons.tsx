@@ -67,15 +67,3 @@ export const ResetIcon = () => (
     <path fill="currentColor" d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
   </svg>
 );
-
-export const ChevronIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none">
-    <path
-      d="M6 9l6 6 6-6"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);

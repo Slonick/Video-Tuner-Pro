@@ -13,6 +13,9 @@ interface Props {
   scope: Scope;
   saved: ScopeFlags;
   hasChannel: boolean;
+  // The card's expanded state: opening into the full-popup overlay widens the
+  // segment, so the pill must re-measure (offsetLeft/width shift with it).
+  open: boolean;
   onPick: (scope: Scope) => void;
 }
 
@@ -29,11 +32,11 @@ const OPTIONS: Array<{ scope: Scope; labelKey: string; titleKey: string; extra?:
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
-export function ScopeSegment({ name, ariaLabel, scope, saved, hasChannel, onPick }: Props) {
+export function ScopeSegment({ name, ariaLabel, scope, saved, hasChannel, open, onPick }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     movePill(ref.current);
-  }, [scope, hasChannel]);
+  }, [scope, hasChannel, open]);
 
   return (
     <div

@@ -6,6 +6,7 @@ import { THEMES, type Theme, setTheme } from "../../shared/theme.js";
 import { LOCALES, LOCALE_NAMES, getLang, setLang, type Lang } from "../../shared/i18n-config.js";
 import { SYNC_META_KEY } from "../../shared/sync-config.js";
 import { msg } from "../../popup/i18n.js";
+import { StoredToggle } from "../../popup/components/StoredToggle.js";
 
 const THEME_LABEL: Record<Theme, string> = {
   system: "themeSystem",
@@ -163,6 +164,13 @@ export function General() {
       <div className="opt-field opt-field-block">
         <span className="opt-field-label">{msg("optLangLabel") || "Language"}</span>
         <LangGrid />
+      </div>
+      <div className="opt-field">
+        <span className="opt-field-text">
+          <span className="opt-field-label">{msg("forceRateLabel") || "Force speed"}</span>
+          <span className="opt-field-desc">{msg("forceRateHint")}</span>
+        </span>
+        <StoredToggle id="forceRateToggle" storageKey="forceRate" defaultOn={false} />
       </div>
       <div className="opt-field">
         <span className="opt-field-label">{msg("optBackupTitle") || "Backup"}</span>

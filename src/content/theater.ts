@@ -5,6 +5,7 @@
 // YouTube itself is in theater / full-bleed mode.
 import { api } from "./platform/browser.js";
 import { STORE, OUR_AREAS } from "./platform/storage.js";
+import { onStreamPage } from "./live/detection.js";
 
 const ATTR = "vtp-super-theater";
 
@@ -61,10 +62,28 @@ export function applySuperTheater(on: boolean): void {
   document.documentElement.toggleAttribute(ATTR, on);
 }
 
+// Streams and regular videos each have their own super-theater setting, so a
+// live page can keep the chat visible while videos stay full-bleed. Pick the one
+// that matches the current page.
+function effectiveKey(): "superTheater" | "superTheaterStream" {
+  return onStreamPage() ? "superTheaterStream" : "superTheater";
+}
+function reapply(): void {
+  const key = effectiveKey();
+  STORE.get([key], (r) => applySuperTheater(r[key] === true));
+}
+
 if (isYouTube()) {
-  STORE.get(["superTheater"], (r) => applySuperTheater(r.superTheater === true));
+  reapply();
+  // The live-state flag (data-vtp-live, set by the MAIN-world probe) lands a beat
+  // after load and flips on SPA navigation between a video and a live page — so
+  // re-pick the setting whenever it changes.
+  new MutationObserver(reapply).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-vtp-live"],
+  });
   api.storage.onChanged.addListener((changes, area) => {
     if (!OUR_AREAS.has(area)) return;
-    if (changes.superTheater) applySuperTheater(changes.superTheater.newValue === true);
+    if (changes.superTheater || changes.superTheaterStream) reapply();
   });
 }

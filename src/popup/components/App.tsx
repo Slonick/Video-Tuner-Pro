@@ -32,12 +32,12 @@ export function App() {
           <span>{msg("groupVideo") || "Video"}</span>
         </div>
         <SpeedCard speed={speed} domain={tab?.domain ?? ""} />
-        <LiveSyncCard sync={sync} />
+        <LiveSyncCard sync={sync} live={speed.live} />
 
         <div className="group-label">
           <span>{msg("groupAudio") || "Audio"}</span>
         </div>
-        <AutoSlowCard autoSlow={autoSlow} />
+        <AutoSlowCard autoSlow={autoSlow} live={speed.live} />
         <AudioCard audio={audio} translating={translating} />
       </div>
     </>

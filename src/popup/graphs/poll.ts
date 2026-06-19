@@ -81,10 +81,16 @@ export function startPoll(
           }
           if (r.buffer && r.buffer.length) {
             const seedB = r.buffer
-              .map((p: number[]) => ({ t: t0 - p[0], v: p[1] }))
+              .map((p: number[]) => ({ t: t0 - p[0], v: p[1], a: p[2] ?? null }))
               .sort((x: BufSample, y: BufSample) => x.t - y.t);
             g.bufHist.unshift(...seedB);
-            if (g.bufSmooth == null && seedB.length) g.bufSmooth = seedB[seedB.length - 1].v;
+            // Ease the live edge up from the seeded tail (both lines) rather than
+            // ramping from empty.
+            const last = seedB[seedB.length - 1];
+            if (last) {
+              if (g.bufSmooth == null) g.bufSmooth = last.v;
+              if (g.bufAheadSmooth == null && last.a != null) g.bufAheadSmooth = last.a;
+            }
             while (g.bufHist.length && t0 - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
           }
         });

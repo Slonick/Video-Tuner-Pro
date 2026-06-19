@@ -277,17 +277,18 @@
 }
 
 /* Slider, preset grid and Reset / Remember are always visible (change or save a
-   speed without expanding); the collapsible body below holds only the toggles. */
-.speed-section > .speed-slider {
+   speed without expanding); the collapsible body below holds only the toggles.
+   (Descendant, not child: in the overlay these sit inside .card-scroll.) */
+.speed-section .speed-slider {
   margin: 10px 0 8px;
 }
 /* Extra gap below the actions only when the body is open — it separates them
    from the toggle rows. Collapsed, the bottom gap is just the card's 12px
    padding, uniform with the other cards. */
-.speed-section > .quick-actions {
+.speed-section .quick-actions {
   margin-bottom: 0;
 }
-.speed-section:has(.speed-body.open) > .quick-actions {
+.speed-section:has(.speed-body.open) .quick-actions {
   margin-bottom: 12px;
 }
 

@@ -200,6 +200,21 @@ body {
   font-size: 13px;
 }
 
+/* Stacked label + description on one side of an .opt-field (e.g. the Force-speed
+   toggle), so the control sits opposite a short explanation. */
+.opt-field-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.opt-field-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .opt-actions {
   display: flex;
   gap: 8px;

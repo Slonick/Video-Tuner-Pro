@@ -21,9 +21,23 @@ body {
   /* Stretch so the two cards in each row share a height — the shorter one's
      surface just extends; its expand chevron is already pinned to the bottom. */
   align-items: stretch;
+  /* Positioning context for a card that expands into a full-grid overlay. */
+  position: relative;
 }
 .popup-grid .sync-section {
   margin-bottom: 0; /* the grid gap spaces the cards now */
+}
+
+/* --- Overlay-expand (all cards) ----------------------------------------------
+   Each card lives in a slot (the grid item); the slot holds its space while the
+   card lifts out into a full-grid overlay, so siblings don't reflow. */
+.card-slot {
+  display: flex;
+  min-width: 0;
+}
+.card-slot > .sync-section {
+  flex: 1;
+  margin-bottom: 0;
 }
 .group-label {
   grid-column: 1 / -1;

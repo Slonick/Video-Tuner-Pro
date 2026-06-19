@@ -58,6 +58,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   showRemaining: "general",
   streamBadge: "general",
   superTheater: "general",
+  superTheaterStream: "general",
   audioSpeed: "general",
   forceRate: "general",
   badgePos: "general",

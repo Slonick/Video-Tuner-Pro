@@ -3,7 +3,10 @@ import { onStreamPage, liveVideo } from "./live/detection.js";
 import { forwardBuffer, streamLatency } from "./live/metrics.js";
 
 // Recent latency/buffer samples on live streams, to pre-fill the live graph.
-export const bufferLevelHist: { at: number; v: number }[] = [];
+// v = primary line (latency, or buffered-ahead when latency isn't exposed);
+// a = the buffered-ahead line, recorded only when latency is the primary (mirrors
+// monitorData) so the popup can seed it too instead of starting it from empty.
+export const bufferLevelHist: { at: number; v: number; a: number | null }[] = [];
 export const BUF_HIST_MS = 500;
 const BUF_HIST_MAX = 64;
 
@@ -39,6 +42,7 @@ export function recordBufferSample(): void {
   const lv = liveVideo();
   if (!lv) return;
   const l = streamLatency();
-  bufferLevelHist.push({ at: Date.now(), v: l != null ? l : forwardBuffer(lv) });
+  const fb = forwardBuffer(lv);
+  bufferLevelHist.push({ at: Date.now(), v: l != null ? l : fb, a: l != null ? fb : null });
   while (bufferLevelHist.length > BUF_HIST_MAX) bufferLevelHist.shift();
 }

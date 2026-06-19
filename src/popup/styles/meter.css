@@ -27,6 +27,12 @@
   }
 }
 
+/* Taller live chart in the full-popup overlay. fitCanvas re-reads clientHeight
+   each frame, so the draw loop picks this up on its own. */
+.is-overlay .meter canvas {
+  height: 83px;
+}
+
 .meter-legend {
   display: flex;
   gap: 12px;

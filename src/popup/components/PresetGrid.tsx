@@ -1,9 +1,7 @@
 // The speed-preset buttons. Collapsed, only the pinned quick row (≤4, filled to
 // 4 with the lowest unpinned — see quickPresetIndices) shows as one row; the rest
-// are "extra", hidden by CSS until the card expands, when the grid FLIP-animates
-// (the gridRef is measured by useExpand). data-key carries each preset's assigned
-// hotkey label (e.g. "⇧1"), driving the corner hint.
-import type { RefObject } from "react";
+// are "extra", hidden by CSS until the card expands. data-key carries each
+// preset's assigned hotkey label (e.g. "⇧1"), driving the corner hint.
 import { chordLabel } from "../../shared/keymap.js";
 import { quickPresetIndices } from "../../shared/presets.js";
 
@@ -12,14 +10,13 @@ interface Props {
   presetKeys: (string | null)[];
   pinned: boolean[];
   activePercent: number;
-  gridRef: RefObject<HTMLDivElement>;
   onPick: (fraction: number) => void;
 }
 
-export function PresetGrid({ presets, presetKeys, pinned, activePercent, gridRef, onPick }: Props) {
+export function PresetGrid({ presets, presetKeys, pinned, activePercent, onPick }: Props) {
   const quick = new Set(quickPresetIndices(pinned));
   return (
-    <div ref={gridRef} className="buttons-grid presetgrid">
+    <div className="buttons-grid presetgrid">
       {presets.map((pct, i) => {
         const key = chordLabel(presetKeys[i]);
         return (

@@ -182,7 +182,11 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse, () => ({
       audio: audioLevelHist.map((p) => [Math.round(p.in * 10) / 10, Math.round(p.out * 10) / 10]),
       audioStep: A_HIST_MS,
-      buffer: bufferLevelHist.map((p) => [nowT - p.at, Math.round(p.v * 100) / 100]),
+      buffer: bufferLevelHist.map((p) => [
+        nowT - p.at,
+        Math.round(p.v * 100) / 100,
+        p.a == null ? null : Math.round(p.a * 100) / 100,
+      ]),
       autoSlow: autoSlowHist.map((p) => [
         Math.round(p.rate * 10) / 10,
         Math.round(p.speed * 100) / 100,

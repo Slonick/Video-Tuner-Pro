@@ -1,8 +1,7 @@
 // Speed card. State/behaviour come from useSpeed; this renders the markup (same
-// classes/ids the CSS keys off) and drives the two imperative bits via refs: the
-// readout/slider tween (React can't animate a range thumb) and the preset-grid
-// FLIP on expand. The readout has no JSX text child so a re-render can't clobber
-// the tweened value.
+// classes/ids the CSS keys off) and drives the readout/slider tween via refs
+// (React can't animate a range thumb). The readout has no JSX text child so a
+// re-render can't clobber the tweened value.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { tweenNumber } from "../core/tween-number.js";
 import { tweenSlider } from "../core/tween-slider.js";
@@ -11,8 +10,8 @@ import { StoredToggle } from "./StoredToggle.js";
 import { InfoTip } from "./InfoTip.js";
 import { ScopeSegment } from "./ScopeSegment.js";
 import { PresetGrid } from "./PresetGrid.js";
-import { MinusIcon, PlusIcon, ResetIcon, WarnIcon, ChevronIcon } from "../icons.js";
-import { useExpand } from "../hooks/useExpand.js";
+import { MinusIcon, PlusIcon, ResetIcon, WarnIcon } from "../icons.js";
+import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import type { UseSpeed } from "../hooks/useSpeed.js";
 
 interface Props {
@@ -21,11 +20,13 @@ interface Props {
 }
 
 export function SpeedCard({ speed: s, domain }: Props) {
+  const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLSpanElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
-  const { open, toggle, bodyRef, onBodyTransitionEnd } = useExpand(sectionRef, gridRef);
+  // Locked on a live stream (manual speed isn't applied), so it doesn't expand
+  // there either — Super theater moves to the Live-sync card, which is active then.
+  const { open, toggle } = useCardOverlay(sectionRef, slotRef, !s.live);
 
   const [flash, setFlash] = useState(false);
 
@@ -73,190 +74,178 @@ export function SpeedCard({ speed: s, domain }: Props) {
   const stepPct = Math.round(s.speedStep * 100);
 
   return (
-    <div
-      ref={sectionRef}
-      className={
-        "sync-section speed-section" +
-        (s.live ? " locked" : "") +
-        (s.isYouTube ? " is-youtube" : "")
-      }
-    >
-      <div className="sec-head">
-        <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
-          <span className="sec-text">
-            <strong className="current-domain" id="currentDomain">
-              {domain || "—"}
-            </strong>
-            <span className="switch-sub" id="speedScope">
-              {s.channel && s.channelName ? s.channelName : msg("speedScopeSite")}
-            </span>
-          </span>
-          <span
-            className="info warn"
-            id="liveWarn"
-            aria-label="Live"
-            style={{ display: s.live ? "inline-flex" : "none" }}
-          >
-            <WarnIcon />
-          </span>
-        </button>
-        <div className="speed-quick">
-          <button
-            type="button"
-            className="spin"
-            id="speedDown"
-            aria-label="Slower"
-            title={msg("tipSlower")}
-            onClick={() => s.nudge(-s.speedStep)}
-          >
-            <MinusIcon />
-          </button>
-          <span ref={readoutRef} className="speed-pct" id="currentSpeedPct" />
-          <button
-            type="button"
-            className="spin"
-            id="speedUp"
-            aria-label="Faster"
-            title={msg("tipFaster")}
-            onClick={() => s.nudge(s.speedStep)}
-          >
-            <PlusIcon />
-          </button>
-          <span className="speed-quick-div" aria-hidden="true"></span>
-          <button
-            type="button"
-            className="spin"
-            id="speedReset"
-            aria-label="Reset"
-            title={msg("tipResetSpeed")}
-            onClick={s.resetManual}
-          >
-            <ResetIcon />
-          </button>
-        </div>
-        <span className="tip live-note">{msg("liveNote")}</span>
-      </div>
-
-      <input
-        ref={sliderRef}
-        type="range"
-        className="speed-slider"
-        id="speedSlider"
-        min="25"
-        max={s.speedMax}
-        step="5"
-        defaultValue="100"
-      />
-
-      <PresetGrid
-        presets={s.presets}
-        presetKeys={s.presetKeys}
-        pinned={s.pinned}
-        activePercent={percent}
-        gridRef={gridRef}
-        onPick={s.setSpeed}
-      />
-
-      <div className="quick-actions">
-        <fieldset className="scope-group">
-          <legend>{msg("scopeLabel")}</legend>
-          <ScopeSegment
-            name="scope"
-            ariaLabel="Save scope"
-            scope={s.scope}
-            saved={s.saved}
-            hasChannel={!!s.channel}
-            onPick={s.pickScope}
-          />
-        </fieldset>
-        <div className="action-row">
-          <button className="btn-action btn-reset" id="resetBtn" onClick={s.resetScope}>
-            {msg("resetButton")}
-          </button>
-          <button
-            className="btn-action btn-default"
-            id="setDefaultBtn"
-            style={flash ? { background: "#4caf50" } : undefined}
-            onClick={onSave}
-          >
-            {flash ? msg("savedFeedback") : msg("rememberButton")}
-          </button>
-        </div>
-      </div>
-
+    <div ref={slotRef} className="card-slot">
       <div
-        ref={bodyRef}
-        className={"sync-body speed-body" + (open ? " open" : "")}
-        id="speedBody"
-        onTransitionEnd={onBodyTransitionEnd}
+        ref={sectionRef}
+        className={
+          "sync-section speed-section overlay-card" +
+          (open ? " is-overlay" : "") +
+          (s.live ? " locked" : "") +
+          (s.isYouTube ? " is-youtube" : "")
+        }
       >
-        <div className="extra-row">
-          <span>{msg("onVideoLabel")}</span>
-          <StoredToggle id="onVideoToggle" storageKey="showRemaining" defaultOn />
-        </div>
-
-        <div className="extra-row" id="superTheaterRow">
-          <span className="extra-label">
-            <span>{msg("superTheaterLabel")}</span>
-            <InfoTip below tip={msg("superTheaterHint")} />
-          </span>
-          <StoredToggle id="superTheaterToggle" storageKey="superTheater" defaultOn={false} />
-        </div>
-
-        <div className="extra-row">
-          <span className="extra-label">
-            <span>{msg("kbdLabel")}</span>
-            <InfoTip below>
-              <span className="tip kbd-tip">
-                <span className="kbd-g">
-                  <kbd>A</kbd>
-                  <span>{msg("kbdSlower")}</span>
-                  <span className="amt">−{stepPct}%</span>
-                </span>
-                <span className="kbd-g">
-                  <kbd>⇧</kbd>
-                  <kbd>A</kbd>
-                  <span className="amt">−{stepPct * 2}%</span>
-                </span>
-                <span className="kbd-g">
-                  <kbd>D</kbd>
-                  <span>{msg("kbdFaster")}</span>
-                  <span className="amt">+{stepPct}%</span>
-                </span>
-                <span className="kbd-g">
-                  <kbd>⇧</kbd>
-                  <kbd>D</kbd>
-                  <span className="amt">+{stepPct * 2}%</span>
-                </span>
-                <span className="kbd-g">
-                  <kbd>R</kbd>
-                  <span>{msg("kbdReset")}</span>
-                </span>
+        <div className="sec-head">
+          <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
+            <span className="sec-text">
+              <strong className="current-domain" id="currentDomain">
+                {domain || "—"}
+              </strong>
+              <span className="switch-sub" id="speedScope">
+                {s.channel && s.channelName ? s.channelName : msg("speedScopeSite")}
               </span>
-            </InfoTip>
-          </span>
-          <StoredToggle id="kbdToggle" storageKey="keyboard" defaultOn />
+            </span>
+            <span
+              className="info warn"
+              id="liveWarn"
+              aria-label="Live"
+              style={{ display: s.live ? "inline-flex" : "none" }}
+            >
+              <WarnIcon />
+            </span>
+          </button>
+          <div className="speed-quick">
+            <button
+              type="button"
+              className="spin"
+              id="speedDown"
+              aria-label="Slower"
+              title={msg("tipSlower")}
+              onClick={() => s.nudge(-s.speedStep)}
+            >
+              <MinusIcon />
+            </button>
+            <span ref={readoutRef} className="speed-pct" id="currentSpeedPct" />
+            <button
+              type="button"
+              className="spin"
+              id="speedUp"
+              aria-label="Faster"
+              title={msg("tipFaster")}
+              onClick={() => s.nudge(s.speedStep)}
+            >
+              <PlusIcon />
+            </button>
+            <span className="speed-quick-div" aria-hidden="true"></span>
+            <button
+              type="button"
+              className="spin"
+              id="speedReset"
+              aria-label="Reset"
+              title={msg("tipResetSpeed")}
+              onClick={s.resetManual}
+            >
+              <ResetIcon />
+            </button>
+          </div>
+          <span className="tip live-note">{msg("liveNote")}</span>
         </div>
 
-        <div className="extra-row">
-          <span className="extra-label">
-            <span>{msg("audioSpeedLabel")}</span>
-            <InfoTip below tip={msg("audioSpeedHint")} />
-          </span>
-          <StoredToggle id="audioSpeedToggle" storageKey="audioSpeed" defaultOn={false} />
-        </div>
+        <div className="card-scroll">
+          <input
+            ref={sliderRef}
+            type="range"
+            className="speed-slider"
+            id="speedSlider"
+            min="25"
+            max={s.speedMax}
+            step="5"
+            defaultValue="100"
+          />
 
-        <div className="extra-row">
-          <span className="extra-label">
-            <span>{msg("forceRateLabel")}</span>
-            <InfoTip below tip={msg("forceRateHint")} />
-          </span>
-          <StoredToggle id="forceRateToggle" storageKey="forceRate" defaultOn={false} />
-        </div>
-      </div>
+          <PresetGrid
+            presets={s.presets}
+            presetKeys={s.presetKeys}
+            pinned={s.pinned}
+            activePercent={percent}
+            onPick={s.setSpeed}
+          />
 
-      <div className="expand-hint" aria-hidden="true" onClick={toggle}>
-        <ChevronIcon />
+          <div className="quick-actions">
+            <fieldset className="scope-group">
+              <legend>{msg("scopeLabel")}</legend>
+              <ScopeSegment
+                name="scope"
+                ariaLabel="Save scope"
+                scope={s.scope}
+                saved={s.saved}
+                hasChannel={!!s.channel}
+                open={open}
+                onPick={s.pickScope}
+              />
+            </fieldset>
+            <div className="action-row">
+              <button className="btn-action btn-reset" id="resetBtn" onClick={s.resetScope}>
+                {msg("resetButton")}
+              </button>
+              <button
+                className="btn-action btn-default"
+                id="setDefaultBtn"
+                style={flash ? { background: "#4caf50" } : undefined}
+                onClick={onSave}
+              >
+                {flash ? msg("savedFeedback") : msg("rememberButton")}
+              </button>
+            </div>
+          </div>
+
+          <div className={"sync-body speed-body" + (open ? " open" : "")} id="speedBody">
+            <div className="extra-row">
+              <span>{msg("onVideoLabel")}</span>
+              <StoredToggle id="onVideoToggle" storageKey="showRemaining" defaultOn />
+            </div>
+
+            <div className="extra-row" id="superTheaterRow">
+              <span className="extra-label">
+                <span>{msg("superTheaterLabel")}</span>
+                <InfoTip below tip={msg("superTheaterHint")} />
+              </span>
+              <StoredToggle id="superTheaterToggle" storageKey="superTheater" defaultOn={false} />
+            </div>
+
+            <div className="extra-row">
+              <span className="extra-label">
+                <span>{msg("kbdLabel")}</span>
+                <InfoTip below>
+                  <span className="tip kbd-tip">
+                    <span className="kbd-g">
+                      <kbd>A</kbd>
+                      <span>{msg("kbdSlower")}</span>
+                      <span className="amt">−{stepPct}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>⇧</kbd>
+                      <kbd>A</kbd>
+                      <span className="amt">−{stepPct * 2}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>D</kbd>
+                      <span>{msg("kbdFaster")}</span>
+                      <span className="amt">+{stepPct}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>⇧</kbd>
+                      <kbd>D</kbd>
+                      <span className="amt">+{stepPct * 2}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>R</kbd>
+                      <span>{msg("kbdReset")}</span>
+                    </span>
+                  </span>
+                </InfoTip>
+              </span>
+              <StoredToggle id="kbdToggle" storageKey="keyboard" defaultOn />
+            </div>
+
+            <div className="extra-row">
+              <span className="extra-label">
+                <span>{msg("audioSpeedLabel")}</span>
+                <InfoTip below tip={msg("audioSpeedHint")} />
+              </span>
+              <StoredToggle id="audioSpeedToggle" storageKey="audioSpeed" defaultOn={false} />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -98,22 +98,24 @@ describe("recordBufferSample", () => {
     expect(bufferLevelHist.length).toBe(0);
   });
 
-  it("samples site latency where exposed", () => {
+  it("samples site latency where exposed, with buffered-ahead alongside", () => {
     h.onStream = true;
     h.live = {};
     h.latency = 3.5;
     h.buffer = 8;
     recordBufferSample();
     expect(bufferLevelHist.at(-1)?.v).toBe(3.5);
+    expect(bufferLevelHist.at(-1)?.a).toBe(8);
   });
 
-  it("falls back to the buffered-ahead seconds without site latency", () => {
+  it("falls back to the buffered-ahead seconds without site latency (no ahead line)", () => {
     h.onStream = true;
     h.live = {};
     h.latency = null;
     h.buffer = 6;
     recordBufferSample();
     expect(bufferLevelHist.at(-1)?.v).toBe(6);
+    expect(bufferLevelHist.at(-1)?.a).toBeNull();
   });
 
   it("caps the history at 64 samples", () => {

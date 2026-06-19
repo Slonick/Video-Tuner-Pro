@@ -36,8 +36,7 @@ export default defineConfig({
         // React UI (.tsx) isn't measured at all (include is *.ts); these are the
         // .ts animation/canvas-bridge helpers behind it.
         "src/popup/graphs/**",
-        "src/popup/lib/section-anim.ts", // FLIP + scroll-reveal (the old sections.ts)
-        "src/popup/hooks/useExpand.ts", // expand/collapse + FLIP orchestration
+        "src/popup/hooks/useCardOverlay.ts", // card→overlay FLIP orchestration
         "src/popup/hooks/useGraphs.ts", // canvas-meter bridge into graphs/**
         "src/content/badge/icon.ts",
       ],

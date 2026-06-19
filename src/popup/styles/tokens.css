@@ -28,7 +28,6 @@
   --shadow: rgba(0, 0, 0, 0.18);
   --tip-bg: #1d1d1f;
   --tip-text: #f5f5f7;
-  --hint-fade: rgba(0, 0, 0, 0.06);
 
   --warn-bg: #fff7e6;
   --warn-line: #f0d9a8;
@@ -76,7 +75,6 @@
   --shadow: rgba(0, 0, 0, 0.4);
   --tip-bg: #f5f5f7;
   --tip-text: #1d1d1f;
-  --hint-fade: rgba(255, 255, 255, 0.07);
 
   --warn-bg: #2c2618;
   --warn-line: #4a3f24;
