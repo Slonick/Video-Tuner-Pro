@@ -13,4 +13,5 @@ export interface AudioLevels {
   in?: number;
   out?: number;
   threshold?: number;
+  knee?: number;
 }

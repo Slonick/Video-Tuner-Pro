@@ -72,7 +72,7 @@ export function drawAudio(g: GraphState, t: number): void {
     if (!Number.isNaN(thr) && c > 0.01) {
       const yThr = inY(thr),
         yLoud = inY(A_MAX);
-      const knee = Number(byId<HTMLInputElement>("acKnee").value) || 0;
+      const knee = g.knee;
       const kneeFrac = Math.min(0.8, Math.max(0.05, knee / Math.max(1, -thr)));
       const grad = acx.createLinearGradient(0, yThr, 0, yLoud);
       grad.addColorStop(0, "rgba(255,159,10,0.10)"); // just over threshold

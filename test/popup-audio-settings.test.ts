@@ -25,7 +25,6 @@ describe("stored values populate the card", () => {
     expect((byId("acThreshold") as HTMLInputElement).value).toBe("-40");
     expect(valOf("acThreshold")).toBe("-40 dB");
     expect(valOf("acRatio")).toBe("6:1");
-    expect(valOf("acAttack")).toBe("20 ms"); // 0.02 s → 20 ms
     expect(valOf("acGain")).toBe("12 dB");
   });
 
@@ -143,15 +142,15 @@ describe("slider + toggle persistence", () => {
   it("merges rapid different-key writes instead of clobbering them", async () => {
     const { saved } = await mountApp({});
     const ratio = byId("acRatio") as HTMLInputElement;
-    const knee = byId("acKnee") as HTMLInputElement;
+    const threshold = byId("acThreshold") as HTMLInputElement;
     ratio.value = "5";
     input(ratio);
-    knee.value = "10";
-    input(knee);
+    threshold.value = "-30";
+    input(threshold);
     await wait(420);
     const s = saved();
     expect(s.audioCompRatio).toBe(5);
-    expect(s.audioCompKnee).toBe(10);
+    expect(s.audioCompThreshold).toBe(-30);
   });
 
   it("the toggle persists the audioComp flag", async () => {

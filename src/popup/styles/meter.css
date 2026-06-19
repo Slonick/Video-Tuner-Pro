@@ -75,6 +75,13 @@
   background: #ff9f0a;
 }
 
+.dot-target {
+  width: 2px;
+  height: 9px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
 /* --- Compressor parameter rows ------------------------------------------- */
 /* Each param in its own filled card so it reads as a separate control. */
 .param {

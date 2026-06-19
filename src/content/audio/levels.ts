@@ -1,7 +1,13 @@
-export function rmsToDb(buf: ArrayLike<number>): number {
+// Linear RMS (0..1) of a time-domain buffer — the raw amplitude the auto-slow
+// envelope tracker works on, before any dB conversion.
+export function rmsLinear(buf: ArrayLike<number>): number {
   let sum = 0;
   for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-  const rms = Math.sqrt(sum / buf.length);
+  return Math.sqrt(sum / buf.length);
+}
+
+export function rmsToDb(buf: ArrayLike<number>): number {
+  const rms = rmsLinear(buf);
   return rms > 0.0000158 ? 20 * Math.log10(rms) : -100; // floor ~ -96 dB
 }
 

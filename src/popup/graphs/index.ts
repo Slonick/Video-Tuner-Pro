@@ -1,7 +1,8 @@
-import { createGraphState, A_WINDOW, BUF_WINDOW } from "./state.js";
+import { createGraphState, A_WINDOW, BUF_WINDOW, AS_WINDOW } from "./state.js";
 import { now } from "./draw-util.js";
 import { drawAudio } from "./audio-meter.js";
 import { drawBuffer } from "./latency-graph.js";
+import { drawAutoSlow } from "./autoslow-graph.js";
 import { startPoll } from "./poll.js";
 
 // Drive the audio + buffer canvases. `getTabId` supplies the tab to poll (the
@@ -13,10 +14,12 @@ export function setupGraphs(
 ): () => void {
   const aCanvas = document.getElementById("audioMeter") as HTMLCanvasElement | null;
   const bCanvas = document.getElementById("bufferMeter") as HTMLCanvasElement | null;
+  const asCanvas = document.getElementById("autoSlowMeter") as HTMLCanvasElement | null;
   const acx = aCanvas ? aCanvas.getContext("2d") : null;
   const bcx = bCanvas ? bCanvas.getContext("2d") : null;
+  const ascx = asCanvas ? asCanvas.getContext("2d") : null;
   if (!aCanvas || !acx || !bCanvas || !bcx) return () => {};
-  const g = createGraphState(aCanvas, acx, bCanvas, bcx);
+  const g = createGraphState(aCanvas, acx, bCanvas, bcx, asCanvas, ascx);
   let raf = 0;
 
   function frame(): void {
@@ -48,8 +51,19 @@ export function setupGraphs(
     } else {
       g.bufCur = g.bufCurAhead = null;
     }
+    // Auto-slow speech graph: ease toward the latest polled rate/speed and record
+    // a point per frame so the line scrolls smoothly.
+    if (g.asActive) {
+      g.asRateCur += (g.asRate - g.asRateCur) * 0.3;
+      g.asSpeedCur += (g.asSpeed - g.asSpeedCur) * 0.3;
+      g.asHist.push({ t, rate: g.asRateCur, speed: g.asSpeedCur });
+      while (g.asHist.length && t - g.asHist[0].t > AS_WINDOW + 200) g.asHist.shift();
+    } else if (g.asHist.length) {
+      g.asHist.length = 0;
+    }
     drawAudio(g, t);
     drawBuffer(g, t);
+    drawAutoSlow(g, t);
     raf = requestAnimationFrame(frame);
   }
 

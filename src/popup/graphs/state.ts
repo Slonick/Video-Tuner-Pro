@@ -20,17 +20,28 @@ export const A_MIN = -100,
   A_MAX = 0; // audio dB range (centre = A_MIN)
 export const A_WINDOW = 6000; // audio waveform time window (ms)
 export const BUF_WINDOW = 30000; // latency graph time window (ms)
+export const AS_WINDOW = 8000; // auto-slow speech-rate graph time window (ms)
+export const AS_RATE_MAX = 16; // top of the syllable-rate axis (syll/s)
+
+export interface AutoSlowSample {
+  t: number;
+  rate: number;
+  speed: number;
+}
 
 export interface GraphState {
   aCanvas: HTMLCanvasElement;
   acx: CanvasRenderingContext2D; // audio meter
   bCanvas: HTMLCanvasElement;
   bcx: CanvasRenderingContext2D; // latency graph
+  asCanvas: HTMLCanvasElement | null;
+  ascx: CanvasRenderingContext2D | null; // auto-slow speech-rate graph (optional)
 
   cur: { in: number; out: number }; // eased displayed levels
   tgt: { in: number; out: number }; // latest polled levels
   audioActive: boolean;
   audioEnabled: boolean; // compressor actually processing on the page
+  knee: number; // compressor knee (dB) — from poll data; popup has no knee slider
   compAnim: number; // eased 0(off)…1(on) for readout/ghost morph
   histSeeded: boolean; // graphs pre-filled from history yet?
   audioHist: AudioSample[]; // {t, in, out} dB level history
@@ -55,6 +66,16 @@ export interface GraphState {
   bufBitrateAt: number;
   yMax: number; // eased Y scale — latency (down) half
   yMaxAhead: number; // eased Y scale — buffer (up) half
+
+  // Auto-slow speech graph: latest polled values, their eased counterparts, and
+  // the recorded history.
+  asActive: boolean;
+  asRate: number; // latest polled syllable rate (syll/s)
+  asSpeed: number; // latest polled effective speed (×)
+  asTargetLine: number; // the trigger target (syll/s)
+  asRateCur: number; // eased rate
+  asSpeedCur: number; // eased speed
+  asHist: AutoSlowSample[];
 }
 
 export function createGraphState(
@@ -62,16 +83,21 @@ export function createGraphState(
   acx: CanvasRenderingContext2D,
   bCanvas: HTMLCanvasElement,
   bcx: CanvasRenderingContext2D,
+  asCanvas: HTMLCanvasElement | null,
+  ascx: CanvasRenderingContext2D | null,
 ): GraphState {
   return {
     aCanvas,
     acx,
     bCanvas,
     bcx,
+    asCanvas,
+    ascx,
     cur: { in: A_MIN, out: A_MIN },
     tgt: { in: A_MIN, out: A_MIN },
     audioActive: false,
     audioEnabled: false,
+    knee: 30,
     compAnim: 0,
     histSeeded: false,
     audioHist: [],
@@ -95,5 +121,12 @@ export function createGraphState(
     bufBitrateAt: 0,
     yMax: 8,
     yMaxAhead: 8,
+    asActive: false,
+    asRate: 0,
+    asSpeed: 1,
+    asTargetLine: 7,
+    asRateCur: 0,
+    asSpeedCur: 1,
+    asHist: [],
   };
 }

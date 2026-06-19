@@ -25,6 +25,15 @@ export const KEY_CATEGORY: Record<string, Category> = {
   speedMax: "speeds",
   speedStep: "speeds",
   holdSpeed: "speeds",
+  // Auto-slow for dense speech: the per-scope enable + the global floor. Grouped
+  // with speeds — it resolves per scope and acts on the playback rate.
+  autoSlowGlobal: "speeds",
+  autoSlowSites: "speeds",
+  autoSlowChannels: "speeds",
+  autoSlowFloor: "speeds",
+  autoSlowHold: "speeds",
+  autoSlowReaction: "speeds",
+  autoSlowEaseBack: "speeds",
   // Live-sync: the on/off toggle and the allowed-delay, saved per scope.
   liveSync: "delays",
   liveSyncTarget: "delays", // legacy global fallback

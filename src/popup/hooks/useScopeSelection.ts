@@ -18,8 +18,9 @@ export interface ScopeSelection {
   pickScope: (scope: Scope) => void;
   markSaved: (scope: Scope, on: boolean) => void;
   // Write/clear the selected scope straight to storage (global/site only — channel
-  // needs the page). `resetFallback` runs `done` once the store has been updated.
-  saveFallback: (scope: Scope, value: number) => void;
+  // needs the page). `value` is a number for speed/target, or a settings bundle for
+  // auto-slow. `resetFallback` runs `done` once the store has been updated.
+  saveFallback: (scope: Scope, value: unknown) => void;
   resetFallback: (scope: Scope, done: () => void) => void;
 }
 
@@ -68,14 +69,14 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
   );
 
   const saveFallback = useCallback(
-    (s: Scope, value: number) => {
+    (s: Scope, value: unknown) => {
       if (s === "global") {
         STORE.set({ [storage.global[0]]: value });
         return;
       }
       if (s === "site" && domain) {
         STORE.get([storage.siteMap], (r) => {
-          const map = { ...((r[storage.siteMap] || {}) as Record<string, number>) };
+          const map = { ...((r[storage.siteMap] || {}) as Record<string, unknown>) };
           map[domain] = value;
           STORE.set({ [storage.siteMap]: map });
         });

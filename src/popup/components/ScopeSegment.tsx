@@ -8,7 +8,7 @@ import { msg } from "../i18n.js";
 import type { Scope, ScopeFlags } from "../lib/scope.js";
 
 interface Props {
-  name: "scope" | "syncScope"; // id prefix → matches the original element ids
+  name: "scope" | "syncScope" | "autoScope"; // id prefix → matches the original element ids
   ariaLabel: string;
   scope: Scope;
   saved: ScopeFlags;

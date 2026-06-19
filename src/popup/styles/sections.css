@@ -4,6 +4,26 @@
    on/off switch, and the body that slides open.
    ============================================================ */
 
+/* "beta" tag tucked into the card's bottom-right corner (frame), so the title text
+   doesn't have to carry "(beta)" and wrap on a narrow card. The expand chevron is
+   centred, so the corner is free. */
+.beta-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: 3;
+  padding: 2px 6px 1px;
+  border-radius: 7px 0 10px 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1.4;
+  text-transform: lowercase;
+  pointer-events: none;
+}
+
 .sync-section {
   position: relative;
   background: var(--surface);

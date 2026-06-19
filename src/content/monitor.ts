@@ -6,11 +6,13 @@ import { catchupBufferLimited } from "./live/catchup.js";
 import { forwardBuffer, streamLatency } from "./live/metrics.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { audioLevels } from "./audio/metering.js";
+import { autoSlowLive } from "./audio/autoslow-state.js";
 import { streamBitrate } from "./bitrate.js";
 import type { AudioLevels } from "./audio/types.js";
 
 export interface MonitorData {
   audio: AudioLevels;
+  autoSlow: { active: boolean; rate: number; target: number; speed: number };
   buffer: number | null;
   bufferAhead: number | null;
   bufLimited: boolean;
@@ -42,6 +44,7 @@ export function monitorData(): MonitorData {
   }
   return {
     audio: audioLevels(),
+    autoSlow: { ...autoSlowLive },
     buffer: lag,
     bufferAhead: bufAhead,
     bufLimited: limited,

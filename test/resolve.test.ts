@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSpeed, resolveSyncTarget } from "../src/content/core/resolve.js";
+import { resolveSpeed, resolveSyncTarget, resolveAutoSlow } from "../src/content/core/resolve.js";
 
 // The priority chain (below the manual in-tab override, which the caller owns):
 // channel > site > global > 100%.
@@ -70,5 +70,68 @@ describe("resolveSyncTarget", () => {
 
   it("falls to the 5s default with nothing saved (scope null)", () => {
     expect(resolveSyncTarget([], D, {}, {}, undefined)).toEqual({ target: 5, scope: null });
+  });
+});
+
+// Each scope stores a bundle {on, target}; the highest-priority scope with an entry
+// supplies both. Priority channel > site > global; default off/6. (Floor is global.)
+describe("resolveAutoSlow", () => {
+  const D = "youtube.com";
+  const B = (on: boolean, target = 6) => ({ on, target });
+
+  it("a channel bundle wins over site + global", () => {
+    expect(resolveAutoSlow(["UC1"], D, { [D]: B(false) }, { UC1: B(true, 8) }, B(false))).toEqual({
+      enabled: true,
+      target: 8,
+      scope: "channel",
+    });
+  });
+
+  it("an explicit channel `off` overrides a broader `on`", () => {
+    expect(resolveAutoSlow(["UC1"], D, { [D]: B(true) }, { UC1: B(false) }, B(true))).toEqual({
+      enabled: false,
+      target: 6,
+      scope: "channel",
+    });
+  });
+
+  it("falls to the site bundle when no channel entry", () => {
+    expect(resolveAutoSlow(["UC1"], D, { [D]: B(true, 5) }, {}, B(false))).toEqual({
+      enabled: true,
+      target: 5,
+      scope: "site",
+    });
+  });
+
+  it("falls to the global bundle when no channel/site entry", () => {
+    expect(resolveAutoSlow([], D, {}, {}, B(true, 7))).toEqual({
+      enabled: true,
+      target: 7,
+      scope: "global",
+    });
+  });
+
+  it("defaults to off with nothing saved (scope null)", () => {
+    expect(resolveAutoSlow([], D, {}, {}, undefined)).toEqual({
+      enabled: false,
+      target: 6,
+      scope: null,
+    });
+  });
+
+  it("clamps an out-of-range target", () => {
+    expect(resolveAutoSlow([], D, {}, {}, B(true, 99))).toEqual({
+      enabled: true,
+      target: 12,
+      scope: "global",
+    });
+  });
+
+  it("treats a site entry for another host as absent", () => {
+    expect(resolveAutoSlow([], D, { "other.com": B(true) }, {}, undefined)).toEqual({
+      enabled: false,
+      target: 6,
+      scope: null,
+    });
   });
 });

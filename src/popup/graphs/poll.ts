@@ -27,7 +27,16 @@ export function startPoll(
       const wasActive = g.audioActive;
       g.audioActive = !!a.active;
       g.audioEnabled = !!a.enabled;
+      if (typeof a.knee === "number") g.knee = a.knee;
       onTranslating(!!a.translation); // VOT etc. playing → warn + lock the section
+
+      const as = resp.autoSlow;
+      g.asActive = !!(as && as.active);
+      if (g.asActive) {
+        g.asRate = as.rate;
+        g.asSpeed = as.speed;
+        g.asTargetLine = as.target;
+      }
       if (g.audioActive) {
         g.tgt.in = a.in;
         g.tgt.out = a.out;

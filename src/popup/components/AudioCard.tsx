@@ -17,7 +17,6 @@ import { type CompParams, type CompPreset } from "../../shared/comp-presets.js";
 const presetLabel = (p: CompPreset, i: number) =>
   p.name || (p.nameKey ? msg(p.nameKey) : msg("optCompPresetName", String(i + 1)));
 const dB = (n: number) => n + " dB";
-const ms = (n: number) => Math.round(n * 1000) + " ms";
 
 interface Row {
   key: keyof CompParams;
@@ -31,6 +30,8 @@ interface Row {
   fmt: (n: number) => string;
 }
 
+// Knee / attack / release live only on the options page now — the popup keeps the
+// everyday controls (threshold, ratio, and the make-up gain slider below).
 const ROWS: Row[] = [
   {
     key: "threshold",
@@ -44,17 +45,6 @@ const ROWS: Row[] = [
     fmt: dB,
   },
   {
-    key: "knee",
-    label: "audioKnee",
-    valId: "acKneeVal",
-    sliderId: "acKnee",
-    min: 0,
-    max: 40,
-    step: 1,
-    desc: "audioKneeDesc",
-    fmt: dB,
-  },
-  {
     key: "ratio",
     label: "audioRatio",
     valId: "acRatioVal",
@@ -64,28 +54,6 @@ const ROWS: Row[] = [
     step: 0.5,
     desc: "audioRatioDesc",
     fmt: (n) => n + ":1",
-  },
-  {
-    key: "attack",
-    label: "audioAttack",
-    valId: "acAttackVal",
-    sliderId: "acAttack",
-    min: 0,
-    max: 1,
-    step: 0.001,
-    desc: "audioAttackDesc",
-    fmt: ms,
-  },
-  {
-    key: "release",
-    label: "audioRelease",
-    valId: "acReleaseVal",
-    sliderId: "acRelease",
-    min: 0,
-    max: 1,
-    step: 0.001,
-    desc: "audioReleaseDesc",
-    fmt: ms,
   },
 ];
 

@@ -11,6 +11,7 @@ import { SpeedPresets } from "./sections/SpeedPresets.js";
 import { Presets } from "./sections/Presets.js";
 import { Saved } from "./sections/Saved.js";
 import { Sync } from "./sections/Sync.js";
+import { AutoSlow } from "./sections/AutoSlow.js";
 
 function Options() {
   return (
@@ -34,6 +35,9 @@ function Options() {
         </div>
         <div className="opt-col opt-col-12">
           <Presets />
+        </div>
+        <div className="opt-col opt-col-12">
+          <AutoSlow />
         </div>
         <div className="opt-col opt-col-6">
           <Sync />

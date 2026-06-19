@@ -5,7 +5,7 @@ import { channelKeys } from "./channel.js";
 import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
-import { collectVideos, collectAudios, seenVideos, seenAudios } from "./videos.js";
+import { collectVideos, collectAudios, primaryVideo, seenVideos, seenAudios } from "./videos.js";
 import { isLive, probeLive, onStreamPage, trackDvr, resetDvr } from "./live/detection.js";
 import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
@@ -102,14 +102,33 @@ export function resetScope(scope: SpeedScope): void {
 // differs — applyAll runs often (1s tick + every MutationObserver pass), and a
 // redundant write restarts the audio time-stretcher and glitches sound.
 function setMediaRate(media: HTMLMediaElement): void {
+  // The applied rate is the user's speed scaled by the auto-slow factor (1 when
+  // the feature is off or no dense speech is detected). defaultPlaybackRate stays
+  // at the *intended* speed so a freshly-loaded source isn't seeded at a
+  // momentarily-slowed rate.
+  const eff = effectiveSpeed();
   try {
     if (media.preservesPitch === false) media.preservesPitch = true;
     if (Math.abs(media.defaultPlaybackRate - S.currentSpeed) > 0.001)
       media.defaultPlaybackRate = S.currentSpeed;
-    if (Math.abs(media.playbackRate - S.currentSpeed) > 0.001) media.playbackRate = S.currentSpeed;
+    if (Math.abs(media.playbackRate - eff) > 0.001) media.playbackRate = eff;
   } catch (e) {
     /* some players reject rate before metadata is ready */
   }
+}
+
+// The speed actually written to playbackRate: the user's speed times the live
+// auto-slow factor. Ignored entirely when the feature is off.
+export function effectiveSpeed(): number {
+  return S.autoSlowEnabled ? S.currentSpeed * S.autoSlowFactor : S.currentSpeed;
+}
+
+// Re-assert the effective rate on the primary video right now — the autoslow
+// sampler calls this when the factor moves, so a slowdown takes effect without
+// waiting for the next 1s tick.
+export function reapplyPrimaryRate(): void {
+  const v = primaryVideo();
+  if (v && !isLive(v)) setMediaRate(v);
 }
 
 // Re-assert our rate on a single element. Backs the hard-capture handler

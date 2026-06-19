@@ -37,6 +37,7 @@ export function audioLevels(): AudioLevels {
     in: inDb,
     out: audioOutDb(g, inDb),
     threshold: S.audioCompThreshold,
+    knee: S.audioCompKnee, // the meter draws the soft-knee band; popup no longer has the slider
     translation: translationActive(), // a voice-over translator is playing → compression is paused
   };
 }

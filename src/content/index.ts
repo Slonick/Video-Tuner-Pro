@@ -4,7 +4,12 @@ import { api, ctxValid } from "./platform/browser.js";
 import { STORE, OUR_AREAS, whenReady } from "./platform/storage.js";
 import { clamp, clampTarget, clampNum } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
-import { resolveSpeed, resolveSyncTarget } from "./core/resolve.js";
+import {
+  resolveSpeed,
+  resolveSyncTarget,
+  resolveAutoSlow,
+  type AutoSlowSettings,
+} from "./core/resolve.js";
 import { normalizePresetSet, normalizeSpeedStep, normalizeHoldSpeed } from "../shared/presets.js";
 import { normalizeKeymap } from "../shared/keymap.js";
 import { S } from "./state.js";
@@ -15,6 +20,8 @@ import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
+import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
+import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
 import { collectVideos, startTracking, stopTracking, reconcile } from "./videos.js";
 import "./messaging.js"; // registers the popup message handler
@@ -25,6 +32,7 @@ import { currentChannel, channelKeys } from "./channel.js";
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;
+let autoSlowSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
 let lastChannel: string | null = null; // re-resolve speed when the YouTube channel changes
 
@@ -66,6 +74,10 @@ function stopTimers() {
   if (bufferSampler != null) {
     clearInterval(bufferSampler);
     bufferSampler = null;
+  }
+  if (autoSlowSampler != null) {
+    clearInterval(autoSlowSampler);
+    autoSlowSampler = null;
   }
 }
 
@@ -112,6 +124,13 @@ function loadSpeed() {
       "audioCompAttack",
       "audioCompRelease",
       "audioCompGain",
+      "autoSlowSites",
+      "autoSlowChannels",
+      "autoSlowGlobal",
+      "autoSlowFloor",
+      "autoSlowHold",
+      "autoSlowReaction",
+      "autoSlowEaseBack",
       "showRemaining",
       "streamBadge",
       "audioSpeed",
@@ -162,6 +181,22 @@ function loadSpeed() {
       S.audioCompAttack = clampNum(result.audioCompAttack, 0, 1, 0);
       S.audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 1);
       S.audioCompGain = clampNum(result.audioCompGain, 0, 24, 0);
+      // Auto-slow: enable + target resolve by scope (one bundle per scope); the
+      // floor and the response dynamics (hold/reaction/ease-back) are global.
+      S.autoSlowFloor = clampNum(result.autoSlowFloor, 0.5, 2, 1.0);
+      S.autoSlowHold = clampNum(result.autoSlowHold, 0, 4, 1.2);
+      S.autoSlowReaction = clampNum(result.autoSlowReaction, 0, 100, 50);
+      S.autoSlowEaseBack = clampNum(result.autoSlowEaseBack, 0, 100, 25);
+      const rs = resolveAutoSlow(
+        channelKeys(),
+        getDomain(),
+        (result.autoSlowSites || {}) as Record<string, AutoSlowSettings>,
+        (result.autoSlowChannels || {}) as Record<string, AutoSlowSettings>,
+        result.autoSlowGlobal as AutoSlowSettings | undefined,
+      );
+      S.autoSlowScope = rs.scope;
+      S.autoSlowEnabled = rs.enabled;
+      S.autoSlowTarget = rs.target;
       applyResolved(domains, channels, result.globalSpeed as number | undefined);
       applyAll();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
@@ -187,6 +222,7 @@ function reresolve() {
     updateTimeBadge();
   });
   applyResolvedTargetFromStore(); // the channel changed — its allowed-delay may differ
+  applyResolvedAutoSlowFromStore(); // ...and its auto-slow enable may differ too
 }
 
 // Wait for the selective-sync config so the first resolve reads each setting from
@@ -225,6 +261,8 @@ function startTimers(immediate = false) {
   if (liveTick == null) liveTick = setTimeout(tick, immediate ? 0 : tickInterval);
   if (audioSampler == null) audioSampler = setInterval(recordAudioSample, A_HIST_MS);
   if (bufferSampler == null) bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
+  // Always running; the sample body no-ops cheaply while auto-slow is off.
+  if (autoSlowSampler == null) autoSlowSampler = setInterval(autoSlowSample, AUTOSLOW_MS);
 }
 
 // A media event or the tab regaining focus: drop back to the fast cadence and
@@ -373,6 +411,21 @@ api.storage.onChanged.addListener((changes, area) => {
     S.audioSpeedEnabled = changes.audioSpeed.newValue === true;
     if (S.audioSpeedEnabled) applyAll();
     else resetAudios(); // turned off — hand the <audio> elements back to the page
+  }
+  if (changes.autoSlowSites || changes.autoSlowChannels || changes.autoSlowGlobal) {
+    applyResolvedAutoSlowFromStore(); // re-resolve the scoped bundle (enable + target)
+  }
+  if (changes.autoSlowFloor) {
+    S.autoSlowFloor = clampNum(changes.autoSlowFloor.newValue, 0.5, 2, 1.0);
+  }
+  if (changes.autoSlowHold) {
+    S.autoSlowHold = clampNum(changes.autoSlowHold.newValue, 0, 4, 1.2);
+  }
+  if (changes.autoSlowReaction) {
+    S.autoSlowReaction = clampNum(changes.autoSlowReaction.newValue, 0, 100, 50);
+  }
+  if (changes.autoSlowEaseBack) {
+    S.autoSlowEaseBack = clampNum(changes.autoSlowEaseBack.newValue, 0, 100, 25);
   }
   if (changes.forceRate) S.forceRate = changes.forceRate.newValue === true;
   if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;

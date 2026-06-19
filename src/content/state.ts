@@ -59,6 +59,19 @@ export const S = {
   badgePos: null as { fx: number; fy: number } | null,
   // Whether the badge is pinned (per site): pinned → always visible, no auto-hide.
   badgePinned: false,
+  // Auto-slow for dense speech: when the speaker tarators, temporarily lower the
+  // effective playback speed so it stays intelligible. Enabling resolves by scope
+  // (channel > site > global), like speed; `autoSlowEnabled`/`autoSlowScope` hold
+  // the resolved result. `autoSlowFactor` is the live multiplier the sampler
+  // drives (1 = no slowdown); `autoSlowFloor` is the lowest effective speed.
+  autoSlowEnabled: false,
+  autoSlowScope: null as "channel" | "site" | "global" | null,
+  autoSlowFloor: 1.0, // min effective speed (fraction), 0.5…2 — scoped with the bundle
+  autoSlowTarget: 6, // comfort ceiling (syllables/sec) — scoped; the graph's target line
+  autoSlowHold: 1.2, // s, global — how long it stays slowed after speech eases up
+  autoSlowReaction: 50, // 0…100, global — how fast it slows down when speech is dense
+  autoSlowEaseBack: 25, // 0…100, global — how fast it returns to the user's speed
+  autoSlowFactor: 1.0, // live, set by the autoslow sampler — not persisted
   // Audio compression (raw DynamicsCompressor parameters)
   audioCompEnabled: false,
   audioCompThreshold: -60, // dB, -100…0
