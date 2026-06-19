@@ -32,6 +32,10 @@ import {
   applyResolvedAutoSlowFromStore,
 } from "./audio/autoslow-config.js";
 import { AUTO_SLOW_DEFAULTS, type AutoSlowSettings } from "./core/resolve.js";
+import { monitorData } from "./monitor.js";
+import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
+import { autoSlowHist, AUTO_SLOW_HIST_MS } from "./audio/autoslow-state.js";
+import { bufferLevelHist } from "./bitrate.js";
 
 // Build a settings bundle from a popup message, clamped to valid ranges.
 function autoSlowFromRequest(req: { enabled?: unknown; target?: unknown }): AutoSlowSettings {
@@ -41,9 +45,6 @@ function autoSlowFromRequest(req: { enabled?: unknown; target?: unknown }): Auto
     target: Number.isNaN(target) ? AUTO_SLOW_DEFAULTS.target : Math.min(12, Math.max(3, target)),
   };
 }
-import { monitorData } from "./monitor.js";
-import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
-import { bufferLevelHist } from "./bitrate.js";
 
 function replyFromVideoFrame(
   sendResponse: (response?: unknown) => void,
@@ -138,8 +139,8 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       live: onStreamPage(),
     }));
   }
-  // --- Auto-slow settings bundle (enable + sensitivity + floor), per scope —
-  // mirrors the live-sync target above, but carries three values together.
+  // --- Auto-slow settings bundle (enable + target), per scope — mirrors the
+  // live-sync target above.
   if (request.action === "setAutoSlow") {
     setAutoSlowPreview(autoSlowFromRequest(request)); // live preview, no persist
     return replyFromVideoFrame(sendResponse, () => ({ success: true }));
@@ -182,6 +183,11 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       audio: audioLevelHist.map((p) => [Math.round(p.in * 10) / 10, Math.round(p.out * 10) / 10]),
       audioStep: A_HIST_MS,
       buffer: bufferLevelHist.map((p) => [nowT - p.at, Math.round(p.v * 100) / 100]),
+      autoSlow: autoSlowHist.map((p) => [
+        Math.round(p.rate * 10) / 10,
+        Math.round(p.speed * 100) / 100,
+      ]),
+      autoSlowStep: AUTO_SLOW_HIST_MS,
     }));
   }
   return false;

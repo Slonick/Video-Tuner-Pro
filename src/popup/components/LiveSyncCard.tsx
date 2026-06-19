@@ -71,62 +71,63 @@ export function LiveSyncCard({ sync: ls }: Props) {
         <canvas id="bufferMeter"></canvas>
       </div>
 
+      <div className="sync-delay-row">
+        <span>{msg("allowedDelay")}</span>
+        <div className="speed-quick">
+          <button
+            type="button"
+            className="spin"
+            id="syncDown"
+            aria-label="Shorter"
+            title="−1 s"
+            onClick={() => ls.nudge(-1)}
+          >
+            <MinusIcon />
+          </button>
+          <span className="sync-val">
+            <b id="syncTargetVal">{ls.target}</b> <span>{msg("secondsShort")}</span>
+          </span>
+          <button
+            type="button"
+            className="spin"
+            id="syncUp"
+            aria-label="Longer"
+            title="+1 s"
+            onClick={() => ls.nudge(1)}
+          >
+            <PlusIcon />
+          </button>
+          <span className="speed-quick-div" aria-hidden="true"></span>
+          <button
+            type="button"
+            className="spin"
+            id="syncReset"
+            aria-label="Reset"
+            title={msg("tipResetTarget")}
+            onClick={ls.resetManual}
+          >
+            <ResetIcon />
+          </button>
+        </div>
+      </div>
+      <input
+        type="range"
+        className="speed-slider"
+        id="syncTarget"
+        min="1"
+        max="30"
+        step="1"
+        value={ls.target}
+        onInput={(e) => ls.previewTarget(Number((e.target as HTMLInputElement).value))}
+        onChange={(e) => ls.previewTarget(Number(e.target.value))}
+      />
+
       <div
         ref={bodyRef}
         className={"sync-body" + (open ? " open" : "")}
         id="syncBody"
         onTransitionEnd={onBodyTransitionEnd}
       >
-        <div className="sync-delay-row">
-          <span>{msg("allowedDelay")}</span>
-          <div className="speed-quick">
-            <button
-              type="button"
-              className="spin"
-              id="syncDown"
-              aria-label="Shorter"
-              title="−1 s"
-              onClick={() => ls.nudge(-1)}
-            >
-              <MinusIcon />
-            </button>
-            <span className="sync-val">
-              <b id="syncTargetVal">{ls.target}</b> <span>{msg("secondsShort")}</span>
-            </span>
-            <button
-              type="button"
-              className="spin"
-              id="syncUp"
-              aria-label="Longer"
-              title="+1 s"
-              onClick={() => ls.nudge(1)}
-            >
-              <PlusIcon />
-            </button>
-            <span className="speed-quick-div" aria-hidden="true"></span>
-            <button
-              type="button"
-              className="spin"
-              id="syncReset"
-              aria-label="Reset"
-              title={msg("tipResetTarget")}
-              onClick={ls.resetManual}
-            >
-              <ResetIcon />
-            </button>
-          </div>
-        </div>
-        <input
-          type="range"
-          className="speed-slider"
-          id="syncTarget"
-          min="1"
-          max="30"
-          step="1"
-          value={ls.target}
-          onInput={(e) => ls.previewTarget(Number((e.target as HTMLInputElement).value))}
-          onChange={(e) => ls.previewTarget(Number(e.target.value))}
-        />
         <div className="quick-actions">
           <fieldset className="scope-group">
             <legend>{msg("scopeLabel")}</legend>

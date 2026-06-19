@@ -21,11 +21,14 @@ export default defineConfig({
       exclude: [
         "src/**/*.d.ts",
         "src/types/**",
-        "src/content/audio/types.ts",      // type-only (interfaces)
+        "src/content/audio/types.ts", // type-only (interfaces)
         // Entry points / bootstrap glue — wired by the browser, not unit-tested.
         "src/background/**",
         "src/content/index.ts",
         "src/content/inject.ts",
+        // Browser-wired sampler: reads the analyser/video and applies the rate.
+        // The pure detector + controller live in pace.ts and are unit-tested.
+        "src/content/audio/autoslow.ts",
         // Options page — browser-wired DOM glue; its pure logic lives in
         // src/shared (presets / keymap / sync-config) and is unit-tested there.
         "src/options/**",

@@ -81,7 +81,13 @@ async function measureHeight(file) {
   ]);
   const h = stdout.match(/VH(\d+)/);
   const a = stdout.match(/AUD(\d+)_(\d+)/);
-  return { height: h ? Number(h[1]) : 600, audioTop: a ? Number(a[1]) : null, audioBottom: a ? Number(a[2]) : null };
+  const g = stdout.match(/GRP([\d_]+)/);
+  return {
+    height: h ? Number(h[1]) : 600,
+    audioTop: a ? Number(a[1]) : null,
+    audioBottom: a ? Number(a[2]) : null,
+    groupTops: g ? g[1].split("_").map(Number) : [],
+  };
 }
 
 // `height`: skip the measure pass and capture at this height — themes don't
@@ -95,10 +101,16 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   const inject =
     `<script>window.__SCENARIO__=${JSON.stringify(scenario)};window.__MESSAGES__=${JSON.stringify(messages)};window.__VERSION__=${JSON.stringify(version)};window.__THEME__=${JSON.stringify(theme)};</script>\n` +
     `<script src="mock.js"></script>\n`;
-  // Optionally open a collapsible section (e.g. the compressor) for the shot:
-  // disable the transition + max-height none so it expands fully and instantly.
-  const expandJs = expand
-    ? `<script>addEventListener("load",()=>{const e=document.getElementById(${JSON.stringify(expand)});if(e){e.style.transition="none";e.classList.add("open");e.style.maxHeight="none";}const b=document.querySelector('[data-target="${expand}"]');if(b)b.setAttribute("aria-expanded","true");});</script>\n`
+  // Optionally open one or more collapsible sections (e.g. all the cards) for the
+  // shot: disable the transition + max-height none so each expands fully/instantly.
+  const expandIds = Array.isArray(expand) ? expand : expand ? [expand] : [];
+  const expandJs = expandIds.length
+    ? `<script>addEventListener("load",()=>{${expandIds
+        .map(
+          (id) =>
+            `{const e=document.getElementById(${JSON.stringify(id)});if(e){e.style.transition="none";e.classList.add("open");e.style.maxHeight="none";}}`,
+        )
+        .join("")}});</script>\n`
     : "";
 
   // The mock sets toggles checked at runtime, which fires the knob's slide
@@ -115,16 +127,16 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   const pageFile = join(TMP, `popup-${tag}.html`);
   await writeFile(pageFile, html);
 
-  let audioTop = null, audioBottom = null;
+  let audioTop = null, audioBottom = null, groupTops = [];
   if (height == null) {
     // Measure pass → tight capture (uniform padding, no empty tail). Wait past
     // the section open transition (0.28s) before measuring. Also record the
-    // compressor section's bounds so promo framing can box it tightly.
+    // compressor section's bounds and the group-label tops (Video / Audio split).
     const meas = html.replace("</body>",
-      '<script>addEventListener("load",()=>setTimeout(()=>{const b=Math.ceil(document.body.getBoundingClientRect().height);const e=document.getElementById("audioBody");let a="";if(e){const r=e.closest(".sync-section").getBoundingClientRect();a="AUD"+Math.round(r.top)+"_"+Math.round(r.bottom);}document.title="VH"+b+" "+a;},450))</script></body>');
+      '<script>addEventListener("load",()=>setTimeout(()=>{const b=Math.ceil(document.body.getBoundingClientRect().height);const e=document.getElementById("audioBody");let a="";if(e){const r=e.closest(".sync-section").getBoundingClientRect();a="AUD"+Math.round(r.top)+"_"+Math.round(r.bottom);}const gs=[...document.querySelectorAll(".group-label")].map(g=>Math.round(g.getBoundingClientRect().top));const gp=gs.length?"GRP"+gs.join("_"):"";document.title="VH"+b+" "+a+" "+gp;},450))</script></body>');
     const measFile = join(TMP, `measure-${tag}.html`);
     await writeFile(measFile, meas);
-    ({ height, audioTop, audioBottom } = await measureHeight(measFile));
+    ({ height, audioTop, audioBottom, groupTops } = await measureHeight(measFile));
   }
 
   await runChrome([
@@ -134,5 +146,5 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
     `file://${pageFile}`,
   ]);
 
-  return { out, width, height, audioTop, audioBottom };
+  return { out, width, height, audioTop, audioBottom, groupTops };
 }

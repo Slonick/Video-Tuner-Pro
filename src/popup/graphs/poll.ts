@@ -3,7 +3,7 @@
 // background-collected history so they don't start empty.
 import { api } from "../platform/browser.js";
 import { now } from "./draw-util.js";
-import { A_WINDOW, BUF_WINDOW } from "./state.js";
+import { A_WINDOW, BUF_WINDOW, AS_WINDOW } from "./state.js";
 import type { GraphState, BufSample } from "./state.js";
 
 // Poll the page ~13×/s and fold monitor data into the shared graph state. `getTabId`
@@ -32,10 +32,10 @@ export function startPoll(
 
       const as = resp.autoSlow;
       g.asActive = !!(as && as.active);
+      if (as && typeof as.target === "number") g.asTargetLine = as.target; // always tracks the setting
       if (g.asActive) {
         g.asRate = as.rate;
         g.asSpeed = as.speed;
-        g.asTargetLine = as.target;
       }
       if (g.audioActive) {
         g.tgt.in = a.in;
@@ -51,11 +51,22 @@ export function startPoll(
 
       // Pre-fill both graphs once from the background-collected history so they
       // don't start empty (when there's any history to fill them with).
-      if (!g.histSeeded && (g.audioActive || g.bufLive)) {
+      if (!g.histSeeded && (g.audioActive || g.bufLive || g.asActive)) {
         g.histSeeded = true;
         api.tabs.sendMessage(tabId, { action: "getHistory" }, (r) => {
           if (api.runtime.lastError || !r) return;
           const t0 = now();
+          if (r.autoSlow && r.autoSlow.length) {
+            const step = r.autoSlowStep || 100,
+              n = r.autoSlow.length;
+            const seed = r.autoSlow.map((p: number[], i: number) => ({
+              t: t0 - (n - 1 - i) * step,
+              rate: p[0],
+              speed: p[1],
+            }));
+            g.asHist.unshift(...seed);
+            while (g.asHist.length && t0 - g.asHist[0].t > AS_WINDOW + 200) g.asHist.shift();
+          }
           if (r.audio && r.audio.length) {
             const step = r.audioStep || 150,
               n = r.audio.length;

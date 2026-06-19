@@ -53,6 +53,19 @@ vi.mock("../src/content/audio/metering.js", () => ({
   A_HIST_MS: 150,
 }));
 vi.mock("../src/content/bitrate.js", () => ({ bufferLevelHist: [] }));
+const autoslow = vi.hoisted(() => ({
+  persistSiteAutoSlow: vi.fn(),
+  persistChannelAutoSlow: vi.fn(),
+  persistGlobalAutoSlow: vi.fn(),
+  resetAutoSlowScope: vi.fn(),
+  setAutoSlowPreview: vi.fn(),
+  applyResolvedAutoSlowFromStore: vi.fn(),
+}));
+vi.mock("../src/content/audio/autoslow-config.js", () => autoslow);
+vi.mock("../src/content/audio/autoslow-state.js", () => ({
+  autoSlowHist: [{ rate: 7, speed: 1.4 }],
+  AUTO_SLOW_HIST_MS: 100,
+}));
 
 import { S } from "../src/content/state.js";
 import "../src/content/messaging.js";
@@ -188,15 +201,51 @@ describe("getMonitor / getHistory", () => {
     expect(send({ action: "getMonitor" }).resp).toEqual({ mock: "monitor" });
   });
 
-  it("getHistory rounds and shapes the audio/buffer history", () => {
+  it("getHistory rounds and shapes the audio/buffer/auto-slow history", () => {
     const resp = send({ action: "getHistory" }).resp as {
       audio: number[][];
       audioStep: number;
       buffer: number[][];
+      autoSlow: number[][];
+      autoSlowStep: number;
     };
     expect(resp.audio).toEqual([[-10, -12]]);
     expect(resp.audioStep).toBe(150);
     expect(resp.buffer).toEqual([]);
+    expect(resp.autoSlow).toEqual([[7, 1.4]]);
+    expect(resp.autoSlowStep).toBe(100);
+  });
+});
+
+describe("auto-slow actions", () => {
+  it("setAutoSlow previews the (clamped) bundle live", () => {
+    const { resp } = send({ action: "setAutoSlow", enabled: true, target: 99 });
+    expect(autoslow.setAutoSlowPreview).toHaveBeenCalledWith({ on: true, target: 12 });
+    expect((resp as { success: boolean }).success).toBe(true);
+  });
+
+  it("rememberAutoSlow persists the bundle by scope", () => {
+    send({ action: "rememberAutoSlow", scope: "channel", enabled: true, target: 7 });
+    expect(autoslow.persistChannelAutoSlow).toHaveBeenCalledWith({ on: true, target: 7 });
+    send({ action: "rememberAutoSlow", scope: "global", enabled: false, target: 5 });
+    expect(autoslow.persistGlobalAutoSlow).toHaveBeenCalledWith({ on: false, target: 5 });
+    send({ action: "rememberAutoSlow", scope: "site", enabled: true, target: 6 });
+    expect(autoslow.persistSiteAutoSlow).toHaveBeenCalledWith({ on: true, target: 6 });
+  });
+
+  it("resetAutoSlow routes the scope and resetAutoSlowToSaved re-resolves", () => {
+    send({ action: "resetAutoSlow", scope: "global" });
+    expect(autoslow.resetAutoSlowScope).toHaveBeenCalledWith("global");
+    send({ action: "resetAutoSlowToSaved" });
+    expect(autoslow.applyResolvedAutoSlowFromStore).toHaveBeenCalled();
+  });
+
+  it("getAutoSlow replies with the resolved enable + target + scope", () => {
+    S.autoSlowEnabled = true;
+    S.autoSlowTarget = 6;
+    S.autoSlowScope = "site";
+    const { resp } = send({ action: "getAutoSlow" });
+    expect(resp).toMatchObject({ enabled: true, target: 6, scope: "site", channel: "UCabc" });
   });
 });
 

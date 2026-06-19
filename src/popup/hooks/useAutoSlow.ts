@@ -31,6 +31,7 @@ export interface UseAutoSlow {
   saved: ScopeFlags;
   setEnabled: (on: boolean) => void;
   setTarget: (v: number) => void;
+  nudge: (delta: number) => void;
   save: () => void;
   resetManual: () => void;
   resetScope: () => void;
@@ -100,6 +101,12 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     setTargetState(v);
     debounced.current();
   }, []);
+  // Step the target, clamped to the slider's range; reads the ref so back-to-back
+  // taps don't race a pending re-render.
+  const nudge = useCallback(
+    (delta: number) => setTarget(Math.min(12, Math.max(3, ref.current.target + delta))),
+    [setTarget],
+  );
 
   const save = useCallback(() => {
     const b = { ...ref.current };
@@ -173,6 +180,7 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     saved: sc.saved,
     setEnabled,
     setTarget,
+    nudge,
     save,
     resetManual,
     resetScope,

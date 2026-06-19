@@ -44,7 +44,9 @@ export function monitorData(): MonitorData {
   }
   return {
     audio: audioLevels(),
-    autoSlow: { ...autoSlowLive },
+    // target always reflects the current setting, so the graph's target line is
+    // right even when auto-slow is idle (no active sample to refresh it).
+    autoSlow: { ...autoSlowLive, target: S.autoSlowTarget },
     buffer: lag,
     bufferAhead: bufAhead,
     bufLimited: limited,

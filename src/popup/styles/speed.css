@@ -198,6 +198,22 @@
   background-repeat: no-repeat;
 }
 
+/* Tick marks on the target-rate slider (3–12 syll/s, range 9): every 1 →
+   a tick at 1/9 = 11.1111% of the thumb's travel, left-aligned at each step.
+   (The slider still steps by 0.5 for finer control.) */
+#autoSlowTarget {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--muted) 0,
+    var(--muted) 1.5px,
+    transparent 1.5px,
+    transparent 11.1111%
+  );
+  background-size: calc(100% - 18px) 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 /* --- Preset buttons — active one filled with the accent. ----------------- */
 .buttons-grid {
   display: grid;
@@ -334,8 +350,8 @@
   padding: 0;
 }
 
-/* "Allowed delay" row: label on the left, a −/value/+ cluster on the right
-   (reusing .speed-quick / .spin from the speed header). */
+/* "Allowed delay" / "Target rate" row: label on the left, a −/value/+ cluster on
+   the right (reusing .speed-quick / .spin from the speed header). */
 .sync-delay-row {
   display: flex;
   align-items: center;
@@ -344,6 +360,11 @@
   margin-bottom: 8px;
   font-size: 12px;
   color: var(--text);
+}
+/* When the row sits right under an always-visible graph (live-sync, auto-slow),
+   give it air so it doesn't butt against the meter. */
+.meter.always + .sync-delay-row {
+  margin-top: 12px;
 }
 .sync-val {
   min-width: 36px;

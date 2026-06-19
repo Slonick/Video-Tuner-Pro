@@ -124,7 +124,7 @@ export function createGraphState(
     asActive: false,
     asRate: 0,
     asSpeed: 1,
-    asTargetLine: 7,
+    asTargetLine: 6, // placeholder until the first poll reports the real setting
     asRateCur: 0,
     asSpeedCur: 1,
     asHist: [],

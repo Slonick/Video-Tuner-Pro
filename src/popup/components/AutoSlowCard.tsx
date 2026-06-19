@@ -1,13 +1,13 @@
-// Auto-slow card (audio group). Mirrors the live-sync card: an enable toggle plus
-// two scoped settings (sensitivity + slowest speed) saved per scope
-// (channel > site > global). Toggle/sliders preview live; Save commits the bundle
-// to the chosen scope, Reset clears it. Global response dynamics live in options.
+// Auto-slow card (audio group). Mirrors the live-sync card: an enable toggle, the
+// live speech graph, and an always-visible target-rate row (steppers + slider).
+// The target previews live; Save commits the {enable, target} bundle to the chosen
+// scope (channel > site > global), Reset clears it. Dynamics live in options.
 import { useRef, useState } from "react";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
 import { InfoTip } from "./InfoTip.js";
 import { ScopeSegment } from "./ScopeSegment.js";
-import { ChevronIcon } from "../icons.js";
+import { MinusIcon, PlusIcon, ResetIcon, ChevronIcon } from "../icons.js";
 import { useExpand } from "../hooks/useExpand.js";
 import type { UseAutoSlow } from "../hooks/useAutoSlow.js";
 
@@ -62,30 +62,61 @@ export function AutoSlowCard({ autoSlow: a }: Props) {
         <canvas id="autoSlowMeter"></canvas>
       </div>
 
+      <div className="sync-delay-row">
+        <span>{msg("autoSlowTargetLabel") || "Target rate"}</span>
+        <div className="speed-quick">
+          <button
+            type="button"
+            className="spin"
+            id="autoSlowDown"
+            aria-label="Lower target"
+            onClick={() => a.nudge(-0.5)}
+          >
+            <MinusIcon />
+          </button>
+          <span className="sync-val">
+            <b>{a.target.toFixed(1)}</b> <span>/s</span>
+          </span>
+          <button
+            type="button"
+            className="spin"
+            id="autoSlowUp"
+            aria-label="Raise target"
+            onClick={() => a.nudge(0.5)}
+          >
+            <PlusIcon />
+          </button>
+          <span className="speed-quick-div" aria-hidden="true"></span>
+          <button
+            type="button"
+            className="spin"
+            id="autoSlowReset"
+            aria-label="Reset"
+            title={msg("tipResetTarget")}
+            onClick={a.resetManual}
+          >
+            <ResetIcon />
+          </button>
+        </div>
+      </div>
+      <input
+        type="range"
+        className="speed-slider"
+        id="autoSlowTarget"
+        min="3"
+        max="12"
+        step="0.5"
+        value={a.target}
+        onInput={(e) => a.setTarget(Number((e.target as HTMLInputElement).value))}
+        onChange={(e) => a.setTarget(Number(e.target.value))}
+      />
+
       <div
         ref={bodyRef}
         className={"sync-body" + (open ? " open" : "")}
         id="autoSlowBody"
         onTransitionEnd={onBodyTransitionEnd}
       >
-        <div className="sync-delay-row">
-          <span>{msg("autoSlowTargetLabel") || "Target rate"}</span>
-          <span className="sync-val">
-            <b>{a.target.toFixed(1)}</b> <span>/s</span>
-          </span>
-        </div>
-        <input
-          type="range"
-          className="speed-slider"
-          id="autoSlowTarget"
-          min="3"
-          max="12"
-          step="0.5"
-          value={a.target}
-          onInput={(e) => a.setTarget(Number((e.target as HTMLInputElement).value))}
-          onChange={(e) => a.setTarget(Number(e.target.value))}
-        />
-
         <div className="quick-actions">
           <fieldset className="scope-group">
             <legend>{msg("scopeLabel")}</legend>

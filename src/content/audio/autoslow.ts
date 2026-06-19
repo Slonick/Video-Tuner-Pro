@@ -9,7 +9,7 @@ import { reapplyPrimaryRate } from "../speed.js";
 import { audioContext, audioGraphs } from "./routing.js";
 import { rmsLinear } from "./levels.js";
 import { SyllableMeter, suggestEffectiveSpeed, rampStep, PACE } from "./pace.js";
-import { autoSlowLive } from "./autoslow-state.js";
+import { autoSlowLive, recordAutoSlowSample } from "./autoslow-state.js";
 
 const APPLY_MS = 100; // how often we re-evaluate and move the factor
 // The reaction / ease-back settings (0..100) map onto these per-step move caps
@@ -108,6 +108,7 @@ export function autoSlowSample(): void {
   autoSlowLive.rate = rate;
   autoSlowLive.target = target;
   autoSlowLive.speed = appliedEff; // effective playback speed after the slowdown
+  recordAutoSlowSample(rate, appliedEff);
 }
 
 export const AUTOSLOW_MS = PACE.SAMPLE_MS;
