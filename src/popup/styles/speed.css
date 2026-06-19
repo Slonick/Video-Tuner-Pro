@@ -80,17 +80,25 @@
   }
 }
 
-/* The live note is anchored to the header (so it spans the card width), and
-   revealed when the ⚠ next to the domain is hovered or focused. */
+/* The live note is a plain CSS tooltip (not Floating UI): absolutely anchored to
+   the header so it spans the card width, and revealed when the ⚠ next to the
+   domain is hovered or focused. It re-declares the position/hidden state the base
+   .tip no longer carries (that's portaled now). */
 .tip.live-note {
+  position: absolute;
   left: 0;
   right: 0;
   top: calc(100% + 8px);
   bottom: auto;
+  width: auto;
   background: var(--warn-bg);
   color: var(--warn-text);
   border: 1px solid var(--warn-line);
+  opacity: 0;
   transform: translateY(-4px);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 .sec-head:has(#liveWarn:hover) .live-note,
 .sec-head:has(#liveWarn:focus-visible) .live-note {
@@ -520,16 +528,12 @@
   color: var(--text);
 }
 
-/* A toggle row whose label carries an info (i) tooltip — group the label + icon
-   and make the row the positioning context so the tip anchors to it. */
+/* Groups a toggle row's label text with its info (i) icon. */
 .extra-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-#superTheaterRow {
-  position: relative;
 }
 
 /* The speed body is open by default, so trim its vertical chrome (the section's

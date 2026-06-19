@@ -67,6 +67,8 @@
   "kbdFaster": { "message": "aumentar" },
   "kbdSlower": { "message": "diminuir" },
   "kbdReset": { "message": "redefinir" },
+  "kbdToggle": { "message": "alternar 1×" },
+  "kbdHold": { "message": "segurar" },
   "optPageTitle": { "message": "Video Tuner Pro — Configurações" },
   "optHeader": { "message": "Configurações" },
   "optGeneralTitle": { "message": "Geral" },

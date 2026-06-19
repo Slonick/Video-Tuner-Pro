@@ -9,7 +9,6 @@ import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
 import { InfoTip } from "./InfoTip.js";
 import { ParamSlider } from "./ParamSlider.js";
-import { WarnIcon } from "../icons.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import type { UseAudioCompressor } from "../hooks/useAudioCompressor.js";
 import { type CompParams, type CompPreset } from "../../shared/comp-presets.js";
@@ -107,17 +106,9 @@ export function AudioCard({ audio: a, translating, forceOpen }: Props) {
               <span className="switch-sub">{msg("audioSubtitle")}</span>
             </span>
           </button>
-          <span
-            className="info warn"
-            id="audioVotWarn"
-            tabIndex={0}
-            role="button"
-            aria-label="Translation active"
-            style={{ display: translating ? "inline-flex" : "none" }}
-          >
-            <WarnIcon />
-            <span className="tip">{msg("audioVotNote")}</span>
-          </span>
+          {translating && (
+            <InfoTip warn id="audioVotWarn" label="Translation active" tip={msg("audioVotNote")} />
+          )}
           <Switch id="audioCompToggle" checked={a.enabled} onChange={onToggle} />
         </div>
 

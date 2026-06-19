@@ -12,6 +12,8 @@ import { ScopeSegment } from "./ScopeSegment.js";
 import { PresetGrid } from "./PresetGrid.js";
 import { MinusIcon, PlusIcon, ResetIcon, WarnIcon } from "../icons.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
+import { STORE } from "../platform/storage.js";
+import { codeLabel, normalizeKeymap, DEFAULT_KEYMAP } from "../../shared/keymap.js";
 import type { UseSpeed } from "../hooks/useSpeed.js";
 
 interface Props {
@@ -37,6 +39,11 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
   }, [forceOpen, setOpen]);
 
   const [flash, setFlash] = useState(false);
+  // The shortcut hints read the live keymap so they reflect any remaps.
+  const [keymap, setKeymap] = useState(DEFAULT_KEYMAP);
+  useEffect(() => {
+    STORE.get(["keymap"], (r) => setKeymap(normalizeKeymap(r.keymap)));
+  }, []);
 
   // Glide the readout + thumb to the new speed (or snap it). No JSX text child on
   // the readout — this owns it.
@@ -213,32 +220,38 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
             <div className="extra-row">
               <span className="extra-label">
                 <span>{msg("kbdLabel")}</span>
-                <InfoTip below>
-                  <span className="tip kbd-tip">
-                    <span className="kbd-g">
-                      <kbd>A</kbd>
-                      <span>{msg("kbdSlower")}</span>
-                      <span className="amt">−{stepPct}%</span>
-                    </span>
-                    <span className="kbd-g">
-                      <kbd>⇧</kbd>
-                      <kbd>A</kbd>
-                      <span className="amt">−{stepPct * 2}%</span>
-                    </span>
-                    <span className="kbd-g">
-                      <kbd>D</kbd>
-                      <span>{msg("kbdFaster")}</span>
-                      <span className="amt">+{stepPct}%</span>
-                    </span>
-                    <span className="kbd-g">
-                      <kbd>⇧</kbd>
-                      <kbd>D</kbd>
-                      <span className="amt">+{stepPct * 2}%</span>
-                    </span>
-                    <span className="kbd-g">
-                      <kbd>R</kbd>
-                      <span>{msg("kbdReset")}</span>
-                    </span>
+                <InfoTip below className="kbd-tip">
+                  <span className="kbd-g">
+                    <kbd>{codeLabel(keymap.slower)}</kbd>
+                    <span>{msg("kbdSlower")}</span>
+                    <span className="amt">−{stepPct}%</span>
+                  </span>
+                  <span className="kbd-g">
+                    <kbd>⇧</kbd>
+                    <kbd>{codeLabel(keymap.slower)}</kbd>
+                    <span className="amt">−{stepPct * 2}%</span>
+                  </span>
+                  <span className="kbd-g">
+                    <kbd>{codeLabel(keymap.faster)}</kbd>
+                    <span>{msg("kbdFaster")}</span>
+                    <span className="amt">+{stepPct}%</span>
+                  </span>
+                  <span className="kbd-g">
+                    <kbd>⇧</kbd>
+                    <kbd>{codeLabel(keymap.faster)}</kbd>
+                    <span className="amt">+{stepPct * 2}%</span>
+                  </span>
+                  <span className="kbd-g">
+                    <kbd>{codeLabel(keymap.reset)}</kbd>
+                    <span>{msg("kbdReset")}</span>
+                  </span>
+                  <span className="kbd-g">
+                    <kbd>{codeLabel(keymap.toggle)}</kbd>
+                    <span>{msg("kbdToggle")}</span>
+                  </span>
+                  <span className="kbd-g">
+                    <kbd>{codeLabel(keymap.hold)}</kbd>
+                    <span>{msg("kbdHold")}</span>
                   </span>
                 </InfoTip>
               </span>

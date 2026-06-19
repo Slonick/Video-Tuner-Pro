@@ -67,6 +67,8 @@
   "kbdFaster": { "message": "बढ़ाएँ" },
   "kbdSlower": { "message": "घटाएँ" },
   "kbdReset": { "message": "रीसेट" },
+  "kbdToggle": { "message": "1× टॉगल" },
+  "kbdHold": { "message": "दबाए रखें" },
   "optPageTitle": { "message": "Video Tuner Pro — सेटिंग्स" },
   "optHeader": { "message": "सेटिंग्स" },
   "optGeneralTitle": { "message": "सामान्य" },

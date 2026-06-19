@@ -67,6 +67,8 @@
   "kbdFaster": { "message": "提高" },
   "kbdSlower": { "message": "降低" },
   "kbdReset": { "message": "重置" },
+  "kbdToggle": { "message": "切换 1×" },
+  "kbdHold": { "message": "按住" },
   "optPageTitle": { "message": "Video Tuner Pro — 设置" },
   "optHeader": { "message": "设置" },
   "optGeneralTitle": { "message": "常规" },

@@ -46,6 +46,7 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.19",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   }

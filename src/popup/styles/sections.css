@@ -107,27 +107,7 @@
     height: 15px;
   }
 
-  /* Reveal the section's hint on hover/focus. */
-  &:hover .tip,
-  &:focus-visible .tip {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* Flipped below the section when there isn't room above (JS toggles it). */
-  &.tip-below .tip {
-    bottom: auto;
-    top: calc(100% + 8px);
-    transform: translateY(-4px);
-  }
-
-  &.tip-below:hover .tip,
-  &.tip-below:focus-visible .tip {
-    transform: translateY(0);
-  }
-
-  /* Warning variant (live stream / active translation): amber, and its tooltip
-       is pinned below so it can't get clipped at the top of the popup. */
+  /* Warning variant (live stream / active translation): amber icon. */
   &.warn {
     color: #ff9f0a;
     align-self: center;
@@ -136,34 +116,16 @@
     &:focus-visible {
       color: #e8900a;
     }
-
-    .tip {
-      left: 0;
-      right: 0;
-      top: calc(100% + 8px);
-      bottom: auto;
-      width: auto;
-      background: var(--warn-bg);
-      color: var(--warn-text);
-      border: 1px solid var(--warn-line);
-      transform: translateY(-4px);
-    }
-
-    &:hover .tip,
-    &:focus-visible .tip {
-      transform: translateY(0);
-    }
   }
 }
 
-/* Base tooltip — kept top-level (specificity 0,1,0) so the .info-scoped rules
-   above can override it; nesting it under .info would raise its specificity. */
+/* Tooltip bubble. Floating UI portals it onto document.body and sets its
+   position inline, so it escapes the cards' overflow/scroll clipping; this rule
+   is only the look. Sizes to its content, capped so long hints wrap. */
 .tip {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 8px);
-  z-index: 30;
+  z-index: 1000;
+  width: max-content;
+  max-width: 240px;
   padding: 9px 11px;
   border-radius: 9px;
   background: var(--tip-bg);
@@ -173,12 +135,12 @@
   line-height: 1.45;
   text-align: left;
   box-shadow: 0 8px 22px var(--shadow);
-  opacity: 0;
-  transform: translateY(4px);
   pointer-events: none;
-  transition:
-    opacity 0.15s,
-    transform 0.15s;
+}
+.tip.warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border: 1px solid var(--warn-line);
 }
 
 /* --- Header row + on/off switch ------------------------------------------ */

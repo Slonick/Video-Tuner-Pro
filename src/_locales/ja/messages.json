@@ -67,6 +67,8 @@
   "kbdFaster": { "message": "上げる" },
   "kbdSlower": { "message": "下げる" },
   "kbdReset": { "message": "リセット" },
+  "kbdToggle": { "message": "1×切替" },
+  "kbdHold": { "message": "長押し" },
   "optPageTitle": { "message": "Video Tuner Pro — 設定" },
   "optHeader": { "message": "設定" },
   "optGeneralTitle": { "message": "全般" },

@@ -1,46 +1,73 @@
-// The little "i" info bubble with a tooltip. Tooltips open upward by default and
-// flip below when the section sits too near the top; rows that always sit below
-// (toggle rows) pass `below`. Ported from the tooltip logic in sections.ts.
-import { useEffect, useRef, type ReactNode } from "react";
-import { InfoIcon } from "../icons.js";
+// The little "i" info bubble (and the amber "warn" variant) with a tooltip.
+// Floating UI positions the bubble and renders it in a portal on document.body,
+// so it escapes the cards' overflow/scroll/transform clipping and flips/shifts to
+// stay in view on its own.
+import { useState, type ReactNode } from "react";
+import {
+  useFloating,
+  autoUpdate,
+  offset,
+  flip,
+  shift,
+  useHover,
+  useFocus,
+  useDismiss,
+  useRole,
+  useInteractions,
+  FloatingPortal,
+} from "@floating-ui/react";
+import { InfoIcon, WarnIcon } from "../icons.js";
 
 interface Props {
   tip?: string; // simple text tooltip
-  children?: ReactNode; // structured tooltip content (e.g. the keyboard hints)
-  below?: boolean; // pinned below — no auto-flip
+  children?: ReactNode; // structured content (e.g. the keyboard hints)
+  below?: boolean; // prefer opening downward (flip still kicks in if cramped)
+  warn?: boolean; // amber warning variant (uses WarnIcon)
+  className?: string; // extra class on the bubble (e.g. "kbd-tip")
+  id?: string;
+  label?: string; // trigger aria-label
 }
 
-export function InfoTip({ tip, children, below }: Props) {
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (below) return;
-    const info = ref.current;
-    const tipEl = info?.querySelector<HTMLElement>(".tip");
-    if (!info || !tipEl) return;
-    const place = () => {
-      const head = info.closest(".sec-head") || info;
-      const need = tipEl.offsetHeight + 16;
-      info.classList.toggle("tip-below", head.getBoundingClientRect().top < need);
-    };
-    info.addEventListener("mouseenter", place);
-    info.addEventListener("focusin", place);
-    return () => {
-      info.removeEventListener("mouseenter", place);
-      info.removeEventListener("focusin", place);
-    };
-  }, [below]);
+export function InfoTip({ tip, children, below, warn, className, id, label }: Props) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: below || warn ? "bottom" : "top",
+    middleware: [offset(8), flip({ padding: 8 }), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useHover(context, { move: false }),
+    useFocus(context),
+    useDismiss(context),
+    useRole(context, { role: "tooltip" }),
+  ]);
 
   return (
-    <span
-      ref={ref}
-      className={"info" + (below ? " tip-below" : "")}
-      tabIndex={0}
-      role="button"
-      aria-label="Info"
-    >
-      <InfoIcon />
-      {children ?? <span className="tip">{tip}</span>}
-    </span>
+    <>
+      <span
+        ref={refs.setReference}
+        className={"info" + (warn ? " warn" : "")}
+        id={id}
+        tabIndex={0}
+        aria-label={label ?? (warn ? "Warning" : "Info")}
+        {...getReferenceProps()}
+      >
+        {warn ? <WarnIcon /> : <InfoIcon />}
+      </span>
+      {open && (
+        <FloatingPortal>
+          <div
+            ref={refs.setFloating}
+            className={"tip" + (warn ? " warn" : "") + (className ? " " + className : "")}
+            style={floatingStyles}
+            {...getFloatingProps()}
+          >
+            {children ?? tip}
+          </div>
+        </FloatingPortal>
+      )}
+    </>
   );
 }

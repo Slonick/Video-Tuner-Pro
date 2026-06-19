@@ -98,6 +98,8 @@
   "kbdFaster": { "message": "increase" },
   "kbdSlower": { "message": "decrease" },
   "kbdReset": { "message": "reset" },
+  "kbdToggle": { "message": "1× toggle" },
+  "kbdHold": { "message": "hold" },
   "optPageTitle": { "message": "Video Tuner Pro — Settings" },
   "optHeader": { "message": "Settings" },
   "optGeneralTitle": { "message": "General" },

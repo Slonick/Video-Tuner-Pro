@@ -67,6 +67,8 @@
   "kbdFaster": { "message": "збільшити" },
   "kbdSlower": { "message": "зменшити" },
   "kbdReset": { "message": "скидання" },
+  "kbdToggle": { "message": "1× перемкнути" },
+  "kbdHold": { "message": "утримувати" },
   "optPageTitle": { "message": "Video Tuner Pro — Налаштування" },
   "optHeader": { "message": "Налаштування" },
   "optGeneralTitle": { "message": "Загальні" },

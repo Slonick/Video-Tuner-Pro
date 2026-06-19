@@ -7,7 +7,7 @@ import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
 import { InfoTip } from "./InfoTip.js";
 import { ScopeSegment } from "./ScopeSegment.js";
-import { MinusIcon, PlusIcon, ResetIcon, WarnIcon } from "../icons.js";
+import { MinusIcon, PlusIcon, ResetIcon } from "../icons.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import type { UseAutoSlow } from "../hooks/useAutoSlow.js";
 
@@ -58,17 +58,9 @@ export function AutoSlowCard({ autoSlow: a, live, forceOpen }: Props) {
               </span>
             </span>
           </button>
-          <span
-            className="info warn"
-            id="autoSlowLiveWarn"
-            tabIndex={0}
-            role="button"
-            aria-label="Live stream"
-            style={{ display: live ? "inline-flex" : "none" }}
-          >
-            <WarnIcon />
-            <span className="tip">{msg("autoSlowLiveNote")}</span>
-          </span>
+          {live && (
+            <InfoTip warn id="autoSlowLiveWarn" label="Live stream" tip={msg("autoSlowLiveNote")} />
+          )}
           <Switch id="autoSlowToggle" checked={a.enabled} onChange={a.setEnabled} />
         </div>
 
