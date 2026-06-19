@@ -68,4 +68,21 @@ describe("auto-slow card", () => {
     await wait(120);
     expect(lastCall("resetAutoSlow")).toMatchObject({ action: "resetAutoSlow", scope: "site" });
   });
+
+  it("the per-target Reset sends resetAutoSlowToSaved and pulls the saved value", async () => {
+    const { replies, lastCall } = await mountApp({ tab: EX, replies: reply() });
+    replies.resetAutoSlowToSaved = { success: true };
+    replies.getAutoSlow = { enabled: true, target: 9, scope: "site", channel: null };
+    click("autoSlowReset");
+    expect(lastCall("resetAutoSlowToSaved")).toMatchObject({ action: "resetAutoSlowToSaved" });
+    await wait(120); // deferred getAutoSlow pull
+    expect(sliderValue("autoSlowTarget")).toBe(9);
+  });
+
+  it("the per-target Reset falls back to storage when the page doesn't answer", async () => {
+    await mountApp({ tab: EX, replies: { getAutoSlow: undefined } });
+    click("autoSlowReset");
+    await wait(120);
+    expect(Number.isFinite(sliderValue("autoSlowTarget"))).toBe(true);
+  });
 });

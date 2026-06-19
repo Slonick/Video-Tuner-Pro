@@ -135,6 +135,27 @@ describe("save / reset by scope", () => {
     await wait(120); // deferred getTarget
     expect(sliderValue("syncTarget")).toBe(5);
   });
+
+  it("the per-target Reset sends resetTargetToSaved and pulls the saved value", async () => {
+    const { replies, lastCall } = await mountApp({ tab: EX });
+    replies.resetTargetToSaved = { success: true };
+    replies.getTarget = { target: 8, scope: "site", channel: null, channelName: "", live: false };
+    click("syncReset");
+    expect(lastCall("resetTargetToSaved")).toMatchObject({ action: "resetTargetToSaved" });
+    await wait(120); // deferred getTarget pull
+    expect(sliderValue("syncTarget")).toBe(8);
+  });
+
+  it("the per-target Reset falls back to storage when the page doesn't answer", async () => {
+    await mountApp({
+      tab: EX,
+      settings: { syncTargets: { "example.com": 7 } },
+      replies: { getTarget: undefined },
+    });
+    click("syncReset");
+    await wait(120);
+    expect(sliderValue("syncTarget")).toBe(7);
+  });
 });
 
 describe("no content script (storage fallback)", () => {
