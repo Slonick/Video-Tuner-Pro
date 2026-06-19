@@ -43,14 +43,16 @@ export default defineConfig({
       reporter: ["text", "text-summary", "html", "json-summary"],
       // CI fails when any metric drops below its floor. Set a few points under the
       // current numbers so routine edits don't trip the gate; ratchet them up as
-      // coverage improves. (At time of writing: ~90% stmts, 78% branch, 89% funcs,
-      // 95% lines on the gated set — periodic samplers and timer scheduling live in
-      // the excluded entry points, so the gated set is the real unit-testable logic.)
+      // coverage improves. (Currently ~90% stmts, 81% branch, 91% funcs, ~93% lines
+      // on the gated set.) The lines floor sits a touch lower because the v8 line
+      // count drifts ~1% between Node versions (local vs CI), and the Radix/motion
+      // rebuild moved several pure helpers — tween-slider/seg-pill — into React
+      // components (.tsx), which `include: src/**/*.ts` deliberately doesn't measure.
       thresholds: {
         statements: 87,
         branches: 74,
         functions: 87,
-        lines: 92,
+        lines: 91,
       },
     },
   },

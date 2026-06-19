@@ -9,6 +9,8 @@ import { useAudioCompressor } from "../hooks/useAudioCompressor.js";
 import { useGraphs } from "../hooks/useGraphs.js";
 import { STORE } from "../platform/storage.js";
 import { msg } from "../i18n.js";
+import { domMax } from "motion/react";
+import { MotionProvider } from "../../ui/MotionProvider.js";
 import { Header } from "./Header.js";
 import { SpeedCard } from "./SpeedCard.js";
 import { LiveSyncCard } from "./LiveSyncCard.js";
@@ -27,18 +29,17 @@ export function App() {
   useGraphs(tab?.tabId ?? null, setTranslating);
 
   // First-open walkthrough: show it once, the first time the popup opens, then
-  // remember it's been seen. `tourCard` is the card the tour is currently expanding
-  // (its "hidden settings" step), or null.
+  // remember it's been seen.
   const [showTour, setShowTour] = useState(false);
   useEffect(() => {
     STORE.get(["popupGuideSeen"], (r) => setShowTour(r.popupGuideSeen !== true));
   }, []);
-  const [tourCard, setTourCard] = useState<number | null>(null);
-  const onExpand = useCallback((card: number | null) => setTourCard(card), []);
   const closeTour = useCallback(() => {
     setShowTour(false);
     STORE.set({ popupGuideSeen: true });
   }, []);
+  const [tourCard, setTourCard] = useState<number | null>(null);
+  const onExpand = useCallback((card: number | null) => setTourCard(card), []);
   // Drive each card open/closed from the tour; undefined hands control back to the
   // user once the tour is gone. Slot order is Speed, Live-sync, Auto-slow, Audio.
   const forceOpen = (n: number): boolean | undefined => (showTour ? tourCard === n : undefined);
@@ -51,7 +52,7 @@ export function App() {
   const audioTranslating = showTour ? false : translating;
 
   return (
-    <>
+    <MotionProvider features={domMax}>
       <Header />
       <div className="popup-grid">
         <div className="group-label">
@@ -72,6 +73,6 @@ export function App() {
         <AudioCard audio={audio} translating={audioTranslating} forceOpen={forceOpen(3)} />
       </div>
       {showTour && <GuideTour onClose={closeTour} onExpand={onExpand} />}
-    </>
+    </MotionProvider>
   );
 }

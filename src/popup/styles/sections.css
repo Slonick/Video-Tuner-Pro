@@ -119,9 +119,9 @@
   }
 }
 
-/* Tooltip bubble. Floating UI portals it onto document.body and sets its
-   position inline, so it escapes the cards' overflow/scroll clipping; this rule
-   is only the look. Sizes to its content, capped so long hints wrap. */
+/* Tooltip bubble. Radix Tooltip is the Content element here and portals it onto
+   document.body, so it escapes the cards' overflow/scroll clipping; this rule is
+   only the look. Sizes to its content, capped so long hints wrap. */
 .tip {
   z-index: 1000;
   width: max-content;
@@ -141,6 +141,24 @@
   background: var(--warn-bg);
   color: var(--warn-text);
   border: 1px solid var(--warn-line);
+}
+
+/* Fade-in on open, keyed off Radix's data-state. Opacity only — a transform
+   keyframe would fight Radix's positioning transform on the Content. The base
+   opacity stays 1, so the bubble is visible even if the animation never runs. */
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+}
+.tip[data-state="delayed-open"],
+.tip[data-state="instant-open"] {
+  animation: tip-in 0.14s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tip[data-state] {
+    animation: none;
+  }
 }
 
 /* --- Header row + on/off switch ------------------------------------------ */
@@ -191,29 +209,30 @@
   cursor: pointer;
 }
 
-.switch-input {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-
-  &:checked + .switch-track {
-    background: var(--accent);
-
-    .switch-knob {
-      transform: translateX(16px);
-    }
-  }
-}
-
+/* Radix Switch.Root (a <button>). The knob's travel is driven by motion.dev, so
+   only the track colour transitions here; the checked colour keys off data-state. */
 .switch-track {
   position: relative;
   display: block;
   width: 40px;
   height: 24px;
+  border: none;
   border-radius: 12px;
   background: var(--track);
   transition: background 0.2s;
+
+  &[data-state="checked"] {
+    background: var(--accent);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 .switch-knob {
@@ -225,7 +244,6 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 2px var(--shadow);
-  transition: transform 0.2s;
 }
 
 /* --- Collapsible body ---------------------------------------------------- */

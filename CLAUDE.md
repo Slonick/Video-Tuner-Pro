@@ -60,6 +60,14 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Comments & Attribution
+
+**Comments explain WHY, not WHAT. Commits are the author's alone.**
+
+- Don't write obvious comments that restate the code (`// loop over items`, `// set x to 5`). The code already says what; a comment earns its place only by explaining intent, a tradeoff, a gotcha, or a non-obvious reason.
+- If a comment would just paraphrase the line below it, delete it.
+- Commits and PRs are authored solely under the repository owner's name. Never add `Co-Authored-By` trailers, "Generated with" / tool-attribution footers, or any other co-authorship metadata.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

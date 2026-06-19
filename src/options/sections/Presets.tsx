@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
 import { Switch } from "../../ui/Switch.js";
+import { Slider } from "../../ui/Slider.js";
 import {
   COMP_MIN_PRESETS,
   COMP_MAX_PRESETS,
@@ -147,14 +148,14 @@ export function Presets() {
           <span>{msg("optGlobalGain") || "Global gain"}</span>
           <b className="opt-param-val">{globalGain} dB</b>
         </div>
-        <input
-          type="range"
+        <Slider
           className="opt-slider"
           min={GAIN_MIN}
           max={GAIN_MAX}
           step={GAIN_STEP}
           value={globalGain}
-          onChange={(e) => setGlobal(Number(e.target.value))}
+          ariaLabel={msg("optGlobalGain") || "Global gain"}
+          onChange={setGlobal}
         />
       </div>
 
@@ -196,14 +197,14 @@ export function Presets() {
                   <span>{msg(p.label)}</span>
                   <b className="opt-param-val">{p.fmt(cur[p.key])}</b>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   className="opt-slider"
                   min={p.min}
                   max={p.max}
                   step={p.step}
                   value={cur[p.key]}
-                  onChange={(e) => setParam(i, p.key, Number(e.target.value))}
+                  ariaLabel={msg(p.label)}
+                  onChange={(v) => setParam(i, p.key, v)}
                 />
               </div>
             ))}
@@ -216,14 +217,14 @@ export function Presets() {
                 </span>
               </div>
               {cur.gain != null && (
-                <input
-                  type="range"
+                <Slider
                   className="opt-slider"
                   min={GAIN_MIN}
                   max={GAIN_MAX}
                   step={GAIN_STEP}
                   value={cur.gain}
-                  onChange={(e) => setPresetGain(i, Number(e.target.value))}
+                  ariaLabel={msg("audioGain") || "Make-up gain"}
+                  onChange={(v) => setPresetGain(i, v)}
                 />
               )}
             </div>

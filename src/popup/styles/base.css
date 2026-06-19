@@ -100,7 +100,7 @@ body {
 .tour-cap {
   position: fixed;
   z-index: 2;
-  width: 268px;
+  width: 312px;
   max-width: calc(100vw - 16px);
   padding: 13px 14px 12px;
   border-radius: 12px;
@@ -123,7 +123,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap; /* let the buttons drop below the dots on long locales */
+  gap: 8px 10px;
 }
 .tour-dots {
   display: flex;

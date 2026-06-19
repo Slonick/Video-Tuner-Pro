@@ -20,14 +20,15 @@ const BADGE_STYLE: CSSProperties = {
   alignItems: "center",
   font: "600 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
   color: "#fff",
-  background: "rgba(0,0,0,0.55)",
-  padding: "5px 9px",
-  borderRadius: "6px",
+  background: "rgba(20,20,22,0.45)",
+  padding: "10px 16px",
+  borderRadius: "10px",
+  boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
   whiteSpace: "nowrap",
   opacity: 0,
   transition: "opacity .25s",
-  WebkitBackdropFilter: "blur(3px)",
-  backdropFilter: "blur(3px)",
+  WebkitBackdropFilter: "blur(12px) saturate(160%)",
+  backdropFilter: "blur(12px) saturate(160%)",
 };
 
 // Small red dot left of the speed, shown only on live streams (the value that

@@ -70,7 +70,7 @@ interface Rect {
   height: number;
 }
 
-const CAP_W = 268;
+const CAP_W = 312;
 const PAD = 12;
 const SPOT_PAD = 6; // breathing room between the spotlight ring and the element
 

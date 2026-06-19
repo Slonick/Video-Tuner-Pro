@@ -101,13 +101,13 @@
     margin-bottom: 0;
   }
 
-  input[type="range"] {
+  .speed-slider {
     margin: 6px 0 8px;
   }
 
   /* No desc under the slider (buffer card) — let the card padding be the
        bottom gap instead of doubling it with the slider's own margin. */
-  input[type="range"]:last-child {
+  .speed-slider:last-child {
     margin-bottom: 0;
   }
 }

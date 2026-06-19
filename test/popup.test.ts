@@ -7,6 +7,8 @@ import { scenario } from "./mocks/scenarios.js";
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const byId = (id: string) => document.getElementById(id)!;
+// Toggles are Radix Switches (role="switch" buttons), not checkboxes.
+const isOn = (id: string) => byId(id).getAttribute("aria-checked") === "true";
 const tick = () => new Promise((r) => setTimeout(r, 50));
 
 beforeAll(async () => {
@@ -47,9 +49,9 @@ describe("popup integration", () => {
   });
 
   it("reflects stored settings in the toggles", () => {
-    expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
-    expect((byId("liveSyncToggle") as HTMLInputElement).checked).toBe(true);
-    expect((byId("onVideoToggle") as HTMLInputElement).checked).toBe(true);
+    expect(isOn("audioCompToggle")).toBe(true);
+    expect(isOn("liveSyncToggle")).toBe(true);
+    expect(isOn("onVideoToggle")).toBe(true);
   });
 
   // Interaction behaviour (presets, sliders, scopes) is covered deterministically

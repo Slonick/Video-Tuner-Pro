@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { mountApp, byId, flush, wait } from "./mocks/mount-popup.js";
+import { mountApp, byId, flush, wait, sliderValue, setSlider } from "./mocks/mount-popup.js";
 
 // The audio compressor card via the real <App/>: stored values populate the
 // sliders/readouts, presets fill them (leaving make-up gain), and edits persist
 // (debounced + merged) to the keys the content script reads.
 const valOf = (id: string) => byId(id + "Val").textContent;
-const input = (el: HTMLInputElement) => el.dispatchEvent(new Event("input", { bubbles: true }));
+// The toggle is a Radix Switch (role="switch" button), not a checkbox.
+const isOn = (id: string) => byId(id).getAttribute("aria-checked") === "true";
 
 describe("stored values populate the card", () => {
   it("formats each param into its slider + readout", async () => {
@@ -21,8 +22,8 @@ describe("stored values populate the card", () => {
         audioCompGain: 12,
       },
     });
-    expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
-    expect((byId("acThreshold") as HTMLInputElement).value).toBe("-40");
+    expect(isOn("audioCompToggle")).toBe(true);
+    expect(sliderValue("acThreshold")).toBe(-40);
     expect(valOf("acThreshold")).toBe("-40 dB");
     expect(valOf("acRatio")).toBe("6:1");
     expect(valOf("acGain")).toBe("12 dB");
@@ -30,22 +31,21 @@ describe("stored values populate the card", () => {
 
   it("clamps out-of-range stored values to the slider bounds", async () => {
     await mountApp({ settings: { audioCompGain: 999, audioCompRatio: 0 } });
-    expect((byId("acGain") as HTMLInputElement).value).toBe("24");
-    expect((byId("acRatio") as HTMLInputElement).value).toBe("1");
+    expect(sliderValue("acGain")).toBe(24);
+    expect(sliderValue("acRatio")).toBe(1);
   });
 });
 
 describe("compressor preset leaves make-up gain untouched", () => {
   it("fills the comp sliders, turns compression on, but never overwrites gain", async () => {
     await mountApp({});
-    (byId("audioCompToggle") as HTMLInputElement).checked = false;
-    (byId("acGain") as HTMLInputElement).value = "18";
+    setSlider("acGain", 18);
     document.querySelector<HTMLElement>('.btn-preset[data-preset="2"]')!.click(); // Movie
     await flush();
-    expect((byId("acThreshold") as HTMLInputElement).value).toBe("-28");
-    expect((byId("acRatio") as HTMLInputElement).value).toBe("8");
-    expect((byId("acGain") as HTMLInputElement).value).toBe("18"); // manual control preserved
-    expect((byId("audioCompToggle") as HTMLInputElement).checked).toBe(true);
+    expect(sliderValue("acThreshold")).toBe(-28);
+    expect(sliderValue("acRatio")).toBe(8);
+    expect(sliderValue("acGain")).toBe(18); // manual control preserved
+    expect(isOn("audioCompToggle")).toBe(true);
   });
 });
 
@@ -113,17 +113,15 @@ describe("popup preset quick row + extras (speed parity)", () => {
     expect(b.textContent).toBe("B");
     b.click();
     await flush();
-    expect((byId("acThreshold") as HTMLInputElement).value).toBe("-22");
-    expect((byId("acRatio") as HTMLInputElement).value).toBe("7");
+    expect(sliderValue("acThreshold")).toBe(-22);
+    expect(sliderValue("acRatio")).toBe(7);
   });
 });
 
 describe("slider + toggle persistence", () => {
   it("updates the readout live and saves the param after the debounce", async () => {
     const { saved } = await mountApp({});
-    const ratio = byId("acRatio") as HTMLInputElement;
-    ratio.value = "12";
-    input(ratio);
+    setSlider("acRatio", 12);
     await flush();
     expect(valOf("acRatio")).toBe("12:1");
     await wait(420); // 350 ms debounce
@@ -132,21 +130,15 @@ describe("slider + toggle persistence", () => {
 
   it("saves make-up gain on its own key, independent of the presets", async () => {
     const { saved } = await mountApp({});
-    const gain = byId("acGain") as HTMLInputElement;
-    gain.value = "9";
-    input(gain);
+    setSlider("acGain", 9);
     await wait(420);
     expect(saved().audioCompGain).toBe(9);
   });
 
   it("merges rapid different-key writes instead of clobbering them", async () => {
     const { saved } = await mountApp({});
-    const ratio = byId("acRatio") as HTMLInputElement;
-    const threshold = byId("acThreshold") as HTMLInputElement;
-    ratio.value = "5";
-    input(ratio);
-    threshold.value = "-30";
-    input(threshold);
+    setSlider("acRatio", 5);
+    setSlider("acThreshold", -30);
     await wait(420);
     const s = saved();
     expect(s.audioCompRatio).toBe(5);
@@ -155,7 +147,7 @@ describe("slider + toggle persistence", () => {
 
   it("the toggle persists the audioComp flag", async () => {
     const { saved } = await mountApp({});
-    (byId("audioCompToggle") as HTMLInputElement).click(); // on → off
+    byId("audioCompToggle").click(); // on → off
     await flush();
     expect(saved().audioComp).toBe(false);
   });
@@ -183,13 +175,13 @@ describe("compressor preset gain routing", () => {
         ],
       },
     });
-    expect((byId("acGain") as HTMLInputElement).value).toBe("3"); // global to start
+    expect(sliderValue("acGain")).toBe(3); // global to start
     click(1); // B has no gain → unchanged
     await flush();
-    expect((byId("acGain") as HTMLInputElement).value).toBe("3");
+    expect(sliderValue("acGain")).toBe(3);
     click(0); // A carries gain 8
     await flush();
-    expect((byId("acGain") as HTMLInputElement).value).toBe("8");
+    expect(sliderValue("acGain")).toBe(8);
   });
 
   it("the slider edits the active preset's own gain, not the global", async () => {
@@ -198,9 +190,7 @@ describe("compressor preset gain routing", () => {
     });
     click(0);
     await flush();
-    const g = byId("acGain") as HTMLInputElement;
-    g.value = "10";
-    g.dispatchEvent(new Event("input", { bubbles: true }));
+    setSlider("acGain", 10);
     await wait(420);
     const s = saved();
     expect(s.audioCompGain).toBe(10); // applied live
@@ -213,9 +203,7 @@ describe("compressor preset gain routing", () => {
     });
     click(0);
     await flush();
-    const g = byId("acGain") as HTMLInputElement;
-    g.value = "9";
-    g.dispatchEvent(new Event("input", { bubbles: true }));
+    setSlider("acGain", 9);
     await wait(420);
     const s = saved();
     expect(s.audioCompGain).toBe(9);

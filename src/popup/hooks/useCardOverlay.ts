@@ -4,8 +4,10 @@
 // overlay. Shared by all four cards (only one can be open — the overlay covers
 // the others). setOpen is for the cards that auto-expand on first enable.
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { animate } from "motion/react";
+import type { AnimationPlaybackControls } from "motion/react";
 
-const DUR = 300;
+const DUR = 0.3; // seconds (motion)
 
 export function useCardOverlay(
   sectionRef: RefObject<HTMLElement>,
@@ -17,6 +19,7 @@ export function useCardOverlay(
   const [open, setOpenState] = useState(false);
   const firstRect = useRef<DOMRect | null>(null);
   const compactH = useRef(0);
+  const flip = useRef<AnimationPlaybackControls | null>(null);
 
   // Capture the card's current rect (and, when opening, its collapsed height) so
   // the layout effect can FLIP from here to the post-render rect.
@@ -48,27 +51,36 @@ export function useCardOverlay(
     // (must be set before we measure the overlay's full rect below).
     if (open && slot) slot.style.height = `${Math.round(compactH.current)}px`;
 
-    // FLIP: invert from the new rect back to the old one, then play to identity.
+    // FLIP: invert from the new rect back to the old one, then play to identity —
+    // driven by motion.dev. onComplete (not the finished promise) so a stop() from
+    // a rapid re-toggle / unmount doesn't run stale cleanup.
     const last = sec.getBoundingClientRect();
     const dx = first.left - last.left,
       dy = first.top - last.top;
     const sx = last.width ? first.width / last.width : 1,
       sy = last.height ? first.height / last.height : 1;
-    sec.style.transition = "none";
+    flip.current?.stop();
     sec.style.transformOrigin = "top left";
-    sec.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-    void sec.offsetWidth; // commit the inverted state
-    sec.style.transition = `transform ${DUR}ms cubic-bezier(0.4, 0, 0.2, 1)`;
-    sec.style.transform = "";
+    flip.current = animate(
+      sec,
+      { x: [dx, 0], y: [dy, 0], scaleX: [sx, 1], scaleY: [sy, 1] },
+      {
+        duration: DUR,
+        ease: [0.4, 0, 0.2, 1],
+        onComplete: () => {
+          // Clear EVERY transform property motion may have written (it uses the
+          // individual translate/scale props, not just `transform`). A leftover
+          // transform on the open card makes it a containing block, which throws
+          // off Radix Tooltip's positioning for any tooltip triggered inside it.
+          for (const p of ["transform", "translate", "scale", "rotate", "transformOrigin"]) {
+            sec.style.removeProperty(p);
+          }
+          if (!open && slot) slot.style.height = ""; // release the slot once collapsed
+        },
+      },
+    );
 
-    const done = (e: TransitionEvent) => {
-      if (e.target !== sec || e.propertyName !== "transform") return;
-      sec.removeEventListener("transitionend", done);
-      sec.style.transition = "";
-      sec.style.transformOrigin = "";
-      if (!open && slot) slot.style.height = ""; // release the slot once collapsed
-    };
-    sec.addEventListener("transitionend", done);
+    return () => flip.current?.stop();
   }, [open, sectionRef, slotRef]);
 
   return { open, toggle, setOpen };
