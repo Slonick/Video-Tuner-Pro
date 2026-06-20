@@ -59,6 +59,12 @@
     "service_worker": "background.js",
     "scripts": ["background.js"]
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup/popup.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "video-speed-controller-pro@slonick.dev",

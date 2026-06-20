@@ -16,6 +16,7 @@ export default tseslint.config(
       "tools/",
       "e2e/",
       ".screenshots/",
+      ".claude/", // transient agent worktrees — not ours to lint
       "**/*.mjs",
     ],
   },

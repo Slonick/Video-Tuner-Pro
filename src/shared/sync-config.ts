@@ -63,6 +63,10 @@ export const KEY_CATEGORY: Record<string, Category> = {
   forceRate: "general",
   badgePos: "general",
   badgePinned: "general",
+  // On-video launcher button (opens the popup as an in-page overlay): when to
+  // show it, and its dragged per-site position.
+  overlayButton: "general",
+  overlayBtnPos: "general",
   liveSyncSeen: "general",
   audioSeen: "general",
   popupGuideSeen: "general",

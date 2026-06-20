@@ -11,6 +11,31 @@ body {
   padding: 10px;
 }
 
+/* As an in-page overlay (the launcher loads this in an iframe), the whole popup
+   turns to glass: the base and the cards become translucent over the video the
+   iframe blurs beneath them. Theme-aware tints keep the text legible; the toolbar
+   popup keeps its solid --bg / --surface. */
+html.vtp-embedded body {
+  background: var(--glass-base);
+}
+html.vtp-embedded .sync-section {
+  background: var(--glass-surface);
+}
+/* A card expanded into the full-popup overlay pins over its siblings. Rather than
+   make it opaque, keep it glass and fade the others (and the group labels) out —
+   so nothing shows through the translucent panel. useCardOverlay flags the grid
+   with .has-overlay while a card is open; the fade is symmetric, so collapsing
+   eases them back in. */
+html.vtp-embedded .sync-section,
+html.vtp-embedded .group-label {
+  transition: opacity 0.25s ease;
+}
+html.vtp-embedded .popup-grid.has-overlay .sync-section:not(.is-overlay),
+html.vtp-embedded .popup-grid.has-overlay > .group-label {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Two columns grouped by theme: the video cards (Speed, Live-sync) on the top row,
    the audio cards (Auto-slow, Compressor) on the bottom — each card keeps its own
    ~330px width, the popup is just twice as wide. */

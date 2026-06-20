@@ -3,7 +3,7 @@
 // height while expanded, so the rest of the grid doesn't reflow underneath the
 // overlay. Shared by all four cards (only one can be open — the overlay covers
 // the others). setOpen is for the cards that auto-expand on first enable.
-import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { animate } from "motion/react";
 import type { AnimationPlaybackControls } from "motion/react";
 
@@ -82,6 +82,23 @@ export function useCardOverlay(
 
     return () => flip.current?.stop();
   }, [open, sectionRef, slotRef]);
+
+  // Flag the grid while this card is open so the in-page overlay can fade the
+  // other cards out (see html.vtp-embedded .popup-grid.has-overlay in base.css).
+  // Ref-counted on the grid: during a tour's card-to-card handoff two cards are
+  // briefly open at once, so the class must stay until the last one closes.
+  useEffect(() => {
+    if (!open) return;
+    const grid = slotRef.current?.closest<HTMLElement>(".popup-grid");
+    if (!grid) return;
+    grid.dataset.overlayCount = String((Number(grid.dataset.overlayCount) || 0) + 1);
+    grid.classList.add("has-overlay");
+    return () => {
+      const left = (Number(grid.dataset.overlayCount) || 1) - 1;
+      grid.dataset.overlayCount = String(left);
+      if (left <= 0) grid.classList.remove("has-overlay");
+    };
+  }, [open, slotRef]);
 
   return { open, toggle, setOpen };
 }
