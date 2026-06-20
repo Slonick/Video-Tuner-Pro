@@ -59,7 +59,13 @@ async function buildMock() {
 // concurrent headless instances occasionally hang at exit instead of
 // terminating, which would otherwise stall the whole render pool forever.
 // stderr is captured and discarded (harmless dbus spam on CI).
+//
+// --disable-dev-shm-usage: the CI runner is a container, whose /dev/shm
+// defaults to 64MB. Headless Chrome backs its renderer bitmaps there and
+// aborts with SIGTRAP when it runs out — which the larger CJK composites
+// (ja/zh_CN/hi) do. This routes that shared memory to /tmp instead.
 export async function runChrome(args) {
+  args = ["--disable-dev-shm-usage", ...args];
   for (let attempt = 0; ; attempt++) {
     try {
       return await execFile(CHROME, args, {
