@@ -238,7 +238,7 @@ function mount(): void {
     touchAction: "none",
     color: "#fff",
     background: "rgba(20,20,22,0.45)",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
+    boxShadow: "0 0 0 1px rgba(255,255,255,0.12), 0 6px 20px rgba(0,0,0,0.35)",
     WebkitBackdropFilter: "blur(12px) saturate(160%)",
     backdropFilter: "blur(12px) saturate(160%)",
     display: "flex",
@@ -251,7 +251,7 @@ function mount(): void {
   // The play triangle from the toolbar icon (its brand mark), nudged right to
   // sit optically centered in the circle.
   fab.innerHTML =
-    '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
     '<path d="M9 6.5v11l9-5.5z"/></svg>';
   shadow.append(fab);
   hookFabDrag(fab);

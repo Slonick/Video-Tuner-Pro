@@ -23,7 +23,7 @@ const BADGE_STYLE: CSSProperties = {
   background: "rgba(20,20,22,0.45)",
   padding: "10px 16px",
   borderRadius: "10px",
-  boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
+  boxShadow: "0 0 0 1px rgba(255,255,255,0.12), 0 6px 20px rgba(0,0,0,0.35)",
   whiteSpace: "nowrap",
   opacity: 0,
   transition: "opacity .25s",
