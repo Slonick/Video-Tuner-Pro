@@ -165,10 +165,11 @@ describe("compressor preset gain routing", () => {
   const click = (i: number) =>
     document.querySelector<HTMLElement>(`.btn-preset[data-preset="${i}"]`)!.click();
 
-  it("applying a preset with its own gain sets the gain; one without leaves it", async () => {
+  it("a preset with its own gain sets the gain; one without falls back to the global", async () => {
     await mountApp({
       settings: {
         audioCompGain: 3,
+        audioCompBaseGain: 3,
         compPresets: [
           P({ name: "A", gain: 8, pin: true }),
           P({ name: "B", threshold: -22, pin: true }),
@@ -176,12 +177,12 @@ describe("compressor preset gain routing", () => {
       },
     });
     expect(sliderValue("acGain")).toBe(3); // global to start
-    click(1); // B has no gain → unchanged
-    await flush();
-    expect(sliderValue("acGain")).toBe(3);
     click(0); // A carries gain 8
     await flush();
     expect(sliderValue("acGain")).toBe(8);
+    click(1); // B has no gain → back to the global base, not stuck at 8
+    await flush();
+    expect(sliderValue("acGain")).toBe(3);
   });
 
   it("the slider edits the active preset's own gain, not the global", async () => {
@@ -206,7 +207,8 @@ describe("compressor preset gain routing", () => {
     setSlider("acGain", 9);
     await wait(420);
     const s = saved();
-    expect(s.audioCompGain).toBe(9);
+    expect(s.audioCompGain).toBe(9); // applied live
+    expect(s.audioCompBaseGain).toBe(9); // and stored as the global base
     expect((s.compPresets as Array<{ gain?: number }>)[0].gain).toBeUndefined(); // preset untouched
   });
 });

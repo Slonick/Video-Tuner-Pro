@@ -39,6 +39,10 @@ export function useAudioCompressor(): UseAudioCompressor {
   const [enabled, setEnabledState] = useState(true);
   const [comp, setComp] = useState<CompState>({ values: DEFAULTS, animate: false });
   const [gain, setGainState] = useState(0);
+  // The global make-up gain a preset without its own gain falls back to. Kept
+  // apart from the live `audioCompGain` so a preset's gain override can't clobber
+  // it — leaving that preset restores this value.
+  const [baseGain, setBaseGain] = useState(0);
   const [presets, setPresets] = useState<CompPreset[]>(() => normalizeCompPresets(undefined));
 
   const pending = useRef<Record<string, unknown>>({});
@@ -94,7 +98,8 @@ export function useAudioCompressor(): UseAudioCompressor {
         setPresets(next);
         saveAudio({ compPresets: next, audioCompGain: value });
       } else {
-        saveAudio({ audioCompGain: value });
+        setBaseGain(value);
+        saveAudio({ audioCompBaseGain: value, audioCompGain: value });
       }
     },
     [activePreset, presets, saveAudio],
@@ -113,16 +118,13 @@ export function useAudioCompressor(): UseAudioCompressor {
       };
       setComp({ values, animate: true });
       setEnabledState(true);
-      // A preset with its own gain sets the live gain too; one without leaves the
-      // current (global) gain untouched.
-      const extra: Record<string, unknown> = {};
-      if (p.gain != null) {
-        setGainState(p.gain);
-        extra.audioCompGain = p.gain;
-      }
-      saveAudio({ ...compToStorage(values), audioComp: true, ...extra });
+      // A preset with its own gain sets the live gain to it; one without falls
+      // back to the global make-up gain, restoring it.
+      const liveGain = p.gain != null ? p.gain : baseGain;
+      setGainState(liveGain);
+      saveAudio({ ...compToStorage(values), audioComp: true, audioCompGain: liveGain });
     },
-    [presets, saveAudio],
+    [presets, baseGain, saveAudio],
   );
 
   useEffect(() => {
@@ -130,6 +132,7 @@ export function useAudioCompressor(): UseAudioCompressor {
       [
         "audioComp",
         "audioCompGain",
+        "audioCompBaseGain",
         "audioCompThreshold",
         "audioCompKnee",
         "audioCompRatio",
@@ -148,7 +151,10 @@ export function useAudioCompressor(): UseAudioCompressor {
           },
           animate: false,
         });
-        setGainState(clampNum(r.audioCompGain, 0, 24, 0));
+        const live = clampNum(r.audioCompGain, 0, 24, 0);
+        setGainState(live);
+        // Migrate pre-split installs: an absent base gain inherits the stored live.
+        setBaseGain(clampNum(r.audioCompBaseGain, 0, 24, live));
       },
     );
     STORE.get(["compPresets"], (r) => setPresets(normalizeCompPresets(r.compPresets)));

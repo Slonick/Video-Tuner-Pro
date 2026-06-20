@@ -3,7 +3,8 @@
 // popup, given an optional make-up-gain override, pinned (pinned ones — up to
 // COMP_QUICK_COUNT — are the popup's buttons), removed, and new ones added.
 // Persisted under "compPresets" as a list; the global make-up gain lives under
-// "audioCompGain". The popup reads both to label, show, and apply the buttons.
+// "audioCompBaseGain" (the live value the content script applies is "audioCompGain").
+// The popup reads both to label, show, and apply the buttons.
 import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
@@ -75,11 +76,12 @@ export function Presets() {
   const [globalGain, setGlobalGain] = useState(GAIN_DEFAULT);
 
   useEffect(() => {
-    STORE.get(["compPresets", "audioCompGain"], (r) => {
+    STORE.get(["compPresets", "audioCompGain", "audioCompBaseGain"], (r) => {
       const list = normalizeCompPresets(r.compPresets);
       setPresets(list);
       setNames(list.map((p) => p.name ?? ""));
-      setGlobalGain(coerceGain(r.audioCompGain) ?? GAIN_DEFAULT);
+      // Pre-split installs have no base gain yet — inherit the stored live gain.
+      setGlobalGain(coerceGain(r.audioCompBaseGain) ?? coerceGain(r.audioCompGain) ?? GAIN_DEFAULT);
     });
   }, []);
 
@@ -103,7 +105,9 @@ export function Presets() {
 
   const setGlobal = (v: number) => {
     setGlobalGain(v);
-    STORE.set({ audioCompGain: v });
+    // Set the global base and apply it live (audioCompGain is what the content
+    // script reads); a no-gain preset later falls back to this base.
+    STORE.set({ audioCompBaseGain: v, audioCompGain: v });
   };
 
   // Toggle a preset's gain override on (seeded from the global gain) or off.
