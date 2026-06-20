@@ -40,6 +40,42 @@ function ThemeSeg() {
   );
 }
 
+type OverlayMode = "off" | "fullscreen" | "always";
+const OVERLAY_MODES: OverlayMode[] = ["off", "fullscreen", "always"];
+const OVERLAY_LABEL: Record<OverlayMode, string> = {
+  off: "overlayBtnOff",
+  fullscreen: "overlayBtnFullscreen",
+  always: "overlayBtnAlways",
+};
+
+function OverlayBtnSeg() {
+  const [mode, setMode] = useState<OverlayMode>("fullscreen");
+  useEffect(() => {
+    STORE.get(["overlayButton"], (r) => {
+      const v = r.overlayButton;
+      setMode(v === "off" || v === "always" ? v : "fullscreen");
+    });
+  }, []);
+  const pick = (m: OverlayMode) => {
+    setMode(m);
+    STORE.set({ overlayButton: m });
+  };
+  return (
+    <div className="seg" id="overlayBtnSeg">
+      {OVERLAY_MODES.map((m) => (
+        <button
+          key={m}
+          type="button"
+          className={"seg-btn" + (m === mode ? " is-active" : "")}
+          onClick={() => pick(m)}
+        >
+          {msg(OVERLAY_LABEL[m]) || m}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function LangGrid() {
   const [lang, setLangState] = useState<Lang>("system");
   useEffect(() => {
@@ -164,6 +200,13 @@ export function General() {
       <div className="opt-field opt-field-block">
         <span className="opt-field-label">{msg("optLangLabel") || "Language"}</span>
         <LangGrid />
+      </div>
+      <div className="opt-field opt-field-block">
+        <span className="opt-field-text">
+          <span className="opt-field-label">{msg("overlayBtnLabel") || "On-video button"}</span>
+          <span className="opt-field-desc">{msg("overlayBtnHint")}</span>
+        </span>
+        <OverlayBtnSeg />
       </div>
       <div className="opt-field">
         <span className="opt-field-text">

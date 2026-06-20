@@ -59,6 +59,13 @@ export const S = {
   badgePos: null as { fx: number; fy: number } | null,
   // Whether the badge is pinned (per site): pinned → always visible, no auto-hide.
   badgePinned: false,
+  // On-video launcher button that opens the popup as an in-page overlay. When to
+  // surface it: "off", "fullscreen" (only while a video is fullscreen), or
+  // "always" (whenever the pointer is over a video). Default: fullscreen only.
+  overlayButton: "fullscreen" as "off" | "fullscreen" | "always",
+  // Where the launcher button sits, as a fraction of the video frame — per site,
+  // set by dragging it. null = the default right-center spot.
+  overlayBtnPos: null as { fx: number; fy: number } | null,
   // Auto-slow for dense speech: when the speaker tarators, temporarily lower the
   // effective playback speed so it stays intelligible. Enabling resolves by scope
   // (channel > site > global), like speed; `autoSlowEnabled`/`autoSlowScope` hold

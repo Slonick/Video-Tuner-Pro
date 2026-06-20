@@ -19,6 +19,7 @@ import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
+import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
 import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
@@ -55,7 +56,7 @@ let lastReconcileAt = 0;
 // mutation, which makes the old instance's observer notice the dead context and
 // tear itself down.)
 try {
-  document.querySelectorAll("[data-vtp-badge]").forEach((n) => n.remove());
+  document.querySelectorAll("[data-vtp-badge],[data-vtp-launcher]").forEach((n) => n.remove());
 } catch (e) {
   /* ignore */
 }
@@ -141,6 +142,8 @@ function loadSpeed() {
       "presetKeys",
       "speedStep",
       "holdSpeed",
+      "overlayButton",
+      "overlayBtnPos",
     ],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
@@ -148,6 +151,15 @@ function loadSpeed() {
       const badgePos = (result.badgePos || {}) as Record<string, { fx: number; fy: number }>;
       S.badgePos = badgePos[getDomain()] || null;
       S.badgePinned = ((result.badgePinned || {}) as Record<string, boolean>)[getDomain()] === true;
+      S.overlayButton =
+        result.overlayButton === "off" || result.overlayButton === "always"
+          ? result.overlayButton
+          : "fullscreen";
+      const overlayBtnPos = (result.overlayBtnPos || {}) as Record<
+        string,
+        { fx: number; fy: number }
+      >;
+      S.overlayBtnPos = overlayBtnPos[getDomain()] || null;
       // Defaults-on: features ship enabled; an explicit `false` in storage (the
       // user turned it off) is still respected.
       S.showRemaining = result.showRemaining !== false;
@@ -202,6 +214,7 @@ function loadSpeed() {
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
       updateTimeBadge();
+      updateLauncher();
     },
   );
 }
@@ -220,6 +233,7 @@ function reresolve() {
     applyAll();
     controlLive();
     updateTimeBadge();
+    updateLauncher();
   });
   applyResolvedTargetFromStore(); // the channel changed — its allowed-delay may differ
   applyResolvedAutoSlowFromStore(); // ...and its auto-slow enable may differ too
@@ -245,6 +259,7 @@ function tick() {
   applyAll();
   controlLive();
   updateTimeBadge();
+  updateLauncher();
   if (currentChannel() !== lastChannel) reresolve();
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
@@ -360,7 +375,7 @@ function startObserver() {
   startTracking({
     onMediaChange: scheduleReapply,
     onContextDead: teardown,
-    isOwnNode: ownsBadgeNode,
+    isOwnNode: (n) => ownsBadgeNode(n) || ownsLauncherNode(n),
   });
 }
 if (document.documentElement) {
@@ -406,6 +421,18 @@ api.storage.onChanged.addListener((changes, area) => {
     S.badgePinned = map[getDomain()] === true;
     updateTimeBadge(); // re-syncs the pin + forces visibility when pinned
     flashBadge(); // when unpinned, resumes the auto-hide countdown
+  }
+  if (changes.overlayButton) {
+    const v = changes.overlayButton.newValue;
+    S.overlayButton = v === "off" || v === "always" ? v : "fullscreen";
+    updateLauncher();
+  }
+  if (changes.overlayBtnPos) {
+    const map =
+      (changes.overlayBtnPos.newValue as Record<string, { fx: number; fy: number }> | undefined) ||
+      {};
+    S.overlayBtnPos = map[getDomain()] || null;
+    updateLauncher();
   }
   if (changes.audioSpeed) {
     S.audioSpeedEnabled = changes.audioSpeed.newValue === true;

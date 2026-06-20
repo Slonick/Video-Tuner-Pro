@@ -21,6 +21,11 @@
   --seg: #f0f0f2;
   --track: #d8d8dc;
 
+  /* In-page overlay (launcher) glass: translucent base + card surfaces, blurred
+     by the iframe beneath. Theme-aware so light-theme text stays legible. */
+  --glass-base: rgba(236, 236, 238, 0.55);
+  --glass-surface: rgba(255, 255, 255, 0.62);
+
   /* Audio meter readout (over its own busy waveform) */
   --meter-out: #0a5fc4;
   --meter-in: #5b5b60;
@@ -46,6 +51,9 @@
     --seg: #3a3a3c;
     --track: #48484a;
 
+    --glass-base: rgba(28, 28, 30, 0.55);
+    --glass-surface: rgba(54, 54, 56, 0.62);
+
     --meter-out: #7fb8ff;
     --meter-in: #cfcfd4;
 
@@ -68,6 +76,9 @@
   --accent: #0a84ff;
   --seg: #3a3a3c;
   --track: #48484a;
+
+  --glass-base: rgba(28, 28, 30, 0.55);
+  --glass-surface: rgba(54, 54, 56, 0.62);
 
   --meter-out: #7fb8ff;
   --meter-in: #cfcfd4;
