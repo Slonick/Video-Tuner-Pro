@@ -29,7 +29,7 @@ export function Keys() {
   // Live refs so the global keydown handler (bound once) sees current state.
   const capRef = useRef<Action | null>(null);
   const mapRef = useRef<Keymap>(keymap);
-  const dupeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const dupeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   capRef.current = capturing;
   mapRef.current = keymap;
 

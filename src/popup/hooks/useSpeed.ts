@@ -82,7 +82,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   // Synchronous mirror so back-to-back nudges / a save right after one see the
   // latest value (no re-render between them).
   const speedRef = useRef(1);
-  const sliderTimer = useRef<ReturnType<typeof setTimeout>>();
+  const sliderTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const isYouTube = /(^|\.)youtube(-nocookie)?\.com$/.test(domain);
 

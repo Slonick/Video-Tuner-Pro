@@ -31,7 +31,7 @@ export default tseslint.config(
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     plugins: { react, "react-hooks": reactHooks },
-    settings: { react: { version: "18" } },
+    settings: { react: { version: "19" } },
     rules: {
       ...react.configs.flat.recommended.rules,
       ...react.configs.flat["jsx-runtime"].rules,
@@ -48,6 +48,12 @@ export default tseslint.config(
       "react/no-unescaped-entities": "off",
       // Flag `any` (mostly in chrome mocks / Web Audio) without blocking the build.
       "@typescript-eslint/no-explicit-any": "warn",
+      // react-hooks v7 added these React-Compiler-era rules to its recommended set.
+      // They flag pre-existing intentional patterns — the latest-ref idiom
+      // (`ref.current = x` during render) and a sync setState in a layout effect.
+      // Reworking that working code is out of scope for a dependency bump.
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
     },
   },
   {

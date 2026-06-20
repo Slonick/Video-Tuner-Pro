@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 export function useFlash(ms = 1500): [boolean, () => void] {
   const [on, setOn] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const pulse = () => {
     setOn(true);
