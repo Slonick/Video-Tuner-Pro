@@ -42,7 +42,7 @@ export function useAudioCompressor(): UseAudioCompressor {
   const [presets, setPresets] = useState<CompPreset[]>(() => normalizeCompPresets(undefined));
 
   const pending = useRef<Record<string, unknown>>({});
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const saveAudio = useCallback((obj: Record<string, unknown>) => {
     Object.assign(pending.current, obj);
     clearTimeout(saveTimer.current);

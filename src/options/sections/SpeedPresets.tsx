@@ -69,7 +69,7 @@ export function SpeedPresets() {
   const capRef = useRef<number | null>(null);
   const rowsRef = useRef<Row[]>([]);
   const keymapRef = useRef<Keymap | null>(null);
-  const dupeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const dupeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   capRef.current = capturing;
   rowsRef.current = rows ?? [];
 

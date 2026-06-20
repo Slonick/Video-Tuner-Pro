@@ -108,7 +108,7 @@ function Backup() {
   const [exp, setExp] = useState<Flash>(null);
   const [imp, setImp] = useState<Flash>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const flash = (set: (f: Flash) => void, key: string, ok: boolean) => {

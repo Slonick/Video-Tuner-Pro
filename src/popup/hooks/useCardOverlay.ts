@@ -10,8 +10,8 @@ import type { AnimationPlaybackControls } from "motion/react";
 const DUR = 0.3; // seconds (motion)
 
 export function useCardOverlay(
-  sectionRef: RefObject<HTMLElement>,
-  slotRef: RefObject<HTMLElement>,
+  sectionRef: RefObject<HTMLElement | null>,
+  slotRef: RefObject<HTMLElement | null>,
   // When false, the card won't expand on a header click (a disabled card has
   // nothing to configure). Closing an already-open card is always allowed.
   canOpen = true,
