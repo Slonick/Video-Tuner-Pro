@@ -2,7 +2,7 @@
 // as a side effect of being imported.
 import { api, ctxValid } from "./platform/browser.js";
 import { STORE, OUR_AREAS, whenReady } from "./platform/storage.js";
-import { clamp, clampTarget, clampNum } from "./core/clamp.js";
+import { clamp, clampTarget } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import {
   resolveSpeed,
@@ -10,16 +10,16 @@ import {
   resolveAutoSlow,
   type AutoSlowSettings,
 } from "./core/resolve.js";
-import { normalizePresetSet, normalizeSpeedStep, normalizeHoldSpeed } from "../shared/presets.js";
-import { normalizeKeymap } from "../shared/keymap.js";
+import { normalizePresetSet } from "../shared/presets.js";
 import { S } from "./state.js";
-import { applyAll, reassertRate, resetAudios } from "./speed.js";
+import { applyAll, reassertRate } from "./speed.js";
 import { controlLive } from "./live/sync.js";
 import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
+import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
 import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
@@ -108,6 +108,9 @@ function loadSpeed() {
   if (!ctxValid()) return;
   STORE.get(
     [
+      // Bespoke keys: cross-scope resolution (speed / sync target / auto-slow
+      // bundle), paired presets, and per-domain maps. The simple scalars/flags
+      // come from the settings registry.
       "domains",
       "channels",
       "globalSpeed",
@@ -118,32 +121,13 @@ function loadSpeed() {
       "syncTargetGlobal",
       "badgePos",
       "badgePinned",
-      "audioComp",
-      "audioCompThreshold",
-      "audioCompKnee",
-      "audioCompRatio",
-      "audioCompAttack",
-      "audioCompRelease",
-      "audioCompGain",
+      "overlayBtnPos",
       "autoSlowSites",
       "autoSlowChannels",
       "autoSlowGlobal",
-      "autoSlowFloor",
-      "autoSlowHold",
-      "autoSlowReaction",
-      "autoSlowEaseBack",
-      "showRemaining",
-      "streamBadge",
-      "audioSpeed",
-      "forceRate",
-      "keyboard",
-      "keymap",
       "speedPresets",
       "presetKeys",
-      "speedStep",
-      "holdSpeed",
-      "overlayButton",
-      "overlayBtnPos",
+      ...REGISTRY_KEYS,
     ],
     (result) => {
       const domains = (result.domains || {}) as Record<string, number>;
@@ -151,29 +135,17 @@ function loadSpeed() {
       const badgePos = (result.badgePos || {}) as Record<string, { fx: number; fy: number }>;
       S.badgePos = badgePos[getDomain()] || null;
       S.badgePinned = ((result.badgePinned || {}) as Record<string, boolean>)[getDomain()] === true;
-      S.overlayButton =
-        result.overlayButton === "off" || result.overlayButton === "always"
-          ? result.overlayButton
-          : "fullscreen";
       const overlayBtnPos = (result.overlayBtnPos || {}) as Record<
         string,
         { fx: number; fy: number }
       >;
       S.overlayBtnPos = overlayBtnPos[getDomain()] || null;
-      // Defaults-on: features ship enabled; an explicit `false` in storage (the
-      // user turned it off) is still respected.
-      S.showRemaining = result.showRemaining !== false;
-      S.streamBadge = result.streamBadge !== false;
-      // Opt-in (default off): explicit `true` required.
-      S.audioSpeedEnabled = result.audioSpeed === true;
-      S.forceRate = result.forceRate === true;
-      S.keyboardEnabled = result.keyboard !== false;
-      S.keymap = normalizeKeymap(result.keymap);
+      // Simple scalars/flags (badge toggles, keyboard, steps, overlay button, audio
+      // compressor params, auto-slow dynamics) load from the registry in one pass.
+      loadRegistry(result);
       const ps = normalizePresetSet(result.speedPresets, result.presetKeys);
       S.presets = ps.presets.map((p) => p / 100);
       S.presetKeys = ps.keys;
-      S.speedStep = normalizeSpeedStep(result.speedStep) / 100;
-      S.holdSpeed = normalizeHoldSpeed(result.holdSpeed) / 100;
       S.liveSyncEnabled = result.liveSync !== false;
       // Allowed delay resolves by scope: channel > site > global > 5s. The legacy
       // `liveSyncTarget` acts as the old global fallback.
@@ -186,19 +158,8 @@ function loadSpeed() {
       );
       S.targetScope = rt.scope;
       S.liveSyncTarget = clampTarget(rt.target);
-      S.audioCompEnabled = result.audioComp !== false;
-      S.audioCompThreshold = clampNum(result.audioCompThreshold, -100, 0, -60);
-      S.audioCompKnee = clampNum(result.audioCompKnee, 0, 40, 30);
-      S.audioCompRatio = clampNum(result.audioCompRatio, 1, 20, 10);
-      S.audioCompAttack = clampNum(result.audioCompAttack, 0, 1, 0);
-      S.audioCompRelease = clampNum(result.audioCompRelease, 0, 1, 1);
-      S.audioCompGain = clampNum(result.audioCompGain, 0, 24, 0);
       // Auto-slow: enable + target resolve by scope (one bundle per scope); the
-      // floor and the response dynamics (hold/reaction/ease-back) are global.
-      S.autoSlowFloor = clampNum(result.autoSlowFloor, 0.5, 2, 1.0);
-      S.autoSlowHold = clampNum(result.autoSlowHold, 0, 4, 1.2);
-      S.autoSlowReaction = clampNum(result.autoSlowReaction, 0, 100, 50);
-      S.autoSlowEaseBack = clampNum(result.autoSlowEaseBack, 0, 100, 25);
+      // floor and the response dynamics are loaded by the registry above.
       const rs = resolveAutoSlow(
         channelKeys(),
         getDomain(),
@@ -400,15 +361,23 @@ api.storage.onChanged.addListener((changes, area) => {
   } else if (changes.liveSync) {
     controlLive();
   }
-  if (changes.showRemaining) {
-    S.showRemaining = !!changes.showRemaining.newValue;
-    updateTimeBadge();
-    flashBadge();
-  }
-  if (changes.streamBadge) {
-    S.streamBadge = !!changes.streamBadge.newValue;
-    updateTimeBadge();
-    flashBadge();
+  // Simple scalars/flags + their side-effects (badge toggles re-render the badge,
+  // audio-speed re-applies/resets, the overlay button re-evaluates) come from the
+  // registry in one pass.
+  applyRegistryChanges(changes);
+  // Audio compressor values are in the registry too; only its engage/re-apply stays
+  // here — the toggle re-engages (retrying while the context warms up), a param tweak
+  // just re-applies once.
+  if (changes.audioComp) engageAudio(0);
+  else if (
+    changes.audioCompThreshold ||
+    changes.audioCompKnee ||
+    changes.audioCompRatio ||
+    changes.audioCompAttack ||
+    changes.audioCompRelease ||
+    changes.audioCompGain
+  ) {
+    applyAudioComp();
   }
   if (changes.badgePos) {
     const map =
@@ -422,11 +391,6 @@ api.storage.onChanged.addListener((changes, area) => {
     updateTimeBadge(); // re-syncs the pin + forces visibility when pinned
     flashBadge(); // when unpinned, resumes the auto-hide countdown
   }
-  if (changes.overlayButton) {
-    const v = changes.overlayButton.newValue;
-    S.overlayButton = v === "off" || v === "always" ? v : "fullscreen";
-    updateLauncher();
-  }
   if (changes.overlayBtnPos) {
     const map =
       (changes.overlayBtnPos.newValue as Record<string, { fx: number; fy: number }> | undefined) ||
@@ -434,29 +398,9 @@ api.storage.onChanged.addListener((changes, area) => {
     S.overlayBtnPos = map[getDomain()] || null;
     updateLauncher();
   }
-  if (changes.audioSpeed) {
-    S.audioSpeedEnabled = changes.audioSpeed.newValue === true;
-    if (S.audioSpeedEnabled) applyAll();
-    else resetAudios(); // turned off — hand the <audio> elements back to the page
-  }
   if (changes.autoSlowSites || changes.autoSlowChannels || changes.autoSlowGlobal) {
     applyResolvedAutoSlowFromStore(); // re-resolve the scoped bundle (enable + target)
   }
-  if (changes.autoSlowFloor) {
-    S.autoSlowFloor = clampNum(changes.autoSlowFloor.newValue, 0.5, 2, 1.0);
-  }
-  if (changes.autoSlowHold) {
-    S.autoSlowHold = clampNum(changes.autoSlowHold.newValue, 0, 4, 1.2);
-  }
-  if (changes.autoSlowReaction) {
-    S.autoSlowReaction = clampNum(changes.autoSlowReaction.newValue, 0, 100, 50);
-  }
-  if (changes.autoSlowEaseBack) {
-    S.autoSlowEaseBack = clampNum(changes.autoSlowEaseBack.newValue, 0, 100, 25);
-  }
-  if (changes.forceRate) S.forceRate = changes.forceRate.newValue === true;
-  if (changes.keyboard) S.keyboardEnabled = !!changes.keyboard.newValue;
-  if (changes.keymap) S.keymap = normalizeKeymap(changes.keymap.newValue);
   if (changes.speedPresets || changes.presetKeys) {
     // Both arrays sort together, so re-read both and recompute the pair set.
     STORE.get(["speedPresets", "presetKeys"], (r) => {
@@ -464,42 +408,5 @@ api.storage.onChanged.addListener((changes, area) => {
       S.presets = ps.presets.map((p) => p / 100);
       S.presetKeys = ps.keys;
     });
-  }
-  if (changes.speedStep) S.speedStep = normalizeSpeedStep(changes.speedStep.newValue) / 100;
-  if (changes.holdSpeed) S.holdSpeed = normalizeHoldSpeed(changes.holdSpeed.newValue) / 100;
-  let audioChanged = false;
-  if (changes.audioComp) {
-    S.audioCompEnabled = !!changes.audioComp.newValue;
-    audioChanged = true;
-  }
-  if (changes.audioCompThreshold) {
-    S.audioCompThreshold = clampNum(changes.audioCompThreshold.newValue, -100, 0, -60);
-    audioChanged = true;
-  }
-  if (changes.audioCompKnee) {
-    S.audioCompKnee = clampNum(changes.audioCompKnee.newValue, 0, 40, 30);
-    audioChanged = true;
-  }
-  if (changes.audioCompRatio) {
-    S.audioCompRatio = clampNum(changes.audioCompRatio.newValue, 1, 20, 10);
-    audioChanged = true;
-  }
-  if (changes.audioCompAttack) {
-    S.audioCompAttack = clampNum(changes.audioCompAttack.newValue, 0, 1, 0);
-    audioChanged = true;
-  }
-  if (changes.audioCompRelease) {
-    S.audioCompRelease = clampNum(changes.audioCompRelease.newValue, 0, 1, 1);
-    audioChanged = true;
-  }
-  if (changes.audioCompGain) {
-    S.audioCompGain = clampNum(changes.audioCompGain.newValue, 0, 24, 0);
-    audioChanged = true;
-  }
-  if (audioChanged) {
-    // On a toggle flip, retry a few times so it engages even if the video/context
-    // wasn't ready; a param tweak just re-applies once.
-    if (changes.audioComp) engageAudio(0);
-    else applyAudioComp();
   }
 });
