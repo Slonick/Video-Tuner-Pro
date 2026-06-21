@@ -88,6 +88,11 @@ describe("saved values manager", () => {
       syncTargets: { "example.com": 8 },
       channels: { "twitch:foo": 1.25 },
     });
+    // The data-driven sections (Saved among them) render null until their stored
+    // values load across a couple of async hops, so let those renders settle.
+    await flush();
+    await flush();
+    await flush();
     const rows = document.querySelectorAll("#savedLists .saved-row");
     expect(rows.length).toBeGreaterThanOrEqual(3); // global + site + channel
     // The site row has two chips (speed + delay); delete the speed.

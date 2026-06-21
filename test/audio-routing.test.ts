@@ -110,7 +110,7 @@ describe("setupGraph source gating (canRouteAudio)", () => {
   it("skips a source-less video (src may still be loading)", async () => {
     const { setupGraph, lastSkip } = await load();
     expect(setupGraph(vid())).toBeNull();
-    expect(lastSkip()).toBe("cors");
+    expect(lastSkip()).toBe("loading"); // transient — not a hard "cors" block
   });
 
   it("yields (skips) while a VOT translation is actively playing", async () => {
@@ -122,7 +122,7 @@ describe("setupGraph source gating (canRouteAudio)", () => {
     document.body.appendChild(host);
     const { setupGraph, lastSkip } = await load();
     expect(setupGraph(vid({ srcObject: {} }))).toBeNull(); // even a safe source is left alone
-    expect(lastSkip()).toBe("cors");
+    expect(lastSkip()).toBe("vot"); // VOT is handled by its own lock, not the cors block
   });
 });
 

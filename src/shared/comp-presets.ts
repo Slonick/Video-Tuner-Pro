@@ -31,7 +31,7 @@ export interface CompPreset extends CompParams {
 // row — more would overflow the popup's ~600px height cap).
 export const COMP_MIN_PRESETS = 1;
 export const COMP_MAX_PRESETS = 8;
-export const COMP_QUICK_COUNT = 4;
+export const COMP_QUICK_COUNT = 3; // the popup's quick row fits three (Voice / Night / Movie)
 
 // Make-up gain bounds (dB) — shared by the popup slider, the options' global-gain
 // slider, and a preset's optional gain override.
@@ -113,7 +113,7 @@ export function coerceGain(raw: unknown): number | undefined {
   return Math.min(GAIN_MAX, Math.max(GAIN_MIN, Math.round(n)));
 }
 
-// Drop pins beyond COMP_QUICK_COUNT (the popup row only fits that many), keeping
+// Drop pins beyond COMP_QUICK_COUNT (the popup's quick row fits that many), keeping
 // the earliest-listed ones. Mutates + returns the list.
 function capPins(list: CompPreset[]): CompPreset[] {
   let pins = 0;

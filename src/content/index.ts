@@ -122,6 +122,7 @@ function loadSpeed() {
       "badgePos",
       "badgePinned",
       "overlayBtnPos",
+      "overlayPanelPos",
       "autoSlowSites",
       "autoSlowChannels",
       "autoSlowGlobal",
@@ -140,6 +141,10 @@ function loadSpeed() {
         { fx: number; fy: number }
       >;
       S.overlayBtnPos = overlayBtnPos[getDomain()] || null;
+      S.overlayPanelPos =
+        ((result.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>)[
+          getDomain()
+        ] || null;
       // Simple scalars/flags (badge toggles, keyboard, steps, overlay button, audio
       // compressor params, auto-slow dynamics) load from the registry in one pass.
       loadRegistry(result);
@@ -397,6 +402,13 @@ api.storage.onChanged.addListener((changes, area) => {
       {};
     S.overlayBtnPos = map[getDomain()] || null;
     updateLauncher();
+  }
+  if (changes.overlayPanelPos) {
+    const map =
+      (changes.overlayPanelPos.newValue as
+        | Record<string, { fx: number; fy: number }>
+        | undefined) || {};
+    S.overlayPanelPos = map[getDomain()] || null;
   }
   if (changes.autoSlowSites || changes.autoSlowChannels || changes.autoSlowGlobal) {
     applyResolvedAutoSlowFromStore(); // re-resolve the scoped bundle (enable + target)

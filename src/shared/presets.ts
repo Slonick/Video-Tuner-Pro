@@ -11,7 +11,8 @@ import { parseChord, formatChord } from "./keymap.js";
 // of four — a second row overflows the popup's ~600px height cap).
 export const MAX_PRESETS = 16;
 export const MIN_PRESETS = 1;
-export const QUICK_COUNT = 4;
+export const QUICK_COUNT = 4; // a full quick row; the collapsed popup always shows ≥ this many
+export const QUICK_MAX = 8; // up to two rows — users can pin a second row of quick presets
 // The popup slider's lower bound; presets snap to this floor and the 5% step.
 export const PRESET_MIN = 25;
 // Absolute ceiling for any preset value — matches the hard playback cap
@@ -141,7 +142,7 @@ export function normalizePresetSet(
   }
   let pins = 0;
   for (const r of rows) {
-    if (r.pin && ++pins > QUICK_COUNT) r.pin = false;
+    if (r.pin && ++pins > QUICK_MAX) r.pin = false;
   }
   return {
     presets: rows.map((r) => r.pct),
@@ -150,13 +151,16 @@ export function normalizePresetSet(
   };
 }
 
-// The preset indices shown in the collapsed quick row: the pinned ones, then the
-// lowest-value unpinned to fill up to QUICK_COUNT, returned in ascending-value
-// order (the lists are already value-sorted, so index order == value order).
+// The preset indices shown in the collapsed quick row(s): all pinned (up to
+// QUICK_MAX = two rows), padded with the lowest-value unpinned up to QUICK_COUNT so
+// the row is never sparse. Returned in ascending-value order (the lists are already
+// value-sorted, so index order == value order).
 export function quickPresetIndices(pinned: boolean[]): number[] {
   const all = pinned.map((_, i) => i);
-  const pick = all.filter((i) => pinned[i]).concat(all.filter((i) => !pinned[i]));
-  return pick.slice(0, QUICK_COUNT).sort((a, b) => a - b);
+  const pinnedIdx = all.filter((i) => pinned[i]);
+  const count = Math.min(QUICK_MAX, Math.max(QUICK_COUNT, pinnedIdx.length));
+  const pick = pinnedIdx.concat(all.filter((i) => !pinned[i]));
+  return pick.slice(0, count).sort((a, b) => a - b);
 }
 
 // As playback-rate fractions (e.g. 1.5), for the content script.

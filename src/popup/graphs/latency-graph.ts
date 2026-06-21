@@ -63,7 +63,7 @@ export function drawBuffer(g: GraphState, t: number): void {
   const bottom = padT + gh;
   const ampFull = (v: number) => (Math.min(Math.max(v, 0), g.yMaxAhead) / g.yMaxAhead) * gh;
   const fmtS = (val: number) => val.toFixed(2) + "s";
-  const halo = col("--seg", "#eee");
+  const halo = col("--glass-l3", "#eee"); // readout halo = the panel layer (was --seg)
   const v =
     g.bufShown != null
       ? g.bufHist.length
@@ -107,10 +107,15 @@ export function drawBuffer(g: GraphState, t: number): void {
     bcx.fillText(target + "s", pw - 2, yy - 2);
   };
   const put = (s: string, y: number, color: string): void => {
-    bcx.strokeStyle = halo;
-    bcx.strokeText(s, pw / 2, y);
+    // Soft halo (panel-coloured shadow) instead of a hard outline — reads over the
+    // chart line but stays glassy/clean.
+    bcx.save();
+    bcx.shadowColor = halo;
+    bcx.shadowBlur = 5;
     bcx.fillStyle = color;
     bcx.fillText(s, pw / 2, y);
+    bcx.fillText(s, pw / 2, y); // twice → the soft halo reads a touch stronger
+    bcx.restore();
   };
   // Amber gradient over the part of a series past the target (like the audio
   // over-threshold fill): faint at the target line, solid toward the scale edge.

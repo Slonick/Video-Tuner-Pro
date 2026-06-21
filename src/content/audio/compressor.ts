@@ -2,6 +2,7 @@
 // metering keeps working.
 import { S } from "../state.js";
 import { collectVideos, primaryVideo } from "../videos.js";
+import { onStreamPage, isLive } from "../live/detection.js";
 import { compOn } from "./translation.js";
 import {
   audioContext,
@@ -61,9 +62,15 @@ export function applyAudioComp(videos?: HTMLVideoElement[]): {
   for (const v of list) {
     let g: AudioGraph | null | undefined = audioGraphs.get(v);
     if (!g) {
-      // Compression on → route every video. Off → still route the PRIMARY video
-      // so the meter/graph always work (it runs transparent, output == input).
-      if (!S.audioCompEnabled && v !== primary) continue;
+      // Capture only what a live feature actually needs: compression routes every
+      // video; auto-slow needs just the primary's analyser — and never on a live
+      // stream, where it yields to live-sync and doesn't run anyway. With nothing that
+      // needs it we capture nothing, rather than permanently holding the page's single
+      // audio-capture slot (createMediaElementSource is one-shot, can't be released)
+      // and blocking other audio extensions on every page.
+      const need =
+        S.audioCompEnabled || (S.autoSlowEnabled && v === primary && !onStreamPage() && !isLive(v));
+      if (!need) continue;
       g = setupGraph(v);
       if (!g) {
         skipped++;

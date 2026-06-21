@@ -2,10 +2,15 @@
 // config has loaded and the saved language is applied — render the React app so
 // every section reads from the right storage area in the chosen language.
 import { createRoot } from "react-dom/client";
-import { domAnimation } from "motion/react";
-import { MotionProvider } from "../ui/MotionProvider.js";
+import { GlassBackdrop } from "../ui/GlassBackdrop.js";
+import {
+  ensureGlassFilter,
+  applyGlassOpacity,
+  clampGlassOpacity,
+  GLASS_OPACITY_KEY,
+} from "../shared/glass.js";
 import { loadLang, msg } from "../popup/i18n.js";
-import { whenReady } from "../shared/store.js";
+import { whenReady, STORE } from "../shared/store.js";
 import { initTheme } from "../shared/theme.js";
 import { General } from "./sections/General.js";
 import { Keys } from "./sections/Keys.js";
@@ -17,7 +22,8 @@ import { AutoSlow } from "./sections/AutoSlow.js";
 
 function Options() {
   return (
-    <MotionProvider features={domAnimation}>
+    <>
+      <GlassBackdrop />
       <main className="wrap">
         <header className="opt-header">
           <h1>
@@ -50,7 +56,7 @@ function Options() {
           </div>
         </div>
       </main>
-    </MotionProvider>
+    </>
   );
 }
 
@@ -58,6 +64,10 @@ initTheme();
 whenReady(() => {
   loadLang(() => {
     document.title = msg("optPageTitle") || "Video Tuner Pro — Settings";
+    ensureGlassFilter(document);
+    STORE.get([GLASS_OPACITY_KEY], (r) =>
+      applyGlassOpacity(document.documentElement, clampGlassOpacity(r[GLASS_OPACITY_KEY])),
+    );
     createRoot(document.getElementById("root")!).render(<Options />);
   });
 });

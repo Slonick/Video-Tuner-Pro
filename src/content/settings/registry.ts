@@ -7,10 +7,11 @@
 import { clampNum } from "../core/clamp.js";
 import { normalizeSpeedStep, normalizeHoldSpeed } from "../../shared/presets.js";
 import { normalizeKeymap } from "../../shared/keymap.js";
+import { clampGlassOpacity, GLASS_OPACITY_KEY } from "../../shared/glass.js";
 import { S } from "../state.js";
 import { applyAll, resetAudios } from "../speed.js";
-import { updateTimeBadge, flashBadge } from "../badge/overlay.js";
-import { updateLauncher } from "../overlay/launcher.js";
+import { updateTimeBadge, flashBadge, applyBadgeGlass } from "../badge/overlay.js";
+import { updateLauncher, applyLauncherGlass } from "../overlay/launcher.js";
 
 // One settings key. `parse` turns a raw stored value into the typed value (default +
 // clamp/normalize); `set` writes it onto S (a typed setter, so field and value types
@@ -90,6 +91,16 @@ export const REGISTRY: Entry<unknown>[] = [
       raw === "off" || raw === "always" ? raw : "fullscreen",
     set: (v) => (S.overlayButton = v),
     apply: () => updateLauncher(),
+  }),
+  // Glass opacity multiplier — scales the on-video badge + launcher glass live.
+  entry({
+    key: GLASS_OPACITY_KEY,
+    parse: (raw) => clampGlassOpacity(raw),
+    set: (v) => (S.glassOpacity = v),
+    apply: () => {
+      applyLauncherGlass();
+      applyBadgeGlass();
+    },
   }),
   // Audio compressor — values only. The engage-vs-reapply side-effect stays bespoke
   // in index.ts (the toggle re-engages; a param tweak just re-applies), so it isn't

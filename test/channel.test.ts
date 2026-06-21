@@ -18,6 +18,13 @@ describe("currentChannel (stable per-channel key)", () => {
     expect(currentChannel()).toBe("@WGC098");
   });
 
+  it("reads a non-ASCII @handle that YouTube percent-encodes in the href", () => {
+    at("www.youtube.com", "/watch");
+    // /@Ігрович (Cyrillic) → the href is percent-encoded; the key is the decoded handle.
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@%D0%86%D0%B3%D1%80%D0%BE%D0%B2%D0%B8%D1%87">Ігрович</a></ytd-video-owner-renderer>`;
+    expect(currentChannel()).toBe("@Ігрович");
+  });
+
   it("reads the /channel/UC… id when there's no handle", () => {
     at("www.youtube.com", "/watch");
     document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/channel/UCabc_123">Name</a></ytd-video-owner-renderer>`;

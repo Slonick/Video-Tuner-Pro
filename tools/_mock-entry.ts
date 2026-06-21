@@ -11,6 +11,7 @@ declare global {
     __MESSAGES__?: Record<string, { message: string }>;
     __VERSION__?: string;
     __THEME__?: string;
+    __LOCALE__?: string;
   }
 }
 
@@ -23,5 +24,11 @@ data.settings = { popupGuideSeen: true, ...data.settings };
 // data-theme attribute — not the OS prefers-color-scheme — decides the colours.
 const theme = window.__THEME__;
 if (theme === "light" || theme === "dark") data.settings = { ...data.settings, theme };
-(window as unknown as { chrome: typeof chrome }).chrome =
-  createMockChrome({ ...data, messages, version: window.__VERSION__ });
+// Force the popup's language (it reads the saved uiLang setting, not __MESSAGES__).
+const locale = window.__LOCALE__;
+if (locale) data.settings = { ...data.settings, uiLang: locale };
+(window as unknown as { chrome: typeof chrome }).chrome = createMockChrome({
+  ...data,
+  messages,
+  version: window.__VERSION__,
+});

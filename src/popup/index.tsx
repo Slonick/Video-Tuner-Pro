@@ -24,6 +24,20 @@ function wireEmbeddedOverlay(): void {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") post({ close: true });
   });
+  // Drag the panel by its header: the host raises a capture layer that tracks the
+  // pointer (the iframe would otherwise swallow the moves) and saves the spot per
+  // site. Screen coords cross the frame boundary unchanged, so the host needs no
+  // scale math. A double-click recentres it — but since the host's capture layer
+  // eats the clicks, the host detects the double-click itself (two no-move presses);
+  // we just forward the press. Clicks on the gear / Ko-fi controls are left alone.
+  const inHeader = (t: EventTarget | null) =>
+    t instanceof Element && t.closest(".header") && !t.closest("button, a");
+  document.addEventListener("pointerdown", (e) => {
+    if (e.button === 0 && inHeader(e.target)) {
+      e.preventDefault(); // no text selection / iframe drag-capture
+      post({ drag: "start", sx: e.screenX, sy: e.screenY });
+    }
+  });
 }
 
 initTheme();

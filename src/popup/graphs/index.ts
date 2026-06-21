@@ -11,6 +11,7 @@ import { startPoll } from "./poll.js";
 export function setupGraphs(
   getTabId: () => number | null,
   onTranslating: (on: boolean) => void,
+  onBlocked: (reason: string | null) => void,
 ): () => void {
   const aCanvas = document.getElementById("audioMeter") as HTMLCanvasElement | null;
   const bCanvas = document.getElementById("bufferMeter") as HTMLCanvasElement | null;
@@ -67,7 +68,7 @@ export function setupGraphs(
     raf = requestAnimationFrame(frame);
   }
 
-  const stopPoll = startPoll(g, getTabId, onTranslating);
+  const stopPoll = startPoll(g, getTabId, onTranslating, onBlocked);
   raf = requestAnimationFrame(frame);
   return () => {
     cancelAnimationFrame(raf);

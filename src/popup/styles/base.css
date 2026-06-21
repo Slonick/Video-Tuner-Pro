@@ -8,7 +8,16 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
-  padding: 10px;
+  padding: var(--space-2-5);
+}
+
+/* Buttons don't inherit the page font OR color by default — they fall back to the UA
+   button font and the `ButtonText` system colour (which goes dark next to our dark
+   glass). Inherit both so a button with no explicit colour reads like the page (each
+   button still sets its own size/weight, and explicit colours win). */
+button {
+  font-family: inherit;
+  color: inherit;
 }
 
 /* As an in-page overlay (the launcher loads this in an iframe), the whole popup
@@ -17,21 +26,40 @@ body {
    popup keeps its solid --bg / --surface. */
 html.vtp-embedded body {
   background: var(--glass-base);
+  /* Over real video the muted greys lose contrast through the glass; a theme-aware
+     halo lifts every label/subtitle off the moving picture. */
+  text-shadow: 0 1px 2px var(--text-halo);
 }
+
+/* In the on-video overlay the header doubles as the panel's drag handle. */
+html.vtp-embedded .header {
+  cursor: grab;
+  user-select: none;
+}
+
 html.vtp-embedded .sync-section {
   background: var(--glass-surface);
 }
-/* A card expanded into the full-popup overlay pins over its siblings. Rather than
-   make it opaque, keep it glass and fade the others (and the group labels) out —
-   so nothing shows through the translucent panel. useCardOverlay flags the grid
-   with .has-overlay while a card is open; the fade is symmetric, so collapsing
-   eases them back in. */
-html.vtp-embedded .sync-section,
-html.vtp-embedded .group-label {
+
+/* The thin group divider ("Video"/"Audio") all but vanishes over video — give the
+   hairline the same halo so it reads. */
+html.vtp-embedded .group-label::after {
+  box-shadow: 0 0 2px var(--text-halo);
+}
+
+/* A card expanded into the full-popup overlay pins over its siblings. The cards
+   are translucent glass, so the others (and the group labels) fade out while one
+   is open — otherwise they'd show through the panel. This is now standard in both
+   the toolbar popup and the on-page overlay. useCardOverlay flags the grid with
+   .has-overlay while a card is open; the fade is symmetric, so collapsing eases
+   them back in. */
+.sync-section,
+.group-label {
   transition: opacity 0.25s ease;
 }
-html.vtp-embedded .popup-grid.has-overlay .sync-section:not(.is-overlay),
-html.vtp-embedded .popup-grid.has-overlay > .group-label {
+
+.popup-grid.has-overlay .sync-section:not(.is-overlay),
+.popup-grid.has-overlay > .group-label {
   opacity: 0;
   pointer-events: none;
 }
@@ -42,15 +70,17 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
 .popup-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--space-2-5);
   /* Stretch so the two cards in each row share a height — the shorter one's
      surface just extends; its expand chevron is already pinned to the bottom. */
   align-items: stretch;
   /* Positioning context for a card that expands into a full-grid overlay. */
   position: relative;
 }
+
 .popup-grid .sync-section {
-  margin-bottom: 0; /* the grid gap spaces the cards now */
+  margin-bottom: 0;
+  /* the grid gap spaces the cards now */
 }
 
 /* --- Overlay-expand (all cards) ----------------------------------------------
@@ -60,25 +90,59 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   display: flex;
   min-width: 0;
 }
+
 .card-slot > .sync-section {
   flex: 1;
   margin-bottom: 0;
 }
+
 .group-label {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 2px 2px 0;
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
 }
+
 .group-label::after {
   content: "";
   flex: 1;
   height: 1px;
   background: var(--track);
+}
+
+/* No-audio warning: just a danger ⚠ centred ON the Audio divider (its solid fill masks
+   the hairline behind it, so the line appears to break for it). The message lives in a
+   tooltip on hover/focus. Shown when the page's audio capture can't be obtained. */
+.group-label.has-warn {
+  position: relative;
+}
+.group-warn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+  cursor: help;
+}
+.group-warn svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.group-warn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ── First-open walkthrough (GuideTour) ─────────────────────────────────────
@@ -91,15 +155,17 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   z-index: 100;
   animation: tour-fade 0.18s ease-out;
 }
+
 @keyframes tour-fade {
   from {
     opacity: 0;
   }
 }
+
 .tour-spot {
   position: fixed;
   z-index: 1;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow:
     0 0 0 3px var(--accent),
     0 0 0 9999px rgba(0, 0, 0, 0.58);
@@ -110,6 +176,7 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
     width 0.25s ease,
     height 0.25s ease;
 }
+
 /* Transparent click target over the spotlighted header on the "expand" step:
    clicking it opens the card and advances the tour. */
 .tour-hotspot {
@@ -118,77 +185,89 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   margin: 0;
   padding: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
 }
+
 .tour-cap {
   position: fixed;
   z-index: 2;
   width: 312px;
   max-width: calc(100vw - 16px);
   padding: 13px 14px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
 }
+
 .tour-cap-title {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   font-size: 13px;
   font-weight: 600;
 }
+
 .tour-cap-desc {
   margin: 0 0 13px;
   font-size: 12px;
   line-height: 1.45;
   color: var(--muted);
 }
+
 .tour-cap-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap; /* let the buttons drop below the dots on long locales */
+  flex-wrap: wrap;
+  /* let the buttons drop below the dots on long locales */
   gap: 8px 10px;
 }
+
 .tour-dots {
   display: flex;
   gap: 5px;
 }
+
 .tour-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--track);
   transition: background 0.2s;
 }
+
 .tour-dot.is-on {
   background: var(--accent);
 }
+
 .tour-btns {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
+
 .tour-skip,
 .tour-back {
   padding: 5px 8px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: none;
   color: var(--muted);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
+
 .tour-skip:hover,
 .tour-back:hover {
   color: var(--text);
 }
+
 .tour-next {
   padding: 5px 14px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: #fff;
   font: inherit;
@@ -196,6 +275,7 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   font-weight: 600;
   cursor: pointer;
 }
+
 .tour-next:disabled {
   opacity: 0.4;
   cursor: default;
@@ -210,7 +290,7 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   h1 {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: 13px;
     font-weight: 600;
   }
@@ -226,7 +306,7 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   color: #fff;
   background: var(--accent);
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -241,7 +321,8 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   width: 28px;
   height: 28px;
   color: var(--muted);
-  opacity: 0.5;
+  opacity: var(--header-icon-opacity);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
   transition: opacity 0.12s;
 
   & svg {
@@ -266,7 +347,7 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 /* Gear button → opens the options page. Same muted/faint treatment as the Ko-fi
@@ -282,7 +363,10 @@ html.vtp-embedded .popup-grid.has-overlay > .group-label {
   border: none;
   background: none;
   color: var(--muted);
-  opacity: 0.5;
+  /* Match the Ko-fi cup: same faint strength + light shadow so the gear reads on
+     the light background (it was missed before — only .kofi got the shadow). */
+  opacity: var(--header-icon-opacity);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
   cursor: pointer;
   transition: opacity 0.12s;
 

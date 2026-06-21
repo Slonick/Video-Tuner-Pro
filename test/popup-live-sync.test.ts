@@ -7,6 +7,20 @@ import { mountApp, byId, flush, wait, sliderValue, setSlider } from "./mocks/mou
 // Save commits (rememberTarget), Reset clears (resetTarget).
 const EX = { id: 3, url: "https://example.com/" };
 const click = (id: string) => byId(id).click();
+// "Save for" is a single menu button: the trigger (syncSetBtn) is just "Save" and
+// opens a popover. .scope-primary names + saves to the active scope; every scope is a
+// .scope-row-wrap[data-key] holding .scope-row (save) + .scope-del (remove). Removes
+// are two-step (ConfirmButton): syncResetBtn (subline) needs a second click to confirm.
+const openMenu = async () => {
+  click("syncSetBtn");
+  await flush();
+};
+const primary = () => document.querySelector<HTMLElement>(".scope-menu .scope-primary")!;
+const row = (scope: string) =>
+  document.querySelector<HTMLElement>(
+    `.scope-menu .scope-row-wrap[data-key="${scope}"] .scope-row`,
+  );
+const val = (scope: string) => row(scope)?.querySelector(".scope-val");
 
 describe("loadSyncSettings", () => {
   it("reflects the resolved target + scope from getTarget", async () => {
@@ -18,10 +32,11 @@ describe("loadSyncSettings", () => {
     });
     expect(sliderValue("syncTarget")).toBe(12);
     expect(byId("syncTargetVal").textContent).toBe("12");
-    expect(byId("syncScopeSite").classList.contains("active")).toBe(true);
+    await openMenu();
+    expect(primary().textContent).toContain("for this site");
   });
 
-  it("shows the Channel segment and preselects it when the target came from the channel", async () => {
+  it("defaults the save target to Channel when the target came from the channel", async () => {
     await mountApp({
       tab: EX,
       replies: {
@@ -34,11 +49,11 @@ describe("loadSyncSettings", () => {
         },
       },
     });
-    expect(byId("syncScopeSeg").classList.contains("has-channel")).toBe(true);
-    expect(byId("syncScopeChannel").classList.contains("active")).toBe(true);
+    await openMenu();
+    expect(primary().textContent).toContain("for this channel");
   });
 
-  it("dots the slots that hold a saved delay", async () => {
+  it("shows each saved scope's value in the menu", async () => {
     await mountApp({
       tab: EX,
       settings: { syncTargets: { "example.com": 8 }, syncTargetGlobal: 12 },
@@ -46,20 +61,21 @@ describe("loadSyncSettings", () => {
         getTarget: { target: 8, scope: "site", channel: null, channelName: "", live: false },
       },
     });
-    expect(byId("syncScopeSite").classList.contains("has-saved")).toBe(true);
-    expect(byId("syncScopeGlobal").classList.contains("has-saved")).toBe(true);
-    expect(byId("syncScopeChannel").classList.contains("has-saved")).toBe(false);
+    // The menu shows the value stored at each scope on its row (active included).
+    await openMenu();
+    expect(val("site")!.textContent).toContain("8");
+    expect(row("global")!.textContent).toContain("12");
   });
 
-  it("preselects Site (never Global) when the delay came from the global scope", async () => {
+  it("targets Global on the Save button when the delay resolves from the global scope", async () => {
     await mountApp({
       tab: EX,
       replies: {
         getTarget: { target: 12, scope: "global", channel: null, channelName: "", live: false },
       },
     });
-    expect(byId("syncScopeSite").classList.contains("active")).toBe(true);
-    expect(byId("syncScopeGlobal").classList.contains("active")).toBe(false);
+    await openMenu();
+    expect(primary().textContent).toContain("everywhere");
   });
 
   it("clamps an out-of-range target from the page", async () => {
@@ -108,32 +124,38 @@ describe("toggle + slider", () => {
 });
 
 describe("save / reset by scope", () => {
-  it("Save sends rememberTarget for the selected scope and dots the slot", async () => {
+  it("Save sends rememberTarget for the default scope and marks it saved", async () => {
     const { lastCall } = await mountApp({ tab: EX });
-    click("syncScopeSite");
-    await flush();
     click("syncUp"); // 5 → 6
     await flush();
-    click("syncSetBtn");
+    await openMenu();
+    primary().click(); // save to the active scope (Site)
     await flush();
     expect(lastCall("rememberTarget")).toMatchObject({
       action: "rememberTarget",
       scope: "site",
       target: 6,
     });
-    expect(byId("syncScopeSite").classList.contains("has-saved")).toBe(true);
+    // Saved state shows as the value on the active scope's row.
+    await openMenu();
+    expect(val("site")).toBeTruthy();
   });
 
   it("Reset clears the slot, sends resetTarget, and pulls the new value back", async () => {
-    const { replies, lastCall } = await mountApp({ tab: EX });
-    click("syncScopeSite");
+    const { replies, lastCall } = await mountApp({
+      tab: EX,
+      settings: { syncTargets: { "example.com": 8 } }, // Site saved → Reset enabled
+    });
     await flush();
     replies.resetTarget = { success: true };
-    replies.getTarget = { target: 5, scope: null, channel: null, channelName: "", live: false };
-    click("syncResetBtn");
+    replies.getTarget = { target: 9, scope: null, channel: null, channelName: "", live: false };
+    await openMenu();
+    click("syncResetBtn"); // arm
+    await flush();
+    click("syncResetBtn"); // confirm → clear the active scope (Site)
     expect(lastCall("resetTarget")).toMatchObject({ action: "resetTarget", scope: "site" });
     await wait(120); // deferred getTarget
-    expect(sliderValue("syncTarget")).toBe(5);
+    expect(sliderValue("syncTarget")).toBe(9);
   });
 
   it("the per-target Reset sends resetTargetToSaved and pulls the saved value", async () => {
@@ -166,6 +188,7 @@ describe("no content script (storage fallback)", () => {
       replies: { getTarget: undefined },
     });
     expect(sliderValue("syncTarget")).toBe(9);
-    expect(byId("syncScopeSite").classList.contains("active")).toBe(true);
+    await openMenu();
+    expect(primary().textContent).toContain("for this site");
   });
 });

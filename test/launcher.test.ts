@@ -119,7 +119,11 @@ describe("launcher — open / close", () => {
     fire(fab, "pointerup", 580, 158);
     const frame = frameEl();
     expect(frame).not.toBeNull();
-    expect(frame!.src).toBe("chrome-extension://test/popup/popup.html");
+    // src carries the host + OS schemes in the hash, so the popup can match the host's
+    // color-scheme (transparency) and theme the glass to the OS.
+    expect(frame!.src).toMatch(
+      /^chrome-extension:\/\/test\/popup\/popup\.html#vtp-(light|dark)-(light|dark)$/,
+    );
     expect(frame!.style.display).toBe("block");
     // Outside click (the backdrop) closes it.
     const backdrop = host()!.shadowRoot!.querySelector("div") as HTMLElement;

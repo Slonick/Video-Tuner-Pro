@@ -80,7 +80,10 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   // NOT routable yet: do NOT ban the element. Its src may still be loading or the
   // player may have just swapped the <video> (common on Twitch). Retry next tick.
   if (!canRouteAudio(video)) {
-    lastAudioSkip = "cors";
+    // Split the "not routable" cases: VOT and a still-loading src are transient (the
+    // popup shouldn't warn), but a genuine cross-origin source is a hard block.
+    const src = video.currentSrc || video.src || "";
+    lastAudioSkip = translationActive() ? "vot" : !src && !video.srcObject ? "loading" : "cors";
     const sig = (video.currentSrc || video.src || "") + "|" + !!video.srcObject;
     if (sig !== lastNotRoutableLog) {
       lastNotRoutableLog = sig;

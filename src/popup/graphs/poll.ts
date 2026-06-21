@@ -13,6 +13,7 @@ export function startPoll(
   g: GraphState,
   getTabId: () => number | null,
   onTranslating: (on: boolean) => void,
+  onBlocked: (reason: string | null) => void,
 ): () => void {
   const id = setInterval(() => {
     const tabId = getTabId();
@@ -21,6 +22,7 @@ export function startPoll(
       if (api.runtime.lastError || !resp) {
         g.audioActive = false;
         onTranslating(false);
+        onBlocked(null);
         return;
       }
       const a = resp.audio || {};
@@ -29,6 +31,7 @@ export function startPoll(
       g.audioEnabled = !!a.enabled;
       if (typeof a.knee === "number") g.knee = a.knee;
       onTranslating(!!a.translation); // VOT etc. playing → warn + lock the section
+      onBlocked(typeof a.blocked === "string" ? a.blocked : null); // capture failed → warn + lock
 
       const as = resp.autoSlow;
       g.asActive = !!(as && as.active);

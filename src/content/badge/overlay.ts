@@ -261,6 +261,11 @@ function hookBadgeMouse(): void {
 
 // Keep the badge's content/position fresh (called every tick). Visibility is
 // driven by mouse movement (flashBadge), so it only appears when you move over the
+// Re-apply the glass-opacity multiplier (General setting) to the badge glass.
+export function applyBadgeGlass(): void {
+  badgeHost?.style.setProperty("--glass-opacity", String(S.glassOpacity));
+}
+
 // video and auto-hides after a moment.
 export function updateTimeBadge(): void {
   const v = primaryVideo();
@@ -280,6 +285,7 @@ export function updateTimeBadge(): void {
   if (!el) {
     const refs = mountBadge(); // React renders the badge into a shadow root
     badgeHost = refs.host;
+    badgeHost.style.setProperty("--glass-opacity", String(S.glassOpacity)); // scales the glass
     el = refs.el;
     badgeDotEl = refs.dotEl;
     badgeTextEl = refs.textEl;

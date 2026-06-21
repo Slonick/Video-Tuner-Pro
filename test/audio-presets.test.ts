@@ -82,7 +82,7 @@ describe("normalizeCompPresets", () => {
   });
 
   it("caps the pinned count at COMP_QUICK_COUNT, keeping the earliest", () => {
-    const many = Array.from({ length: 6 }, () => ({
+    const many = Array.from({ length: COMP_QUICK_COUNT + 2 }, () => ({
       threshold: -50,
       knee: 20,
       ratio: 5,

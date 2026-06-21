@@ -8,6 +8,7 @@
 import type { CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
+import { ensureGlassFilter } from "../../shared/glass.js";
 
 const BADGE_STYLE: CSSProperties = {
   position: "fixed",
@@ -20,15 +21,17 @@ const BADGE_STYLE: CSSProperties = {
   alignItems: "center",
   font: "600 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
   color: "#fff",
-  background: "rgba(20,20,22,0.45)",
+  // Liquid glass over the video: a translucent dark tint heavily blurred +
+  // saturated/brightened so the moving video refracts through it, hairline edge.
+  background: "rgb(20 20 22 / calc(0.32 * var(--glass-opacity, 1)))",
   padding: "10px 16px",
-  borderRadius: "10px",
-  boxShadow: "0 0 0 1px rgba(255,255,255,0.12), 0 6px 20px rgba(0,0,0,0.35)",
+  borderRadius: "13px",
+  boxShadow: "0 0 0 1px rgba(255,255,255,0.14)",
   whiteSpace: "nowrap",
   opacity: 0,
   transition: "opacity .25s",
-  WebkitBackdropFilter: "blur(12px) saturate(160%)",
-  backdropFilter: "blur(12px) saturate(160%)",
+  WebkitBackdropFilter: "blur(7px) saturate(180%) brightness(1.04)",
+  backdropFilter: "blur(7px) saturate(180%) brightness(1.04) url(#vtp-glass)",
 };
 
 // Small red dot left of the speed, shown only on live streams (the value that
@@ -117,5 +120,9 @@ export function mountBadge(): BadgeRefs {
       />,
     ),
   );
+  // Inject our liquid-glass displacement filter into this shadow (the badge is
+  // static and never re-renders, so React won't remove this trailing node). It's
+  // not a <div>, so overlay.ts/tests still find the badge via querySelector("div").
+  ensureGlassFilter(shadow);
   return { host, el: el!, dotEl: dotEl!, textEl: textEl!, pinEl: pinEl! };
 }

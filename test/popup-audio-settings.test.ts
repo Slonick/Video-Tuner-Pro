@@ -59,9 +59,9 @@ describe("popup preset quick row + extras (speed parity)", () => {
     ...over,
   });
 
-  it("renders every preset; pins fill the quick row to 4, the rest are extra", async () => {
+  it("renders every preset; only the pinned ones form the quick row, the rest are extra", async () => {
     const presets = Array.from({ length: 6 }, (_, i) =>
-      P({ name: `P${i}`, pin: i === 0 || i === 5 }),
+      P({ name: `P${i}`, pin: i === 0 || i === 2 }),
     );
     await mountApp({ settings: { compPresets: presets } });
     const btns = [...document.querySelectorAll<HTMLElement>(".btn-preset")];
@@ -70,34 +70,34 @@ describe("popup preset quick row + extras (speed parity)", () => {
       .filter((b) => b.classList.contains("extra"))
       .map((b) => b.getAttribute("data-preset"))
       .sort();
-    // pinned {0,5} + the two lowest unpinned {1,2} fill the quick four → {3,4} extra.
-    expect(extras).toEqual(["3", "4"]);
+    // pinned {0,2} are the quick row; everything else is extra
+    expect(extras).toEqual(["1", "3", "4", "5"]);
   });
 
-  it("marks no preset extra when there are 4 or fewer", async () => {
+  it("marks no preset extra when all are pinned", async () => {
     await mountApp({
-      settings: { compPresets: [P({ name: "A", pin: false }), P({ name: "B", pin: false })] },
+      settings: { compPresets: [P({ name: "A", pin: true }), P({ name: "B", pin: true })] },
     });
     const btns = [...document.querySelectorAll<HTMLElement>(".btn-preset")];
     expect(btns).toHaveLength(2);
     expect(btns.some((b) => b.classList.contains("extra"))).toBe(false);
   });
 
-  it("sizes the grid columns to the visible count (no empty trailing cell)", async () => {
+  it("sizes the grid columns to the pinned count (no empty trailing cell)", async () => {
     await mountApp({
       settings: {
-        compPresets: ["A", "B", "C"].map((name) => P({ name, pin: false })),
+        compPresets: ["A", "B", "C"].map((name) => P({ name, pin: true })),
       },
     });
     const grid = document.querySelector<HTMLElement>(".preset-grid")!;
-    expect(grid.style.gridTemplateColumns).toBe("repeat(3, 1fr)"); // 3 presets → 3 columns
+    expect(grid.style.gridTemplateColumns).toBe("repeat(3, 1fr)"); // 3 pinned → 3 columns
   });
 
-  it("caps the grid at 4 columns when there are more than four", async () => {
-    const presets = Array.from({ length: 6 }, (_, i) => P({ name: `P${i}`, pin: i < 2 }));
+  it("caps the pinned quick row at three", async () => {
+    const presets = Array.from({ length: 6 }, (_, i) => P({ name: `P${i}`, pin: i < 5 }));
     await mountApp({ settings: { compPresets: presets } });
     const grid = document.querySelector<HTMLElement>(".preset-grid")!;
-    expect(grid.style.gridTemplateColumns).toBe("repeat(4, 1fr)");
+    expect(grid.style.gridTemplateColumns).toBe("repeat(3, 1fr)"); // pins normalize to 3
   });
 
   it("applies the preset at its full-list index, not its visible position", async () => {

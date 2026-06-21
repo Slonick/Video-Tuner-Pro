@@ -15,7 +15,11 @@ const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/M
 const DIST = join(ROOT, "dist/chrome/popup");
 const TMP = join(ROOT, ".screenshots/_work");
 
-const exists = (p) => access(p).then(() => true, () => false);
+const exists = (p) =>
+  access(p).then(
+    () => true,
+    () => false,
+  );
 
 async function ensureDist() {
   if (!(await exists(join(DIST, "popup.html")))) {
@@ -51,7 +55,10 @@ async function buildMock() {
   await build({
     entryPoints: [join(ROOT, "tools/_mock-entry.ts")],
     outfile: join(TMP, "mock.js"),
-    bundle: true, format: "iife", target: "es2022", logLevel: "silent",
+    bundle: true,
+    format: "iife",
+    target: "es2022",
+    logLevel: "silent",
   });
 }
 
@@ -69,8 +76,10 @@ export async function runChrome(args) {
   for (let attempt = 0; ; attempt++) {
     try {
       return await execFile(CHROME, args, {
-        encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
-        timeout: 30_000, killSignal: "SIGKILL",
+        encoding: "utf8",
+        maxBuffer: 32 * 1024 * 1024,
+        timeout: 30_000,
+        killSignal: "SIGKILL",
       });
     } catch (e) {
       if (attempt >= 1) throw e;
@@ -82,8 +91,12 @@ export async function runChrome(args) {
 // top/bottom, so callers can frame that block tightly with uniform padding.
 async function measureHeight(file) {
   const { stdout } = await runChrome([
-    "--headless=new", "--disable-gpu", "--no-sandbox",
-    "--virtual-time-budget=1200", "--dump-dom", `file://${file}`,
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--virtual-time-budget=1200",
+    "--dump-dom",
+    `file://${file}`,
   ]);
   const h = stdout.match(/VH(\d+)/);
   const a = stdout.match(/AUD(\d+)_(\d+)/);
@@ -98,10 +111,24 @@ async function measureHeight(file) {
 
 // `height`: skip the measure pass and capture at this height — themes don't
 // change layout, so a re-render of the same scenario can reuse the first one.
-export async function renderPopup({ scenario = "audio", locale = "en", out, theme = "light", dpr = 2, width = 340, expand = null, extraCss = "", height = null }) {
+export async function renderPopup({
+  scenario = "audio",
+  locale = "en",
+  out,
+  theme = "light",
+  dpr = 2,
+  width = 340,
+  expand = null,
+  extraCss = "",
+  height = null,
+  embedded = false,
+  bg = "",
+}) {
   await prepare();
 
-  const messages = JSON.parse(await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"));
+  const messages = JSON.parse(
+    await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"),
+  );
   // The popup header shows the manifest version; feed the real one to the mock.
   const { version } = JSON.parse(await readFile(join(ROOT, "src/manifest.json"), "utf8"));
   const inject =
@@ -122,35 +149,53 @@ export async function renderPopup({ scenario = "audio", locale = "en", out, them
   // The mock sets toggles checked at runtime, which fires the knob's slide
   // transition; a screenshot can land mid-slide and freeze the knob off-centre.
   // Kill the switch transition so the checked state renders at its final spot.
-  const freeze = '<style>.switch-track,.switch-knob{transition:none!important}</style>';
-  const extra = freeze + (extraCss ? `<style>${extraCss}</style>` : "");
+  const freeze = "<style>.switch-track,.switch-knob{transition:none!important}</style>";
+  // Embedded-over-"video" preview: a busy background behind the glass + transparent
+  // body so the cards' backdrop-filter actually has something to refract/blur.
+  const bgCss = bg
+    ? `<style>html{background:${bg};background-attachment:fixed;}body{background:transparent!important;}</style>`
+    : "";
+  const extra = freeze + bgCss + (extraCss ? `<style>${extraCss}</style>` : "");
   let html = await readFile(join(DIST, "popup.html"), "utf8");
+  if (embedded) html = html.replace(/<html(\s|>)/, '<html class="vtp-embedded"$1');
   // The build emits a self-closing link tag; match it so the injected styles land.
   const cssLink = '<link rel="stylesheet" href="popup.css" />';
   html = html.replace(cssLink, cssLink + (await themeStyle(theme)) + extra);
-  html = html.replace('<script src="popup.js"></script>', inject + '<script src="popup.js"></script>\n' + expandJs);
+  html = html.replace(
+    '<script src="popup.js"></script>',
+    inject + '<script src="popup.js"></script>\n' + expandJs,
+  );
   // Per-render file names so concurrent renders don't clobber each other; the
   // shared popup.css/js/mock.js copies are identical for every render.
   const tag = basename(out).replace(/\.png$/, "");
   const pageFile = join(TMP, `popup-${tag}.html`);
   await writeFile(pageFile, html);
 
-  let audioTop = null, audioBottom = null, groupTops = [];
+  let audioTop = null,
+    audioBottom = null,
+    groupTops = [];
   if (height == null) {
     // Measure pass → tight capture (uniform padding, no empty tail). Wait past
     // the section open transition (0.28s) before measuring. Also record the
     // compressor section's bounds and the group-label tops (Video / Audio split).
-    const meas = html.replace("</body>",
-      '<script>addEventListener("load",()=>setTimeout(()=>{const b=Math.ceil(document.body.getBoundingClientRect().height);const e=document.getElementById("audioBody");let a="";if(e){const r=e.closest(".sync-section").getBoundingClientRect();a="AUD"+Math.round(r.top)+"_"+Math.round(r.bottom);}const gs=[...document.querySelectorAll(".group-label")].map(g=>Math.round(g.getBoundingClientRect().top));const gp=gs.length?"GRP"+gs.join("_"):"";document.title="VH"+b+" "+a+" "+gp;},450))</script></body>');
+    const meas = html.replace(
+      "</body>",
+      '<script>addEventListener("load",()=>setTimeout(()=>{const b=Math.ceil(document.body.getBoundingClientRect().height);const e=document.getElementById("audioBody");let a="";if(e){const r=e.closest(".sync-section").getBoundingClientRect();a="AUD"+Math.round(r.top)+"_"+Math.round(r.bottom);}const gs=[...document.querySelectorAll(".group-label")].map(g=>Math.round(g.getBoundingClientRect().top));const gp=gs.length?"GRP"+gs.join("_"):"";document.title="VH"+b+" "+a+" "+gp;},450))</script></body>',
+    );
     const measFile = join(TMP, `measure-${tag}.html`);
     await writeFile(measFile, meas);
     ({ height, audioTop, audioBottom, groupTops } = await measureHeight(measFile));
   }
 
   await runChrome([
-    "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
-    `--force-device-scale-factor=${dpr}`, `--window-size=${width},${height}`,
-    "--virtual-time-budget=2500", `--screenshot=${out}`,
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--hide-scrollbars",
+    `--force-device-scale-factor=${dpr}`,
+    `--window-size=${width},${height}`,
+    "--virtual-time-budget=2500",
+    `--screenshot=${out}`,
     `file://${pageFile}`,
   ]);
 

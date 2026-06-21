@@ -15,7 +15,7 @@ import {
 } from "../../shared/presets.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
-import { useScopeSelection } from "./useScopeSelection.js";
+import { useScopeSelection, type ScopeValues } from "./useScopeSelection.js";
 import { pullAfter, type SpeedResponse } from "../lib/messaging.js";
 
 const STORAGE: ScopeStorage = {
@@ -43,12 +43,13 @@ export interface UseSpeed {
   channelName: string;
   scope: Scope;
   saved: ScopeFlags;
+  savedValues: ScopeValues;
   isYouTube: boolean;
   setSpeed: (fraction: number) => void;
   nudge: (delta: number) => void;
   resetManual: () => void;
-  resetScope: () => void;
-  save: () => void;
+  resetScope: (target?: Scope) => void;
+  save: (target?: Scope) => void;
   pickScope: (scope: Scope) => void;
   sliderInput: (percent: number) => void;
   sliderCommit: (percent: number) => void;
@@ -152,32 +153,57 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     });
   }, [hasTab, fallbackFromStorage, send, applyResolved]);
 
-  const resetScope = useCallback(() => {
-    markSaved(scope, false);
-    // Channel has no off-page fallback (it needs the DOM) — revert to 1× instead.
-    const fallback = () =>
-      scope === "channel" ? setSpeed(1) : resetFallback(scope, () => fallbackFromStorage(true));
-    if (!hasTab) {
-      fallback();
-      return;
-    }
-    void send("reset", { scope }).then((r) => {
-      if (r == null) fallback();
-      else pullAfter<SpeedResponse>(send, "getSpeed", applyResolved);
-    });
-  }, [scope, hasTab, markSaved, resetFallback, fallbackFromStorage, setSpeed, send, applyResolved]);
-
-  const save = useCallback(() => {
-    const v = clamp(speedRef.current);
-    if (hasTab) {
-      void send("remember", { scope, speed: v }).then((r) => {
-        if (r == null) saveFallback(scope, v);
+  // `target` defaults to the active scope, or the scope chosen from the menu.
+  const resetScope = useCallback(
+    (target: Scope = scope) => {
+      markSaved(target, false);
+      // Channel has no off-page fallback (it needs the DOM) — revert to 1× instead.
+      const fallback = () =>
+        target === "channel" ? setSpeed(1) : resetFallback(target, () => fallbackFromStorage(true));
+      if (!hasTab) {
+        fallback();
+        return;
+      }
+      void send("reset", { scope: target }).then((r) => {
+        if (r == null) fallback();
+        // After clearing `target`, re-resolve: the value drops to the next scope
+        // (channel > site > global > 100%) and the Save button retargets to it.
+        else
+          pullAfter<SpeedResponse>(send, "getSpeed", (resp) => {
+            applyResolved(resp);
+            defaultScope(resp.scope, !!resp.channel);
+            refreshSaved();
+          });
       });
-    } else {
-      saveFallback(scope, v);
-    }
-    markSaved(scope, true);
-  }, [scope, hasTab, send, saveFallback, markSaved]);
+    },
+    [
+      scope,
+      hasTab,
+      markSaved,
+      resetFallback,
+      fallbackFromStorage,
+      setSpeed,
+      send,
+      applyResolved,
+      defaultScope,
+      refreshSaved,
+    ],
+  );
+
+  const save = useCallback(
+    (target: Scope = scope) => {
+      const v = clamp(speedRef.current);
+      if (hasTab) {
+        void send("remember", { scope: target, speed: v }).then((r) => {
+          if (r == null) saveFallback(target, v);
+        });
+      } else {
+        saveFallback(target, v);
+      }
+      markSaved(target, true, v);
+    },
+    [scope, hasTab, send, saveFallback, markSaved],
+  );
 
   const sliderInput = useCallback(
     (percent: number) => {
@@ -266,6 +292,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     channelName: sc.channelName,
     scope,
     saved: sc.saved,
+    savedValues: sc.savedValues,
     isYouTube,
     setSpeed,
     nudge,

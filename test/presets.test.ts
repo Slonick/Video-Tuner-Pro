@@ -229,14 +229,15 @@ describe("normalizePresetSet", () => {
     const { pinned } = normalizePresetSet([50, 100], [null, null], [false, false]);
     expect(pinned).toEqual([false, false]);
   });
-  it("caps the pinned presets at four, keeping the lowest values", () => {
+  it("caps the pinned presets at eight (two quick rows), keeping the lowest values", () => {
+    const vals = [50, 100, 150, 200, 250, 300, 350, 400, 450]; // nine pinned
     const { presets, pinned } = normalizePresetSet(
-      [100, 200, 300, 400, 500],
-      [null, null, null, null, null],
-      [true, true, true, true, true],
+      vals,
+      vals.map(() => null),
+      vals.map(() => true),
     );
-    expect(pinned.filter(Boolean)).toHaveLength(4);
-    expect(pinned[presets.indexOf(500)]).toBe(false); // the highest got dropped
+    expect(pinned.filter(Boolean)).toHaveLength(8);
+    expect(pinned[presets.indexOf(450)]).toBe(false); // the highest got dropped
   });
 });
 
@@ -251,5 +252,13 @@ describe("quickPresetIndices", () => {
     // one high pin (index 5) + three lowest unpinned (0,1,2)
     const pinned = [false, false, false, false, false, true];
     expect(quickPresetIndices(pinned)).toEqual([0, 1, 2, 5]);
+  });
+  it("shows all pinned (no padding) when more than four are pinned, up to eight", () => {
+    // six pinned → a full second row, no unpinned padding
+    expect(quickPresetIndices([true, true, true, true, true, true, false, false])).toEqual([
+      0, 1, 2, 3, 4, 5,
+    ]);
+    // capped at eight even if more are pinned
+    expect(quickPresetIndices(Array(10).fill(true))).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 });

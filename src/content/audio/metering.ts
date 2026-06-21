@@ -2,7 +2,7 @@ import { ctxValid } from "../platform/browser.js";
 import { S } from "../state.js";
 import { primaryVideo } from "../videos.js";
 import { translationActive } from "./translation.js";
-import { audioContext, audioGraphs } from "./routing.js";
+import { audioContext, audioGraphs, lastSkip } from "./routing.js";
 import { rmsToDb, deriveOutDb } from "./levels.js";
 import type { AudioGraph, AudioLevels } from "./types.js";
 
@@ -10,6 +10,12 @@ import type { AudioGraph, AudioLevels } from "./types.js";
 export const audioLevelHist: { in: number; out: number }[] = [];
 export const A_HIST_MS = 150;
 const A_HIST_MAX = 48;
+
+// Only the persistent capture failures become a popup warning; loading/suspended/VOT
+// are transient and resolve on their own.
+function blockReason(skip: string | null): { blocked?: "inuse" | "cors" | "noctx" } {
+  return skip === "inuse" || skip === "cors" || skip === "noctx" ? { blocked: skip } : {};
+}
 
 function analyserDb(an: AnalyserNode): number {
   const buf = an._buf || (an._buf = new Float32Array(an.fftSize));
@@ -28,7 +34,15 @@ export function audioLevels(): AudioLevels {
   // Report levels whenever the graph exists — even with compression off (it runs
   // transparent), so the meter and threshold preview stay live.
   if (!g || !g.analyserIn) {
-    return { active: false, enabled: S.audioCompEnabled, translation: translationActive() };
+    return {
+      active: false,
+      enabled: S.audioCompEnabled,
+      translation: translationActive(),
+      // Surface a hard capture failure so the popup can warn + lock the audio cards
+      // (monitor.ts runs applyAudioComp() right before this, so the skip is current).
+      // Transient reasons (loading/suspended/VOT) are left off.
+      ...blockReason(lastSkip()),
+    };
   }
   const inDb = analyserDb(g.analyserIn);
   return {

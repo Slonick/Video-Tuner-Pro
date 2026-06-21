@@ -11,10 +11,9 @@
   /* Super theater still works on a YouTube live stream, so its row stays
        active; the speed-affecting controls and the (no-op on a stream) on-video
        / keyboard rows dim like the buttons. */
-  .speed-slider,
+  .slider-row,
   .buttons-grid,
   .quick-actions,
-  .speed-quick .spin,
   .speed-body .extra-row:not(#superTheaterRow) {
     opacity: 0.4;
     pointer-events: none;
@@ -46,7 +45,7 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 /* Thin separator between the −/+ nudges and the ⟲ reset-to-saved button. */
@@ -68,18 +67,6 @@
 /* On a live stream the ⚠ sits to the right of the domain+channel block, centred
    across both lines (via .sec-main's align-items). The text column clips on its
    own, so a long domain or channel never crowds the badge out. */
-#liveWarn {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  margin-left: 3px;
-
-  & svg {
-    width: 18px;
-    height: 18px;
-  }
-}
-
 /* The live note is a plain CSS tooltip (not Floating UI): absolutely anchored to
    the header so it spans the card width, and revealed when the ⚠ next to the
    domain is hovered or focused. It re-declares the position/hidden state the base
@@ -100,6 +87,7 @@
     opacity 0.15s,
     transform 0.15s;
 }
+
 .sec-head:has(#liveWarn:hover) .live-note,
 .sec-head:has(#liveWarn:focus-visible) .live-note {
   opacity: 1;
@@ -113,8 +101,8 @@
   width: 24px;
   height: 24px;
   border: none;
-  border-radius: 7px;
-  background: var(--seg);
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
   color: var(--text);
   cursor: pointer;
   transition:
@@ -145,7 +133,7 @@
   align-items: center;
   width: 100%;
   height: 18px;
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-3);
   touch-action: none;
   user-select: none;
   cursor: pointer;
@@ -154,16 +142,21 @@
 .speed-slider .slider-track {
   position: relative;
   flex-grow: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--track);
+  /* macOS 27 kit: 6px translucent groove, fully rounded. */
+  height: 6px;
+  border-radius: 3px;
+  /* Visible neutral-gray groove (a real recess, darker than the l1 cell it may sit
+     in) so the track reads on both the white page and dark theme. */
+  background: var(--groove);
 }
 
 .speed-slider .slider-thumb {
   display: block;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  /* Kit slider knob: a 20×16 horizontal pill (wider than tall, fully rounded).
+     Centred on the track via top:50% + translateY in the Slider. */
+  width: 20px;
+  height: 16px;
+  border-radius: var(--radius-md);
   background: #fff;
   box-shadow: 0 1px 3px var(--shadow);
   outline: none;
@@ -176,20 +169,20 @@
   }
 }
 
-/* Tick marks on the SPEED slider only (25–300%, range 275): every 50% →
-   50/100/150/200/250/300. Drawn as the track's background so the thumb covers
-   the ones it sits on. Sized to the thumb's travel (track − 18px thumb,
-   centered) so the marks line up with the thumb at each value. A tick every
-   50/275 = 18.1818% of that inner width, centred at 9.0909% (the 50% pos). */
-#speedSlider .slider-track {
+/* Tick marks on any slider given a `tickStep` (speed, and the compressor params —
+   so every slider reads the same). The spacing isn't hard-coded: Slider sets
+   --tick-gap (period) and --tick-off (first tick) as fractions of the thumb's travel
+   from the live min/max, so a configurable max stays correct. Drawn as the track's
+   background so the thumb covers the marks it sits on. */
+.slider-ticked.slider-track {
   background-image: repeating-linear-gradient(
     to right,
     transparent 0,
-    transparent calc(9.0909% - 0.75px),
-    var(--muted) calc(9.0909% - 0.75px),
-    var(--muted) calc(9.0909% + 0.75px),
-    transparent calc(9.0909% + 0.75px),
-    transparent 18.1818%
+    transparent calc(var(--tick-off) - 0.75px),
+    var(--muted) calc(var(--tick-off) - 0.75px),
+    var(--muted) calc(var(--tick-off) + 0.75px),
+    transparent calc(var(--tick-off) + 0.75px),
+    transparent var(--tick-gap)
   );
   background-size: calc(100% - 18px) 100%;
   background-position: center;
@@ -236,9 +229,9 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 3px;
   padding: 3px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
   border: 1px solid var(--track);
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
 }
 
 /* Collapsed hides the extra presets so the four quick ones form a single row;
@@ -247,6 +240,7 @@
 .presetgrid .extra {
   display: none;
 }
+
 .speed-section:has(.speed-body.open) .presetgrid .extra {
   display: block;
 }
@@ -260,14 +254,17 @@
   top: 0;
   right: 0;
   padding: 1px 4px;
-  /* Flush into the corner: top-right matches the button's 6px round, inner corner tucked. */
-  border-radius: 0 6px 0 4px;
+  /* Tucked flush into the cell's top-right corner: the outer corner matches the
+     cell radius, the inner (bottom-left) gets a small round. */
+  border-radius: 0 var(--radius-lg) 0 var(--radius-xs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9px;
   font-weight: 600;
-  line-height: 1.2;
-  /* Inactive button → badge wears the active (accent) look, and vice versa. */
-  background: var(--accent);
-  color: #fff;
+  line-height: 1.3;
+  /* A quiet chip, not an accent (no blue) — a neutral fill solid enough to read on
+     every cell, accent or not. */
+  background: rgba(120, 120, 128, 0.45);
+  color: var(--text);
   /* Hidden by default; fades + grows out of the corner when shown (see below). */
   opacity: 0;
   transform: translateY(-2px) scale(0.8);
@@ -279,51 +276,51 @@
     background 0.12s,
     color 0.12s;
 }
+
 .btn-speed.active[data-key]::before {
-  background: var(--seg);
-  color: var(--text);
+  /* On the accent-filled active cell, the hint is a translucent white. */
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
 }
+
 .speed-section:has(.speed-body.open):has(#kbdToggle[data-state="checked"])
   .btn-speed[data-key]::before {
   opacity: 1;
   transform: none;
-}
-/* Nudge the (centered) label left so the corner badge doesn't sit over it. */
-.speed-section:has(.speed-body.open):has(#kbdToggle[data-state="checked"]) .btn-speed[data-key] {
-  padding-right: 20px;
 }
 
 /* Slider, preset grid and Reset / Remember are always visible (change or save a
    speed without expanding); the collapsible body below holds only the toggles.
    (Descendant, not child: in the overlay these sit inside .card-scroll.) */
 .speed-section .speed-slider {
-  margin: 10px 0 8px;
+  margin: var(--space-2-5) 0 var(--space-2);
 }
+
 /* Extra gap below the actions only when the body is open — it separates them
    from the toggle rows. Collapsed, the bottom gap is just the card's 12px
    padding, uniform with the other cards. */
 .speed-section .quick-actions {
   margin-bottom: 0;
 }
+
 .speed-section:has(.speed-body.open) .quick-actions {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .btn-speed {
   position: relative;
-  padding: 6px 0;
+  padding: var(--space-1-5) 0;
   border: none;
-  border-radius: 6px;
-  background: var(--seg);
+  border-radius: var(--radius-sm);
+  background: var(--control-fill);
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition:
     background 0.12s,
     color 0.12s,
-    filter 0.12s,
-    padding 0.16s ease;
+    filter 0.12s;
 
   &:hover:not(.active) {
     background: var(--track);
@@ -340,32 +337,11 @@
   }
 }
 
-/* --- Quick actions: scope picker + Reset / Remember ---------------------- */
+/* --- Quick actions: the Save menu trigger (see SaveScope) ------- */
 .quick-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-/* The buffer scope is a labelled group box — "Save for" sits in the border
-   (native <legend>), framing the segmented control inside. */
-.scope-group {
-  margin: 0; /* spacing comes from the surrounding flex gap */
-  padding: 7px 8px 8px;
-  border: 1px solid var(--track);
-  border-radius: 9px;
-  min-inline-size: auto; /* override the fieldset default */
-}
-.scope-group legend {
-  padding: 0 5px;
-  margin-left: 2px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-}
-/* The group box already frames it — drop the segmented control's own border. */
-.scope-group .scope-seg {
-  border: none;
-  padding: 0;
+  gap: var(--space-1-5);
 }
 
 /* "Allowed delay" / "Target rate" row: label on the left, a −/value/+ cluster on
@@ -374,17 +350,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: var(--space-2-5);
+  margin-bottom: var(--space-2);
   font-size: 12px;
   color: var(--text);
 }
+
 /* The target/delay row sits right under the always-visible graph (it's the first
    thing in .card-scroll, just below the meter) — give it air so the −/+/reset
    cluster doesn't butt against the chart. */
 .card-scroll > .sync-delay-row:first-child {
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
+
 .sync-val {
   min-width: 36px;
   text-align: center;
@@ -396,9 +374,9 @@
 .btn-action {
   padding: 7px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   /* background/color animate so the green "Saved" flash fades in and out. */
@@ -409,7 +387,7 @@
 }
 
 .btn-reset {
-  background: var(--seg);
+  background: var(--control-fill);
 
   &:hover {
     filter: brightness(0.96);
@@ -422,102 +400,8 @@
   font-weight: 600;
 
   &:hover {
-    filter: brightness(1.05);
+    filter: brightness(1.08);
   }
-}
-
-/* Scope picker: Global / Site / Channel as a segmented control — a bordered
-   group holds the three filled options, the selected one filled with the accent,
-   so it reads as 1-of-N rather than three loose buttons. The Channel option shows
-   only on a YouTube watch page (.has-channel, set by the popup); the row is then
-   three columns. */
-.scope-seg {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--track);
-  border-radius: 9px;
-}
-.scope-seg.has-channel {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-/* Filled cells; the pill rides ABOVE them (z 2) so it stays visible while it
-   slides, and the active cell sits ABOVE the pill (z 3) — transparent, so the
-   pill shows through with the label on top. */
-.scope-opt {
-  position: relative;
-  z-index: 1;
-  padding: 6px 0;
-  border: none;
-  border-radius: 6px;
-  background: var(--seg);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.12s,
-    color 0.12s,
-    filter 0.12s;
-
-  &:hover:not(.active) {
-    background: var(--track);
-  }
-
-  &.active {
-    background: transparent;
-    color: #fff;
-    font-weight: 600;
-  }
-}
-
-/* The label sits above the pill (an absolutely-positioned child of the cell). */
-.scope-label {
-  position: relative;
-  z-index: 1;
-}
-
-/* Corner dot marking a scope whose slot holds a saved speed. Accent on a filled
-   cell; white when active (it then sits on the accent pill). */
-.scope-opt.has-saved::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  top: 5px;
-  right: 5px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.scope-opt.has-saved.active::after {
-  background: #fff;
-}
-
-/* Selection pill: an absolutely-positioned child filling the active cell. It
-   glides between cells via motion.dev's shared-layout animation (layoutId), so it
-   carries no CSS transition — motion owns the movement (and reduced motion). */
-.seg-pill {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: 6px;
-  background: var(--accent);
-  pointer-events: none;
-}
-.scope-channel {
-  display: none;
-}
-.scope-seg.has-channel .scope-channel {
-  display: block;
-}
-
-.action-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
 }
 
 /* Inline toggle: show speed + remaining time on the video. */
@@ -525,8 +409,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
+  gap: var(--space-2-5);
+  margin-top: var(--space-3);
   font-size: 12px;
   color: var(--text);
 }
@@ -535,19 +419,47 @@
 .extra-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   min-width: 0;
+}
+
+/* A two-line toggle row: label on top, the explanation as a muted second line
+   (instead of hiding it behind an (i) tooltip). */
+.extra-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.extra-sub {
+  margin-top: var(--space-0-5);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
 }
 
 /* The speed body is open by default, so trim its vertical chrome (the section's
    12px top margin / 16px bottom padding) to keep the popup from scrolling on
    open — Chrome caps popup height at ~600px. */
 .speed-body.sync-body.open {
-  margin-top: 8px;
+  margin-top: var(--space-2);
   padding-bottom: 8px;
 }
+
 .speed-body .extra-row {
-  margin-top: 8px;
+  margin-top: var(--space-2);
+}
+
+/* Toggle rows inside a .list-group (box defined in meter.css): inset hairline
+   dividers between rows. */
+.list-group .extra-row {
+  margin-top: 0;
+  padding: var(--space-2-5) 0;
+  border-top: 1px solid var(--track);
+}
+
+.list-group .extra-row:first-child {
+  border-top: none;
 }
 
 /* Shortcut keycaps inside the Keyboard-shortcuts info tooltip. The tooltip
@@ -562,26 +474,63 @@
   justify-content: start;
   gap: 7px 16px;
 }
+
 .kbd-tip .kbd-g {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
+
 .kbd-tip .amt {
   opacity: 0.8;
 }
+
 .kbd-tip kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 16px;
   height: 16px;
-  padding: 0 4px;
-  border-radius: 4px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
   background: rgba(128, 128, 128, 0.3);
   color: inherit;
   font-family: inherit;
   font-size: 10px;
   font-weight: 600;
   line-height: 1;
+}
+
+/* Accent fill on the slider track, up to the knob — the standard macOS slider. */
+.speed-slider .slider-range {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* Flat inline control row: −  slider  +  reset  value (SliderRow). No capsule —
+   the slider fills between the flat stepper buttons, value at the trailing edge. */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: var(--space-2-5) 0 var(--space-2);
+}
+
+.slider-row .speed-slider {
+  flex: 1;
+  margin: 0;
+}
+
+.slider-row-val {
+  flex: 0 0 auto;
+  min-width: 48px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }

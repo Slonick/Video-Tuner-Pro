@@ -5,11 +5,10 @@ import { useEffect, useRef } from "react";
 import { STORE } from "../platform/storage.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
-import { Slider } from "../../ui/Slider.js";
-import { useFlash } from "../hooks/useFlash.js";
+import { SliderRow } from "./SliderRow.js";
 import { InfoTip } from "./InfoTip.js";
-import { ScopeSegment } from "./ScopeSegment.js";
-import { MinusIcon, PlusIcon, ResetIcon } from "../icons.js";
+import { SaveScope } from "./SaveScope.js";
+import { Button } from "../../ui/Button.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import { StoredToggle } from "./StoredToggle.js";
 import type { UseLiveSync } from "../hooks/useLiveSync.js";
@@ -30,7 +29,6 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
   useEffect(() => {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
-  const [flash, pulse] = useFlash();
 
   // Auto-expand the first time live-sync is switched on, once ever.
   const onToggle = (on: boolean) => {
@@ -41,11 +39,6 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
       setOpen(true);
       STORE.set({ liveSyncSeen: true });
     });
-  };
-
-  const onSave = () => {
-    ls.save();
-    pulse();
   };
 
   return (
@@ -59,7 +52,7 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
         }
       >
         <div className="sec-head">
-          <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
+          <Button className="sec-main" aria-expanded={open} onClick={toggle}>
             <span className="sec-text">
               <span className="sec-title-row">
                 <strong>{msg("syncTitle")}</strong>
@@ -67,7 +60,7 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
               </span>
               <span className="switch-sub">{msg("syncSubtitle")}</span>
             </span>
-          </button>
+          </Button>
           <Switch id="liveSyncToggle" checked={ls.enabled} onChange={onToggle} />
         </div>
 
@@ -86,107 +79,83 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
               <span>{msg("meterTargetMark")}</span>
             </span>
           </div>
-          <canvas id="bufferMeter"></canvas>
+          <canvas
+            id="bufferMeter"
+            role="img"
+            aria-label={msg("a11yBufferMeter") || "Live latency and buffer graph"}
+          ></canvas>
         </div>
 
         <div className="card-scroll">
           <div className="sync-delay-row">
             <span>{msg("allowedDelay")}</span>
-            <div className="speed-quick">
-              <button
-                type="button"
-                className="spin"
-                id="syncDown"
-                aria-label="Shorter"
-                title="−1 s"
-                onClick={() => ls.nudge(-1)}
-              >
-                <MinusIcon />
-              </button>
-              <span className="sync-val">
-                <b id="syncTargetVal">{ls.target}</b> <span>{msg("secondsShort")}</span>
-              </span>
-              <button
-                type="button"
-                className="spin"
-                id="syncUp"
-                aria-label="Longer"
-                title="+1 s"
-                onClick={() => ls.nudge(1)}
-              >
-                <PlusIcon />
-              </button>
-              <span className="speed-quick-div" aria-hidden="true"></span>
-              <button
-                type="button"
-                className="spin"
-                id="syncReset"
-                aria-label="Reset"
-                title={msg("tipResetTarget")}
-                onClick={ls.resetManual}
-              >
-                <ResetIcon />
-              </button>
-            </div>
           </div>
-          <Slider
-            className="speed-slider"
-            id="syncTarget"
+          <SliderRow
+            sliderId="syncTarget"
             min={1}
             max={30}
             step={1}
             value={ls.target}
-            ariaLabel={msg("allowedDelayLabel") || "Allowed delay"}
+            ariaLabel={msg("allowedDelay") || "Allowed delay"}
+            ariaValueText={`${ls.target} ${msg("secondsShort")}`}
             onChange={(v) => ls.previewTarget(v)}
+            onDown={() => ls.nudge(-1)}
+            downId="syncDown"
+            downLabel="Shorter"
+            downTitle="−1 s"
+            onUp={() => ls.nudge(1)}
+            upId="syncUp"
+            upLabel="Longer"
+            upTitle="+1 s"
+            onReset={ls.resetManual}
+            resetId="syncReset"
+            resetTitle={msg("tipResetTarget")}
+            valueText={
+              <>
+                <b id="syncTargetVal">{ls.target}</b> {msg("secondsShort")}
+              </>
+            }
           />
 
           <div className={"sync-body" + (open ? " open" : "")} id="syncBody">
             <div className="quick-actions">
-              <fieldset className="scope-group">
-                <legend>{msg("scopeLabel")}</legend>
-                <ScopeSegment
-                  name="syncScope"
-                  ariaLabel="Save allowed delay"
-                  scope={ls.scope}
-                  saved={ls.saved}
-                  hasChannel={!!ls.channel}
-                  open={open}
-                  onPick={ls.pickScope}
-                />
-              </fieldset>
-              <div className="action-row">
-                <button className="btn-action btn-reset" id="syncResetBtn" onClick={ls.resetScope}>
-                  {msg("resetButton")}
-                </button>
-                <button
-                  className="btn-action btn-default"
-                  id="syncSetBtn"
-                  style={flash ? { background: "#4caf50" } : undefined}
-                  onClick={onSave}
-                >
-                  {flash ? msg("savedFeedback") : msg("rememberButton")}
-                </button>
+              <SaveScope
+                scope={ls.scope}
+                saved={ls.saved}
+                savedValues={ls.savedValues}
+                currentValue={ls.target}
+                fmtValue={(v) => `${v as number} ${msg("secondsShort")}`}
+                hasChannel={!!ls.channel}
+                saveLabel={msg("rememberButton")}
+                savedLabel={msg("savedFeedback")}
+                onSave={ls.save}
+                onReset={ls.resetScope}
+                onPick={ls.pickScope}
+                saveId="syncSetBtn"
+                resetId="syncResetBtn"
+              />
+            </div>
+
+            <div className="list-group">
+              <div className="extra-row">
+                <span>{msg("onStreamLabel")}</span>
+                <StoredToggle id="onStreamToggle" storageKey="streamBadge" defaultOn />
               </div>
-            </div>
 
-            <div className="extra-row">
-              <span>{msg("onStreamLabel")}</span>
-              <StoredToggle id="onStreamToggle" storageKey="streamBadge" defaultOn />
-            </div>
-
-            {/* Super theater for streams — its own setting (superTheaterStream),
+              {/* Super theater for streams — its own setting (superTheaterStream),
                 independent of the Speed card's video one, so theater can be on for
                 videos but off on streams (where you may want the chat visible). */}
-            <div className="extra-row">
-              <span className="extra-label">
-                <span>{msg("superTheaterLabel")}</span>
-                <InfoTip below tip={msg("superTheaterHint")} />
-              </span>
-              <StoredToggle
-                id="superTheaterToggleStream"
-                storageKey="superTheaterStream"
-                defaultOn={false}
-              />
+              <div className="extra-row">
+                <span className="extra-text">
+                  <span>{msg("superTheaterLabel")}</span>
+                  <span className="extra-sub">{msg("superTheaterHint")}</span>
+                </span>
+                <StoredToggle
+                  id="superTheaterToggleStream"
+                  storageKey="superTheaterStream"
+                  defaultOn={false}
+                />
+              </div>
             </div>
           </div>
         </div>

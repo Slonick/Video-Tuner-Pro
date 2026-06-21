@@ -43,11 +43,18 @@ export const expect = test.expect;
 
 // Drive the content script through the service worker — the same message contract
 // the popup uses. Returns the content script's reply.
-export async function sendToContent(sw: Worker, action: string, extra: Record<string, unknown> = {}): Promise<unknown> {
-  return sw.evaluate(async ({ action, extra }) => {
-    const [tab] = await chrome.tabs.query({ url: "*://localhost/*" });
-    return await chrome.tabs.sendMessage(tab.id!, { action, ...extra });
-  }, { action, extra });
+export async function sendToContent(
+  sw: Worker,
+  action: string,
+  extra: Record<string, unknown> = {},
+): Promise<unknown> {
+  return sw.evaluate(
+    async ({ action, extra }) => {
+      const [tab] = await chrome.tabs.query({ url: "*://localhost/*" });
+      return await chrome.tabs.sendMessage(tab.id!, { action, ...extra });
+    },
+    { action, extra },
+  );
 }
 
 // Read/seed the extension's sync storage from the service worker.

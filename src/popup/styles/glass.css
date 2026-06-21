@@ -1,0 +1,83 @@
+/* ============================================================
+   Liquid-glass surface — shared by the popup and the options page.
+   Imported last by both popup.css and options.css so its surface
+   treatment overrides the card backgrounds those files set.
+
+   Background is a flat single tone (the colour mesh read poorly), so
+   the frosted glass body blends into it and the refractive EDGE — the
+   bright rim + inset top highlight — is what reads as the "break".
+   The on-page overlay (html.vtp-embedded) blurs the real page behind
+   the iframe. Tokens live in tokens.css (light/dark + OS theme).
+   ============================================================ */
+
+/* Flat single-tone background, fixed behind the content. Hidden in the on-page
+   overlay (there the real page beneath the iframe is what we blur). */
+.glass-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* A soft tonal wash so the glass has something to refract/blur (a flat fill
+     gives the glass nothing to bend). Subtle enough to keep text legible. */
+  background:
+    radial-gradient(110% 75% at 18% 0%, rgba(10, 132, 255, 0.14), transparent 60%),
+    radial-gradient(110% 75% at 100% 100%, rgba(255, 45, 85, 0.1), transparent 55%), var(--bg);
+}
+html.vtp-embedded .glass-backdrop {
+  display: none;
+}
+
+/* Content sits above the background layer. */
+#root > .header,
+#root > .popup-grid,
+.wrap {
+  position: relative;
+  z-index: 1;
+}
+
+/* Frosted cards. On the flat background the glass body blends in; the edge
+   (bright rim + inset top highlight) is the visible refraction. The `html `
+   prefix lifts specificity above the opaque .card rule in options.css. */
+/* Liquid-glass cards: translucent tint + blur + saturate. The actual refraction
+   (our SVG displacement filter #vtp-glass) is added on top at runtime by
+   shared/glass.ts — lightningcss strips url(#…) out of backdrop-filter in the
+   built css, so this stays the blur-only base. */
+html:not(.vtp-embedded) .sync-section,
+html:not(.vtp-embedded) .card {
+  background: var(--glass-card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(var(--card-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--card-blur)) saturate(var(--glass-saturate));
+}
+
+/* On-page overlay: same glass over the video beneath the iframe. */
+html.vtp-embedded .sync-section {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-2xl);
+  backdrop-filter: blur(var(--card-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--card-blur)) saturate(var(--glass-saturate));
+}
+
+/* ── On-video overlay token tuning (theme-following, per the user's choice) ──
+   Over a real video the muted greys and hairlines lose contrast, and the locked
+   grayscale turns muddy. Lift muted + borders and drop the grayscale; the glass
+   densities themselves are tuned in tokens.css. The :root.vtp-embedded specificity
+   (0,2,0) beats the plain :root palette; the theme-qualified blocks below (0,3,0)
+   win back over the dark palette so each theme gets its own contrast direction. */
+:root.vtp-embedded {
+  --muted: #5f5f66; /* darker so labels/sublabels read on the dense light panel */
+  --track: rgba(90, 90, 98, 0.55); /* borders/dividers that survive over video */
+  --lock-filter: none; /* grayscale goes muddy over a real frame */
+}
+@media (prefers-color-scheme: dark) {
+  :root.vtp-embedded:not([data-theme="light"]) {
+    --muted: #c2c2c8; /* lighter so it reads over the video */
+    --track: rgba(190, 190, 200, 0.45);
+  }
+}
+:root.vtp-embedded[data-theme="dark"] {
+  --muted: #c2c2c8;
+  --track: rgba(190, 190, 200, 0.45);
+}

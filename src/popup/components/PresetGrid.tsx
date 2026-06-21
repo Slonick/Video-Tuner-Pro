@@ -4,6 +4,7 @@
 // preset's assigned hotkey label (e.g. "⇧1"), driving the corner hint.
 import { chordLabel } from "../../shared/keymap.js";
 import { quickPresetIndices } from "../../shared/presets.js";
+import { Button } from "../../ui/Button.js";
 
 interface Props {
   presets: number[];
@@ -20,7 +21,7 @@ export function PresetGrid({ presets, presetKeys, pinned, activePercent, onPick 
       {presets.map((pct, i) => {
         const key = chordLabel(presetKeys[i]);
         return (
-          <button
+          <Button
             key={i}
             className={
               "btn-speed" +
@@ -32,7 +33,7 @@ export function PresetGrid({ presets, presetKeys, pinned, activePercent, onPick 
             onClick={() => onPick(pct / 100)}
           >
             {pct + "%"}
-          </button>
+          </Button>
         );
       })}
     </div>

@@ -6,7 +6,7 @@ import { STORE } from "../platform/storage.js";
 import { debounce } from "../core/debounce.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
-import { useScopeSelection } from "./useScopeSelection.js";
+import { useScopeSelection, type ScopeValues } from "./useScopeSelection.js";
 import { pullAfter, type TargetResponse } from "../lib/messaging.js";
 
 const STORAGE: ScopeStorage = {
@@ -28,11 +28,12 @@ export interface UseLiveSync {
   channel: string | null;
   scope: Scope;
   saved: ScopeFlags;
+  savedValues: ScopeValues;
   previewTarget: (seconds: number) => void; // slider drag (live preview, no persist)
   nudge: (delta: number) => void;
-  save: () => void;
+  save: (target?: Scope) => void;
   resetManual: () => void;
-  resetScope: () => void;
+  resetScope: (target?: Scope) => void;
   pickScope: (scope: Scope) => void;
 }
 
@@ -103,30 +104,52 @@ export function useLiveSync(tab: ActiveTab | null, send: SendToTab): UseLiveSync
     STORE.set({ liveSync: on });
   }, []);
 
-  const save = useCallback(() => {
-    const t = clampTarget(targetRef.current);
-    if (hasTab) {
-      void send("rememberTarget", { scope, target: t }).then((r) => {
-        if (r == null) saveFallback(scope, t);
-      });
-    } else {
-      saveFallback(scope, t);
-    }
-    markSaved(scope, true);
-  }, [scope, hasTab, send, saveFallback, markSaved]);
+  const save = useCallback(
+    (target: Scope = scope) => {
+      const t = clampTarget(targetRef.current);
+      if (hasTab) {
+        void send("rememberTarget", { scope: target, target: t }).then((r) => {
+          if (r == null) saveFallback(target, t);
+        });
+      } else {
+        saveFallback(target, t);
+      }
+      markSaved(target, true, t);
+    },
+    [scope, hasTab, send, saveFallback, markSaved],
+  );
 
-  const resetScope = useCallback(() => {
-    markSaved(scope, false);
-    const fallback = () => resetFallback(scope, fromStorage);
-    if (!hasTab) {
-      fallback();
-      return;
-    }
-    void send("resetTarget", { scope }).then((r) => {
-      if (r == null) fallback();
-      else pullAfter<TargetResponse>(send, "getTarget", applyResolved);
-    });
-  }, [scope, hasTab, markSaved, resetFallback, fromStorage, send, applyResolved]);
+  const resetScope = useCallback(
+    (target: Scope = scope) => {
+      markSaved(target, false);
+      const fallback = () => resetFallback(target, fromStorage);
+      if (!hasTab) {
+        fallback();
+        return;
+      }
+      void send("resetTarget", { scope: target }).then((r) => {
+        if (r == null) fallback();
+        // Re-resolve so the value drops to the next scope and Save retargets to it.
+        else
+          pullAfter<TargetResponse>(send, "getTarget", (resp) => {
+            applyResolved(resp);
+            defaultScope(resp.scope, !!resp.channel);
+            refreshSaved();
+          });
+      });
+    },
+    [
+      scope,
+      hasTab,
+      markSaved,
+      resetFallback,
+      fromStorage,
+      send,
+      applyResolved,
+      defaultScope,
+      refreshSaved,
+    ],
+  );
 
   const resetManual = useCallback(() => {
     if (!hasTab) {
@@ -165,6 +188,7 @@ export function useLiveSync(tab: ActiveTab | null, send: SendToTab): UseLiveSync
     channel: sc.channel,
     scope,
     saved: sc.saved,
+    savedValues: sc.savedValues,
     previewTarget,
     nudge,
     save,

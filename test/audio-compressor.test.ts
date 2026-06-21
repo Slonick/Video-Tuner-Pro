@@ -12,11 +12,16 @@ const m = vi.hoisted(() => {
     graphs: new Map<unknown, unknown>(),
     setupGraph: vi.fn(),
     lastSkipVal: null as string | null,
+    stream: false,
     makeParam,
   };
 });
 
 vi.mock("../src/content/audio/translation.js", () => ({ compOn: () => m.compOn }));
+vi.mock("../src/content/live/detection.js", () => ({
+  onStreamPage: () => m.stream,
+  isLive: () => false,
+}));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => m.list,
   primaryVideo: () => m.primary,
@@ -152,10 +157,27 @@ describe("applyAudioComp routing decisions", () => {
     m.compOn = true;
     m.lastSkipVal = null;
     m.setupGraph.mockReset();
+    m.stream = false;
+    S.autoSlowEnabled = false;
   });
 
-  it("OFF: routes only the PRIMARY video (so the meter keeps working)", () => {
+  it("OFF (both audio features off): captures nothing — leaves the page's audio alone", () => {
     S.audioCompEnabled = false;
+    S.autoSlowEnabled = false;
+    const primary = { id: "p" } as unknown as HTMLVideoElement;
+    const other = { id: "o" } as unknown as HTMLVideoElement;
+    m.primary = primary;
+    m.list = [other, primary];
+    m.setupGraph.mockImplementation(() => makeGraph());
+
+    const res = applyAudioComp();
+    expect(res.engaged).toBe(0); // nothing engaged — no createMediaElementSource
+    expect(m.setupGraph).not.toHaveBeenCalled();
+  });
+
+  it("auto-slow ON (compression off): routes only the PRIMARY for its analyser", () => {
+    S.audioCompEnabled = false;
+    S.autoSlowEnabled = true;
     const primary = { id: "p" } as unknown as HTMLVideoElement;
     const other = { id: "o" } as unknown as HTMLVideoElement;
     m.primary = primary;
@@ -164,8 +186,22 @@ describe("applyAudioComp routing decisions", () => {
 
     const res = applyAudioComp();
     expect(res.engaged).toBe(1); // only primary engaged
-    expect(m.setupGraph).toHaveBeenCalledTimes(1); // never even tried the non-primary
+    expect(m.setupGraph).toHaveBeenCalledTimes(1);
     expect(m.setupGraph).toHaveBeenCalledWith(primary);
+  });
+
+  it("auto-slow ON but on a live stream: captures nothing (it yields to live-sync)", () => {
+    S.audioCompEnabled = false;
+    S.autoSlowEnabled = true;
+    m.stream = true;
+    const primary = { id: "p" } as unknown as HTMLVideoElement;
+    m.primary = primary;
+    m.list = [primary];
+    m.setupGraph.mockImplementation(() => makeGraph());
+
+    const res = applyAudioComp();
+    expect(res.engaged).toBe(0);
+    expect(m.setupGraph).not.toHaveBeenCalled();
   });
 
   it("ON: routes every video", () => {

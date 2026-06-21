@@ -3,8 +3,8 @@
 // under storage key "keymap". Pure + unit-tested; shared by the content listener
 // and the options-page editor.
 
-export type Action = "slower" | "faster" | "reset" | "toggle" | "hold";
-export const ACTIONS: Action[] = ["slower", "faster", "reset", "toggle", "hold"];
+export type Action = "slower" | "faster" | "reset" | "toggle" | "hold" | "overlay";
+export const ACTIONS: Action[] = ["slower", "faster", "reset", "toggle", "hold", "overlay"];
 
 export interface Keymap {
   slower: string;
@@ -14,6 +14,9 @@ export interface Keymap {
   toggle: string;
   // Hold for a temporary speed (S.holdSpeed) while pressed; release restores it.
   hold: string;
+  // Open/close the on-video overlay popup — works even with the launcher button
+  // hidden, for people who turned it off or prefer the keyboard.
+  overlay: string;
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -21,7 +24,9 @@ export const DEFAULT_KEYMAP: Keymap = {
   faster: "KeyD",
   reset: "KeyR",
   toggle: "KeyS",
-  hold: "KeyF",
+  // X, not F — many players use F for fullscreen.
+  hold: "KeyX",
+  overlay: "KeyO",
 };
 
 // A code is bindable if it's a plain letter/digit position — enough to avoid
@@ -125,18 +130,21 @@ export function chordLabel(spec: string | null, mac: boolean = IS_MAC): string {
   return mod + alt + (c.shift ? "⇧" : "") + codeLabel(c.code);
 }
 
-// Coerce stored/partial input into a full, valid keymap. Invalid or duplicate
-// bindings fall back to the default for that action (defaults never collide).
+// Coerce stored/partial input into a full, valid keymap. An empty string is a
+// deliberate "unbound" (the action is disabled); invalid or duplicate bindings
+// fall back to the default for that action (defaults never collide).
 export function normalizeKeymap(raw: unknown): Keymap {
   const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const out: Keymap = { ...DEFAULT_KEYMAP };
   const used = new Set<string>();
   for (const a of ACTIONS) {
     const code = src[a];
-    if (typeof code === "string" && isBindableCode(code) && !used.has(code)) {
+    if (code === "") {
+      out[a] = ""; // explicitly unbound — the action does nothing
+    } else if (typeof code === "string" && isBindableCode(code) && !used.has(code)) {
       out[a] = code;
     }
-    used.add(out[a]);
+    if (out[a]) used.add(out[a]); // an unbound "" never reserves a code
   }
   return out;
 }

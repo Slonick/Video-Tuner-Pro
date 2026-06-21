@@ -3,6 +3,7 @@
 // tinted, and the resulting playback speed as a faint ghost line underneath. Rate
 // is on the main axis (0…AS_RATE_MAX syll/s); speed rides a faint secondary scale.
 import { col, fitCanvas } from "./draw-util.js";
+import { msg } from "../i18n.js";
 import { AS_WINDOW, AS_RATE_MAX } from "./state.js";
 import type { GraphState } from "./state.js";
 
@@ -76,6 +77,17 @@ export function drawAutoSlow(g: GraphState, t: number): void {
       else cx.moveTo(x, y);
     });
     cx.stroke();
+  } else {
+    // No samples yet → the bare target line reads as "broken". A centred hint makes
+    // the idle graph read as "ready, listening" instead. The target line + zone
+    // stay for context.
+    cx.font = "11px -apple-system, sans-serif";
+    cx.textAlign = "center";
+    cx.textBaseline = "middle";
+    cx.fillStyle = muted;
+    cx.globalAlpha = 0.7;
+    cx.fillText(msg("autoSlowIdle") || "Waiting for speech…", pw / 2, yTarget);
+    cx.globalAlpha = 1;
   }
 
   // Rate scale in the right gutter: max, the target value, and 0.

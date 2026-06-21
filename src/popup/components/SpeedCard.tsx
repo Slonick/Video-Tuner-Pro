@@ -4,14 +4,14 @@
 // re-render can't clobber the tweened value.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { tweenNumber } from "../core/tween-number.js";
-import { Slider } from "../../ui/Slider.js";
-import { useFlash } from "../hooks/useFlash.js";
+import { SliderRow } from "./SliderRow.js";
 import { msg } from "../i18n.js";
 import { StoredToggle } from "./StoredToggle.js";
 import { InfoTip } from "./InfoTip.js";
-import { ScopeSegment } from "./ScopeSegment.js";
+import { SaveScope } from "./SaveScope.js";
 import { PresetGrid } from "./PresetGrid.js";
-import { MinusIcon, PlusIcon, ResetIcon, WarnIcon } from "../icons.js";
+import { WarnIcon } from "../icons.js";
+import { Button } from "../../ui/Button.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import { STORE } from "../platform/storage.js";
 import { codeLabel, normalizeKeymap, DEFAULT_KEYMAP } from "../../shared/keymap.js";
@@ -38,7 +38,6 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
 
-  const [flash, pulse] = useFlash();
   // The shortcut hints read the live keymap so they reflect any remaps.
   const [keymap, setKeymap] = useState(DEFAULT_KEYMAP);
   useEffect(() => {
@@ -59,11 +58,6 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
     }
   }, [s.speed]);
 
-  const onSave = () => {
-    s.save();
-    pulse();
-  };
-
   const percent = Math.round(s.speed.v * 100);
   const target = Math.min(s.speedMax, Math.max(25, percent));
   const stepPct = Math.round(s.speedStep * 100);
@@ -80,7 +74,7 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
         }
       >
         <div className="sec-head">
-          <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
+          <Button className="sec-main" aria-expanded={open} onClick={toggle}>
             <span className="sec-text">
               <strong className="current-domain" id="currentDomain">
                 {domain || "—"}
@@ -89,64 +83,47 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
                 {s.channel && s.channelName ? s.channelName : msg("speedScopeSite")}
               </span>
             </span>
-            <span
-              className="info warn"
-              id="liveWarn"
-              aria-label="Live"
-              style={{ display: live ? "inline-flex" : "none" }}
-            >
-              <WarnIcon />
-            </span>
-          </button>
-          <div className="speed-quick">
-            <button
-              type="button"
-              className="spin"
-              id="speedDown"
-              aria-label="Slower"
-              title={msg("tipSlower")}
-              onClick={() => s.nudge(-s.speedStep)}
-            >
-              <MinusIcon />
-            </button>
-            <span ref={readoutRef} className="speed-pct" id="currentSpeedPct" />
-            <button
-              type="button"
-              className="spin"
-              id="speedUp"
-              aria-label="Faster"
-              title={msg("tipFaster")}
-              onClick={() => s.nudge(s.speedStep)}
-            >
-              <PlusIcon />
-            </button>
-            <span className="speed-quick-div" aria-hidden="true"></span>
-            <button
-              type="button"
-              className="spin"
-              id="speedReset"
-              aria-label="Reset"
-              title={msg("tipResetSpeed")}
-              onClick={s.resetManual}
-            >
-              <ResetIcon />
-            </button>
-          </div>
+          </Button>
+          {/* Pinned to the right edge (like the other cards' warnings), outside the
+              expand button so it toggles the live note, not the card. */}
+          <span
+            className="info warn"
+            id="liveWarn"
+            aria-label="Live"
+            tabIndex={0}
+            style={{ display: live ? "inline-flex" : "none" }}
+          >
+            <WarnIcon />
+          </span>
           <span className="tip live-note">{msg("liveNote")}</span>
         </div>
 
         <div className="card-scroll">
-          <Slider
-            className="speed-slider"
-            id="speedSlider"
+          <SliderRow
+            sliderId="speedSlider"
             min={25}
             max={s.speedMax}
             step={5}
+            tickStep={50}
             value={target}
             animate={s.speed.animate}
-            ariaLabel={msg("speedLabel") || "Speed"}
+            ariaLabel={msg("meterSpeed") || "Speed"}
+            ariaValueText={Math.round(target * 100) + "%"}
             onChange={s.sliderInput}
             onCommit={s.sliderCommit}
+            onDown={() => s.nudge(-s.speedStep)}
+            downId="speedDown"
+            downLabel="Slower"
+            downTitle={msg("tipSlower")}
+            onUp={() => s.nudge(s.speedStep)}
+            upId="speedUp"
+            upLabel="Faster"
+            upTitle={msg("tipFaster")}
+            onReset={s.resetManual}
+            resetId="speedReset"
+            resetTitle={msg("tipResetSpeed")}
+            readoutRef={readoutRef}
+            readoutId="currentSpeedPct"
           />
 
           <PresetGrid
@@ -158,94 +135,90 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
           />
 
           <div className="quick-actions">
-            <fieldset className="scope-group">
-              <legend>{msg("scopeLabel")}</legend>
-              <ScopeSegment
-                name="scope"
-                ariaLabel="Save scope"
-                scope={s.scope}
-                saved={s.saved}
-                hasChannel={!!s.channel}
-                open={open}
-                onPick={s.pickScope}
-              />
-            </fieldset>
-            <div className="action-row">
-              <button className="btn-action btn-reset" id="resetBtn" onClick={s.resetScope}>
-                {msg("resetButton")}
-              </button>
-              <button
-                className="btn-action btn-default"
-                id="setDefaultBtn"
-                style={flash ? { background: "#4caf50" } : undefined}
-                onClick={onSave}
-              >
-                {flash ? msg("savedFeedback") : msg("rememberButton")}
-              </button>
-            </div>
+            <SaveScope
+              scope={s.scope}
+              saved={s.saved}
+              savedValues={s.savedValues}
+              currentValue={s.speed.v}
+              fmtValue={(v) => Math.round((v as number) * 100) + "%"}
+              hasChannel={!!s.channel}
+              saveLabel={msg("rememberButton")}
+              savedLabel={msg("savedFeedback")}
+              onSave={s.save}
+              onReset={s.resetScope}
+              onPick={s.pickScope}
+              saveId="setDefaultBtn"
+              resetId="resetBtn"
+            />
           </div>
 
           <div className={"sync-body speed-body" + (open ? " open" : "")} id="speedBody">
-            <div className="extra-row">
-              <span>{msg("onVideoLabel")}</span>
-              <StoredToggle id="onVideoToggle" storageKey="showRemaining" defaultOn />
-            </div>
+            <div className="list-group">
+              <div className="extra-row">
+                <span>{msg("onVideoLabel")}</span>
+                <StoredToggle id="onVideoToggle" storageKey="showRemaining" defaultOn />
+              </div>
 
-            <div className="extra-row" id="superTheaterRow">
-              <span className="extra-label">
-                <span>{msg("superTheaterLabel")}</span>
-                <InfoTip below tip={msg("superTheaterHint")} />
-              </span>
-              <StoredToggle id="superTheaterToggle" storageKey="superTheater" defaultOn={false} />
-            </div>
+              <div className="extra-row" id="superTheaterRow">
+                <span className="extra-text">
+                  <span>{msg("superTheaterLabel")}</span>
+                  <span className="extra-sub">{msg("superTheaterHint")}</span>
+                </span>
+                <StoredToggle id="superTheaterToggle" storageKey="superTheater" defaultOn={false} />
+              </div>
 
-            <div className="extra-row">
-              <span className="extra-label">
-                <span>{msg("kbdLabel")}</span>
-                <InfoTip below className="kbd-tip">
-                  <span className="kbd-g">
-                    <kbd>{codeLabel(keymap.slower)}</kbd>
-                    <span>{msg("kbdSlower")}</span>
-                    <span className="amt">−{stepPct}%</span>
-                  </span>
-                  <span className="kbd-g">
-                    <kbd>⇧</kbd>
-                    <kbd>{codeLabel(keymap.slower)}</kbd>
-                    <span className="amt">−{stepPct * 2}%</span>
-                  </span>
-                  <span className="kbd-g">
-                    <kbd>{codeLabel(keymap.faster)}</kbd>
-                    <span>{msg("kbdFaster")}</span>
-                    <span className="amt">+{stepPct}%</span>
-                  </span>
-                  <span className="kbd-g">
-                    <kbd>⇧</kbd>
-                    <kbd>{codeLabel(keymap.faster)}</kbd>
-                    <span className="amt">+{stepPct * 2}%</span>
-                  </span>
-                  <span className="kbd-g">
-                    <kbd>{codeLabel(keymap.reset)}</kbd>
-                    <span>{msg("kbdReset")}</span>
-                  </span>
-                  <span className="kbd-g">
-                    <kbd>{codeLabel(keymap.toggle)}</kbd>
-                    <span>{msg("kbdToggle")}</span>
-                  </span>
-                  <span className="kbd-g">
-                    <kbd>{codeLabel(keymap.hold)}</kbd>
-                    <span>{msg("kbdHold")}</span>
-                  </span>
-                </InfoTip>
-              </span>
-              <StoredToggle id="kbdToggle" storageKey="keyboard" defaultOn />
-            </div>
+              <div className="extra-row">
+                <span className="extra-label">
+                  <span>{msg("kbdLabel")}</span>
+                  <InfoTip below className="kbd-tip">
+                    <span className="kbd-g">
+                      <kbd>{codeLabel(keymap.slower)}</kbd>
+                      <span>{msg("kbdSlower")}</span>
+                      <span className="amt">−{stepPct}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>⇧</kbd>
+                      <kbd>{codeLabel(keymap.slower)}</kbd>
+                      <span className="amt">−{stepPct * 2}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>{codeLabel(keymap.faster)}</kbd>
+                      <span>{msg("kbdFaster")}</span>
+                      <span className="amt">+{stepPct}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>⇧</kbd>
+                      <kbd>{codeLabel(keymap.faster)}</kbd>
+                      <span className="amt">+{stepPct * 2}%</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>{codeLabel(keymap.reset)}</kbd>
+                      <span>{msg("kbdReset")}</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>{codeLabel(keymap.toggle)}</kbd>
+                      <span>{msg("kbdToggle")}</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>{codeLabel(keymap.hold)}</kbd>
+                      <span>{msg("kbdHold")}</span>
+                    </span>
+                    <span className="kbd-g">
+                      <kbd>{codeLabel(keymap.overlay)}</kbd>
+                      <span>{msg("kbdOverlay")}</span>
+                    </span>
+                  </InfoTip>
+                </span>
+                <StoredToggle id="kbdToggle" storageKey="keyboard" defaultOn />
+              </div>
 
-            <div className="extra-row">
-              <span className="extra-label">
-                <span>{msg("audioSpeedLabel")}</span>
-                <InfoTip below tip={msg("audioSpeedHint")} />
-              </span>
-              <StoredToggle id="audioSpeedToggle" storageKey="audioSpeed" defaultOn={false} />
+              <div className="extra-row">
+                <span className="extra-text">
+                  <span>{msg("audioSpeedLabel")}</span>
+                  <span className="extra-sub">{msg("audioSpeedHint")}</span>
+                </span>
+                <StoredToggle id="audioSpeedToggle" storageKey="audioSpeed" defaultOn={false} />
+              </div>
             </div>
           </div>
         </div>

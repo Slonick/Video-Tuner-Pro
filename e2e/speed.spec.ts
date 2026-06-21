@@ -19,7 +19,7 @@ test("keyboard shortcuts change the video playback rate", async ({ page }) => {
   await page.keyboard.press("KeyD"); // +5%
   await expect.poll(() => rate(page)).toBeCloseTo(1.05, 2);
   await page.keyboard.press("KeyD"); // +5%
-  await expect.poll(() => rate(page)).toBeCloseTo(1.10, 2);
+  await expect.poll(() => rate(page)).toBeCloseTo(1.1, 2);
   await page.keyboard.press("KeyA"); // -5%
   await expect.poll(() => rate(page)).toBeCloseTo(1.05, 2);
   await page.keyboard.press("KeyR"); // reset
@@ -41,15 +41,21 @@ test("the toggle key swaps between the last speed and 1×", async ({ page }) => 
 test("the hold key applies a temporary speed while pressed", async ({ page }) => {
   await page.goto("/");
   await page.locator("#v").click();
-  await page.keyboard.down("KeyF"); // hold → default 2×
+  await page.keyboard.down("KeyX"); // hold → default 2×
   await expect.poll(() => rate(page)).toBeCloseTo(2.0, 2);
-  await page.keyboard.up("KeyF"); // release → restore 1×
+  await page.keyboard.up("KeyX"); // release → restore 1×
   await expect.poll(() => rate(page)).toBeCloseTo(1.0, 2);
 });
 
-test("a setSpeed message (the popup's contract) applies to the video", async ({ page, serviceWorker }) => {
+test("a setSpeed message (the popup's contract) applies to the video", async ({
+  page,
+  serviceWorker,
+}) => {
   await page.goto("/");
-  const resp = await sendToContent(serviceWorker, "setSpeed", { speed: 1.5 }) as { success: boolean; speed: number };
+  const resp = (await sendToContent(serviceWorker, "setSpeed", { speed: 1.5 })) as {
+    success: boolean;
+    speed: number;
+  };
   expect(resp.success).toBe(true);
   expect(resp.speed).toBeCloseTo(1.5, 5);
   await expect.poll(() => rate(page)).toBeCloseTo(1.5, 2);

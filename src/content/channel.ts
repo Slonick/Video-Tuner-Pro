@@ -238,8 +238,20 @@ export function channelKeys(): string[] {
         if (m) id = m[1];
       }
       if (!handle) {
-        const m = href.match(/\/(@[A-Za-z0-9._-]+)/);
-        if (m) handle = m[1];
+        // Handles can be non-ASCII (e.g. a Cyrillic @Ігрович), which YouTube
+        // percent-encodes in the href (/@%D0%86…). Match any non-delimiter run after
+        // "@" and decode it, so the key is the real handle — ASCII handles decode to
+        // themselves, so existing keys are unchanged.
+        const m = href.match(/\/@([^/?#]+)/);
+        if (m) {
+          let seg = m[1];
+          try {
+            seg = decodeURIComponent(seg);
+          } catch {
+            /* malformed escape — keep the raw segment */
+          }
+          handle = "@" + seg;
+        }
       }
     }
     return [id, handle].filter((k): k is string => k != null);

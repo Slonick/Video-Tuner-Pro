@@ -8,6 +8,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
 import { Slider } from "../../ui/Slider.js";
+import { Button } from "../../ui/Button.js";
+import { ConfirmButton } from "../../ui/ConfirmButton.js";
 import {
   normalizePresetSet,
   normalizeSpeedMax,
@@ -18,7 +20,7 @@ import {
   DEFAULT_PINNED_VALUES,
   MIN_PRESETS,
   MAX_PRESETS,
-  QUICK_COUNT,
+  QUICK_MAX,
   PRESET_MIN,
   PRESET_MAX,
   SPEED_MAX_DEFAULT,
@@ -174,7 +176,7 @@ export function SpeedPresets() {
   };
 
   const togglePin = (i: number) => {
-    if (!rows[i].pin && pinnedCount >= QUICK_COUNT) return; // only QUICK_COUNT fit the quick row
+    if (!rows[i].pin && pinnedCount >= QUICK_MAX) return; // up to QUICK_MAX fit the quick rows
     commitRows(rows.map((r, j) => (j === i ? { ...r, pin: !r.pin } : r)));
   };
 
@@ -261,19 +263,20 @@ export function SpeedPresets() {
         </div>
       </div>
 
+      <div className="opt-divider" />
+
       <div className="preset-rows">
         {fields.map((val, i) => (
           <div className="preset-row" key={i}>
-            <button
-              type="button"
+            <Button
               className={"preset-pin" + (rows[i].pin ? " is-pinned" : "")}
               title={msg("optPresetPinHint") || "Pin to the collapsed quick row"}
               aria-pressed={rows[i].pin}
-              disabled={!rows[i].pin && pinnedCount >= QUICK_COUNT}
+              disabled={!rows[i].pin && pinnedCount >= QUICK_MAX}
               onClick={() => togglePin(i)}
             >
               <PinIcon />
-            </button>
+            </Button>
             <input
               type="number"
               inputMode="numeric"
@@ -292,8 +295,7 @@ export function SpeedPresets() {
               }}
             />
             <span className="preset-pct">%</span>
-            <button
-              type="button"
+            <Button
               className={
                 "key-cap preset-key" +
                 (capturing === i ? " capturing" : "") +
@@ -307,32 +309,40 @@ export function SpeedPresets() {
                 : rows[i].key
                   ? chordLabel(rows[i].key)
                   : "—"}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <ConfirmButton
               className="preset-remove"
+              split
+              confirmHint={msg("optConfirm") || "Confirm?"}
               title={msg("optPresetRemove") || "Remove preset"}
+              confirmTitle={msg("optPresetRemove") || "Remove preset"}
+              cancelTitle={msg("optCancel") || "Cancel"}
+              ariaLabel={msg("optPresetRemove") || "Remove preset"}
               disabled={rows.length <= MIN_PRESETS}
-              onClick={() => removePreset(i)}
+              onConfirm={() => removePreset(i)}
             >
               ✕
-            </button>
+            </ConfirmButton>
           </div>
         ))}
       </div>
 
-      <div className="card-actions">
-        <button
-          type="button"
+      <div className="card-actions split">
+        <Button
           className="btn-action btn-default"
           disabled={rows.length >= MAX_PRESETS}
           onClick={addPreset}
         >
           {msg("optPresetAdd") || "Add preset"}
-        </button>
-        <button type="button" className="btn-action btn-reset" onClick={resetDefaults}>
+        </Button>
+        <ConfirmButton
+          className="btn-action btn-danger"
+          onConfirm={resetDefaults}
+          confirmChildren={msg("optConfirm") || "Click again to confirm"}
+          confirmTitle={msg("optConfirm") || "Click again to confirm"}
+        >
           {msg("optResetDefaults") || "Reset to defaults"}
-        </button>
+        </ConfirmButton>
       </div>
     </section>
   );

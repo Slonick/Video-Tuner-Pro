@@ -4,11 +4,11 @@
 // locks the card.
 import { useEffect, useRef } from "react";
 import { STORE } from "../platform/storage.js";
-import { quickPresetIndices } from "../../shared/presets.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
 import { InfoTip } from "./InfoTip.js";
 import { ParamSlider } from "./ParamSlider.js";
+import { Button } from "../../ui/Button.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import type { UseAudioCompressor } from "../hooks/useAudioCompressor.js";
 import { type CompParams, type CompPreset } from "../../shared/comp-presets.js";
@@ -25,6 +25,7 @@ interface Row {
   min: number;
   max: number;
   step: number;
+  tickStep: number;
   desc: string;
   fmt: (n: number) => string;
 }
@@ -40,6 +41,7 @@ const ROWS: Row[] = [
     min: -100,
     max: 0,
     step: 1,
+    tickStep: 20,
     desc: "audioThresholdDesc",
     fmt: dB,
   },
@@ -51,6 +53,7 @@ const ROWS: Row[] = [
     min: 1,
     max: 20,
     step: 0.5,
+    tickStep: 5,
     desc: "audioRatioDesc",
     fmt: (n) => n + ":1",
   },
@@ -59,14 +62,19 @@ const ROWS: Row[] = [
 interface Props {
   audio: UseAudioCompressor;
   translating: boolean;
+  // No audio capture (a conflicting extension owns it) → compression can't run, so the
+  // card locks. The reason is shown once on the Audio group label.
+  blocked: boolean;
   // The walkthrough drives the card open/closed (undefined = the user controls it).
   forceOpen?: boolean;
 }
 
-export function AudioCard({ audio: a, translating, forceOpen }: Props) {
+export function AudioCard({ audio: a, translating, blocked, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, a.enabled && !translating);
+  // Openable even when off — there are presets to view/edit; only a locked card
+  // (VOT translation / no audio access) can't be configured.
+  const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !translating && !blocked);
   useEffect(() => {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
@@ -74,7 +82,9 @@ export function AudioCard({ audio: a, translating, forceOpen }: Props) {
   // Same model as the speed presets: pinned presets (filled to 4 with the lowest
   // unpinned) form the collapsed quick row; the rest are "extra", revealed when
   // the card expands.
-  const quick = new Set(quickPresetIndices(a.presets.map((p) => p.pin)));
+  // The pinned presets (up to COMP_QUICK_COUNT) form the collapsed quick row; the
+  // rest are "extra", revealed when the card expands.
+  const quick = new Set(a.presets.map((p, i) => (p.pin ? i : -1)).filter((i) => i >= 0));
 
   const onToggle = (on: boolean) => {
     a.setEnabled(on);
@@ -93,11 +103,12 @@ export function AudioCard({ audio: a, translating, forceOpen }: Props) {
         className={
           "sync-section audio-section overlay-card" +
           (open ? " is-overlay" : "") +
-          (translating ? " audio-locked" : "")
+          (translating ? " audio-locked" : "") +
+          (blocked ? " is-disabled" : "")
         }
       >
         <div className="sec-head">
-          <button type="button" className="sec-main" aria-expanded={open} onClick={toggle}>
+          <Button className="sec-main" aria-expanded={open} onClick={toggle}>
             <span className="sec-text">
               <span className="sec-title-row">
                 <strong>{msg("audioTitle")}</strong>
@@ -105,7 +116,7 @@ export function AudioCard({ audio: a, translating, forceOpen }: Props) {
               </span>
               <span className="switch-sub">{msg("audioSubtitle")}</span>
             </span>
-          </button>
+          </Button>
           {translating && (
             <InfoTip warn id="audioVotWarn" label="Translation active" tip={msg("audioVotNote")} />
           )}
@@ -127,22 +138,24 @@ export function AudioCard({ audio: a, translating, forceOpen }: Props) {
               <span>{msg("meterThr")}</span>
             </span>
           </div>
-          <canvas id="audioMeter"></canvas>
+          <canvas
+            id="audioMeter"
+            role="img"
+            aria-label={msg("a11yAudioMeter") || "Live audio compression meter"}
+          ></canvas>
         </div>
 
         <div className="card-scroll">
           <div className="preset-block">
-            {/* Columns track the visible (quick) count so fewer than four presets fill
-            the width with no empty trailing cell; expanded, the extras wrap into
-            these same columns. */}
+            {/* Columns track the pinned count so the quick row fills the width with no
+            empty trailing cell; expanded, the extras wrap into these same columns. */}
             <div
               className="preset-grid"
-              style={{ gridTemplateColumns: `repeat(${quick.size}, 1fr)` }}
+              style={{ gridTemplateColumns: `repeat(${Math.max(1, quick.size)}, 1fr)` }}
             >
               {a.presets.map((p, i) => (
-                <button
+                <Button
                   key={i}
-                  type="button"
                   className={
                     "btn-preset" +
                     (quick.has(i) ? "" : " extra") +
@@ -152,41 +165,47 @@ export function AudioCard({ audio: a, translating, forceOpen }: Props) {
                   onClick={() => a.applyPreset(i)}
                 >
                   {presetLabel(p, i)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
           <div className={"sync-body" + (open ? " open" : "")} id="audioBody">
-            {ROWS.map((row) => (
+            {/* One grouped card, rows split by hairline dividers (Apple-list style) —
+                not three separate boxes. */}
+            <div className="list-group">
+              {ROWS.map((row) => (
+                <ParamSlider
+                  key={row.key}
+                  id={row.sliderId}
+                  valId={row.valId}
+                  label={msg(row.label)}
+                  desc={msg(row.desc)}
+                  min={row.min}
+                  max={row.max}
+                  step={row.step}
+                  tickStep={row.tickStep}
+                  value={a.comp.values[row.key]}
+                  animate={a.comp.animate}
+                  fmt={row.fmt}
+                  onChange={(v) => a.setParam(row.key, v)}
+                />
+              ))}
               <ParamSlider
-                key={row.key}
-                id={row.sliderId}
-                valId={row.valId}
-                label={msg(row.label)}
-                desc={msg(row.desc)}
-                min={row.min}
-                max={row.max}
-                step={row.step}
-                value={a.comp.values[row.key]}
-                animate={a.comp.animate}
-                fmt={row.fmt}
-                onChange={(v) => a.setParam(row.key, v)}
+                id="acGain"
+                valId="acGainVal"
+                label={msg("audioGain")}
+                desc={msg("audioGainDesc")}
+                min={0}
+                max={24}
+                step={1}
+                tickStep={6}
+                value={a.gain}
+                animate={false}
+                fmt={dB}
+                onChange={a.setGain}
               />
-            ))}
-            <ParamSlider
-              id="acGain"
-              valId="acGainVal"
-              label={msg("audioGain")}
-              desc={msg("audioGainDesc")}
-              min={0}
-              max={24}
-              step={1}
-              value={a.gain}
-              animate={false}
-              fmt={dB}
-              onChange={a.setGain}
-            />
+            </div>
           </div>
         </div>
       </div>

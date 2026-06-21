@@ -36,7 +36,7 @@ describe("popup integration", () => {
   });
 
   it("localizes tooltips via msg()", () => {
-    expect(byId("scopeGlobal").title).toBe("Save for all sites");
+    expect(byId("speedDown").title).toBe("Slower (−5%)");
     expect(byId("speedReset").title).toBe("Reset to the saved speed");
   });
 

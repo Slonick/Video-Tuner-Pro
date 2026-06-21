@@ -1,4 +1,5 @@
 import { byId } from "../dom.js";
+import { msg } from "../i18n.js";
 import { col, fitCanvas, levelMark } from "./draw-util.js";
 import { A_MIN, A_MAX, A_WINDOW } from "./state.js";
 import type { GraphState } from "./state.js";
@@ -173,29 +174,54 @@ export function drawAudio(g: GraphState, t: number): void {
 
   // Readout (throttled so digits sit still), bigger, no difference. OFF → the
   // single input level; ON → output (top) over input (bottom). compAnim cross-fades.
-  if (g.audioActive && g.audioHist.length) {
+  const active = g.audioActive && g.audioHist.length > 0;
+  let inV = A_MIN,
+    outV = A_MIN;
+  if (active) {
     const last = g.audioHist[g.audioHist.length - 1];
     if (g.audioOutShown == null || t - g.audioDiffAt > 600) {
       g.audioOutShown = last.out;
       g.audioInShown = last.in;
       g.audioDiffAt = t;
     }
-    const inV = g.audioInShown ?? A_MIN,
-      outV = g.audioOutShown ?? A_MIN;
-    const seg = col("--seg", "#2c2c2e");
+    inV = g.audioInShown ?? A_MIN;
+    outV = g.audioOutShown ?? A_MIN;
+  }
+  // Silence (the readout would just be "−100 dB") or no audio context → idle hint on
+  // the centre line, matching the auto-slow graph, instead of a dead "−100 dB".
+  if (!active || Math.round(inV) <= A_MIN) {
+    acx.font = "11px -apple-system, sans-serif";
+    acx.textAlign = "center";
+    acx.textBaseline = "middle";
+    acx.fillStyle = muted;
+    acx.globalAlpha = 0.7;
+    acx.fillText(
+      g.audioEnabled
+        ? msg("audioIdle") || "Waiting for audio…"
+        : msg("audioOff") || "Compression off",
+      pw / 2,
+      center,
+    );
+    acx.globalAlpha = 1;
+    acx.textBaseline = "alphabetic";
+  } else {
+    const seg = col("--glass-l3", "#2c2c2e"); // readout halo = the panel layer (was --seg)
     acx.textAlign = "center";
     acx.lineJoin = "round";
+    // Soft halo (panel-coloured shadow, drawn twice) instead of a hard outline —
+    // reads over the bars but stays glassy/clean.
     const offA = Math.max(0, Math.min(1, 1 - c * 2.4));
     if (offA > 0.01) {
       acx.globalAlpha = offA;
       acx.font = "700 16px -apple-system, sans-serif";
       acx.textBaseline = "middle";
-      acx.lineWidth = 4;
+      acx.shadowColor = seg;
+      acx.shadowBlur = 5;
       const lvl = fmtLevel(inV);
-      acx.strokeStyle = seg;
-      acx.strokeText(lvl, pw / 2, center);
       acx.fillStyle = "#c7c7cc";
       acx.fillText(lvl, pw / 2, center);
+      acx.fillText(lvl, pw / 2, center);
+      acx.shadowBlur = 0;
       acx.globalAlpha = 1;
     }
     const onA = Math.max(0, Math.min(1, (c - 0.45) * 2.2));
@@ -205,17 +231,17 @@ export function drawAudio(g: GraphState, t: number): void {
         inC = col("--meter-in", "#cfcfd4");
       acx.font = "700 15px -apple-system, sans-serif";
       acx.textBaseline = "middle";
-      acx.lineWidth = 3.5;
+      acx.shadowColor = seg;
+      acx.shadowBlur = 5;
       const outL = fmtLevel(outV),
         inL = fmtLevel(inV);
-      acx.strokeStyle = seg;
-      acx.strokeText(outL, pw / 2, center - 12);
       acx.fillStyle = outC;
       acx.fillText(outL, pw / 2, center - 12);
-      acx.strokeStyle = seg;
-      acx.strokeText(inL, pw / 2, center + 12);
+      acx.fillText(outL, pw / 2, center - 12);
       acx.fillStyle = inC;
       acx.fillText(inL, pw / 2, center + 12);
+      acx.fillText(inL, pw / 2, center + 12);
+      acx.shadowBlur = 0;
       acx.globalAlpha = 1;
     }
     acx.textBaseline = "alphabetic";

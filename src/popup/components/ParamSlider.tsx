@@ -12,6 +12,7 @@ interface Props {
   max: number;
   step: number;
   value: number;
+  tickStep?: number; // track tick spacing (value units), for uniformity with the other sliders
   animate: boolean; // glide the thumb to `value` instead of snapping
   fmt: (n: number) => string;
   onChange: (value: number) => void;
@@ -26,6 +27,7 @@ export function ParamSlider({
   max,
   step,
   value,
+  tickStep,
   animate,
   fmt,
   onChange,
@@ -45,8 +47,10 @@ export function ParamSlider({
         max={max}
         step={step}
         value={value}
+        tickStep={tickStep}
         animate={animate}
         ariaLabel={label}
+        ariaValueText={fmt(value)}
         onChange={onChange}
       />
       <div className="param-desc">{desc}</div>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VTP overlay fixture (forces color-scheme via meta, like Facebook)</title>
+    <meta name="color-scheme" content="dark" />
+    <!-- A normal host (no forced color-scheme), like most sites: the overlay must be
+         transparent under any OS scheme and its theme must follow the OS. A
+         full-viewport coloured layer sits behind everything (the colour the glass
+         must show through); a small corner video gives the launcher something to
+         attach to without covering the centred overlay panel. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      #bg {
+        position: fixed;
+        inset: 0;
+        background: #00cc00;
+      }
+      #v {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 160px;
+        height: 90px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bg"></div>
+    <video id="v" src="sample.webm" playsinline preload="auto"></video>
+  </body>
+</html>

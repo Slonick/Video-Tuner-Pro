@@ -1,0 +1,594 @@
+/* ============================================================
+   Controls — SHARED by the popup and options page, imported last so
+   it restyles the controls those files define (macOS 27 kit feel).
+   Standalone buttons are flat; segmented groups (theme / language /
+   on-video / scope / presets) are glassy recessed capsules with a
+   raised, sliding accent pill for the selection. `html ` prefix lifts
+   specificity above the per-page rules. Tokens: tokens.css.
+   ============================================================ */
+
+/* Standalone neutral controls (steppers, the Reset button): a flat Apple fill. */
+html .spin,
+html .btn-reset {
+  background: var(--control-fill);
+  transition:
+    background 0.15s,
+    transform 0.12s var(--ease-snap),
+    filter 0.12s,
+    color 0.12s;
+}
+
+html .spin:hover,
+html .btn-reset:hover {
+  background: var(--control-fill-hover);
+}
+
+/* Destructive actions (Reset to defaults / remove). A quiet danger tint at rest
+   marks them as risky; ConfirmButton flips them solid-red once "armed", so the
+   second (confirming) click is unmistakable — no modal needed. */
+html .btn-danger {
+  background: var(--control-fill);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+html .btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, var(--control-fill));
+}
+
+html .btn-danger.is-armed,
+html .preset-remove.is-armed,
+html .preset-remove.is-armed:hover {
+  background: var(--danger);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* ConfirmButton (text): the armed label overlays the hidden-but-in-flow idle label,
+   so the button keeps its width. */
+html .confirm-btn {
+  position: relative;
+}
+
+html .cb-confirm {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* ConfirmButton (icon, split): the ✕ becomes a ✓ confirm (danger) in place; the hint +
+   cancel float in the bubble above (see .confirm-pop), so the row never shifts — only
+   the ✓ stays in flow (same footprint as the idle ✕). */
+.confirm-split {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The hint + cancel float above the armed ✓ as one bubble, so a dense row/cell never
+   has to make room for a side ✕ (which got hidden behind neighbours). */
+.confirm-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* Cancel ✕ inside the bubble (white on the danger fill). */
+html .confirm-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+html .confirm-cancel:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Translucent fills nearly vanish on the light page; a neutral hairline keeps the
+   standalone buttons + steppers legible on both themes (cells are framed by their
+   capsule instead). */
+html .btn-action,
+html .spin,
+html .saved-del {
+  border: 1px solid var(--track);
+}
+
+/* Disabled action button (e.g. Add preset at the max): dimmed + inert, so it clearly
+   reads as unavailable instead of looking like an active button. */
+html .btn-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Segmented cells inside a capsule → transparent over the pill, light hover.
+   Radius = capsule radius (12) − padding (3) so the active cell's corners line up
+   with the capsule. position/z-index keep the label above the sliding pill. */
+html .seg-btn,
+html .btn-speed,
+html .btn-preset {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  /* cells are framed by the capsule + pill, never their own border */
+  border-radius: var(--radius-lg);
+  transition:
+    background 0.15s,
+    transform 0.12s var(--ease-snap),
+    color 0.12s;
+}
+
+/* Preset + segmented cells read as buttons — a faint raised fill on the inactive
+   ones, stronger on hover. The active segmented cell stays transparent so the
+   sliding accent pill shows through. */
+html .seg-btn:not(.is-active),
+html .btn-speed:not(.active),
+html .btn-preset:not(.active) {
+  background: var(--glass-l3);
+}
+
+html .seg-btn:hover:not(.is-active),
+html .btn-speed:hover:not(.active),
+html .btn-preset:hover:not(.active) {
+  background: var(--control-fill-hover);
+}
+
+/* A light hairline ring so each cell stays legible even over busy video; hover just
+   intensifies it (thicker ring + brighter fill). Neutral, no bold accent. */
+html .seg-btn:not(.is-active),
+html .btn-speed:not(.active),
+html .btn-preset:not(.active) {
+  box-shadow: inset 0 0 0 1px var(--track);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.12s var(--ease-snap),
+    color 0.12s;
+}
+
+html .seg-btn:hover:not(.is-active),
+html .btn-speed:hover:not(.active),
+html .btn-preset:hover:not(.active) {
+  box-shadow: inset 0 0 0 1.5px var(--track);
+}
+
+/* Pill-backed selections show the pill, not a cell fill (theme/lang/on-video +
+   scope). Presets have no pill, so their active cell keeps the accent fill. */
+html .seg-btn.is-active {
+  background: transparent;
+  color: #fff;
+}
+
+/* The segmented groups: a simple translucent capsule with a hairline outline
+   (like the overlay panel) — no light-fall / shimmer. */
+html .seg,
+html .lang-grid,
+html .buttons-grid,
+html .preset-grid {
+  position: relative;
+  background: var(--glass-l1);
+  /* group capsule = recessed glass layer below its cells */
+  border: 1px solid var(--track);
+  /* neutral hairline — stays visible on light */
+  border-radius: var(--radius-xl);
+  box-shadow: none;
+}
+
+/* The sliding selection pill — flat accent (no gloss). Placed over the active cell
+   by Segmented/ScopeSegment (measured offsets) and glides between cells via the
+   transition. Lives here (shared) so the options page gets it too. */
+html .seg-pill {
+  position: absolute;
+  z-index: 0;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  pointer-events: none;
+  box-shadow: none;
+  transition:
+    left 0.2s var(--ease-spring),
+    top 0.2s var(--ease-spring),
+    width 0.2s var(--ease-spring),
+    height 0.2s var(--ease-spring),
+    background 0.2s ease,
+    backdrop-filter 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html .seg-pill {
+    transition: none;
+  }
+}
+
+/* While the selection slides, the pill is max glass; when it settles the accent
+   fills back in (background transition above). The moving-to label stays its
+   normal text colour until then, so it isn't left white on the clear glass. */
+html .sliding .seg-pill {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(3px) saturate(140%);
+  -webkit-backdrop-filter: blur(3px) saturate(140%);
+  box-shadow: 0 0 0 1px var(--track);
+}
+
+html .sliding .seg-btn.is-active {
+  color: var(--text);
+}
+
+/* Keyboard focus ring — consistent accent outline across the button family (these
+   relied on the UA default before). Drawn inside so the capsules/grids don't clip it. */
+html .btn-action:focus-visible,
+html .btn-speed:focus-visible,
+html .btn-preset:focus-visible,
+html .seg-btn:focus-visible,
+html .spin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Springy press — a gentle scale-down on tap, shared by all the buttons. */
+html .spin:active,
+html .btn-speed:active,
+html .btn-preset:active,
+html .seg-btn:active,
+html .btn-action:active {
+  transform: scale(0.96);
+}
+
+/* Switches are flat — a pale macOS off-track with a faint inner hairline ring;
+   on = accent; the knob keeps only its drop shadow (no sheen). */
+html .switch-track {
+  background: var(--switch-off);
+  box-shadow: inset 0 0 0 1px var(--switch-ring);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+html .switch-track[data-state="checked"] {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+/* Beta-feature toggle: warm orange when on (signals "experimental" instead of the
+   accent), with a faint warm ring when off so it still reads as special. Keeps the
+   "beta" cue on the control itself — no locale-fragile text tag in the title. */
+html .switch-beta {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--beta) 45%, transparent);
+}
+
+html .switch-beta[data-state="checked"] {
+  background: var(--beta);
+}
+
+/* The slider thumb scales via --thumb-s (composed with its centring translate in
+   Slider's inline transform); ease it so the grow/shrink is smooth. */
+html .slider-thumb {
+  transition: transform 0.21s var(--ease-spring);
+}
+
+/* Moving parts turn to clear glass while in motion (switch knob mid-toggle, slider
+   thumb while dragged / gliding / stepped), then back to solid. A clean see-through
+   pill — a crisp rim + soft lift, with the track showing through; no heavy gloss/blik
+   (that read as a blurry blob, esp. while moving). */
+html .switch-knob.is-moving,
+html .slider-thumb.is-moving {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(3px) saturate(140%);
+  -webkit-backdrop-filter: blur(3px) saturate(140%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+    0 1px 4px var(--shadow);
+}
+
+/* The grow step. The thumb grows for its whole move (.is-moving); the switch knob
+   grows on its own phase (.is-grown) so the toggle can stage glass → grow → move →
+   shrink → solid. The two can't share a scale: the switch knob is a wide pill that
+   nearly fills its track already, so a big grow balloons it into a blob across the
+   whole track — keep it subtle (stays a pill inside the track). The round-ish slider
+   thumb sits on a thin track, so it can lift more. */
+html .slider-thumb.is-moving {
+  --thumb-s: 1.2;
+}
+
+html .switch-knob.is-grown {
+  --knob-s: 1.14;
+}
+
+/* ── Save-scope menu (single trigger button + a portaled popover) ───────────────
+   The trigger is a plain "Save"; clicking opens a popover with the primary save, the
+   active-scope "Saved … Remove" line, and the "Save to" list. Portaled to <body> so it
+   escapes the cards' overflow clipping; reuses .btn-action variants. */
+.scope {
+  position: relative;
+}
+
+.scope-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+}
+
+.scope-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-chev {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 6px;
+  opacity: 0.85;
+  transition: transform 0.15s ease;
+}
+
+.scope-trigger[aria-expanded="true"] .scope-chev {
+  transform: rotate(180deg);
+}
+
+/* Brief confirm after a save — the trigger keeps its accent; a checkmark draws in. */
+.scope-check {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+}
+
+.scope-check path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: scope-check-draw 0.26s 0.02s ease-out forwards;
+}
+
+@keyframes scope-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The popover — portaled, positioned in fixed viewport coords (left + top/bottom). */
+.scope-menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  /* Solid surface (not --glass-opacity glass) so text stays legible over video. */
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 10px 28px var(--shadow);
+  animation: scope-pop 0.12s ease-out;
+}
+
+@keyframes scope-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .scope-menu {
+    animation: none;
+  }
+}
+
+/* Primary: save the current value to the active scope. */
+.scope-primary {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scope-primary:hover {
+  filter: brightness(1.08);
+}
+
+.scope-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* "Saved here … Clear" — state + delete for the active scope, under the primary. */
+.scope-subline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.scope-subline b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.scope-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  /* WCAG 2.2 target-size minimum */
+  padding: 3px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ConfirmButton wraps the label (🗑 + "Remove") in .cb-face, so centre the icon with
+   the text there — the button's own align-items can't reach inside the wrapper. */
+.scope-clear .cb-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.scope-clear:hover {
+  background: rgba(211, 47, 47, 0.14);
+  color: var(--danger);
+}
+
+.scope-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.scope-divider {
+  height: 1px;
+  background: var(--card-border);
+  margin: var(--space-1-5) var(--space-1);
+}
+
+/* Transparent to layout (keeps the menu's flex flow) but a real group for AT. */
+.scope-section {
+  display: contents;
+}
+
+.scope-sec {
+  padding: 2px 9px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Each "save to" row: a save-target button + an optional trailing trash, spaced as a
+   pair; rows stack with a little rhythm so they read as a list of buttons. */
+.scope-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.scope-row-wrap + .scope-row-wrap {
+  margin-top: var(--space-1);
+}
+
+/* Rows are plain (non-accent) buttons — a neutral fill + hairline, like the steppers —
+   so they read as "save here" actions, not a static list. (The primary is the accent.) */
+.scope-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  padding: 8px 9px;
+  border: 1px solid var(--track);
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scope-row:hover {
+  background: var(--control-fill-hover);
+}
+
+.scope-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.scope-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-val {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.scope-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--track);
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.scope-del:hover {
+  background: rgba(211, 47, 47, 0.14);
+  color: var(--danger);
+}
+
+.scope-del:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Two-step confirm (ConfirmButton): armed remove reads as destructive. */
+.scope-del.is-armed {
+  background: var(--danger);
+  color: #fff;
+}
+
+.scope-clear.is-armed {
+  color: var(--danger);
+}
+
+.scope-trash {
+  width: 13px;
+  height: 13px;
+}

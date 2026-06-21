@@ -8,7 +8,7 @@ import { STORE } from "../platform/storage.js";
 import { debounce } from "../core/debounce.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
-import { useScopeSelection } from "./useScopeSelection.js";
+import { useScopeSelection, type ScopeValues } from "./useScopeSelection.js";
 import { pullAfter, type AutoSlowResponse } from "../lib/messaging.js";
 
 const STORAGE: ScopeStorage = {
@@ -29,12 +29,13 @@ export interface UseAutoSlow {
   channel: string | null;
   scope: Scope;
   saved: ScopeFlags;
+  savedValues: ScopeValues;
   setEnabled: (on: boolean) => void;
   setTarget: (v: number) => void;
   nudge: (delta: number) => void;
-  save: () => void;
+  save: (target?: Scope) => void;
   resetManual: () => void;
-  resetScope: () => void;
+  resetScope: (target?: Scope) => void;
   pickScope: (scope: Scope) => void;
 }
 
@@ -108,30 +109,54 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     [setTarget],
   );
 
-  const save = useCallback(() => {
-    const b = { ...ref.current };
-    markSaved(scope, true);
-    if (hasTab) {
-      void send("rememberAutoSlow", { scope, enabled: b.on, target: b.target }).then((r) => {
-        if (r == null) saveFallback(scope, b);
-      });
-    } else {
-      saveFallback(scope, b);
-    }
-  }, [scope, hasTab, send, saveFallback, markSaved]);
+  const save = useCallback(
+    (target: Scope = scope) => {
+      const b = { ...ref.current };
+      markSaved(target, true, b);
+      if (hasTab) {
+        void send("rememberAutoSlow", { scope: target, enabled: b.on, target: b.target }).then(
+          (r) => {
+            if (r == null) saveFallback(target, b);
+          },
+        );
+      } else {
+        saveFallback(target, b);
+      }
+    },
+    [scope, hasTab, send, saveFallback, markSaved],
+  );
 
-  const resetScope = useCallback(() => {
-    markSaved(scope, false);
-    const fallback = () => resetFallback(scope, fromStorage);
-    if (!hasTab) {
-      fallback();
-      return;
-    }
-    void send("resetAutoSlow", { scope }).then((r) => {
-      if (r == null) fallback();
-      else pullAfter<AutoSlowResponse>(send, "getAutoSlow", applyResolved);
-    });
-  }, [scope, hasTab, markSaved, resetFallback, fromStorage, send, applyResolved]);
+  const resetScope = useCallback(
+    (target: Scope = scope) => {
+      markSaved(target, false);
+      const fallback = () => resetFallback(target, fromStorage);
+      if (!hasTab) {
+        fallback();
+        return;
+      }
+      void send("resetAutoSlow", { scope: target }).then((r) => {
+        if (r == null) fallback();
+        // Re-resolve so the value drops to the next scope and Save retargets to it.
+        else
+          pullAfter<AutoSlowResponse>(send, "getAutoSlow", (resp) => {
+            applyResolved(resp);
+            defaultScope(resp.scope, !!resp.channel);
+            refreshSaved();
+          });
+      });
+    },
+    [
+      scope,
+      hasTab,
+      markSaved,
+      resetFallback,
+      fromStorage,
+      send,
+      applyResolved,
+      defaultScope,
+      refreshSaved,
+    ],
+  );
 
   const resetManual = useCallback(() => {
     if (!hasTab) {
@@ -178,6 +203,7 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     channel: sc.channel,
     scope,
     saved: sc.saved,
+    savedValues: sc.savedValues,
     setEnabled,
     setTarget,
     nudge,

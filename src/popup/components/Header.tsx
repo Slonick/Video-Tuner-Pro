@@ -3,6 +3,7 @@
 import { api } from "../platform/browser.js";
 import { msg } from "../i18n.js";
 import { GearIcon, KofiIcon } from "../icons.js";
+import { IconButton } from "../../ui/IconButton.js";
 
 export function Header() {
   const version = api.runtime.getManifest().version;
@@ -16,8 +17,7 @@ export function Header() {
         </span>
       </h1>
       <div className="header-actions">
-        <button
-          type="button"
+        <IconButton
           className="icon-btn"
           id="openOptions"
           aria-label="Settings"
@@ -25,7 +25,7 @@ export function Header() {
           onClick={() => api.runtime.openOptionsPage()}
         >
           <GearIcon />
-        </button>
+        </IconButton>
         <a
           className="kofi"
           href="https://ko-fi.com/slonick"

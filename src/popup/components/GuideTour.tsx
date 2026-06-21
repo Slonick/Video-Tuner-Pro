@@ -6,6 +6,7 @@
 // Saving is intentionally OFF for now (shows on every open) while we iterate.
 import { useLayoutEffect, useState, type CSSProperties } from "react";
 import { msg } from "../i18n.js";
+import { Button } from "../../ui/Button.js";
 
 interface Card {
   titleKey: string;
@@ -140,13 +141,14 @@ export function GuideTour({
       {/* The "expand" step is learn-by-doing: the user clicks the spotlighted header
           to open the card (which advances to the settings step). Skip still bails. */}
       {phase === "expand" && rect && (
-        <button
-          type="button"
+        <Button
           className="tour-hotspot"
           style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }}
           onClick={next}
           aria-label={msg("guideExpand") || "Open the card"}
-        />
+        >
+          {null}
+        </Button>
       )}
       <div className={"tour-cap" + (phase === "settings" ? " is-bottom" : "")} style={cap}>
         <div className="tour-cap-title">{title}</div>
@@ -158,22 +160,17 @@ export function GuideTour({
             ))}
           </div>
           <div className="tour-btns">
-            <button type="button" className="tour-skip" onClick={onClose}>
+            <Button className="tour-skip" onClick={onClose}>
               {msg("guideSkip") || "Skip"}
-            </button>
+            </Button>
             {step > 0 && (
-              <button type="button" className="tour-back" onClick={back}>
+              <Button className="tour-back" onClick={back}>
                 {msg("guideBack") || "Back"}
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              className="tour-next"
-              onClick={next}
-              disabled={phase === "expand"}
-            >
+            <Button className="tour-next" onClick={next} disabled={phase === "expand"}>
               {last ? msg("guideDone") || "Done" : msg("guideNext") || "Next"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

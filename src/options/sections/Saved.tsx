@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Button } from "../../ui/Button.js";
+import { ConfirmButton } from "../../ui/ConfirmButton.js";
 
 type NumMap = Record<string, number>;
 
@@ -47,14 +49,13 @@ function Group({ titleKey, rows }: { titleKey: string; rows: Row[] }) {
           {r.chips.map((c, j) => (
             <span className="saved-val" key={j}>
               <b>{c.label}</b>
-              <button
+              <Button
                 className="saved-del"
-                type="button"
                 aria-label={msg("optDelete") || "Remove"}
                 onClick={c.onDelete}
               >
                 ×
-              </button>
+              </Button>
             </span>
           ))}
         </div>
@@ -82,9 +83,14 @@ function Category({
             <Group key={k} titleKey={k} rows={rows} />
           ))}
           <div className="card-actions">
-            <button type="button" className="btn-action btn-reset" onClick={onReset}>
+            <ConfirmButton
+              className="btn-action btn-danger"
+              onConfirm={onReset}
+              confirmChildren={msg("optConfirm") || "Click again to confirm"}
+              confirmTitle={msg("optConfirm") || "Click again to confirm"}
+            >
               {msg("optResetDefaults") || "Reset to defaults"}
-            </button>
+            </ConfirmButton>
           </div>
         </>
       ) : (

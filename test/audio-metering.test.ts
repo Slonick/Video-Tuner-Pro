@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   graphs: new Map<unknown, unknown>(),
   translation: false,
   ctx: null as { state: string } | null,
+  skip: null as string | null,
 }));
 
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => m.primary }));
@@ -17,6 +18,7 @@ vi.mock("../src/content/audio/translation.js", () => ({ translationActive: () =>
 vi.mock("../src/content/audio/routing.js", () => ({
   audioContext: () => m.ctx,
   audioGraphs: m.graphs,
+  lastSkip: () => m.skip,
 }));
 
 import { S } from "../src/content/state.js";
@@ -45,6 +47,7 @@ beforeEach(() => {
   m.primary = null;
   m.translation = false;
   m.ctx = null;
+  m.skip = null;
   audioLevelHist.length = 0;
   S.audioCompEnabled = true;
   S.audioCompThreshold = -30;
@@ -63,6 +66,18 @@ describe("audioLevels", () => {
   it("reflects the disabled flag while still inactive", () => {
     S.audioCompEnabled = false;
     expect(audioLevels().enabled).toBe(false);
+  });
+
+  it("flags a hard capture failure (inuse / cors / noctx) as blocked", () => {
+    for (const r of ["inuse", "cors", "noctx"]) {
+      m.skip = r;
+      expect(audioLevels().blocked).toBe(r);
+    }
+    // transient reasons resolve on their own → not surfaced as a hard block
+    for (const r of ["loading", "suspended", "vot", null]) {
+      m.skip = r;
+      expect(audioLevels().blocked).toBeUndefined();
+    }
   });
 
   it("reports in/out levels when a graph exists (out = in + reduction)", () => {

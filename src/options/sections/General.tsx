@@ -7,6 +7,17 @@ import { LOCALES, LOCALE_NAMES, getLang, setLang, type Lang } from "../../shared
 import { SYNC_META_KEY } from "../../shared/sync-config.js";
 import { msg } from "../../popup/i18n.js";
 import { StoredToggle } from "../../popup/components/StoredToggle.js";
+import { Button } from "../../ui/Button.js";
+import { Segmented } from "../../ui/Segmented.js";
+import { Slider } from "../../ui/Slider.js";
+import {
+  applyGlassOpacity,
+  clampGlassOpacity,
+  GLASS_OPACITY_KEY,
+  GLASS_OPACITY_MIN,
+  GLASS_OPACITY_MAX,
+  DEFAULT_GLASS_OPACITY,
+} from "../../shared/glass.js";
 
 const THEME_LABEL: Record<Theme, string> = {
   system: "themeSystem",
@@ -25,18 +36,13 @@ function ThemeSeg() {
     setThemeState(t);
   };
   return (
-    <div className="seg" id="themeSeg">
-      {THEMES.map((t) => (
-        <button
-          key={t}
-          type="button"
-          className={"seg-btn" + (t === theme ? " is-active" : "")}
-          onClick={() => pick(t)}
-        >
-          {msg(THEME_LABEL[t]) || t}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      id="themeSeg"
+      ariaLabel={msg("optThemeLabel") || "Theme"}
+      items={THEMES.map((t) => ({ value: t, label: msg(THEME_LABEL[t]) || t }))}
+      value={theme}
+      onChange={pick}
+    />
   );
 }
 
@@ -61,17 +67,40 @@ function OverlayBtnSeg() {
     STORE.set({ overlayButton: m });
   };
   return (
-    <div className="seg" id="overlayBtnSeg">
-      {OVERLAY_MODES.map((m) => (
-        <button
-          key={m}
-          type="button"
-          className={"seg-btn" + (m === mode ? " is-active" : "")}
-          onClick={() => pick(m)}
-        >
-          {msg(OVERLAY_LABEL[m]) || m}
-        </button>
-      ))}
+    <Segmented
+      id="overlayBtnSeg"
+      ariaLabel={msg("overlayBtnLabel") || "On-video button"}
+      items={OVERLAY_MODES.map((m) => ({ value: m, label: msg(OVERLAY_LABEL[m]) || m }))}
+      value={mode}
+      onChange={pick}
+    />
+  );
+}
+
+function GlassOpacity() {
+  const [v, setV] = useState(DEFAULT_GLASS_OPACITY);
+  useEffect(() => {
+    STORE.get([GLASS_OPACITY_KEY], (r) => setV(clampGlassOpacity(r[GLASS_OPACITY_KEY])));
+  }, []);
+  const onChange = (n: number) => {
+    const c = clampGlassOpacity(n);
+    setV(c);
+    applyGlassOpacity(document.documentElement, c); // live preview on this page
+    STORE.set({ [GLASS_OPACITY_KEY]: c });
+  };
+  return (
+    <div className="opt-glass-slider">
+      <Slider
+        className="opt-slider"
+        id="glassOpacity"
+        min={GLASS_OPACITY_MIN}
+        max={GLASS_OPACITY_MAX}
+        step={0.05}
+        value={v}
+        ariaLabel={msg("optGlassLabel") || "Glass opacity"}
+        onChange={onChange}
+      />
+      <b className="opt-param-val">{Math.round(v * 100)}%</b>
     </div>
   );
 }
@@ -86,18 +115,14 @@ function LangGrid() {
     ...LOCALES.map((c) => [c, LOCALE_NAMES[c]] as [Lang, string]),
   ];
   return (
-    <div className="lang-grid" id="langGrid">
-      {options.map(([value, label]) => (
-        <button
-          key={value}
-          type="button"
-          className={"seg-btn" + (value === lang ? " is-active" : "")}
-          onClick={() => setLang(value, () => location.reload())}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      id="langGrid"
+      className="lang-grid"
+      ariaLabel={msg("optLangLabel") || "Language"}
+      items={options.map(([value, label]) => ({ value, label }))}
+      value={lang}
+      onChange={(v) => setLang(v, () => location.reload())}
+    />
   );
 }
 
@@ -158,22 +183,16 @@ function Backup() {
   const cls = (base: string, f: Flash) => base + (f ? (f.ok ? " btn-ok" : " btn-err") : "");
   return (
     <div className="opt-actions">
-      <button
-        type="button"
-        id="exportBtn"
-        className={cls("btn-action btn-default", exp)}
-        onClick={doExport}
-      >
+      <Button id="exportBtn" className={cls("btn-action btn-default", exp)} onClick={doExport}>
         {exp ? msg(exp.key) || exp.key : msg("optExport") || "Export…"}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
         id="importBtn"
         className={cls("btn-action btn-reset", imp)}
         onClick={() => fileRef.current?.click()}
       >
         {imp ? msg(imp.key) || imp.key : msg("optImport") || "Import…"}
-      </button>
+      </Button>
       <input
         ref={fileRef}
         type="file"
@@ -196,6 +215,16 @@ export function General() {
       <div className="opt-field">
         <span className="opt-field-label">{msg("optThemeLabel") || "Theme"}</span>
         <ThemeSeg />
+      </div>
+      <div className="opt-field opt-field-block">
+        <span className="opt-field-text">
+          <span className="opt-field-label">{msg("optGlassLabel") || "Glass opacity"}</span>
+          <span className="opt-field-desc">
+            {msg("optGlassHint") ||
+              "How solid the frosted glass looks, across the popup and on-video panels."}
+          </span>
+        </span>
+        <GlassOpacity />
       </div>
       <div className="opt-field opt-field-block">
         <span className="opt-field-label">{msg("optLangLabel") || "Language"}</span>

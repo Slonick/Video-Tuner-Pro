@@ -13,30 +13,130 @@
 }
 
 :root {
-  --bg: #ececec;
+  /* NEVER set `color-scheme` here. Any concrete value (`dark`, or `light dark` when
+     the OS is dark) makes Chrome paint an OPAQUE backdrop on the on-video overlay
+     iframe and kills the glass — `background: transparent` can't override it. With
+     no color-scheme the iframe stays transparent AND its @media follows the OS, so
+     the theme is correct on normal sites. (Sites that force their own color-scheme,
+     e.g. Facebook in light mode, leak it into the iframe — a browser limitation;
+     transparency wins.) Guarded by e2e/overlay.spec.ts under a dark OS. */
+  --bg: #f2f2f7;
   --surface: #ffffff;
   --text: #1d1d1f;
-  --muted: #86868b;
-  --accent: #0a84ff;
-  --seg: #f0f0f2;
-  --track: #d8d8dc;
+  --muted: #6b6b70;
+  /* AA 4.5:1 on the light page (the lighter Apple gray was ~2.9:1) */
+  --accent: #0073e6;
+  /* darkened so white-on-accent (Save/pill) clears AA 4.5:1 */
+  --accent-text: #0073e6;
+  /* accent used AS small text (.param-val) — split so dark can lift it */
+  --beta: #e0531a;
+  /* experimental-feature switch (warm orange, not the accent) */
+  --danger: #d32f2f;
+  /* destructive actions (reset / remove) — white-on-danger clears AA */
+  --track: rgba(120, 120, 128, 0.55);
+  /* hairlines, dividers, group borders */
+  --groove: rgba(120, 120, 128, 0.28);
+  /* recessed slider track */
+
+  /* Motion — shared easings (theme-agnostic, so defined once here). --ease-spring
+     is the springy overshoot used by knob/thumb/pill moves; --ease-snap is the
+     quick press/settle curve. Durations stay per-control (hand-tuned), not scaled. */
+  --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
+  --ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Radius scale — one standard step set; consolidates the old ad-hoc 4/6/7/8/9/10/
+     12/16. (1–2px micro-rounding on dots/dividers stays literal.) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-pill: 50%;
+
+  /* Spacing scale (4px base) — paddings/margins/gaps map to these steps. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  /* Half-steps for the dense control chrome (kept, not collapsed, to preserve the
+     tuned compact layout). */
+  --space-0-5: 2px;
+  --space-1-5: 6px;
+  --space-2-5: 10px;
+
+  /* User-tunable glass opacity (General settings): a multiplier on every glass
+     tint's alpha below, so one knob takes the whole glass from sheer to solid. */
+  --glass-opacity: 1;
 
   /* In-page overlay (launcher) glass: translucent base + card surfaces, blurred
-     by the iframe beneath. Theme-aware so light-theme text stays legible. */
-  --glass-base: rgba(236, 236, 238, 0.55);
-  --glass-surface: rgba(255, 255, 255, 0.62);
+     by the iframe beneath. Theme-aware so light-theme text stays legible. Light
+     keeps a denser panel (dark text needs the substrate — its legibility ceiling);
+     the outer base is eased so a little video shows in the margins. */
+  --glass-base: rgb(236 236 238 / calc(0.64 * var(--glass-opacity)));
+  --glass-surface: rgb(255 255 255 / calc(0.8 * var(--glass-opacity)));
 
   /* Audio meter readout (over its own busy waveform) */
   --meter-out: #0a5fc4;
   --meter-in: #5b5b60;
 
   --shadow: rgba(0, 0, 0, 0.18);
-  --tip-bg: #1d1d1f;
+  /* Text halo for the on-video overlay. Only the DARK overlay needs it (light text
+     over bright video, lifted by a dark halo). On the light overlay the dense panel
+     + darkened muted already carry legibility, and a white halo would just glow
+     oddly around the dark text — so none here (dark palette sets a real value). */
+  --text-halo: transparent;
+  /* Header gear/Ko-fi: fully opaque on light (they washed out over a bright video),
+     a touch faint on dark where they read fine. */
+  --header-icon-opacity: 1;
+  --tip-bg: rgba(38, 38, 40, 0.92);
+  /* mostly solid → readable over busy video (blur in .tip) */
   --tip-text: #f5f5f7;
 
-  --warn-bg: #fff7e6;
+  --warn-bg: rgba(255, 244, 222, 0.93);
+  /* mostly solid → warn note stays readable over video */
   --warn-line: #f0d9a8;
   --warn-text: #7a5200;
+
+  /* ── Glass material — TUNE THESE. Applied to cards (glass.css) + charts
+     (meter.css) on top of the backdrop-filter blur. --glass-card = the translucent
+     tint, --card-blur/--glass-saturate = the frost, --card-border = the rim edge,
+     --card-hair = the top edge highlight (set to transparent for none), --card-shadow
+     = the lift. */
+  /* Neutral elevation glass — EVERY surface is a frosted layer; higher level =
+     more opaque so it lifts above the one beneath (subtle steps). All alphas are
+     scaled by --glass-opacity, so the transparency slider drives the whole stack.
+     l0 page · l1 group/recess · l2 card · l3 control · l4 raised. */
+  /* Light: recessed layers (l0/l1 — page wash, group cells, capsules, grooves) are
+     a faint neutral GRAY so they read against the near-white page; raised layers
+     (l2 cards, l3 controls, l4) are opaque WHITE so they pop. That spread (gray
+     recess ↔ white raised) is what makes the controls expressive on white. */
+  --glass-l0: rgb(120 120 128 / calc(0.08 * var(--glass-opacity)));
+  --glass-l1: rgb(120 120 128 / calc(0.12 * var(--glass-opacity)));
+  --glass-l2: rgb(255 255 255 / calc(0.62 * var(--glass-opacity)));
+  --glass-l3: rgb(255 255 255 / calc(0.82 * var(--glass-opacity)));
+  --glass-l4: rgb(255 255 255 / calc(0.96 * var(--glass-opacity)));
+  --glass-card: var(--glass-l2);
+  --card-hair: rgba(255, 255, 255, 0.5);
+  --card-border: rgba(255, 255, 255, 0.55);
+  /* The white rim vanishes on the near-white page, so the cards barely lift; a
+     faint dark contact line defines their edge against it (depth without changing
+     the locked transparency steps). */
+  --card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --card-blur: 7px;
+  --glass-saturate: 180%;
+
+  /* Liquid-glass controls — l3 is the resting fill; hover tints it toward --text for a
+     visible step on either theme (l3→l4 alone was too faint, esp. over video). */
+  --control-fill: var(--glass-l3);
+  --control-fill-hover: color-mix(in srgb, var(--text) 15%, var(--control-fill));
+  --control-hi: rgba(255, 255, 255, 0.65);
+
+  /* Switch off-track is a control-level glass layer; faint inner hairline ring. */
+  --switch-off: var(--glass-l3);
+  --switch-ring: rgba(0, 0, 0, 0.12);
 }
 
 /* Dark palette. The same values apply for OS dark (unless light is forced) and
@@ -46,25 +146,52 @@
     --bg: #1c1c1e;
     --surface: #2c2c2e;
     --text: #f5f5f7;
-    --muted: #8e8e93;
-    --accent: #0a84ff;
-    --seg: #3a3a3c;
-    --track: #48484a;
+    --muted: #98989d;
+    --accent: #0073e6;
+    /* white-on-accent fills clear AA 4.5:1 */
+    --accent-text: #4da3ff;
+    /* lighter accent for small text on the dark surface (≈5.3:1) */
+    --danger: #ff6b6b;
+    /* lighter red for the dark surface */
+    --track: rgba(120, 120, 128, 0.4);
 
-    --glass-base: rgba(28, 28, 30, 0.55);
-    --glass-surface: rgba(54, 54, 56, 0.62);
+    /* Dark over video reads well even quite sheer — let more of the frame refract. */
+    --glass-base: rgb(28 28 30 / calc(0.46 * var(--glass-opacity)));
+    --glass-surface: rgb(54 54 56 / calc(0.54 * var(--glass-opacity)));
 
     --meter-out: #7fb8ff;
     --meter-in: #cfcfd4;
 
     --shadow: rgba(0, 0, 0, 0.4);
-    --tip-bg: #f5f5f7;
+    --text-halo: rgba(0, 0, 0, 0.5);
+    --header-icon-opacity: 0.75;
+    --tip-bg: rgba(245, 245, 247, 0.92);
     --tip-text: #1d1d1f;
     --hint-fade: rgba(255, 255, 255, 0.07);
 
-    --warn-bg: #2c2618;
+    --warn-bg: rgba(40, 34, 22, 0.93);
+    /* mostly solid → warn note stays readable over video */
     --warn-line: #4a3f24;
     --warn-text: #e8c887;
+
+    --glass-l0: rgb(60 60 66 / calc(0.34 * var(--glass-opacity)));
+    --glass-l1: rgb(60 60 66 / calc(0.44 * var(--glass-opacity)));
+    --glass-l2: rgb(60 60 66 / calc(0.54 * var(--glass-opacity)));
+    --glass-l3: rgb(60 60 66 / calc(0.66 * var(--glass-opacity)));
+    --glass-l4: rgb(60 60 66 / calc(0.82 * var(--glass-opacity)));
+    --glass-card: var(--glass-l2);
+    --card-hair: rgba(255, 255, 255, 0.16);
+    --card-border: rgba(255, 255, 255, 0.14);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --card-blur: 7px;
+    --glass-saturate: 160%;
+
+    --control-fill: var(--glass-l3);
+    --control-fill-hover: color-mix(in srgb, var(--text) 15%, var(--control-fill));
+    --control-hi: rgba(255, 255, 255, 0.1);
+
+    --switch-off: var(--glass-l3);
+    --switch-ring: rgba(255, 255, 255, 0.07);
   }
 }
 
@@ -72,22 +199,52 @@
   --bg: #1c1c1e;
   --surface: #2c2c2e;
   --text: #f5f5f7;
-  --muted: #8e8e93;
-  --accent: #0a84ff;
-  --seg: #3a3a3c;
-  --track: #48484a;
+  --muted: #98989d;
+  --accent: #0073e6;
+  /* white-on-accent fills clear AA 4.5:1 */
+  --accent-text: #4da3ff;
+  /* lighter accent for small text on the dark surface (≈5.3:1) */
+  --danger: #ff6b6b;
+  /* lighter red for the dark surface */
+  --track: rgba(120, 120, 128, 0.4);
 
-  --glass-base: rgba(28, 28, 30, 0.55);
-  --glass-surface: rgba(54, 54, 56, 0.62);
+  --glass-base: rgb(28 28 30 / calc(0.46 * var(--glass-opacity)));
+  --glass-surface: rgb(54 54 56 / calc(0.54 * var(--glass-opacity)));
 
   --meter-out: #7fb8ff;
   --meter-in: #cfcfd4;
 
   --shadow: rgba(0, 0, 0, 0.4);
-  --tip-bg: #f5f5f7;
+  --text-halo: rgba(0, 0, 0, 0.5);
+  --header-icon-opacity: 0.75;
+  --tip-bg: rgba(245, 245, 247, 0.92);
   --tip-text: #1d1d1f;
+  --hint-fade: rgba(255, 255, 255, 0.07);
 
-  --warn-bg: #2c2618;
+  --warn-bg: rgba(40, 34, 22, 0.93);
+  /* mostly solid → warn note stays readable over video */
   --warn-line: #4a3f24;
   --warn-text: #e8c887;
+
+  /* Mirror the OS-dark block above (this one predated the l0–l4 elevation system
+     and was missing it, so a forced "Dark" theme fell back to the light layers —
+     white l2–l4). Kept identical so forced-dark == OS-dark. */
+  --glass-l0: rgb(60 60 66 / calc(0.34 * var(--glass-opacity)));
+  --glass-l1: rgb(60 60 66 / calc(0.44 * var(--glass-opacity)));
+  --glass-l2: rgb(60 60 66 / calc(0.54 * var(--glass-opacity)));
+  --glass-l3: rgb(60 60 66 / calc(0.66 * var(--glass-opacity)));
+  --glass-l4: rgb(60 60 66 / calc(0.82 * var(--glass-opacity)));
+  --glass-card: var(--glass-l2);
+  --card-hair: rgba(255, 255, 255, 0.16);
+  --card-border: rgba(255, 255, 255, 0.14);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --card-blur: 7px;
+  --glass-saturate: 160%;
+
+  --control-fill: var(--glass-l3);
+  --control-fill-hover: color-mix(in srgb, var(--text) 15%, var(--control-fill));
+  --control-hi: rgba(255, 255, 255, 0.1);
+
+  --switch-off: var(--glass-l3);
+  --switch-ring: rgba(255, 255, 255, 0.07);
 }

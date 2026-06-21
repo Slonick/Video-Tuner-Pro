@@ -2,12 +2,22 @@
    matches; layout is its own (wider, centred) since it's a tab, not the popup.
    Bundled + lowered + minified by Lightning CSS (build.mjs), like popup.css. */
 @import "../popup/styles/tokens.css";
+@import "../popup/styles/glass.css";
+@import "../popup/styles/controls.css";
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   padding: 24px 16px 64px;
+}
+
+/* Buttons don't inherit the page font OR color — keep both inherited so segmented
+   cells (and any button with no explicit colour) match the page instead of the UA
+   `ButtonText` system colour, which goes dark on the dark surface. */
+button {
+  font-family: inherit;
+  color: inherit;
 }
 
 .wrap {
@@ -52,13 +62,13 @@ body {
 .opt-header {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--space-2-5);
   padding: 0 2px 16px;
 
   h1 {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: 20px;
     font-weight: 700;
   }
@@ -68,7 +78,7 @@ body {
   color: #fff;
   background: var(--accent);
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -79,9 +89,9 @@ body {
 .beta-pill {
   display: inline-block;
   vertical-align: 2px;
-  margin-left: 8px;
+  margin-left: var(--space-2);
   padding: 2px 7px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--accent);
   color: #fff;
   font-size: 11px;
@@ -97,8 +107,8 @@ body {
 
 /* --- Cards ---------------------------------------------------------------- */
 .card {
-  background: var(--surface);
-  border-radius: 12px;
+  background: var(--glass-l3);
+  border-radius: var(--radius-xl);
   padding: 18px 18px 16px;
   margin-bottom: 14px;
 
@@ -112,11 +122,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .card-desc {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
@@ -127,7 +137,7 @@ body {
 
 .card-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 14px;
 }
 
@@ -136,8 +146,8 @@ body {
   flex: 0 0 auto;
   padding: 9px 16px;
   border: none;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -158,7 +168,7 @@ body {
 }
 
 .btn-reset {
-  background: var(--seg);
+  background: var(--control-fill);
   color: var(--text);
 }
 
@@ -181,11 +191,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
 
   & + .opt-field {
-    border-top: 1px solid var(--seg);
+    border-top: 1px solid var(--track);
   }
 }
 
@@ -193,7 +203,7 @@ body {
 .opt-field-block {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .opt-field-label {
@@ -205,7 +215,7 @@ body {
 .opt-field-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-0-5);
   min-width: 0;
 }
 
@@ -217,49 +227,33 @@ body {
 
 .opt-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-/* Segmented control — same look as the popup's scope picker (speed.css): a
-   bordered group of filled cells, the selected one filled with the accent. The
-   theme picker is a single row; the language picker is the same cells in a grid. */
+/* Segmented control — the capsule, cells, hover and sliding selection pill all
+   come from the shared controls.css (same as the popup). Only the layout is
+   options-specific: the theme/on-video pickers are a single row, the language
+   picker is the same cells in a 3-column grid. */
 .seg,
 .lang-grid {
   display: grid;
   gap: 3px;
   padding: 3px;
-  border: 1px solid var(--track);
-  border-radius: 9px;
 }
-
 .seg {
   grid-auto-flow: column;
 }
 .lang-grid {
   grid-template-columns: repeat(3, 1fr);
 }
-
 .seg-btn {
   padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: var(--seg);
-  color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition:
-    background 0.12s,
-    color 0.12s;
-
-  &:hover:not(.is-active) {
-    background: var(--track);
-  }
-  &.is-active {
-    background: var(--accent);
-    color: #fff;
-    font-weight: 600;
-  }
+}
+.seg-btn.is-active {
+  font-weight: 600;
 }
 
 /* --- Keyboard rows -------------------------------------------------------- */
@@ -271,11 +265,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
 
   & + .key-row {
-    border-top: 1px solid var(--seg);
+    border-top: 1px solid var(--track);
   }
 }
 
@@ -288,8 +282,8 @@ body {
   min-width: 84px;
   padding: 8px 14px;
   border: 1px solid var(--track);
-  border-radius: 8px;
-  background: var(--seg);
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
@@ -304,19 +298,41 @@ body {
 
   &.capturing {
     border-color: var(--accent);
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, var(--seg));
+    color: var(--accent-text);
+    background: color-mix(in srgb, var(--accent) 12%, var(--control-fill));
   }
 
   &.dupe {
     border-color: #ff3b30;
     color: #ff3b30;
   }
+
+  /* Unbound action — reads as muted "Off" so it's clearly disabled, not blank. */
+  &.is-off {
+    color: var(--muted);
+    font-weight: 500;
+  }
+}
+
+/* Key cap + its enable/disable switch, kept together on the right of the row. */
+.key-ctrl {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+}
+
+/* Hairline separator between a card's top controls (sliders) and its list below. */
+.opt-divider {
+  height: 1px;
+  background: var(--track);
+  border: 0;
+  margin: var(--space-4) 0 var(--space-3);
 }
 
 /* --- Saved-value lists ---------------------------------------------------- */
 .saved-cat {
-  margin-top: 16px;
+  margin-top: var(--space-4);
 }
 
 .saved-cat-title {
@@ -326,26 +342,26 @@ body {
 }
 
 .saved-group {
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
 
 .saved-group-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .saved-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--seg);
+  gap: var(--space-2-5);
+  padding: var(--space-2) var(--space-2-5);
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
 
   & + .saved-row {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 }
 
@@ -362,7 +378,7 @@ body {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
@@ -381,8 +397,8 @@ body {
   width: 20px;
   height: 20px;
   border: none;
-  border-radius: 50%;
-  background: var(--track);
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
   color: var(--text);
   font-size: 14px;
   line-height: 1;
@@ -400,7 +416,7 @@ body {
 .saved-empty {
   font-size: 12px;
   color: var(--muted);
-  padding: 6px 0;
+  padding: var(--space-1-5) 0;
 }
 
 /* --- Sync rows (switches, copied from the popup look) --------------------- */
@@ -418,18 +434,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 11px 0;
 
   & + .sync-cat-row {
-    border-top: 1px solid var(--seg);
+    border-top: 1px solid var(--track);
   }
 }
 
 .sync-cat-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-0-5);
   min-width: 0;
 }
 
@@ -449,15 +465,16 @@ body {
   cursor: pointer;
 }
 
-/* Radix Switch.Root (a <button>). The knob's travel is driven by motion.dev, so
-   only the track colour transitions here; the checked colour keys off data-state. */
+/* The switch button. The track colour transitions here; the checked colour and
+   the knob's transform both key off data-state (set by our Switch component). */
 .switch-track {
   position: relative;
   display: block;
-  width: 40px;
+  /* macOS 27 kit, 3 Rg size: 54×24 track, 32×20 pill knob, 18px travel. */
+  width: 54px;
   height: 24px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--track);
   transition: background 0.2s;
 
@@ -479,65 +496,122 @@ body {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
+  /* Wide horizontal pill knob (kit), not a circle. */
+  width: 32px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: var(--radius-lg);
   background: #fff;
   box-shadow: 0 1px 2px var(--shadow);
+  /* Travel = 54 (track) − 32 (knob) − 2×2 (insets) = 18px. */
+  transition: transform 0.18s var(--ease-spring);
 }
-
-/* --- Compressor preset editor --------------------------------------------- */
-/* The editors tile across the full-width card; the grid gap spaces them, so the
-   stacked-sibling margin is dropped inside it. */
-.comp-preset-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+.switch-track[data-state="checked"] .switch-knob {
+  transform: translateX(18px);
 }
-
-.comp-preset-grid .preset-editor + .preset-editor {
-  margin-top: 0;
-}
-
-.preset-editor {
-  padding: 14px;
-  border: 1px solid var(--seg);
-  border-radius: 10px;
-
-  & + .preset-editor {
-    margin-top: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .switch-knob {
+    transition: none;
   }
 }
 
-/* Name field flanked by the pin toggle (left) and remove (right). */
-.preset-editor-head {
+/* --- Compressor preset editor --------------------------------------------- */
+/* Master–detail: the preset list (pin · name · remove) on the left, the selected
+   preset's parameters on the right. */
+.comp-md {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  margin-top: 14px;
+}
+.comp-list {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.comp-list-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: var(--space-1-5);
+  padding: 3px 4px 3px 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: grab;
+  user-select: none;
 }
-
-.preset-editor-head .preset-name-input {
+/* Drag-reorder feedback: the lifted row fades, the drop target shows an accent rule. */
+.comp-list-row.dragging {
+  opacity: 0.4;
+}
+.comp-list-row.drop-target {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.comp-list-row.is-sel {
+  background: var(--glass-l1);
+  border-color: var(--track);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.comp-list-row.is-sel .comp-list-name {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.comp-list-name {
   flex: 1;
   min-width: 0;
-  margin-bottom: 0;
+  padding: 5px 2px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comp-list-add {
+  margin-top: var(--space-2);
+}
+.comp-detail {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  background: var(--glass-l1);
+  border: 1px solid var(--track);
+  border-radius: var(--radius-lg);
+}
+.comp-detail .preset-name-input {
+  margin-bottom: var(--space-3);
+}
+/* The compressor's lone Reset matches the preset-list column width (200px), so it
+   sits under the list rather than stretching across the whole card. */
+.comp-actions .btn-action {
+  flex: 0 0 200px;
+}
+
+/* Two-button action rows (Add + Reset): equal-width columns sized to the wider
+   button's content — not stretched across the whole card. */
+.card-actions.split {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
 }
 
 /* The make-up-gain value + its enable switch, right-aligned in the param row. */
 .preset-gain-ctrl {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .preset-name-input {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   padding: 7px 10px;
   border: 1px solid var(--track);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: var(--radius-md);
+  background: var(--glass-l3);
   color: var(--text);
   font: inherit;
   font-size: 15px;
@@ -549,8 +623,17 @@ body {
   }
 }
 
+/* Each tuning group is its own glass cell so its bounds read clearly (a recessed
+   l1 layer + neutral hairline; the controls inside sit above it). */
+.opt-param {
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--glass-l1);
+  border: 1px solid var(--track);
+  border-radius: var(--radius-lg);
+}
+
 .opt-param + .opt-param {
-  margin-top: 10px;
+  margin-top: var(--space-2-5);
 }
 
 /* Three speed sliders side by side on the full-width card; gap replaces the
@@ -570,7 +653,7 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
   .opt-params-grid .opt-param + .opt-param {
-    margin-top: 10px;
+    margin-top: var(--space-2-5);
   }
 }
 
@@ -578,21 +661,35 @@ body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: var(--space-2-5);
+  margin-bottom: var(--space-1);
   font-size: 13px;
   color: var(--text);
 }
 
 .opt-param-val {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
+/* Glass-opacity field: slider grows, the % value sits at the end. */
+.opt-glass-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.opt-glass-slider .opt-slider {
+  flex: 1;
+}
+.opt-glass-slider .opt-param-val {
+  min-width: 42px;
+  text-align: right;
+}
+
 /* One-line explanation under a tuning slider. */
 .opt-param-hint {
-  margin: 6px 0 0;
+  margin: var(--space-1-5) 0 0;
   font-size: 11px;
   line-height: 1.35;
   color: var(--muted);
@@ -616,14 +713,14 @@ body {
   flex-grow: 1;
   height: 4px;
   border-radius: 2px;
-  background: var(--track);
+  background: var(--groove);
 }
 
 .opt-slider .slider-thumb {
   display: block;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: #fff;
   box-shadow: 0 1px 3px var(--shadow);
   outline: none;
@@ -659,10 +756,11 @@ body {
 .preset-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: 1px solid var(--seg);
-  border-radius: 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-2);
+  background: var(--glass-l1);
+  border: 1px solid var(--track);
+  border-radius: var(--radius-md);
 }
 
 /* Pin toggle: accent + solid when pinned, dim otherwise. */
@@ -700,8 +798,8 @@ body {
   min-width: 0;
   padding: 5px 6px;
   border: 1px solid var(--track);
-  border-radius: 6px;
-  background: var(--surface);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
   color: var(--text);
   font: inherit;
   font-size: 14px;
@@ -741,7 +839,7 @@ body {
 .preset-remove {
   flex: 0 0 auto;
   width: 26px;
-  padding: 4px;
+  padding: var(--space-1);
   border: none;
   background: none;
   color: var(--muted);

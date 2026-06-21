@@ -4,16 +4,23 @@
 import { useEffect, useRef } from "react";
 import { setupGraphs } from "../graphs/index.js";
 
-export function useGraphs(tabId: number | null, onTranslating: (on: boolean) => void): void {
+export function useGraphs(
+  tabId: number | null,
+  onTranslating: (on: boolean) => void,
+  onBlocked: (reason: string | null) => void,
+): void {
   const tabRef = useRef(tabId);
   tabRef.current = tabId;
   const transRef = useRef(onTranslating);
   transRef.current = onTranslating;
+  const blockedRef = useRef(onBlocked);
+  blockedRef.current = onBlocked;
 
   useEffect(() => {
     return setupGraphs(
       () => tabRef.current,
       (on) => transRef.current(on),
+      (on) => blockedRef.current(on),
     );
   }, []);
 }

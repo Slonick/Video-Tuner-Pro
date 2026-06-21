@@ -11,15 +11,24 @@
 
   /* Always-visible graphs sit between the header and the collapsible body. */
   &.always {
-    margin-top: 12px;
+    margin-top: var(--space-3);
   }
 
   canvas {
     display: block;
     width: 100%;
     height: 50px;
-    border-radius: 8px;
-    background: var(--seg);
+    border-radius: var(--radius-lg);
+    /* Glassy graph (chart drawn on the transparent canvas, this is the panel
+       behind it): the shared glass recipe (tokens.css) — frosted fill + blur +
+       saturate, hairline edge, top edge-highlight, and a subtle inner depth. */
+    background: var(--glass-l2);
+    border: 1px solid var(--card-border);
+    box-shadow:
+      inset 0 1px 0 var(--card-hair),
+      inset 0 1px 3px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(var(--card-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--card-blur)) saturate(var(--glass-saturate));
   }
 
   &.buffer canvas {
@@ -35,7 +44,7 @@
 
 .meter-legend {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 5px;
   font-size: 10px;
   color: var(--muted);
@@ -43,7 +52,7 @@
   span {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .meter-thr {
@@ -88,25 +97,32 @@
   background: var(--accent);
 }
 
-/* --- Compressor parameter rows ------------------------------------------- */
-/* Each param in its own filled card so it reads as a separate control. */
-.param {
-  margin-bottom: 8px;
-  padding: 8px 10px;
-  background: var(--seg);
+/* --- Grouped list card (Apple settings-list style) ----------------------- */
+/* One filled container with rows split by inset hairline dividers — shared by the
+   compressor params (.param rows) and the toggle rows (.extra-row). The horizontal
+   padding insets the dividers from the card edge. */
+.list-group {
+  margin-top: var(--space-2);
+  padding: 0 var(--space-2-5);
+  background: var(--control-fill);
   border: 1px solid var(--track);
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
+}
 
-  &:last-child {
-    margin-bottom: 0;
+.param {
+  padding: 7px 0;
+  border-top: 1px solid var(--track);
+
+  &:first-child {
+    border-top: none;
   }
 
   .speed-slider {
-    margin: 6px 0 8px;
+    margin: 4px 0 5px;
   }
 
-  /* No desc under the slider (buffer card) — let the card padding be the
-       bottom gap instead of doubling it with the slider's own margin. */
+  /* No desc under the slider — let the row padding be the bottom gap instead of
+       doubling it with the slider's own margin. */
   .speed-slider:last-child {
     margin-bottom: 0;
   }
@@ -116,7 +132,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-2-5);
 
   label {
     font-size: 12px;
@@ -128,8 +144,8 @@
     width: 78px;
     padding: 5px 8px;
     border: 1px solid var(--track);
-    border-radius: 7px;
-    background: var(--seg);
+    border-radius: var(--radius-md);
+    background: var(--control-fill);
     color: var(--text);
     font: inherit;
     font-size: 12px;
@@ -155,12 +171,12 @@
 .param-val {
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
   font-variant-numeric: tabular-nums;
 }
 
 .param-desc {
-  margin-top: 3px;
+  margin-top: var(--space-0-5);
   font-size: 11px;
   line-height: 1.4;
   color: var(--muted);
@@ -180,24 +196,25 @@
   gap: 3px;
   padding: 3px;
   border: 1px solid var(--track);
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
 }
 
 .preset-grid .extra {
   display: none;
 }
+
 .audio-section:has(.sync-body.open) .preset-grid .extra {
   display: block;
 }
 
 /* Filled cells, the active one accent-filled — matches .btn-speed. */
 .btn-preset {
-  padding: 6px 0;
+  padding: var(--space-1-5) 0;
   border: none;
-  border-radius: 6px;
-  background: var(--seg);
+  border-radius: var(--radius-sm);
+  background: var(--control-fill);
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -220,6 +237,6 @@
    The bottom margin lifts the buttons clear of the 18px expand-hint strip at the
    section's bottom edge, so tapping the centre preset doesn't hit the chevron. */
 .preset-block {
-  margin-top: 12px;
-  margin-bottom: 8px;
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-2);
 }

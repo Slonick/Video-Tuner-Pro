@@ -1,173 +1,515 @@
 {
   "_note": "Promo-only copy for the store screenshots (not shipped with the extension). Audio param names/descriptions come from the extension's own messages.json. Verify ru/uk/en; de/es/fr/pt_BR/ja/zh_CN/hi are best-effort machine translations.",
   "en": {
-    "video": { "title": "Playback speed", "items": [
-      ["Presets & fine slider", "One click or drag — 25% to 300%, on almost any video."],
-      ["Remember per site, channel or globally", "Save a speed for a YouTube channel, a site, or globally as a default — applied automatically next time."],
-      ["On-video readout", "Current speed and the real time left, right on the player."],
-      ["Super theater (YouTube)", "One toggle makes theater mode fill the whole window — the header tucks away on its own."],
-      ["Keyboard shortcuts", "Adjust speed with A / D — hold Shift for bigger steps, or Shift+1–8 to jump to a preset, no mouse needed."]
-    ]},
-    "stream": { "title": "Live streams", "items": [
-      ["Live-sync catch-up", "Speeds up just enough to reach the live edge, then backs off."],
-      ["Real latency", "True latency to the broadcaster on Twitch & YouTube — not just buffer."],
-      ["Speed & buffer badge", "Shows the current speed and buffer right on the video."],
-      ["Rewind a live stream", "Scrub back and watch the recording at any speed; jump to the live edge and it's a stream again."]
-    ]},
+    "head": "Tune any video",
+    "video": {
+      "title": "Playback speed",
+      "items": [
+        ["Presets & fine slider", "One click or drag — 25% to 300%, on almost any video."],
+        [
+          "Remember per site, channel or globally",
+          "Save a speed for a YouTube channel, a site, or globally as a default — applied automatically next time."
+        ],
+        ["On-video readout", "Current speed and the real time left, right on the player."],
+        [
+          "Super theater (YouTube)",
+          "One toggle makes theater mode fill the whole window — the header tucks away on its own."
+        ],
+        [
+          "Keyboard shortcuts",
+          "Adjust speed with A / D — hold Shift for bigger steps, or Shift+1–8 to jump to a preset, no mouse needed."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Live streams",
+      "items": [
+        ["Live-sync catch-up", "Speeds up just enough to reach the live edge, then backs off."],
+        ["Real latency", "True latency to the broadcaster on Twitch & YouTube — not just buffer."],
+        ["Speed & buffer badge", "Shows the current speed and buffer right on the video."],
+        [
+          "Rewind a live stream",
+          "Scrub back and watch the recording at any speed; jump to the live edge and it's a stream again."
+        ]
+      ]
+    },
     "audioLead": "Evens out loud and quiet sounds — clear dialogue, no blasting explosions. Start with a Voice, Night, or Movie preset, or fine-tune every knob yourself.",
-    "advanced": "Advanced settings"
+    "advanced": "Advanced settings",
+    "auto": {
+      "bullets": [
+        "Watches speech rate vs your target",
+        "Tune the floor, hold and reaction",
+        "Best on talking-head video"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Voice / Night / Movie presets",
+        "Or fine-tune threshold, ratio and gain",
+        "Live input vs output meter"
+      ]
+    }
   },
   "ru": {
-    "video": { "title": "Скорость воспроизведения", "items": [
-      ["Пресеты и точный ползунок", "Клик или перетаскивание — от 25% до 300%, почти на любом видео."],
-      ["Память по сайту, каналу или глобально", "Сохраните скорость для канала YouTube, сайта или глобально по умолчанию — применится автоматически в следующий раз."],
-      ["Индикатор на видео", "Текущая скорость и реальное оставшееся время прямо на плеере."],
-      ["Супертеатр (YouTube)", "Один переключатель — и режим театра занимает всё окно, шапка прячется сама."],
-      ["Горячие клавиши", "Меняйте скорость на A / D — с Shift крупный шаг, а Shift+1–8 — пресеты, без мыши."]
-    ]},
-    "stream": { "title": "Прямые эфиры", "items": [
-      ["Догон Live-sync", "Ускоряется ровно настолько, чтобы догнать эфир, затем сбавляет."],
-      ["Реальная задержка", "Настоящая задержка до вещателя на Twitch и YouTube — не просто буфер."],
-      ["Бейдж скорости и буфера", "Показывает текущую скорость и буфер прямо на видео."],
-      ["Перемотка прямого эфира", "Отмотайте назад и смотрите запись на любой скорости; вернулись к краю — снова эфир."]
-    ]},
+    "head": "Настройте любое видео",
+    "video": {
+      "title": "Скорость воспроизведения",
+      "items": [
+        [
+          "Пресеты и точный ползунок",
+          "Клик или перетаскивание — от 25% до 300%, почти на любом видео."
+        ],
+        [
+          "Память по сайту, каналу или глобально",
+          "Сохраните скорость для канала YouTube, сайта или глобально по умолчанию — применится автоматически в следующий раз."
+        ],
+        ["Индикатор на видео", "Текущая скорость и реальное оставшееся время прямо на плеере."],
+        [
+          "Супертеатр (YouTube)",
+          "Один переключатель — и режим театра занимает всё окно, шапка прячется сама."
+        ],
+        [
+          "Горячие клавиши",
+          "Меняйте скорость на A / D — с Shift крупный шаг, а Shift+1–8 — пресеты, без мыши."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Прямые эфиры",
+      "items": [
+        ["Догон Live-sync", "Ускоряется ровно настолько, чтобы догнать эфир, затем сбавляет."],
+        [
+          "Реальная задержка",
+          "Настоящая задержка до вещателя на Twitch и YouTube — не просто буфер."
+        ],
+        ["Бейдж скорости и буфера", "Показывает текущую скорость и буфер прямо на видео."],
+        [
+          "Перемотка прямого эфира",
+          "Отмотайте назад и смотрите запись на любой скорости; вернулись к краю — снова эфир."
+        ]
+      ]
+    },
     "audioLead": "Выравнивает громкие и тихие звуки — чёткие диалоги, без оглушающих взрывов. Начните с пресета Голос, Ночь или Кино или настройте всё вручную.",
-    "advanced": "Расширенные настройки"
+    "advanced": "Расширенные настройки",
+    "auto": {
+      "bullets": [
+        "Сравнивает темп речи с вашей целью",
+        "Настройка порога, удержания и реакции",
+        "Лучше всего на видео с говорящими"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Пресеты Голос / Ночь / Кино",
+        "Или вручную: порог, соотношение, громкость",
+        "Живой график до/после"
+      ]
+    }
   },
   "uk": {
-    "video": { "title": "Швидкість відтворення", "items": [
-      ["Пресети та точний повзунок", "Клік або перетягування — від 25% до 300%, майже на будь-якому відео."],
-      ["Пам'ять за сайтом, каналом або глобально", "Збережіть швидкість для каналу YouTube, сайту або глобально за замовчуванням — застосується автоматично наступного разу."],
-      ["Індикатор на відео", "Поточна швидкість і реальний залишок часу прямо на плеєрі."],
-      ["Супертеатр (YouTube)", "Один перемикач — і режим театру займає все вікно, шапка ховається сама."],
-      ["Гарячі клавіші", "Змінюйте швидкість на A / D — із Shift більший крок, а Shift+1–8 — пресети, без миші."]
-    ]},
-    "stream": { "title": "Прямі трансляції", "items": [
-      ["Догін Live-sync", "Прискорюється рівно настільки, щоб наздогнати ефір, потім сповільнюється."],
-      ["Реальна затримка", "Справжня затримка до мовника на Twitch і YouTube — не просто буфер."],
-      ["Бейдж швидкості та буфера", "Показує поточну швидкість і буфер прямо на відео."],
-      ["Перемотування прямого ефіру", "Відмотайте назад і дивіться запис на будь-якій швидкості; повернулися до краю — знову ефір."]
-    ]},
+    "head": "Налаштуйте будь-яке відео",
+    "video": {
+      "title": "Швидкість відтворення",
+      "items": [
+        [
+          "Пресети та точний повзунок",
+          "Клік або перетягування — від 25% до 300%, майже на будь-якому відео."
+        ],
+        [
+          "Пам'ять за сайтом, каналом або глобально",
+          "Збережіть швидкість для каналу YouTube, сайту або глобально за замовчуванням — застосується автоматично наступного разу."
+        ],
+        ["Індикатор на відео", "Поточна швидкість і реальний залишок часу прямо на плеєрі."],
+        [
+          "Супертеатр (YouTube)",
+          "Один перемикач — і режим театру займає все вікно, шапка ховається сама."
+        ],
+        [
+          "Гарячі клавіші",
+          "Змінюйте швидкість на A / D — із Shift більший крок, а Shift+1–8 — пресети, без миші."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Прямі трансляції",
+      "items": [
+        [
+          "Догін Live-sync",
+          "Прискорюється рівно настільки, щоб наздогнати ефір, потім сповільнюється."
+        ],
+        ["Реальна затримка", "Справжня затримка до мовника на Twitch і YouTube — не просто буфер."],
+        ["Бейдж швидкості та буфера", "Показує поточну швидкість і буфер прямо на відео."],
+        [
+          "Перемотування прямого ефіру",
+          "Відмотайте назад і дивіться запис на будь-якій швидкості; повернулися до краю — знову ефір."
+        ]
+      ]
+    },
     "audioLead": "Вирівнює гучні та тихі звуки — чіткі діалоги, без оглушливих вибухів. Почніть із пресета Голос, Ніч або Кіно чи налаштуйте все вручну.",
-    "advanced": "Розширені налаштування"
+    "advanced": "Розширені налаштування",
+    "auto": {
+      "bullets": [
+        "Порівнює темп мови з вашою ціллю",
+        "Налаштування порога, утримання й реакції",
+        "Найкраще на відео, де говорять"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Пресети Голос / Ніч / Кіно",
+        "Або вручну: поріг, співвідношення, гучність",
+        "Живий графік до/після"
+      ]
+    }
   },
   "de": {
-    "video": { "title": "Wiedergabetempo", "items": [
-      ["Presets & feiner Regler", "Ein Klick oder Ziehen — 25% bis 300%, auf fast jedem Video."],
-      ["Pro Seite, Kanal oder global merken", "Tempo für einen YouTube-Kanal, eine Seite oder global als Standard speichern — beim nächsten Mal automatisch angewendet."],
-      ["Anzeige im Video", "Aktuelles Tempo und die echte Restzeit direkt im Player."],
-      ["Super-Theater (YouTube)", "Ein Schalter — der Theatermodus füllt das ganze Fenster, die Kopfzeile blendet sich selbst aus."],
-      ["Tastenkürzel", "Tempo mit A / D ändern — mit Shift größere Schritte, mit Shift+1–8 zu einem Preset springen, ganz ohne Maus."]
-    ]},
-    "stream": { "title": "Livestreams", "items": [
-      ["Live-sync-Aufholen", "Beschleunigt gerade so weit, um den Livestream einzuholen, dann zurück."],
-      ["Echte Latenz", "Echte Latenz zum Sender bei Twitch & YouTube — nicht nur Puffer."],
-      ["Tempo- & Puffer-Badge", "Zeigt aktuelles Tempo und Puffer direkt im Video."],
-      ["Livestream zurückspulen", "Zurückspulen und die Aufzeichnung in jedem Tempo ansehen; zurück an den Live-Rand — wieder ein Stream."]
-    ]},
+    "head": "Jedes Video feinjustieren",
+    "video": {
+      "title": "Wiedergabetempo",
+      "items": [
+        ["Presets & feiner Regler", "Ein Klick oder Ziehen — 25% bis 300%, auf fast jedem Video."],
+        [
+          "Pro Seite, Kanal oder global merken",
+          "Tempo für einen YouTube-Kanal, eine Seite oder global als Standard speichern — beim nächsten Mal automatisch angewendet."
+        ],
+        ["Anzeige im Video", "Aktuelles Tempo und die echte Restzeit direkt im Player."],
+        [
+          "Super-Theater (YouTube)",
+          "Ein Schalter — der Theatermodus füllt das ganze Fenster, die Kopfzeile blendet sich selbst aus."
+        ],
+        [
+          "Tastenkürzel",
+          "Tempo mit A / D ändern — mit Shift größere Schritte, mit Shift+1–8 zu einem Preset springen, ganz ohne Maus."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Livestreams",
+      "items": [
+        [
+          "Live-sync-Aufholen",
+          "Beschleunigt gerade so weit, um den Livestream einzuholen, dann zurück."
+        ],
+        ["Echte Latenz", "Echte Latenz zum Sender bei Twitch & YouTube — nicht nur Puffer."],
+        ["Tempo- & Puffer-Badge", "Zeigt aktuelles Tempo und Puffer direkt im Video."],
+        [
+          "Livestream zurückspulen",
+          "Zurückspulen und die Aufzeichnung in jedem Tempo ansehen; zurück an den Live-Rand — wieder ein Stream."
+        ]
+      ]
+    },
     "audioLead": "Gleicht laute und leise Töne aus — klare Dialoge, keine ohrenbetäubenden Explosionen. Mit einem Preset Stimme, Nacht oder Film starten oder alles selbst feinjustieren.",
-    "advanced": "Erweiterte Einstellungen"
+    "advanced": "Erweiterte Einstellungen",
+    "auto": {
+      "bullets": [
+        "Vergleicht das Sprechtempo mit deinem Ziel",
+        "Floor, Halten und Reaktion einstellbar",
+        "Am besten bei Talking-Head-Videos"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Presets Stimme / Nacht / Film",
+        "Oder Schwelle, Verhältnis, Gain feinjustieren",
+        "Live-Pegel: Eingang vs Ausgang"
+      ]
+    }
   },
   "es": {
-    "video": { "title": "Velocidad de reproducción", "items": [
-      ["Preajustes y control deslizante", "Un clic o arrastra — del 25% al 300%, en casi cualquier vídeo."],
-      ["Recordar por sitio, canal o globalmente", "Guarda una velocidad para un canal de YouTube, un sitio o de forma global por defecto; se aplica automáticamente la próxima vez."],
-      ["Indicador en el vídeo", "Velocidad actual y el tiempo real restante, en el propio reproductor."],
-      ["Súper teatro (YouTube)", "Un interruptor y el modo cine llena toda la ventana — la cabecera se oculta sola."],
-      ["Atajos de teclado", "Ajusta la velocidad con A / D — con Shift, pasos mayores; con Shift+1–8, saltas a un preajuste, sin ratón."]
-    ]},
-    "stream": { "title": "Directos", "items": [
-      ["Sincronización en directo", "Acelera lo justo para alcanzar el directo y luego vuelve."],
-      ["Latencia real", "Latencia real con el emisor en Twitch y YouTube, no solo el búfer."],
-      ["Insignia de velocidad y búfer", "Muestra la velocidad y el búfer actuales en el vídeo."],
-      ["Rebobina un directo", "Retrocede y mira la grabación a cualquier velocidad; vuelve al borde en vivo y es un directo otra vez."]
-    ]},
+    "head": "Ajusta cualquier vídeo",
+    "video": {
+      "title": "Velocidad de reproducción",
+      "items": [
+        [
+          "Preajustes y control deslizante",
+          "Un clic o arrastra — del 25% al 300%, en casi cualquier vídeo."
+        ],
+        [
+          "Recordar por sitio, canal o globalmente",
+          "Guarda una velocidad para un canal de YouTube, un sitio o de forma global por defecto; se aplica automáticamente la próxima vez."
+        ],
+        [
+          "Indicador en el vídeo",
+          "Velocidad actual y el tiempo real restante, en el propio reproductor."
+        ],
+        [
+          "Súper teatro (YouTube)",
+          "Un interruptor y el modo cine llena toda la ventana — la cabecera se oculta sola."
+        ],
+        [
+          "Atajos de teclado",
+          "Ajusta la velocidad con A / D — con Shift, pasos mayores; con Shift+1–8, saltas a un preajuste, sin ratón."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Directos",
+      "items": [
+        ["Sincronización en directo", "Acelera lo justo para alcanzar el directo y luego vuelve."],
+        ["Latencia real", "Latencia real con el emisor en Twitch y YouTube, no solo el búfer."],
+        ["Insignia de velocidad y búfer", "Muestra la velocidad y el búfer actuales en el vídeo."],
+        [
+          "Rebobina un directo",
+          "Retrocede y mira la grabación a cualquier velocidad; vuelve al borde en vivo y es un directo otra vez."
+        ]
+      ]
+    },
     "audioLead": "Equilibra los sonidos altos y bajos — diálogos claros, sin explosiones atronadoras. Empieza con un preajuste Voz, Noche o Película, o ajústalo tú mismo.",
-    "advanced": "Ajustes avanzados"
+    "advanced": "Ajustes avanzados",
+    "auto": {
+      "bullets": [
+        "Compara el ritmo del habla con tu objetivo",
+        "Ajusta mínimo, retención y reacción",
+        "Ideal para vídeos de gente hablando"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Ajustes Voz / Noche / Película",
+        "O ajusta umbral, ratio y ganancia",
+        "Medidor de entrada vs salida en vivo"
+      ]
+    }
   },
   "fr": {
-    "video": { "title": "Vitesse de lecture", "items": [
-      ["Préréglages et curseur fin", "Un clic ou un glissement — de 25% à 300%, sur presque toutes les vidéos."],
-      ["Mémoriser par site, chaîne ou globalement", "Enregistrez une vitesse pour une chaîne YouTube, un site ou globalement par défaut ; appliquée automatiquement la prochaine fois."],
-      ["Affichage sur la vidéo", "Vitesse actuelle et temps réel restant, directement sur le lecteur."],
-      ["Super cinéma (YouTube)", "Un bouton et le mode cinéma remplit toute la fenêtre — l'en-tête se masque tout seul."],
-      ["Raccourcis clavier", "Réglez la vitesse avec A / D — avec Maj, de plus grands pas ; Maj+1–8 pour sauter à un préréglage, sans souris."]
-    ]},
-    "stream": { "title": "Directs", "items": [
-      ["Rattrapage Live-sync", "Accélère juste assez pour rejoindre le direct, puis revient."],
-      ["Latence réelle", "Latence réelle jusqu'au diffuseur sur Twitch et YouTube — pas seulement le tampon."],
-      ["Badge vitesse et tampon", "Affiche la vitesse et le tampon actuels sur la vidéo."],
-      ["Rembobiner un direct", "Revenez en arrière et regardez l'enregistrement à n'importe quelle vitesse ; revenez au direct et c'est de nouveau un flux."]
-    ]},
+    "head": "Réglez n’importe quelle vidéo",
+    "video": {
+      "title": "Vitesse de lecture",
+      "items": [
+        [
+          "Préréglages et curseur fin",
+          "Un clic ou un glissement — de 25% à 300%, sur presque toutes les vidéos."
+        ],
+        [
+          "Mémoriser par site, chaîne ou globalement",
+          "Enregistrez une vitesse pour une chaîne YouTube, un site ou globalement par défaut ; appliquée automatiquement la prochaine fois."
+        ],
+        [
+          "Affichage sur la vidéo",
+          "Vitesse actuelle et temps réel restant, directement sur le lecteur."
+        ],
+        [
+          "Super cinéma (YouTube)",
+          "Un bouton et le mode cinéma remplit toute la fenêtre — l'en-tête se masque tout seul."
+        ],
+        [
+          "Raccourcis clavier",
+          "Réglez la vitesse avec A / D — avec Maj, de plus grands pas ; Maj+1–8 pour sauter à un préréglage, sans souris."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Directs",
+      "items": [
+        ["Rattrapage Live-sync", "Accélère juste assez pour rejoindre le direct, puis revient."],
+        [
+          "Latence réelle",
+          "Latence réelle jusqu'au diffuseur sur Twitch et YouTube — pas seulement le tampon."
+        ],
+        ["Badge vitesse et tampon", "Affiche la vitesse et le tampon actuels sur la vidéo."],
+        [
+          "Rembobiner un direct",
+          "Revenez en arrière et regardez l'enregistrement à n'importe quelle vitesse ; revenez au direct et c'est de nouveau un flux."
+        ]
+      ]
+    },
     "audioLead": "Égalise les sons forts et faibles — dialogues clairs, pas d'explosions assourdissantes. Commencez par un préréglage Voix, Nuit ou Film, ou ajustez tout vous-même.",
-    "advanced": "Paramètres avancés"
+    "advanced": "Paramètres avancés",
+    "auto": {
+      "bullets": [
+        "Compare le débit de parole à votre cible",
+        "Réglez plancher, maintien et réaction",
+        "Idéal pour les vidéos de personnes qui parlent"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Préréglages Voix / Nuit / Film",
+        "Ou réglez seuil, ratio et gain",
+        "Niveau entrée vs sortie en direct"
+      ]
+    }
   },
   "pt_BR": {
-    "video": { "title": "Velocidade de reprodução", "items": [
-      ["Predefinições e controle fino", "Um clique ou arraste — de 25% a 300%, em quase qualquer vídeo."],
-      ["Lembrar por site, canal ou globalmente", "Salve uma velocidade para um canal do YouTube, um site ou globalmente como padrão; aplicada automaticamente na próxima vez."],
-      ["Indicador no vídeo", "Velocidade atual e o tempo real restante, no próprio player."],
-      ["Super teatro (YouTube)", "Um botão e o modo cinema preenche a janela inteira — o cabeçalho se esconde sozinho."],
-      ["Atalhos de teclado", "Ajuste a velocidade com A / D — com Shift, passos maiores; Shift+1–8 para ir a uma predefinição, sem mouse."]
-    ]},
-    "stream": { "title": "Transmissões ao vivo", "items": [
-      ["Sincronização ao vivo", "Acelera só o necessário para alcançar a transmissão e depois volta."],
-      ["Latência real", "Latência real até o transmissor no Twitch e YouTube — não só o buffer."],
-      ["Selo de velocidade e buffer", "Mostra a velocidade e o buffer atuais no vídeo."],
-      ["Rebobinar uma transmissão ao vivo", "Volte e assista à gravação em qualquer velocidade; volte para a borda ao vivo e é uma transmissão de novo."]
-    ]},
+    "head": "Ajuste qualquer vídeo",
+    "video": {
+      "title": "Velocidade de reprodução",
+      "items": [
+        [
+          "Predefinições e controle fino",
+          "Um clique ou arraste — de 25% a 300%, em quase qualquer vídeo."
+        ],
+        [
+          "Lembrar por site, canal ou globalmente",
+          "Salve uma velocidade para um canal do YouTube, um site ou globalmente como padrão; aplicada automaticamente na próxima vez."
+        ],
+        ["Indicador no vídeo", "Velocidade atual e o tempo real restante, no próprio player."],
+        [
+          "Super teatro (YouTube)",
+          "Um botão e o modo cinema preenche a janela inteira — o cabeçalho se esconde sozinho."
+        ],
+        [
+          "Atalhos de teclado",
+          "Ajuste a velocidade com A / D — com Shift, passos maiores; Shift+1–8 para ir a uma predefinição, sem mouse."
+        ]
+      ]
+    },
+    "stream": {
+      "title": "Transmissões ao vivo",
+      "items": [
+        [
+          "Sincronização ao vivo",
+          "Acelera só o necessário para alcançar a transmissão e depois volta."
+        ],
+        ["Latência real", "Latência real até o transmissor no Twitch e YouTube — não só o buffer."],
+        ["Selo de velocidade e buffer", "Mostra a velocidade e o buffer atuais no vídeo."],
+        [
+          "Rebobinar uma transmissão ao vivo",
+          "Volte e assista à gravação em qualquer velocidade; volte para a borda ao vivo e é uma transmissão de novo."
+        ]
+      ]
+    },
     "audioLead": "Equilibra sons altos e baixos — diálogos claros, sem explosões ensurdecedoras. Comece com uma predefinição Voz, Noite ou Filme, ou ajuste tudo você mesmo.",
-    "advanced": "Configurações avançadas"
+    "advanced": "Configurações avançadas",
+    "auto": {
+      "bullets": [
+        "Compara o ritmo da fala com seu alvo",
+        "Ajuste piso, retenção e reação",
+        "Melhor em vídeos de pessoas falando"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "Predefinições Voz / Noite / Filme",
+        "Ou ajuste limiar, ratio e ganho",
+        "Medidor de entrada vs saída ao vivo"
+      ]
+    }
   },
   "ja": {
-    "video": { "title": "再生速度", "items": [
-      ["プリセットと微調整スライダー", "クリックまたはドラッグで25%〜300%、ほぼすべての動画で。"],
-      ["サイト・チャンネル・全体ごとに記憶", "YouTubeチャンネル、サイト、または全体の既定として速度を保存すると、次回から自動で適用。"],
-      ["動画上に表示", "現在の速度と実際の残り時間をプレーヤー上に表示。"],
-      ["スーパーシアター（YouTube）", "切り替えるだけでシアターモードがウィンドウ全体に広がり、ヘッダーは自動で隠れます。"],
-      ["キーボードショートカット", "A / D で速度を調整（Shift で大きく、Shift+1–8 でプリセットへ）— マウス不要。"]
-    ]},
-    "stream": { "title": "ライブ配信", "items": [
-      ["ライブ同期で追いつく", "ライブの先端に追いつくだけ速度を上げ、その後戻ります。"],
-      ["実際の遅延", "TwitchやYouTubeでの配信者までの実遅延 — バッファだけではありません。"],
-      ["速度・バッファ表示", "現在の速度とバッファを動画上に表示。"],
-      ["ライブ配信を巻き戻し", "巻き戻して録画を好きな速度で視聴。先端に戻れば再びライブ配信に。"]
-    ]},
+    "head": "どんな動画も思いどおりに",
+    "video": {
+      "title": "再生速度",
+      "items": [
+        ["プリセットと微調整スライダー", "クリックまたはドラッグで25%〜300%、ほぼすべての動画で。"],
+        [
+          "サイト・チャンネル・全体ごとに記憶",
+          "YouTubeチャンネル、サイト、または全体の既定として速度を保存すると、次回から自動で適用。"
+        ],
+        ["動画上に表示", "現在の速度と実際の残り時間をプレーヤー上に表示。"],
+        [
+          "スーパーシアター（YouTube）",
+          "切り替えるだけでシアターモードがウィンドウ全体に広がり、ヘッダーは自動で隠れます。"
+        ],
+        [
+          "キーボードショートカット",
+          "A / D で速度を調整（Shift で大きく、Shift+1–8 でプリセットへ）— マウス不要。"
+        ]
+      ]
+    },
+    "stream": {
+      "title": "ライブ配信",
+      "items": [
+        ["ライブ同期で追いつく", "ライブの先端に追いつくだけ速度を上げ、その後戻ります。"],
+        ["実際の遅延", "TwitchやYouTubeでの配信者までの実遅延 — バッファだけではありません。"],
+        ["速度・バッファ表示", "現在の速度とバッファを動画上に表示。"],
+        ["ライブ配信を巻き戻し", "巻き戻して録画を好きな速度で視聴。先端に戻れば再びライブ配信に。"]
+      ]
+    },
     "audioLead": "大きい音と小さい音を均一化 — セリフは明瞭に、爆発音に驚かされない。音声・夜間・映画のプリセットから始めるも、細かく調整するも自由。",
-    "advanced": "詳細設定"
+    "advanced": "詳細設定",
+    "auto": {
+      "bullets": ["話速を目標値と比較", "下限・保持・反応を調整", "人が話す動画に最適"]
+    },
+    "audio": {
+      "bullets": [
+        "プリセット：音声 / 夜間 / 映画",
+        "または スレッショルド・レシオ・ゲインを微調整",
+        "入力と出力をライブ計測"
+      ]
+    }
   },
   "zh_CN": {
-    "video": { "title": "播放速度", "items": [
-      ["预设与精细滑块", "点击或拖动 — 25% 到 300%，几乎适用于任何视频。"],
-      ["按站点、频道或全局记忆", "为 YouTube 频道、站点或全局默认保存速度，下次自动应用。"],
-      ["视频上显示", "在播放器上直接显示当前速度和真实剩余时间。"],
-      ["超级影院（YouTube）", "一键让影院模式铺满整个窗口 — 顶栏自动隐藏。"],
-      ["键盘快捷键", "用 A / D 调速（Shift 步进更大，Shift+1–8 跳到预设）— 无需鼠标。"]
-    ]},
-    "stream": { "title": "直播", "items": [
-      ["直播同步追赶", "仅加速到追上直播边缘，然后恢复。"],
-      ["真实延迟", "Twitch 和 YouTube 上到主播的真实延迟 — 不只是缓冲。"],
-      ["速度与缓冲标记", "在视频上显示当前速度和缓冲。"],
-      ["回退直播", "往回拖动，以任意速度观看录像；回到直播边缘即恢复为直播。"]
-    ]},
+    "head": "调校任何视频",
+    "video": {
+      "title": "播放速度",
+      "items": [
+        ["预设与精细滑块", "点击或拖动 — 25% 到 300%，几乎适用于任何视频。"],
+        ["按站点、频道或全局记忆", "为 YouTube 频道、站点或全局默认保存速度，下次自动应用。"],
+        ["视频上显示", "在播放器上直接显示当前速度和真实剩余时间。"],
+        ["超级影院（YouTube）", "一键让影院模式铺满整个窗口 — 顶栏自动隐藏。"],
+        ["键盘快捷键", "用 A / D 调速（Shift 步进更大，Shift+1–8 跳到预设）— 无需鼠标。"]
+      ]
+    },
+    "stream": {
+      "title": "直播",
+      "items": [
+        ["直播同步追赶", "仅加速到追上直播边缘，然后恢复。"],
+        ["真实延迟", "Twitch 和 YouTube 上到主播的真实延迟 — 不只是缓冲。"],
+        ["速度与缓冲标记", "在视频上显示当前速度和缓冲。"],
+        ["回退直播", "往回拖动，以任意速度观看录像；回到直播边缘即恢复为直播。"]
+      ]
+    },
     "audioLead": "平衡大声与轻声 — 对白清晰，爆炸声不再震耳。从人声、夜间或电影预设开始，也可自行微调。",
-    "advanced": "高级设置"
+    "advanced": "高级设置",
+    "auto": {
+      "bullets": ["将语速与你的目标比较", "可调下限、保持与反应", "最适合讲话类视频"]
+    },
+    "audio": {
+      "bullets": ["预设：人声 / 夜间 / 电影", "或手动调阈值、压缩比、增益", "实时输入与输出电平"]
+    }
   },
   "hi": {
-    "video": { "title": "प्लेबैक गति", "items": [
-      ["प्रीसेट और बारीक स्लाइडर", "एक क्लिक या ड्रैग — 25% से 300%, लगभग किसी भी वीडियो पर।"],
-      ["साइट, चैनल या वैश्विक रूप से याद रखें", "किसी YouTube चैनल, साइट या वैश्विक डिफ़ॉल्ट के लिए गति सहेजें; अगली बार स्वतः लागू।"],
-      ["वीडियो पर रीडआउट", "मौजूदा गति और वास्तविक शेष समय, सीधे प्लेयर पर।"],
-      ["सुपर थिएटर (YouTube)", "एक टॉगल और थिएटर मोड पूरी विंडो भर देता है — हेडर खुद छिप जाता है।"],
-      ["कीबोर्ड शॉर्टकट", "A / D से गति बदलें (Shift से बड़ा कदम, Shift+1–8 से प्रीसेट पर जाएँ) — माउस की ज़रूरत नहीं।"]
-    ]},
-    "stream": { "title": "लाइव स्ट्रीम", "items": [
-      ["लाइव-सिंक कैच-अप", "लाइव किनारे तक पहुँचने भर तेज़ होता है, फिर वापस।"],
-      ["वास्तविक लेटेंसी", "Twitch और YouTube पर प्रसारक तक वास्तविक लेटेंसी — सिर्फ़ बफ़र नहीं।"],
-      ["गति और बफ़र बैज", "वीडियो पर मौजूदा गति और बफ़र दिखाता है।"],
-      ["लाइव स्ट्रीम रिवाइंड करें", "पीछे जाकर रिकॉर्डिंग किसी भी गति से देखें; लाइव किनारे पर लौटें और फिर से स्ट्रीम।"]
-    ]},
+    "head": "किसी भी वीडियो को ट्यून करें",
+    "video": {
+      "title": "प्लेबैक गति",
+      "items": [
+        ["प्रीसेट और बारीक स्लाइडर", "एक क्लिक या ड्रैग — 25% से 300%, लगभग किसी भी वीडियो पर।"],
+        [
+          "साइट, चैनल या वैश्विक रूप से याद रखें",
+          "किसी YouTube चैनल, साइट या वैश्विक डिफ़ॉल्ट के लिए गति सहेजें; अगली बार स्वतः लागू।"
+        ],
+        ["वीडियो पर रीडआउट", "मौजूदा गति और वास्तविक शेष समय, सीधे प्लेयर पर।"],
+        [
+          "सुपर थिएटर (YouTube)",
+          "एक टॉगल और थिएटर मोड पूरी विंडो भर देता है — हेडर खुद छिप जाता है।"
+        ],
+        [
+          "कीबोर्ड शॉर्टकट",
+          "A / D से गति बदलें (Shift से बड़ा कदम, Shift+1–8 से प्रीसेट पर जाएँ) — माउस की ज़रूरत नहीं।"
+        ]
+      ]
+    },
+    "stream": {
+      "title": "लाइव स्ट्रीम",
+      "items": [
+        ["लाइव-सिंक कैच-अप", "लाइव किनारे तक पहुँचने भर तेज़ होता है, फिर वापस।"],
+        [
+          "वास्तविक लेटेंसी",
+          "Twitch और YouTube पर प्रसारक तक वास्तविक लेटेंसी — सिर्फ़ बफ़र नहीं।"
+        ],
+        ["गति और बफ़र बैज", "वीडियो पर मौजूदा गति और बफ़र दिखाता है।"],
+        [
+          "लाइव स्ट्रीम रिवाइंड करें",
+          "पीछे जाकर रिकॉर्डिंग किसी भी गति से देखें; लाइव किनारे पर लौटें और फिर से स्ट्रीम।"
+        ]
+      ]
+    },
     "audioLead": "तेज़ और धीमी आवाज़ें बराबर करें — साफ़ संवाद, कान फाड़ने वाले धमाके नहीं। आवाज़, रात या मूवी प्रीसेट से शुरू करें, या खुद बारीकी से सेट करें।",
-    "advanced": "उन्नत सेटिंग्स"
+    "advanced": "उन्नत सेटिंग्स",
+    "auto": {
+      "bullets": [
+        "बोलने की गति की तुलना आपके लक्ष्य से",
+        "फ़्लोर, होल्ड और रिएक्शन ट्यून करें",
+        "बातचीत वाले वीडियो पर सर्वोत्तम"
+      ]
+    },
+    "audio": {
+      "bullets": [
+        "प्रीसेट: आवाज़ / रात / मूवी",
+        "या थ्रेशोल्ड, रेशियो और गेन ट्यून करें",
+        "लाइव इनपुट बनाम आउटपुट मीटर"
+      ]
+    }
   }
 }

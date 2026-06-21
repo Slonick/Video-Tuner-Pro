@@ -13,6 +13,9 @@ import {
   type Keymap,
 } from "../../shared/keymap.js";
 import { msg } from "../../popup/i18n.js";
+import { Button } from "../../ui/Button.js";
+import { Switch } from "../../ui/Switch.js";
+import { ConfirmButton } from "../../ui/ConfirmButton.js";
 
 const ROWS: Array<{ action: Action; labelKey: string }> = [
   { action: "slower", labelKey: "tipSlower" },
@@ -20,6 +23,7 @@ const ROWS: Array<{ action: Action; labelKey: string }> = [
   { action: "reset", labelKey: "optKeyReset" },
   { action: "toggle", labelKey: "optKeyToggle" },
   { action: "hold", labelKey: "optKeyHold" },
+  { action: "overlay", labelKey: "optKeyOverlay" },
 ];
 
 export function Keys() {
@@ -30,11 +34,18 @@ export function Keys() {
   const capRef = useRef<Action | null>(null);
   const mapRef = useRef<Keymap>(keymap);
   const dupeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The key each action had before it was switched off, so flipping it back on
+  // restores it (within the session) instead of jumping to the default.
+  const lastKey = useRef<Partial<Record<Action, string>>>({});
   capRef.current = capturing;
   mapRef.current = keymap;
 
   useEffect(() => {
-    STORE.get(["keymap"], (r) => setKeymap(normalizeKeymap(r.keymap)));
+    STORE.get(["keymap"], (r) => {
+      const km = normalizeKeymap(r.keymap);
+      for (const a of ACTIONS) if (km[a]) lastKey.current[a] = km[a];
+      setKeymap(km);
+    });
   }, []);
 
   useEffect(() => {
@@ -50,6 +61,14 @@ export function Keys() {
       e.stopPropagation();
       if (e.code === "Escape") {
         setCapturing(null);
+        return;
+      }
+      // Backspace/Delete unbinds the action (it then does nothing).
+      if (e.code === "Backspace" || e.code === "Delete") {
+        const next = { ...mapRef.current, [cap]: "" };
+        setKeymap(next);
+        setCapturing(null);
+        STORE.set({ keymap: next });
         return;
       }
       if (!isBindableCode(e.code)) {
@@ -79,6 +98,23 @@ export function Keys() {
     STORE.set({ keymap: next });
   };
 
+  // Enable/disable an action via its switch. Off → remember the key, then unbind it
+  // (the content listener ignores ""). On → restore the remembered key (or default).
+  const toggleEnabled = (a: Action, on: boolean) => {
+    let code = "";
+    if (on) {
+      const want = lastKey.current[a] || DEFAULT_KEYMAP[a];
+      // Don't resurrect a key another action now holds — fall back to unbound.
+      code = ACTIONS.some((o) => o !== a && keymap[o] === want) ? "" : want;
+    } else if (keymap[a]) {
+      lastKey.current[a] = keymap[a];
+    }
+    const next = { ...keymap, [a]: code };
+    setKeymap(next);
+    setCapturing(null);
+    STORE.set({ keymap: next });
+  };
+
   return (
     <section className="card">
       <h2>{msg("kbdLabel") || "Keyboard shortcuts"}</h2>
@@ -87,28 +123,38 @@ export function Keys() {
         {ROWS.map(({ action, labelKey }) => (
           <div className="key-row" key={action}>
             <span className="key-label">{msg(labelKey)}</span>
-            <button
-              type="button"
-              id={"key" + action[0].toUpperCase() + action.slice(1)}
-              className={
-                "key-cap" +
-                (capturing === action ? " capturing" : "") +
-                (dupe === action ? " dupe" : "")
-              }
-              data-action={action}
-              onClick={() => setCapturing(action)}
-            >
-              {capturing === action
-                ? msg("optKeyPress") || "Press a key…"
-                : codeLabel(keymap[action])}
-            </button>
+            <span className="key-ctrl">
+              <Button
+                id={"key" + action[0].toUpperCase() + action.slice(1)}
+                className={
+                  "key-cap" +
+                  (capturing === action ? " capturing" : "") +
+                  (dupe === action ? " dupe" : "") +
+                  (capturing !== action && !keymap[action] ? " is-off" : "")
+                }
+                data-action={action}
+                onClick={() => setCapturing(action)}
+              >
+                {capturing === action
+                  ? msg("optKeyPress") || "Press a key…"
+                  : keymap[action]
+                    ? codeLabel(keymap[action])
+                    : msg("optKeyOff") || "Off"}
+              </Button>
+              <Switch checked={!!keymap[action]} onChange={(on) => toggleEnabled(action, on)} />
+            </span>
           </div>
         ))}
       </div>
       <div className="card-actions">
-        <button type="button" className="btn-action btn-reset" onClick={resetDefaults}>
+        <ConfirmButton
+          className="btn-action btn-danger"
+          onConfirm={resetDefaults}
+          confirmChildren={msg("optConfirm") || "Click again to confirm"}
+          confirmTitle={msg("optConfirm") || "Click again to confirm"}
+        >
           {msg("optResetDefaults") || "Reset to defaults"}
-        </button>
+        </ConfirmButton>
       </div>
     </section>
   );

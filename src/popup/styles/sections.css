@@ -4,32 +4,12 @@
    on/off switch, and the body that slides open.
    ============================================================ */
 
-/* "beta" tag tucked into the card's bottom-right corner (frame), so the title text
-   doesn't have to carry "(beta)" and wrap on a narrow card. A warm orange-red (not
-   the accent) so it reads as a "still rough" warning rather than a feature accent. */
-.beta-badge {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  z-index: 3;
-  padding: 2px 6px 1px;
-  border-radius: 7px 0 10px 0;
-  background: #e0531a;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  line-height: 1.4;
-  text-transform: lowercase;
-  pointer-events: none;
-}
-
 .sync-section {
   position: relative;
   background: var(--surface);
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 10px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-2-5);
+  margin-bottom: var(--space-2-5);
 
   /* Last card: no extra margin so the bottom edge gap equals the body's
        10px padding — uniform with the top and sides. */
@@ -45,7 +25,7 @@
     .switch {
       opacity: 0.4;
       pointer-events: none;
-      filter: grayscale(0.3);
+      filter: var(--lock-filter, grayscale(0.3));
     }
   }
 
@@ -55,12 +35,12 @@
   &.autoslow-section.locked {
     .meter,
     .sync-delay-row,
-    .speed-slider,
+    .slider-row,
     .sync-body,
     .switch {
       opacity: 0.4;
       pointer-events: none;
-      filter: grayscale(0.3);
+      filter: var(--lock-filter, grayscale(0.3));
     }
   }
 
@@ -68,21 +48,49 @@
        controls. The chart is left alone — it shows the "Live streams only" hint. */
   &.live-sync-section.locked {
     .sync-delay-row,
-    .speed-slider,
+    .slider-row,
     .sync-body,
     .switch {
       opacity: 0.4;
       pointer-events: none;
-      filter: grayscale(0.3);
+      filter: var(--lock-filter, grayscale(0.3));
     }
   }
+}
+
+/* No audio access (a conflicting extension owns the capture): the card is dimmed and
+   inert — the "why" is the warning on the Audio group label. The on/off switch stays
+   live, though, so the feature (which is what triggered the failed capture) can still
+   be turned back off — otherwise it'd be trapped on. */
+.sync-section.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.sync-section.is-disabled .switch {
+  pointer-events: auto;
 }
 
 /* --- Title row + info tooltip -------------------------------------------- */
 .sec-title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
+  min-width: 0;
+
+  /* Guard: in the narrow collapsed card a title never wraps — it trims with an
+     ellipsis (the info icon stays put). The opened card has room, so it shows the
+     full title. Localized titles are phrased to fit, so this only catches edges. */
+  strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.is-overlay .sec-title-row strong {
+  overflow: visible;
+  white-space: normal;
 }
 
 .info {
@@ -90,8 +98,10 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 15px;
-  height: 15px;
+  /* 15px glyph, but pad the hit area out to ~25px (negative margin keeps the visual
+     footprint unchanged) so the tap target isn't a tiny 15px square. */
+  padding: 5px;
+  margin: -5px;
   color: var(--muted);
   cursor: help;
 
@@ -117,6 +127,27 @@
       color: #e8900a;
     }
   }
+
+  /* Beta marker: a "β" in an orange ring, sized like the info icon; keeps its
+     orange on hover/focus instead of turning accent. */
+  &.beta,
+  &.beta:hover,
+  &.beta:focus-visible {
+    color: var(--beta);
+  }
+}
+
+.beta-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1.3px solid currentColor;
+  border-radius: 50%;
+  font:
+    800 9px/1 -apple-system,
+    sans-serif;
 }
 
 /* Tooltip bubble. Radix Tooltip is the Content element here and portals it onto
@@ -127,16 +158,26 @@
   width: max-content;
   max-width: 240px;
   padding: 9px 11px;
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   background: var(--tip-bg);
   color: var(--tip-text);
+  border: 1px solid var(--card-border);
   font-size: 11px;
   font-weight: 400;
   line-height: 1.45;
   text-align: left;
+  /* The tooltip portals to <body>; on the on-video overlay that body carries a text
+     halo (legibility over video) which looked grubby on the frosted bubble — the
+     glass already separates the text, so cancel it here. */
+  text-shadow: none;
   box-shadow: 0 8px 22px var(--shadow);
+  /* Glass: heavily blur the page behind the (now mostly-solid) --tip-bg so text
+     stays crisp even over busy video. */
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   pointer-events: none;
 }
+
 .tip.warn {
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -151,10 +192,12 @@
     opacity: 0;
   }
 }
+
 .tip[data-state="delayed-open"],
 .tip[data-state="instant-open"] {
   animation: tip-in 0.14s ease-out;
 }
+
 @media (prefers-reduced-motion: reduce) {
   .tip[data-state] {
     animation: none;
@@ -167,7 +210,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .sec-main {
@@ -175,15 +218,23 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
+  gap: var(--space-2);
+  /* Padding + matching negative margin gives the hover wash room without shifting the
+     header layout (the title button had no hover feedback before). */
+  margin: -4px -6px;
+  padding: 4px 6px;
   border: none;
+  border-radius: var(--radius-md);
   background: none;
   color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.12s;
+}
+
+.sec-main:hover {
+  background: var(--control-fill);
 }
 
 .sec-text {
@@ -199,7 +250,7 @@
 }
 
 .switch-sub {
-  margin-top: 2px;
+  margin-top: var(--space-0-5);
   font-size: 11px;
   color: var(--muted);
 }
@@ -209,15 +260,16 @@
   cursor: pointer;
 }
 
-/* Radix Switch.Root (a <button>). The knob's travel is driven by motion.dev, so
-   only the track colour transitions here; the checked colour keys off data-state. */
+/* The switch button. The track colour transitions here; the checked colour and
+   the knob's transform both key off data-state (set by our Switch component). */
 .switch-track {
   position: relative;
   display: block;
-  width: 40px;
+  /* macOS 27 kit, 3 Rg size: 54×24 track, 32×20 pill knob, 18px travel. */
+  width: 54px;
   height: 24px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--track);
   transition: background 0.2s;
 
@@ -239,11 +291,30 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
+  /* Wide horizontal pill knob (kit), not a circle. */
+  width: 32px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: var(--radius-lg);
   background: #fff;
   box-shadow: 0 1px 2px var(--shadow);
+  /* Travel = 54 (track) − 32 (knob) − 2×2 (insets) = 18px. The position (--knob-x)
+     and the transient "moving" grow (--knob-s) compose into one transform so both
+     animate together. */
+  transform: translateX(var(--knob-x, 0)) scale(var(--knob-s, 1));
+  transition:
+    transform 0.21s var(--ease-spring),
+    background 0.21s ease,
+    backdrop-filter 0.21s ease;
+}
+
+.switch-track[data-state="checked"] .switch-knob {
+  --knob-x: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-knob {
+    transition: none;
+  }
 }
 
 /* --- Collapsible body ---------------------------------------------------- */
@@ -261,7 +332,7 @@
 
   &.open {
     max-height: 560px;
-    margin-top: 12px;
+    margin-top: var(--space-3);
     opacity: 1;
     pointer-events: auto;
   }
@@ -282,10 +353,13 @@
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
 }
+
 .is-overlay > .sec-head,
 .is-overlay > .meter {
-  flex: 0 0 auto; /* frozen top — header + chart */
+  flex: 0 0 auto;
+  /* frozen top — header + chart */
 }
+
 /* Only the controls below the chart scroll, and only when they're taller than the
    popup (e.g. a long translation). In English everything fits, so no scrollbar. */
 .is-overlay > .card-scroll {
@@ -293,15 +367,17 @@
   min-height: 0;
   overflow-y: auto;
 }
+
 .overlay-card .sync-body {
   transition: none;
 }
+
 .overlay-card .sync-body.open {
   max-height: none;
 }
 
 .sync-label {
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
   font-size: 12px;
   color: var(--muted);
 
@@ -311,7 +387,7 @@
 }
 
 .sync-hint {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   font-size: 11px;
   line-height: 1.5;
   color: var(--muted);

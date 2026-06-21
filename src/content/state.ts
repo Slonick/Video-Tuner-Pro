@@ -32,13 +32,22 @@ export const S = {
   presets: DEFAULT_PRESETS.map((p) => p / 100) as number[],
   presetKeys: [...DEFAULT_PRESET_KEYS] as (string | null)[],
   // Remappable shortcut keys (e.code values) for slower / faster / reset /
-  // toggle (last speed ⇄ 1×) / hold (temporary speed while pressed).
-  keymap: { slower: "KeyA", faster: "KeyD", reset: "KeyR", toggle: "KeyS", hold: "KeyF" } as {
+  // toggle (last speed ⇄ 1×) / hold (temporary speed while pressed) / overlay
+  // (open the on-video popup).
+  keymap: {
+    slower: "KeyA",
+    faster: "KeyD",
+    reset: "KeyR",
+    toggle: "KeyS",
+    hold: "KeyF",
+    overlay: "KeyO",
+  } as {
     slower: string;
     faster: string;
     reset: string;
     toggle: string;
     hold: string;
+    overlay: string;
   },
   // How much one slower/faster press changes the speed (fraction; Shift doubles).
   speedStep: 0.05,
@@ -66,6 +75,12 @@ export const S = {
   // Where the launcher button sits, as a fraction of the video frame — per site,
   // set by dragging it. null = the default right-center spot.
   overlayBtnPos: null as { fx: number; fy: number } | null,
+  // Where the opened overlay panel sits, as a fraction of the viewport (its centre)
+  // — per site, set by dragging the panel's header. null = centred.
+  overlayPanelPos: null as { fx: number; fy: number } | null,
+  // Glass opacity multiplier for the on-video badge + launcher glass (mirrors the
+  // popup's --glass-opacity token). Set in General; 0.3…1.4, default 1.
+  glassOpacity: 1,
   // Auto-slow for dense speech: when the speaker tarators, temporarily lower the
   // effective playback speed so it stays intelligible. Enabling resolves by scope
   // (channel > site > global), like speed; `autoSlowEnabled`/`autoSlowScope` hold

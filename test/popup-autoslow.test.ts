@@ -12,19 +12,28 @@ const isOn = (id: string) => byId(id).getAttribute("aria-checked") === "true";
 const reply = (over: Record<string, unknown> = {}) => ({
   getAutoSlow: { enabled: true, target: 6, scope: "site", channel: null, ...over },
 });
+// "Save for" is a single menu button: the trigger (autoSlowSetBtn) opens a popover;
+// .scope-primary saves to the active scope; the subline Remove (autoSlowResetBtn) is a
+// two-step ConfirmButton — a second click confirms.
+const openMenu = async () => {
+  click("autoSlowSetBtn");
+  await flush();
+};
+const primary = () => document.querySelector<HTMLElement>(".scope-menu .scope-primary")!;
 
 describe("auto-slow card", () => {
   it("reflects the resolved enable + target + scope from getAutoSlow", async () => {
     await mountApp({ tab: EX, replies: reply({ target: 8 }) });
     expect(isOn("autoSlowToggle")).toBe(true);
     expect(sliderValue("autoSlowTarget")).toBe(8);
-    expect(byId("autoScopeSite").classList.contains("active")).toBe(true);
+    await openMenu();
+    expect(primary().textContent).toContain("for this site");
   });
 
-  it("preselects the Channel scope when the bundle came from a channel", async () => {
+  it("defaults the save target to Channel when the bundle came from a channel", async () => {
     await mountApp({ tab: EX, replies: reply({ scope: "channel", channel: "twitch:x" }) });
-    expect(byId("autoScopeSeg").classList.contains("has-channel")).toBe(true);
-    expect(byId("autoScopeChannel").classList.contains("active")).toBe(true);
+    await openMenu();
+    expect(primary().textContent).toContain("for this channel");
   });
 
   it("the toggle previews live via setAutoSlow", async () => {
@@ -50,7 +59,8 @@ describe("auto-slow card", () => {
 
   it("Save sends rememberAutoSlow for the selected scope", async () => {
     const { lastCall } = await mountApp({ tab: EX, replies: reply({ target: 7 }) });
-    click("autoSlowSetBtn");
+    await openMenu();
+    primary().click();
     await flush();
     expect(lastCall("rememberAutoSlow")).toMatchObject({
       action: "rememberAutoSlow",
@@ -61,10 +71,18 @@ describe("auto-slow card", () => {
   });
 
   it("Reset sends resetAutoSlow and pulls the re-resolved value back", async () => {
-    const { replies, lastCall } = await mountApp({ tab: EX, replies: reply({ target: 8 }) });
+    const { replies, lastCall } = await mountApp({
+      tab: EX,
+      replies: reply({ target: 8 }),
+      settings: { autoSlowSites: { "example.com": { on: true, target: 8 } } }, // Site saved → Reset enabled
+    });
+    await flush();
     replies.resetAutoSlow = { success: true };
     replies.getAutoSlow = { enabled: false, target: 6, scope: null, channel: null };
-    click("autoSlowResetBtn");
+    await openMenu();
+    click("autoSlowResetBtn"); // arm
+    await flush();
+    click("autoSlowResetBtn"); // confirm
     await wait(120);
     expect(lastCall("resetAutoSlow")).toMatchObject({ action: "resetAutoSlow", scope: "site" });
   });
