@@ -53,6 +53,7 @@ jobs:
           CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           rm -rf .promo/store          # drop stale assets from older layouts/sizes
+          node tools/promo-capture.mjs # drive the live popup → per-locale captures
           npm run promo                # localized store screenshots + tiles
           npm run promo:gif            # README animation
 
