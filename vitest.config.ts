@@ -55,10 +55,10 @@ export default defineConfig({
       // into React components (.tsx), which the .tsx exclude above deliberately leaves
       // ungated — so the .ts logic that remains is what these floors track.
       thresholds: {
-        statements: 85,
-        branches: 74,
-        functions: 87,
-        lines: 88,
+        statements: 86,
+        branches: 77,
+        functions: 89,
+        lines: 89,
       },
     },
   },

@@ -3,10 +3,28 @@ import { describe, it, expect } from "vitest";
 import {
   clampGlassOpacity,
   applyGlassOpacity,
+  ensureGlassFilter,
   DEFAULT_GLASS_OPACITY,
   GLASS_OPACITY_MIN,
   GLASS_OPACITY_MAX,
 } from "../src/shared/glass.js";
+
+describe("ensureGlassFilter", () => {
+  it("injects the displacement filter once into a document (idempotent)", () => {
+    const count = () => document.querySelectorAll("svg filter").length;
+    ensureGlassFilter(document);
+    const after1 = count();
+    expect(after1).toBeGreaterThanOrEqual(1);
+    ensureGlassFilter(document); // already present → no duplicate
+    expect(count()).toBe(after1);
+  });
+
+  it("injects into a shadow root too", () => {
+    const sr = document.createElement("div").attachShadow({ mode: "open" });
+    ensureGlassFilter(sr);
+    expect(sr.querySelector("svg")).toBeTruthy();
+  });
+});
 
 describe("clampGlassOpacity", () => {
   it("falls back to the default for non-numeric input", () => {

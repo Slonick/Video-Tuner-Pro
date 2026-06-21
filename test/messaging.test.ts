@@ -224,6 +224,13 @@ describe("auto-slow actions", () => {
     expect((resp as { success: boolean }).success).toBe(true);
   });
 
+  it("setAutoSlow falls back to the default target when none is given", () => {
+    send({ action: "setAutoSlow", enabled: true }); // no target → NaN → default
+    expect(autoslow.setAutoSlowPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ on: true, target: expect.any(Number) }),
+    );
+  });
+
   it("rememberAutoSlow persists the bundle by scope", () => {
     send({ action: "rememberAutoSlow", scope: "channel", enabled: true, target: 7 });
     expect(autoslow.persistChannelAutoSlow).toHaveBeenCalledWith({ on: true, target: 7 });
