@@ -64,3 +64,37 @@ export async function setStorage(sw: Worker, obj: Record<string, unknown>): Prom
 export async function clearStorage(sw: Worker): Promise<void> {
   await sw.evaluate(() => chrome.storage.sync.clear());
 }
+
+// The routed store (shared/store.ts) splits keys between sync and local; the
+// options/popup UIs write through it. For tests we read the union of both areas
+// (sync wins on the rare overlap) and clear both for a clean slate.
+export async function readStored(
+  sw: Worker,
+  keys: string | string[] | null,
+): Promise<Record<string, unknown>> {
+  return (await sw.evaluate(async (keys) => {
+    const [local, sync] = await Promise.all([
+      chrome.storage.local.get(keys ?? null),
+      chrome.storage.sync.get(keys ?? null),
+    ]);
+    return { ...local, ...sync };
+  }, keys)) as Record<string, unknown>;
+}
+export async function clearAll(sw: Worker): Promise<void> {
+  await sw.evaluate(async () => {
+    await chrome.storage.sync.clear();
+    await chrome.storage.local.clear();
+  });
+}
+
+// Open one of the extension's own pages (popup / options) as a real tab the test
+// can click — Playwright drives it directly (no cross-extension sandbox).
+export async function openExtensionPage(
+  context: BrowserContext,
+  extensionId: string,
+  path: string,
+): Promise<import("@playwright/test").Page> {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/${path}`);
+  return page;
+}

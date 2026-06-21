@@ -40,6 +40,9 @@ import {
   persistGlobalSpeed,
   resetScope,
   setSpeed,
+  applyAll,
+  effectiveSpeed,
+  reassertRate,
 } from "../src/content/speed.js";
 
 const get = (keys: string[]): Record<string, unknown> => {
@@ -255,5 +258,61 @@ describe("applyToVideo (via applyAll)", () => {
     expect((v.addEventListener as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
       callsAfterFirst,
     );
+  });
+});
+
+describe("effectiveSpeed + reassertRate", () => {
+  afterEach(() => {
+    S.autoSlowEnabled = false;
+    S.audioSpeedEnabled = false;
+    h.live = false;
+  });
+
+  it("scales by the auto-slow factor only when the feature is on", () => {
+    S.currentSpeed = 2;
+    S.autoSlowEnabled = false;
+    expect(effectiveSpeed()).toBe(2);
+    S.autoSlowEnabled = true;
+    S.autoSlowFactor = 0.5;
+    expect(effectiveSpeed()).toBe(1);
+  });
+
+  it("reassertRate re-applies to a non-live <video> and skips a live one", () => {
+    S.currentSpeed = 1.25;
+    const v = document.createElement("video");
+    reassertRate(v);
+    expect(v.playbackRate).toBeCloseTo(1.25, 5);
+    const live = document.createElement("video");
+    h.live = true;
+    reassertRate(live);
+    expect(live.playbackRate).toBe(1); // live → owned by live-sync, untouched
+  });
+
+  it("reassertRate touches <audio> only when the audio-speed toggle is on", () => {
+    S.currentSpeed = 1.3;
+    const a = document.createElement("audio");
+    S.audioSpeedEnabled = false;
+    reassertRate(a);
+    expect(a.playbackRate).toBe(1);
+    S.audioSpeedEnabled = true;
+    reassertRate(a);
+    expect(a.playbackRate).toBeCloseTo(1.3, 5);
+  });
+
+  it("applyAll writes the auto-slowed rate, forces preservesPitch, seeds the intended default", () => {
+    const v = {
+      playbackRate: 1,
+      defaultPlaybackRate: 1,
+      preservesPitch: false,
+      addEventListener: vi.fn(),
+    } as unknown as HTMLVideoElement;
+    h.videos = [v];
+    S.currentSpeed = 2;
+    S.autoSlowEnabled = true;
+    S.autoSlowFactor = 0.5;
+    applyAll();
+    expect(v.playbackRate).toBeCloseTo(1, 5); // 2 × 0.5 (auto-slowed)
+    expect(v.preservesPitch).toBe(true); // pitch kept natural
+    expect(v.defaultPlaybackRate).toBeCloseTo(2, 5); // seeded at the intended speed
   });
 });

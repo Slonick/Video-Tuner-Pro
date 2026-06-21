@@ -47,6 +47,13 @@ describe("normalizeHost (content == popup)", () => {
     expect(normalizeHost(input)).toBe(expected);
     expect(popupNormalizeHost(input)).toBe(expected); // must stay in sync
   });
+
+  it("treats null / undefined / empty as an empty host", () => {
+    for (const v of [null, undefined, ""]) {
+      expect(normalizeHost(v)).toBe("");
+      expect(popupNormalizeHost(v)).toBe("");
+    }
+  });
 });
 
 describe("debounce", () => {
