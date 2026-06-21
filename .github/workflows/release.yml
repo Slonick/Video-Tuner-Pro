@@ -21,16 +21,6 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
     secrets: inherit
-    # ci.yml's claude-review / claude-triage jobs request pull-requests / id-token
-    # / actions permissions. They're PR-only (skipped on a release), but a reusable
-    # workflow call is permission-checked STATICALLY — before `if:` is evaluated —
-    # so the caller must allow at least what the called jobs request, or the whole
-    # workflow is rejected as invalid. Grant the union here.
-    permissions:
-      contents: read
-      pull-requests: write
-      id-token: write
-      actions: read
 
   # Target-independent gate, run once (not per target): manifest/locale JSON is
   # well-formed, every locale defines the same keys as English, and the store-
@@ -39,7 +29,7 @@ jobs:
   # the upload rejected, so fail here before building or publishing anything.
   validate:
     name: Validate manifest & locales
-    runs-on: [self-hosted, unraid]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -75,7 +65,7 @@ jobs:
   build:
     name: Build & publish ${{ matrix.target }}
     needs: [ci, validate]
-    runs-on: [self-hosted, unraid]
+    runs-on: ubuntu-latest
     # Chrome and Firefox run as independent parallel jobs. fail-fast: false so a
     # failure publishing one store never cancels the other mid-flight.
     strategy:

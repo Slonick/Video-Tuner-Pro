@@ -2,8 +2,10 @@ name: CI
 
 # lint is the cheap fast-fail gate; unit and e2e then run in parallel (both only
 # need lint), so a failure in the basics short-circuits before any tests run while
-# the two independent test layers still finish as fast as possible. On pull
-# requests a Claude code-quality review runs last, once unit AND e2e are green.
+# the two independent test layers still finish as fast as possible.
+#
+# A Claude code-quality review is NOT run automatically (it burned too much runner
+# time); request one on demand by commenting `@claude` on the PR — see claude.yml.
 #
 # Runs on every push to main (post-merge) and on every pull request. Enable branch
 # protection (Settings → Branches → require the "lint" / "unit" / "e2e" checks) to
@@ -26,7 +28,7 @@ jobs:
   # ── Static analysis (fastest gate) ─────────────────────────────────────────
   lint:
     name: lint
-    runs-on: [self-hosted, unraid]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -50,7 +52,7 @@ jobs:
   unit:
     name: unit
     needs: lint
-    runs-on: [self-hosted, unraid]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -98,7 +100,12 @@ jobs:
   e2e:
     name: e2e
     needs: lint
-    runs-on: [self-hosted, unraid]
+    runs-on: ubuntu-latest
+    # The official Playwright image ships Chromium + every required system lib
+    # preinstalled, so the job skips the slow "--with-deps" apt install AND the
+    # browser download (~7 min → seconds; just an image pull). Keep this tag in
+    # lockstep with @playwright/test in package.json on every Playwright bump.
+    container: mcr.microsoft.com/playwright:v1.61.0-jammy
     steps:
       - uses: actions/checkout@v7
 
@@ -109,12 +116,11 @@ jobs:
 
       - run: npm ci
 
-      # No `container:` here — a container job inside the containerized self-hosted
-      # runner can't resolve the runner's /__e (node) bind-mount on the Docker host
-      # (DooD). Install Chromium + system deps directly on the runner instead; the
-      # long-lived runner keeps both cached across runs.
-      - name: Install Playwright Chromium + system deps
-        run: npx playwright install --with-deps chromium
+      # Chromium is baked into the image at the matching revision; this is a
+      # no-op on a match (no --with-deps, no apt) and only fetches if the npm
+      # Playwright build ever drifts ahead of the image tag.
+      - name: Ensure Playwright Chromium
+        run: npx playwright install chromium
 
       - name: Build the extension and run the E2E suite
         run: npm run test:e2e
@@ -165,92 +171,3 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
-
-  # ── Claude code-quality review (PRs only, last — runs only if unit + e2e passed) ─
-  # Auth via a Claude subscription (Pro/Max) token in secret CLAUDE_CODE_OAUTH_TOKEN
-  # (`claude setup-token`). Skipped on push events and on fork PRs (no secret).
-  claude-review:
-    name: claude-review
-    needs: [unit, e2e]
-    if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, unraid]
-    permissions:
-      contents: read
-      pull-requests: write
-      id-token: write # claude-code-action exchanges an OIDC token for its GitHub token
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # The promo-regeneration PR is opened by github-actions[bot]; the action
-          # blocks bot-initiated runs unless they're allow-listed.
-          allowed_bots: "github-actions[bot]"
-          prompt: |
-            Review this pull request and report ONLY genuinely critical issues.
-            If there are none, reply with exactly one line: "No critical issues."
-            Do not comment on anything non-critical.
-
-            Work from the diff, not the whole tree: start with
-            `git diff origin/main...HEAD` and judge the changed hunks. Open a
-            full file only when a hunk genuinely can't be judged without its
-            surrounding context, and don't re-read content the diff already
-            shows — this keeps the review fast and cheap.
-
-            CRITICAL means: a real bug or regression that changes/breaks behaviour;
-            a crash, hang, data loss, or security vulnerability; a broken build or
-            failing test; or incorrect logic in the fragile areas of this MV3
-            TypeScript extension — live-stream detection, the live-sync catch-up
-            algorithm, Web Audio routing/metering, popup⇄content message passing,
-            cross-origin/CORS handling, extension-context invalidation, or the
-            per-target (Chrome/Firefox) manifest.
-
-            NOT critical (stay silent): style, naming, formatting, comments,
-            structure/refactor opinions, micro-optimizations, "nice to have"
-            suggestions, optional/extra test coverage, and any praise.
-
-            For each critical issue give file:line, why it breaks something, and
-            the fix. Be terse. When unsure whether something is critical, omit it.
-
-  # ── Claude failure triage (PRs only, runs only when unit OR e2e failed) ──────
-  # Mirror of claude-review for the red path: pulls the failing job logs and posts
-  # concrete fix suggestions. Same Claude subscription token. PR-only so it can't
-  # fire on routine branch pushes; bounded to actual red runs.
-  claude-triage:
-    name: claude-triage
-    needs: [unit, e2e]
-    if: failure() && github.event_name == 'pull_request'
-    runs-on: [self-hosted, unraid]
-    permissions:
-      contents: read
-      pull-requests: write
-      actions: read # read this run's failed-job logs via `gh run view`
-      id-token: write # claude-code-action exchanges an OIDC token for its GitHub token
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            The CI checks failed on this pull request (run id ${{ github.run_id }}).
-
-            Pull the failing logs first:
-              gh run view ${{ github.run_id }} --log-failed
-            Those are the unit (Vitest) and/or e2e (Playwright) jobs. Identify
-            which tests/checks failed and read their actual error output.
-
-            Then post ONE concise PR comment with concrete, actionable fix
-            recommendations — file:line and the change to make — for each REAL
-            failure. Judge fixes against the diff: `git diff origin/main...HEAD`.
-
-            If a failure looks like flakiness rather than a real defect (a timeout
-            that the automatic retry then passed, a value-poll that needed more
-            time, no link to the changed code), say so explicitly and recommend
-            stabilising the test instead of inventing a code fix — do NOT fabricate
-            a root cause. Be terse.
