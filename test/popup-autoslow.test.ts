@@ -104,3 +104,32 @@ describe("auto-slow card", () => {
     expect(Number.isFinite(sliderValue("autoSlowTarget"))).toBe(true);
   });
 });
+
+// The global response knobs (Slowest speed + Reaction) write their own storage
+// keys live — not per-site — via useAutoSlowKnobs.
+describe("auto-slow response knobs (global)", () => {
+  it("loads the stored floor (as a fraction) + reaction into the sliders", async () => {
+    await mountApp({
+      tab: EX,
+      replies: reply(),
+      settings: { autoSlowFloor: 0.7, autoSlowReaction: 30 },
+    });
+    expect(sliderValue("asFloor")).toBe(70); // 0.7 → 70%
+    expect(sliderValue("asReaction")).toBe(30);
+  });
+
+  it("defaults the knobs when nothing is stored", async () => {
+    await mountApp({ tab: EX, replies: reply() });
+    expect(sliderValue("asFloor")).toBe(100);
+    expect(sliderValue("asReaction")).toBe(50);
+  });
+
+  it("applies edits from the sliders (setFloor / setReaction run their write path)", async () => {
+    await mountApp({ tab: EX, replies: reply() });
+    setSlider("asFloor", 85);
+    setSlider("asReaction", 60);
+    await flush();
+    expect(sliderValue("asFloor")).toBe(85);
+    expect(sliderValue("asReaction")).toBe(60);
+  });
+});
