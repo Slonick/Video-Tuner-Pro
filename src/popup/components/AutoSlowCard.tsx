@@ -49,7 +49,8 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
           "sync-section autoslow-section overlay-card" +
           (open ? " is-overlay" : "") +
           (live ? " locked" : "") +
-          (blocked ? " is-disabled" : "")
+          (blocked ? " is-disabled" : "") +
+          (!a.enabled ? " is-off" : "")
         }
       >
         <div className="sec-head">
@@ -96,36 +97,34 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
             <span>{msg("autoSlowSubtitle") || "Ease off when speech gets too fast"}</span>
             <Switch id="autoSlowToggle" checked={a.enabled} onChange={a.setEnabled} />
           </div>
-          <div className="sync-delay-row">
-            <span>{msg("autoSlowTargetLabel") || "Target rate"}</span>
-          </div>
-          <SliderRow
-            sliderId="autoSlowTarget"
-            min={3}
-            max={12}
-            step={0.5}
-            value={a.target}
-            ariaLabel={msg("meterTarget") || "Target rate"}
-            ariaValueText={`${a.target.toFixed(1)} /s`}
-            onChange={(v) => a.setTarget(v)}
-            onDown={() => a.nudge(-0.5)}
-            downId="autoSlowDown"
-            downLabel="Lower target"
-            onUp={() => a.nudge(0.5)}
-            upId="autoSlowUp"
-            upLabel="Raise target"
-            onReset={a.resetManual}
-            resetId="autoSlowReset"
-            resetTitle={msg("tipResetTarget")}
-            valueText={
-              <>
-                <b>{a.target.toFixed(1)}</b> /s
-              </>
-            }
-          />
 
           <div className={"sync-body" + (open ? " open" : "")} id="autoSlowBody">
-            <div className="quick-actions">
+            {/* Target rate (per-scope) on one row with the Save button. */}
+            <div className="as-target-row">
+              <SliderRow
+                sliderId="autoSlowTarget"
+                min={3}
+                max={12}
+                step={0.5}
+                value={a.target}
+                ariaLabel={msg("meterTarget") || "Target rate"}
+                ariaValueText={`${a.target.toFixed(1)} /s`}
+                onChange={(v) => a.setTarget(v)}
+                onDown={() => a.nudge(-0.5)}
+                downId="autoSlowDown"
+                downLabel="Lower target"
+                onUp={() => a.nudge(0.5)}
+                upId="autoSlowUp"
+                upLabel="Raise target"
+                onReset={a.resetManual}
+                resetId="autoSlowReset"
+                resetTitle={msg("tipResetTarget")}
+                valueText={
+                  <>
+                    <b>{a.target.toFixed(1)}</b> /s
+                  </>
+                }
+              />
               <SaveScope
                 scope={a.scope}
                 saved={a.saved}

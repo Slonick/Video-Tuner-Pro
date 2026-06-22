@@ -45,6 +45,18 @@
     }
   }
 
+  /* Turned off: dim the chart + the (expanded) controls the way Live-sync dims when
+     it has nothing to do, while the enable row stays bright so it can be switched
+     back on. Skipped when already locked/blocked — those dim more strongly. */
+  &.autoslow-section.is-off:not(.locked):not(.is-disabled) {
+    .meter,
+    .sync-body {
+      opacity: 0.4;
+      pointer-events: none;
+      filter: var(--lock-filter, grayscale(0.3));
+    }
+  }
+
   /* The mirror case: off a live stream live-sync has nothing to do, so dim its
        controls. The chart is left alone — it shows the "Live streams only" hint. */
   &.live-sync-section.locked {
