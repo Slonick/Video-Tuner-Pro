@@ -2,7 +2,8 @@
 // live speech graph, and an always-visible target-rate row (steppers + slider).
 // The target previews live; Save commits the {enable, target} bundle to the chosen
 // scope (channel > site > global), Reset clears it. The expanded body also holds the
-// global response knobs (Slowest speed + Reaction; Hold / Ease-back stay options-only).
+// global response knobs (Slowest speed + Soft knee + Reaction; Hold / Ease-back stay
+// options-only).
 import { useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
@@ -151,6 +152,20 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
                 animate={false}
                 fmt={(v) => Math.round(v) + "%"}
                 onChange={k.setFloor}
+              />
+              <ParamSlider
+                id="asKnee"
+                valId="asKneeVal"
+                label={msg("optAutoSlowKnee") || "Soft knee"}
+                desc={msg("optAutoSlowKneeHint") || ""}
+                min={0}
+                max={2}
+                step={0.1}
+                tickStep={0.5}
+                value={k.knee}
+                animate={false}
+                fmt={(v) => "±" + v.toFixed(1) + " /s"}
+                onChange={k.setKnee}
               />
               <ParamSlider
                 id="asReaction"

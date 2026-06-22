@@ -148,6 +148,11 @@ export const REGISTRY: Entry<unknown>[] = [
     set: (v) => (S.autoSlowFloor = v),
   }),
   entry({
+    key: "autoSlowKnee",
+    parse: (raw) => clampNum(raw, 0, 2, 0.5),
+    set: (v) => (S.autoSlowKnee = v),
+  }),
+  entry({
     key: "autoSlowHold",
     parse: (raw) => clampNum(raw, 0, 4, 1.2),
     set: (v) => (S.autoSlowHold = v),

@@ -23,10 +23,11 @@ interface KnobProps {
   min: number;
   max: number;
   step: number;
+  tickStep?: number;
   id: string;
   onChange: (v: number) => void;
 }
-function Knob({ label, hint, value, display, min, max, step, id, onChange }: KnobProps) {
+function Knob({ label, hint, value, display, min, max, step, tickStep, id, onChange }: KnobProps) {
   return (
     <div className="opt-param">
       <div className="opt-param-row">
@@ -39,6 +40,7 @@ function Knob({ label, hint, value, display, min, max, step, id, onChange }: Kno
         min={min}
         max={max}
         step={step}
+        tickStep={tickStep}
         value={value}
         ariaLabel={label}
         onChange={onChange}
@@ -50,18 +52,23 @@ function Knob({ label, hint, value, display, min, max, step, id, onChange }: Kno
 
 export function AutoSlow() {
   const [floorPct, setFloorPct] = useState(100);
+  const [knee, setKnee] = useState(0.5);
   const [hold, setHold] = useState(1.2);
   const [reaction, setReaction] = useState(50);
   const [easeBack, setEaseBack] = useState(25);
 
   useEffect(() => {
-    STORE.get(["autoSlowFloor", "autoSlowHold", "autoSlowReaction", "autoSlowEaseBack"], (r) => {
-      const f = Number(r.autoSlowFloor);
-      setFloorPct(Number.isNaN(f) ? 100 : clampNum(f * 100, 50, 100, 100));
-      setHold(clampNum(r.autoSlowHold, 0, 4, 1.2));
-      setReaction(clampNum(r.autoSlowReaction, 0, 100, 50));
-      setEaseBack(clampNum(r.autoSlowEaseBack, 0, 100, 25));
-    });
+    STORE.get(
+      ["autoSlowFloor", "autoSlowKnee", "autoSlowHold", "autoSlowReaction", "autoSlowEaseBack"],
+      (r) => {
+        const f = Number(r.autoSlowFloor);
+        setFloorPct(Number.isNaN(f) ? 100 : clampNum(f * 100, 50, 100, 100));
+        setKnee(clampNum(r.autoSlowKnee, 0, 2, 0.5));
+        setHold(clampNum(r.autoSlowHold, 0, 4, 1.2));
+        setReaction(clampNum(r.autoSlowReaction, 0, 100, 50));
+        setEaseBack(clampNum(r.autoSlowEaseBack, 0, 100, 25));
+      },
+    );
   }, []);
 
   const write = (key: string, set: (v: number) => void, lo: number, hi: number) => (v: number) => {
@@ -96,6 +103,21 @@ export function AutoSlow() {
             setFloorPct(n);
             STORE.set({ autoSlowFloor: n / 100 });
           }}
+        />
+        <Knob
+          id="autoSlowKnee"
+          label={msg("optAutoSlowKnee") || "Soft knee"}
+          hint={
+            msg("optAutoSlowKneeHint") ||
+            "Eases the slowdown in across a band around the target rate instead of switching on sharply. Wider = gentler, earlier."
+          }
+          value={knee}
+          display={`±${knee.toFixed(1)} /s`}
+          min={0}
+          max={2}
+          step={0.1}
+          tickStep={0.5}
+          onChange={write("autoSlowKnee", setKnee, 0, 2)}
         />
         <Knob
           id="autoSlowHold"

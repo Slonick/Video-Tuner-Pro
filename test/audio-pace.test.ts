@@ -61,10 +61,27 @@ describe("suggestEffectiveSpeed", () => {
     expect(suggestEffectiveSpeed(2, 2, 2, 1)).toBe(2);
   });
 
-  it("slows gradually (partial compensation), not straight to full", () => {
-    // perceived 8 at 2× → intrinsic 4 → full comp 1.5×; eased 0.7 of the way:
-    // 2 − (2 − 1.5)·0.7 = 1.65×. Gentler than the 1.5 of full compensation.
-    expect(suggestEffectiveSpeed(8, 2, 2, 1, 6)).toBeCloseTo(1.65, 5);
+  it("hard knee (softKnee 0) fully compensates to the target", () => {
+    // perceived 8 at 2× → intrinsic 4 → clamp perceived to target 6 → 6/4 = 1.5×.
+    expect(suggestEffectiveSpeed(8, 2, 2, 1, 6, 0)).toBeCloseTo(1.5, 5);
+  });
+
+  it("soft knee engages gradually inside the band", () => {
+    // intrinsic 2.5 → at 2× perceived is 5, inside the knee [4,8] (target 6, ±2):
+    // q = 5 − (5−6+2)²/8 = 4.875 → 4.875/2.5 = 1.95× — barely slowed.
+    expect(suggestEffectiveSpeed(5, 2, 2, 1, 6, 2)).toBeCloseTo(1.95, 5);
+  });
+
+  it("soft knee leaves the speed alone below the band (target − knee)", () => {
+    // perceived 4 at 2× → intrinsic 2, p = 4 = target − 2 → no slowdown.
+    expect(suggestEffectiveSpeed(4, 2, 2, 1, 6, 2)).toBeCloseTo(2, 5);
+  });
+
+  it("a wider knee starts slowing earlier than a narrow one", () => {
+    const wide = suggestEffectiveSpeed(5, 2, 2, 1, 6, 2); // band [4,8] → engaged
+    const narrow = suggestEffectiveSpeed(5, 2, 2, 1, 6, 0.5); // band [5.5,6.5] → not yet
+    expect(wide).toBeLessThan(narrow);
+    expect(narrow).toBeCloseTo(2, 5);
   });
 
   it("reaches the floor only on very dense speech", () => {

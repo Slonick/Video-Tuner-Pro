@@ -196,13 +196,14 @@ test.describe("Options · Keys", () => {
 });
 
 test.describe("Options · Auto-slow", () => {
-  test("the four global knobs persist their extremes", async ({
+  test("the five global knobs persist their extremes", async ({
     context,
     extensionId,
     serviceWorker,
   }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
     await sliderTo(page, "#autoSlowFloor", "Home"); // 50% → 0.5
+    await sliderTo(page, "#autoSlowKnee", "End"); // ±2 /s
     await sliderTo(page, "#autoSlowHold", "End"); // 4 s
     await sliderTo(page, "#autoSlowReaction", "End"); // 100%
     await sliderTo(page, "#autoSlowEaseBack", "End"); // 100%
@@ -210,6 +211,7 @@ test.describe("Options · Auto-slow", () => {
       .poll(async () =>
         readStored(serviceWorker, [
           "autoSlowFloor",
+          "autoSlowKnee",
           "autoSlowHold",
           "autoSlowReaction",
           "autoSlowEaseBack",
@@ -217,6 +219,7 @@ test.describe("Options · Auto-slow", () => {
       )
       .toEqual({
         autoSlowFloor: 0.5,
+        autoSlowKnee: 2,
         autoSlowHold: 4,
         autoSlowReaction: 100,
         autoSlowEaseBack: 100,

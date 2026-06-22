@@ -333,14 +333,16 @@ describe("Options · Compressor presets", () => {
 });
 
 describe("Options · Auto-slow", () => {
-  it("the four knobs persist their extremes", async () => {
+  it("the five knobs persist their extremes", async () => {
     const { get } = await mountOptions({});
     sliderKey(byId("autoSlowFloor").querySelector('[role="slider"]')!, "Home"); // 50% → 0.5
+    sliderKey(byId("autoSlowKnee").querySelector('[role="slider"]')!, "End"); // ±2 /s
     sliderKey(byId("autoSlowHold").querySelector('[role="slider"]')!, "End"); // 4 s
     sliderKey(byId("autoSlowReaction").querySelector('[role="slider"]')!, "End"); // 100%
     sliderKey(byId("autoSlowEaseBack").querySelector('[role="slider"]')!, "End"); // 100%
     await flush();
     expect(get(["autoSlowFloor"]).autoSlowFloor).toBeCloseTo(0.5, 2);
+    expect(get(["autoSlowKnee"]).autoSlowKnee).toBeCloseTo(2, 2);
     expect(get(["autoSlowHold"]).autoSlowHold).toBe(4);
     expect(get(["autoSlowReaction"]).autoSlowReaction).toBe(100);
     expect(get(["autoSlowEaseBack"]).autoSlowEaseBack).toBe(100);
