@@ -131,6 +131,25 @@ describe("launcher — open / close", () => {
     expect(frameEl()!.style.display).toBe("none");
   });
 
+  it("recreates the iframe on each open so it loads the current popup", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    const fab = fabEl()!;
+    // Open, close, reopen.
+    fire(fab, "pointerdown", 580, 158);
+    fire(fab, "pointerup", 580, 158);
+    const first = frameEl()!;
+    fire(host()!.shadowRoot!.querySelector("div") as HTMLElement, "pointerdown"); // backdrop → close
+    fire(fab, "pointerdown", 580, 158);
+    fire(fab, "pointerup", 580, 158);
+    const second = frameEl()!;
+    expect(second).not.toBe(first); // fresh element each open
+    expect(host()!.shadowRoot!.querySelectorAll("iframe").length).toBe(1); // old one removed
+    expect(second.style.display).toBe("block");
+    fire(host()!.shadowRoot!.querySelector("div") as HTMLElement, "pointerdown"); // leave closed
+  });
+
   it("a drag repositions the button and persists the fraction instead of opening", () => {
     S.overlayButton = "always";
     h.primary = fakeVideo();

@@ -228,7 +228,7 @@ function openPopup(): void {
   if (open || !shadow) return;
   open = true;
   fab?.setAttribute("aria-expanded", "true"); // morphs the icon play → ✕
-  if (!frame) {
+  if (!backdrop) {
     backdrop = document.createElement("div");
     // Transparent click-catcher (close on outside click); the frost lives on the
     // panel itself, not a full-screen scrim.
@@ -239,34 +239,41 @@ function openPopup(): void {
       zIndex: "2147483646",
     } as Partial<CSSStyleDeclaration>);
     backdrop.addEventListener("pointerdown", closePopup);
-    frame = document.createElement("iframe");
-    // Chrome makes the overlay iframe TRANSPARENT only when its color-scheme matches
-    // the host's used scheme; a mismatch paints an opaque backdrop. And the host's
-    // scheme isn't readable inside the iframe (Facebook forces it via <meta>, which
-    // getComputedStyle doesn't surface). So compute it HERE and pass two things:
-    //   host  → the popup sets color-scheme to match → transparent on any site;
-    //   os    → the popup themes the glass to the OS (decoupled from color-scheme).
-    frame.src = api.runtime.getURL("popup/popup.html") + overlaySchemeHash();
-    // The panel blurs the video behind it — backdrop-filter on the iframe element
-    // (in the page) is reliable, unlike a filter applied inside the iframe document.
-    // The translucent tint lives in the popup's own CSS (html.vtp-embedded, theme
-    // aware), so it's left off here; this element only supplies blur + the frame.
-    Object.assign(frame.style, {
-      position: "fixed",
-      left: "50%",
-      top: "50%",
-      border: "1px solid rgba(255,255,255,0.14)", // hairline edge for the glass panel
-      borderRadius: "16px",
-      WebkitBackdropFilter: "blur(10px) saturate(180%) brightness(1.04)",
-      backdropFilter: "blur(10px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
-      boxShadow: "0 24px 70px rgba(0,0,0,0.5)",
-      colorScheme: "normal",
-      zIndex: "2147483647",
-    } as Partial<CSSStyleDeclaration>);
-    shadow.append(backdrop, frame);
+    shadow.append(backdrop);
   }
-  backdrop!.style.display = "block";
+  // Recreate the iframe on every open so it always loads the current popup/popup.html
+  // — the toolbar popup is recreated by the browser each open; this mirrors that. The
+  // old frame is removed first to drop its document (timers, graph samplers) and avoid
+  // leaks. frameH (module-level) carries the last reported height across opens so the
+  // panel starts at its real size with no flicker; layoutFrame() refits it.
+  if (frame) frame.remove();
+  frame = document.createElement("iframe");
+  // Chrome makes the overlay iframe TRANSPARENT only when its color-scheme matches
+  // the host's used scheme; a mismatch paints an opaque backdrop. And the host's
+  // scheme isn't readable inside the iframe (Facebook forces it via <meta>, which
+  // getComputedStyle doesn't surface). So compute it HERE and pass two things:
+  //   host  → the popup sets color-scheme to match → transparent on any site;
+  //   os    → the popup themes the glass to the OS (decoupled from color-scheme).
+  frame.src = api.runtime.getURL("popup/popup.html") + overlaySchemeHash();
+  // The panel blurs the video behind it — backdrop-filter on the iframe element
+  // (in the page) is reliable, unlike a filter applied inside the iframe document.
+  // The translucent tint lives in the popup's own CSS (html.vtp-embedded, theme
+  // aware), so it's left off here; this element only supplies blur + the frame.
+  Object.assign(frame.style, {
+    position: "fixed",
+    left: "50%",
+    top: "50%",
+    border: "1px solid rgba(255,255,255,0.14)", // hairline edge for the glass panel
+    borderRadius: "16px",
+    WebkitBackdropFilter: "blur(10px) saturate(180%) brightness(1.04)",
+    backdropFilter: "blur(10px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
+    boxShadow: "0 24px 70px rgba(0,0,0,0.5)",
+    colorScheme: "normal",
+    zIndex: "2147483647",
+  } as Partial<CSSStyleDeclaration>);
+  shadow.append(frame);
   frame.style.display = "block";
+  backdrop.style.display = "block"; // cached backdrop is hidden on close — re-show it
   layoutFrame();
   positionPanel();
   // Entrance: the panel scales up + fades in about its centre (the translate keeps
