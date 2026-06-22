@@ -1,10 +1,36 @@
 // Poll the page for monitor data ~13×/s and fold it into the shared graph state;
 // the rAF loop interpolates between samples. Also seeds both graphs once from the
 // background-collected history so they don't start empty.
-import { api } from "../platform/browser.js";
+import { sendToTab } from "../platform/browser.js";
 import { now } from "./draw-util.js";
 import { A_WINDOW, BUF_WINDOW, AS_WINDOW } from "./state.js";
 import type { GraphState, BufSample } from "./state.js";
+
+interface MonitorResp {
+  audio?: {
+    active?: boolean;
+    enabled?: boolean;
+    knee?: number;
+    translation?: boolean;
+    blocked?: string;
+    in?: number;
+    out?: number;
+  };
+  autoSlow?: { active?: boolean; target?: number; rate: number; speed: number };
+  live?: boolean;
+  buffer?: number;
+  bufferAhead?: number;
+  bitrate?: number;
+  bufLimited?: boolean;
+}
+
+interface HistoryResp {
+  autoSlow?: number[][];
+  autoSlowStep?: number;
+  audio?: number[][];
+  audioStep?: number;
+  buffer?: number[][];
+}
 
 // Poll the page ~13×/s and fold monitor data into the shared graph state. `getTabId`
 // supplies the active tab; `onTranslating` reports VOT state to the caller (React).
@@ -18,8 +44,8 @@ export function startPoll(
   const id = setInterval(() => {
     const tabId = getTabId();
     if (tabId == null) return;
-    api.tabs.sendMessage(tabId, { action: "getMonitor" }, (resp) => {
-      if (api.runtime.lastError || !resp) {
+    void sendToTab<MonitorResp>(tabId, { action: "getMonitor" }).then((resp) => {
+      if (!resp) {
         g.audioActive = false;
         onTranslating(false);
         onBlocked(null);
@@ -36,11 +62,11 @@ export function startPoll(
       const as = resp.autoSlow;
       g.asActive = !!(as && as.active);
       if (as && typeof as.target === "number") g.asTargetLine = as.target; // always tracks the setting
-      if (g.asActive) {
+      if (as && g.asActive) {
         g.asRate = as.rate;
         g.asSpeed = as.speed;
       }
-      if (g.audioActive) {
+      if (g.audioActive && typeof a.in === "number" && typeof a.out === "number") {
         g.tgt.in = a.in;
         g.tgt.out = a.out;
         // Snap on (re)activation instead of easing up from the −100 floor, so the
@@ -56,8 +82,8 @@ export function startPoll(
       // don't start empty (when there's any history to fill them with).
       if (!g.histSeeded && (g.audioActive || g.bufLive || g.asActive)) {
         g.histSeeded = true;
-        api.tabs.sendMessage(tabId, { action: "getHistory" }, (r) => {
-          if (api.runtime.lastError || !r) return;
+        void sendToTab<HistoryResp>(tabId, { action: "getHistory" }).then((r) => {
+          if (!r) return;
           const t0 = now();
           if (r.autoSlow && r.autoSlow.length) {
             const step = r.autoSlowStep || 100,
