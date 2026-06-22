@@ -142,6 +142,13 @@ export const REGISTRY: Entry<unknown>[] = [
   }),
   // Auto-slow response dynamics (floor + hold/reaction/ease-back) — global scalars
   // with no side-effect; the scoped enable/target bundle stays bespoke.
+  // Master on/off — global (like the compressor), not per-scope. The sampler resets
+  // the slowdown itself when it sees the flag off, so no apply side-effect here.
+  entry({
+    key: "autoSlowEnabled",
+    parse: (raw) => raw === true,
+    set: (v) => (S.autoSlowEnabled = v),
+  }),
   entry({
     key: "autoSlowFloor",
     parse: (raw) => clampNum(raw, 0.5, 2, 1.0),

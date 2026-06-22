@@ -18,10 +18,9 @@ interface Props {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   id?: string;
-  ariaLabel?: string; // for a toggle with no adjacent text label
 }
 
-export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
+export function Switch({ checked, onChange, disabled, id }: Props) {
   const [pos, setPos] = useState(checked); // knob side — lags `checked` during the move phase
   const [glass, setGlass] = useState(false);
   const [grown, setGrown] = useState(false);
@@ -63,7 +62,6 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
       id={id}
       role="switch"
       aria-checked={checked}
-      aria-label={ariaLabel}
       disabled={disabled}
       data-state={checked ? "checked" : "unchecked"}
       className="switch switch-track"

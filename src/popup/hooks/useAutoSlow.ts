@@ -1,8 +1,8 @@
-// Auto-slow card state — a per-scope bundle (enable + sensitivity + floor),
-// resolved and saved like the live-sync allowed-delay (channel > site > global).
-// The toggle/sliders preview live (setAutoSlow, no persist); Save commits the
-// bundle to the chosen scope, Reset clears it. The global response dynamics
-// (hold/reaction/ease-back) live on the options page, not here.
+// Auto-slow TARGET state — the comfort ceiling, saved per scope (channel > site >
+// global) like the live-sync allowed-delay. The slider previews live (setAutoSlow,
+// no persist); Save commits the target to the chosen scope, Reset clears it. The
+// master ON/OFF is a separate global flag (autoSlowEnabled, a StoredToggle in the
+// card header), and the response dynamics live on the options page — neither here.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { debounce } from "../core/debounce.js";
@@ -18,19 +18,16 @@ const STORAGE: ScopeStorage = {
 };
 
 interface Bundle {
-  on: boolean;
   target: number;
 }
-const DEF: Bundle = { on: false, target: 6 };
+const DEF: Bundle = { target: 6 };
 
 export interface UseAutoSlow {
-  enabled: boolean;
   target: number; // comfort ceiling, syllables/sec
   channel: string | null;
   scope: Scope;
   saved: ScopeFlags;
   savedValues: ScopeValues;
-  setEnabled: (on: boolean) => void;
   setTarget: (v: number) => void;
   nudge: (delta: number) => void;
   save: (target?: Scope) => void;
@@ -53,25 +50,19 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     resetFallback,
   } = sc;
 
-  const [enabled, setEnabledState] = useState(false);
   const [target, setTargetState] = useState(DEF.target);
-  // Synchronous mirror so a Save right after a slider drag reads the latest values.
+  // Synchronous mirror so a Save right after a slider drag reads the latest value.
   const ref = useRef<Bundle>({ ...DEF });
 
   const apply = useCallback((b: Bundle) => {
     ref.current = { ...b };
-    setEnabledState(b.on);
     setTargetState(b.target);
   }, []);
-  const applyResolved = useCallback(
-    (r: AutoSlowResponse) => apply({ on: !!r.enabled, target: r.target }),
-    [apply],
-  );
+  const applyResolved = useCallback((r: AutoSlowResponse) => apply({ target: r.target }), [apply]);
 
   // Live preview (no persist) — rebound when the tab (hence `send`) changes.
   const pushPreview = useCallback(() => {
-    const b = ref.current;
-    void send("setAutoSlow", { enabled: b.on, target: b.target });
+    void send("setAutoSlow", { target: ref.current.target });
   }, [send]);
   const debounced = useRef(debounce(pushPreview, 160));
   useEffect(() => {
@@ -83,20 +74,12 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     STORE.get(["autoSlowGlobal", "autoSlowSites"], (r) => {
       const sites = (r.autoSlowSites || {}) as Record<string, Bundle>;
       const b = (domain && sites[domain]) || (r.autoSlowGlobal as Bundle) || DEF;
-      apply({ on: !!b.on, target: b.target ?? DEF.target });
+      apply({ target: b.target ?? DEF.target });
       defaultScope(null, false);
       refreshSaved();
     });
   }, [domain, apply, defaultScope, refreshSaved]);
 
-  const setEnabled = useCallback(
-    (on: boolean) => {
-      ref.current.on = on;
-      setEnabledState(on);
-      pushPreview(); // toggling takes effect at once
-    },
-    [pushPreview],
-  );
   const setTarget = useCallback((v: number) => {
     ref.current.target = v;
     setTargetState(v);
@@ -114,11 +97,9 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
       const b = { ...ref.current };
       markSaved(target, true, b);
       if (hasTab) {
-        void send("rememberAutoSlow", { scope: target, enabled: b.on, target: b.target }).then(
-          (r) => {
-            if (r == null) saveFallback(target, b);
-          },
-        );
+        void send("rememberAutoSlow", { scope: target, target: b.target }).then((r) => {
+          if (r == null) saveFallback(target, b);
+        });
       } else {
         saveFallback(target, b);
       }
@@ -198,13 +179,11 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
   ]);
 
   return {
-    enabled,
     target,
     channel: sc.channel,
     scope,
     saved: sc.saved,
     savedValues: sc.savedValues,
-    setEnabled,
     setTarget,
     nudge,
     save,

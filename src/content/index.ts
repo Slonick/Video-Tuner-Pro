@@ -163,8 +163,9 @@ function loadSpeed() {
       );
       S.targetScope = rt.scope;
       S.liveSyncTarget = clampTarget(rt.target);
-      // Auto-slow: enable + target resolve by scope (one bundle per scope); the
-      // floor and the response dynamics are loaded by the registry above.
+      // Auto-slow: the target resolves by scope (one bundle per scope). The master
+      // enable is a GLOBAL flag (loaded by the registry above), not per-scope; the
+      // floor and response dynamics are registry-loaded too.
       const rs = resolveAutoSlow(
         channelKeys(),
         getDomain(),
@@ -173,7 +174,6 @@ function loadSpeed() {
         result.autoSlowGlobal as AutoSlowSettings | undefined,
       );
       S.autoSlowScope = rs.scope;
-      S.autoSlowEnabled = rs.enabled;
       S.autoSlowTarget = rs.target;
       applyResolved(domains, channels, result.globalSpeed as number | undefined);
       applyAll();

@@ -34,22 +34,10 @@
        outside .sync-body, so they're listed explicitly. */
   &.autoslow-section.locked {
     .meter,
-    .extra-row,
-    .as-target-row,
+    .sync-delay-row,
+    .slider-row,
     .sync-body,
     .switch {
-      opacity: 0.4;
-      pointer-events: none;
-      filter: var(--lock-filter, grayscale(0.3));
-    }
-  }
-
-  /* Turned off: dim the chart + the (expanded) controls the way Live-sync dims when
-     it has nothing to do, while the enable row stays bright so it can be switched
-     back on. Skipped when already locked/blocked — those dim more strongly. */
-  &.autoslow-section.is-off:not(.locked):not(.is-disabled) {
-    .meter,
-    .sync-body {
       opacity: 0.4;
       pointer-events: none;
       filter: var(--lock-filter, grayscale(0.3));
@@ -139,6 +127,27 @@
       color: #e8900a;
     }
   }
+
+  /* Beta marker: a "β" in an orange ring, sized like the info icon; keeps its
+     orange on hover/focus instead of turning accent. */
+  &.beta,
+  &.beta:hover,
+  &.beta:focus-visible {
+    color: var(--beta);
+  }
+}
+
+.beta-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1.3px solid currentColor;
+  border-radius: 50%;
+  font:
+    800 9px/1 -apple-system,
+    sans-serif;
 }
 
 /* Tooltip bubble. Radix Tooltip is the Content element here and portals it onto
@@ -202,21 +211,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2-5);
-}
-
-/* "BETA" badge in a card header — sits where the on/off switch sits on the other
-   cards. Auto-slow's enable is per-scope (in the body), not a global header toggle,
-   so the header carries this marker instead. */
-.beta-badge {
-  flex: 0 0 auto;
-  align-self: center;
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
-  background: var(--beta);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
 }
 
 .sec-main {

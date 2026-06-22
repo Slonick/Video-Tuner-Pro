@@ -2,9 +2,10 @@
 import { describe, it, expect } from "vitest";
 import { mountApp, byId, flush, wait, sliderValue, setSlider } from "./mocks/mount-popup.js";
 
-// The auto-slow card via the real <App/>: enable + target rate are saved per scope
-// (channel > site > global) via messaging — the toggle/slider preview live
-// (setAutoSlow), Save commits (rememberAutoSlow), Reset clears (resetAutoSlow).
+// The auto-slow card via the real <App/>: the master enable is a GLOBAL flag
+// (autoSlowEnabled, a StoredToggle in the header). The target rate is saved per scope
+// (channel > site > global) via messaging — the slider previews live (setAutoSlow),
+// Save commits the target (rememberAutoSlow), Reset clears it (resetAutoSlow).
 const EX = { id: 4, url: "https://example.com/" };
 const click = (id: string) => byId(id).click();
 // The toggle is a Radix Switch (role="switch" button), not a checkbox.
@@ -22,18 +23,17 @@ const openMenu = async () => {
 const primary = () => document.querySelector<HTMLElement>(".scope-menu .scope-primary")!;
 
 describe("auto-slow card", () => {
-  it("reflects the resolved enable + target + scope from getAutoSlow", async () => {
-    await mountApp({ tab: EX, replies: reply({ target: 8 }) });
-    expect(isOn("autoSlowToggle")).toBe(true);
-    expect(sliderValue("autoSlowTarget")).toBe(8);
+  it("reflects the global enable flag + per-scope target + scope", async () => {
+    await mountApp({ tab: EX, replies: reply({ target: 8 }), settings: { autoSlowEnabled: true } });
+    expect(isOn("autoSlowToggle")).toBe(true); // from the global autoSlowEnabled flag
+    expect(sliderValue("autoSlowTarget")).toBe(8); // from the resolved per-scope target
     await openMenu();
     expect(primary().textContent).toContain("for this site");
   });
 
-  it("carries a BETA badge in the header (the enable toggle lives in the body)", async () => {
+  it("carries a beta marker in the header", async () => {
     await mountApp({ tab: EX, replies: reply() });
-    expect(document.querySelector(".beta-badge")?.textContent).toBe("BETA");
-    // The toggle moved into the card body but keeps its id, so it's still reachable.
+    expect(document.querySelector(".beta-glyph")?.textContent).toBe("β");
     expect(byId("autoSlowToggle")).not.toBeNull();
   });
 
@@ -43,18 +43,12 @@ describe("auto-slow card", () => {
     expect(primary().textContent).toContain("for this channel");
   });
 
-  it("the toggle previews live via setAutoSlow", async () => {
-    const { lastCall } = await mountApp({
-      tab: EX,
-      replies: reply({ enabled: false, scope: null }),
-    });
+  it("the header toggle flips the global autoSlowEnabled flag", async () => {
+    await mountApp({ tab: EX, replies: reply(), settings: { autoSlowEnabled: false } });
+    expect(isOn("autoSlowToggle")).toBe(false);
     click("autoSlowToggle");
     await flush();
-    expect(lastCall("setAutoSlow")).toMatchObject({
-      action: "setAutoSlow",
-      enabled: true,
-      target: 6,
-    });
+    expect(isOn("autoSlowToggle")).toBe(true);
   });
 
   it("the target slider previews live (debounced setAutoSlow)", async () => {
@@ -72,7 +66,6 @@ describe("auto-slow card", () => {
     expect(lastCall("rememberAutoSlow")).toMatchObject({
       action: "rememberAutoSlow",
       scope: "site",
-      enabled: true,
       target: 7,
     });
   });

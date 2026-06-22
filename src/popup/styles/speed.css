@@ -344,30 +344,6 @@
   gap: var(--space-1-5);
 }
 
-/* Auto-slow: the target-rate slider and the Save button share one row. The slider
-   takes the slack; Save shrinks to its label instead of spanning full width. */
-.as-target-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-/* The slider takes the slack; everything else shrinks to content. */
-.as-target-row .speed-slider {
-  flex: 1;
-  min-width: 0;
-}
-.as-target-row .slider-row-val {
-  flex: 0 0 auto;
-}
-.as-target-row .scope {
-  flex: 0 0 auto;
-}
-.as-target-row .scope-trigger {
-  width: auto;
-  padding-left: var(--space-3);
-  padding-right: var(--space-3);
-}
-
 /* "Allowed delay" / "Target rate" row: label on the left, a −/value/+ cluster on
    the right (reusing .speed-quick / .spin from the speed header). */
 .sync-delay-row {
@@ -483,15 +459,6 @@
 }
 
 .list-group .extra-row:first-child {
-  border-top: none;
-}
-
-/* The target+Save row sits as a row of the grouped box too — same inset divider. */
-.list-group .as-target-row {
-  padding: var(--space-2-5) 0;
-  border-top: 1px solid var(--track);
-}
-.list-group .as-target-row:first-child {
   border-top: none;
 }
 

@@ -71,7 +71,7 @@ function release(): void {
 // primary analyser's RMS, feeds the meter, and every APPLY_MS nudges the factor.
 export function autoSlowSample(): void {
   if (!S.autoSlowEnabled) {
-    autoSlowLive.active = false;
+    release(); // global master off → hand the rate back and reset
     return;
   }
   const ctx = audioContext();

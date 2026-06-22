@@ -7,7 +7,6 @@ import { channelKeys } from "../channel.js";
 import { ctxValid } from "../platform/browser.js";
 import { STORE } from "../platform/storage.js";
 import { S } from "../state.js";
-import { reapplyPrimaryRate } from "../speed.js";
 
 type Map = Record<string, AutoSlowSettings>;
 
@@ -37,23 +36,17 @@ export function persistGlobalAutoSlow(s: AutoSlowSettings): void {
   STORE.set({ autoSlowGlobal: s });
 }
 
-// Set the resolved settings live, dropping any active slowdown when turned off so
-// the user's speed is restored at once; turning on lets the sampler take over.
-// Apply the scoped part (enable + target). The floor is a separate global setting
-// (loaded/updated in the content entry), so it isn't touched here.
-function applySettings(enabled: boolean, target: number): void {
-  S.autoSlowEnabled = enabled;
+// Apply the scoped part — just the target. The master enable is a global flag
+// (registry-loaded; the sampler resets the slowdown when it's off) and the floor /
+// response dynamics are global too, so none of those are touched here.
+function applySettings(target: number): void {
   S.autoSlowTarget = target;
-  if (!enabled && S.autoSlowFactor !== 1) {
-    S.autoSlowFactor = 1;
-    reapplyPrimaryRate();
-  }
 }
 
-// Live preview (no persist) — the card's toggle/slider push the bundle here so the
+// Live preview (no persist) — the card's target slider pushes the bundle here so the
 // effect is audible before Save commits it. Mirrors live-sync's setTarget.
 export function setAutoSlowPreview(s: AutoSlowSettings): void {
-  applySettings(!!s.on, s.target);
+  applySettings(s.target);
 }
 
 function applyResolvedAutoSlow(
@@ -63,7 +56,7 @@ function applyResolvedAutoSlow(
 ): void {
   const r = resolveAutoSlow(channelKeys(), getDomain(), site, channels, global);
   S.autoSlowScope = r.scope;
-  applySettings(r.enabled, r.target);
+  applySettings(r.target);
 }
 
 export function applyResolvedAutoSlowFromStore(): void {

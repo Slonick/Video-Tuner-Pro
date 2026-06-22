@@ -1,20 +1,16 @@
-// Auto-slow card (audio group). The live speech graph, then an always-visible box
-// with one compact row: the enable toggle, the per-scope target slider (+ reset and
-// readout), and Save. Unlike the other cards the enable is NOT global — it's saved
-// per scope with the target — so it sits in the body, and the header carries a BETA
-// badge where a global switch would be. The target previews live; Save commits the
-// {enable, target} bundle to the chosen scope (channel > site > global). The expand
-// reveals the global response knobs (Slowest speed + Soft knee; Reaction / Hold /
-// Ease-back stay options-only).
+// Auto-slow card (audio group). Standard card shape like the others: a global
+// on/off switch in the header (StoredToggle on `autoSlowEnabled`), the live speech
+// graph, an always-visible target-rate row, and an expanded body with Save (the
+// target is still saved per scope: channel > site > global) plus the global response
+// knobs (Slowest speed + Soft knee; Reaction / Hold / Ease-back stay options-only).
+// A "β" beta marker sits by the title.
 import { useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
-import { Switch } from "../../ui/Switch.js";
-import { Slider } from "../../ui/Slider.js";
-import { IconButton } from "../../ui/IconButton.js";
-import { ResetIcon } from "../icons.js";
+import { SliderRow } from "./SliderRow.js";
 import { ParamSlider } from "./ParamSlider.js";
 import { InfoTip } from "./InfoTip.js";
 import { SaveScope } from "./SaveScope.js";
+import { StoredToggle } from "./StoredToggle.js";
 import { Button } from "../../ui/Button.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import { useAutoSlowKnobs } from "../hooks/useAutoSlowKnobs.js";
@@ -51,8 +47,7 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
           "sync-section autoslow-section overlay-card" +
           (open ? " is-overlay" : "") +
           (live ? " locked" : "") +
-          (blocked ? " is-disabled" : "") +
-          (!a.enabled ? " is-off" : "")
+          (blocked ? " is-disabled" : "")
         }
       >
         <div className="sec-head">
@@ -60,6 +55,7 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
             <span className="sec-text">
               <span className="sec-title-row">
                 <strong>{msg("autoSlowLabel") || "Auto-slow dense speech"}</strong>
+                <InfoTip beta tip={msg("betaNote")} />
                 <InfoTip tip={msg("autoSlowHint")} />
               </span>
               <span className="switch-sub">
@@ -70,9 +66,7 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
           {live && (
             <InfoTip warn id="autoSlowLiveWarn" label="Live stream" tip={msg("autoSlowLiveNote")} />
           )}
-          <span className="beta-badge" title={msg("betaNote")}>
-            BETA
-          </span>
+          <StoredToggle id="autoSlowToggle" storageKey="autoSlowEnabled" defaultOn={false} />
         </div>
 
         <div className="meter autoslow always">
@@ -98,50 +92,42 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
         </div>
 
         <div className="card-scroll">
-          {/* Always-visible essentials on one compact row: enable toggle, the per-scope
-             target slider, its reset + readout, and Save. Shown collapsed too. */}
-          <div className="list-group">
-            <div className="as-target-row">
-              <Switch
-                id="autoSlowToggle"
-                ariaLabel={msg("enableLabel") || "Enable"}
-                checked={a.enabled}
-                onChange={a.setEnabled}
-              />
-              <Slider
-                className="speed-slider"
-                id="autoSlowTarget"
-                min={3}
-                max={12}
-                step={0.5}
-                value={a.target}
-                ariaLabel={msg("meterTarget") || "Target rate"}
-                ariaValueText={`${a.target.toFixed(1)} /s`}
-                onChange={(v) => a.setTarget(v)}
-              />
-              <IconButton
-                className="spin"
-                id="autoSlowReset"
-                aria-label="Reset"
-                title={msg("tipResetTarget")}
-                onClick={a.resetManual}
-              >
-                <ResetIcon />
-              </IconButton>
-              <span className="slider-row-val">
+          <div className="sync-delay-row">
+            <span>{msg("autoSlowTargetLabel") || "Target rate"}</span>
+          </div>
+          <SliderRow
+            sliderId="autoSlowTarget"
+            min={3}
+            max={12}
+            step={0.5}
+            value={a.target}
+            ariaLabel={msg("meterTarget") || "Target rate"}
+            ariaValueText={`${a.target.toFixed(1)} /s`}
+            onChange={(v) => a.setTarget(v)}
+            onDown={() => a.nudge(-0.5)}
+            downId="autoSlowDown"
+            downLabel="Lower target"
+            onUp={() => a.nudge(0.5)}
+            upId="autoSlowUp"
+            upLabel="Raise target"
+            onReset={a.resetManual}
+            resetId="autoSlowReset"
+            resetTitle={msg("tipResetTarget")}
+            valueText={
+              <>
                 <b>{a.target.toFixed(1)}</b> /s
-              </span>
+              </>
+            }
+          />
+
+          <div className={"sync-body" + (open ? " open" : "")} id="autoSlowBody">
+            <div className="quick-actions">
               <SaveScope
                 scope={a.scope}
                 saved={a.saved}
                 savedValues={a.savedValues}
-                currentValue={{ on: a.enabled, target: a.target }}
-                fmtCurrent={(v) => `${(v as { target: number }).target.toFixed(1)} /s`}
-                fmtValue={(v) => {
-                  const b = v as { on?: boolean; target: number };
-                  const state = b.on ? msg("stateOn") || "On" : msg("stateOff") || "Off";
-                  return `${state} · ${b.target.toFixed(1)} /s`;
-                }}
+                currentValue={{ target: a.target }}
+                fmtValue={(v) => `${(v as { target: number }).target.toFixed(1)} /s`}
                 hasChannel={!!a.channel}
                 saveLabel={msg("rememberButton")}
                 savedLabel={msg("savedFeedback")}
@@ -152,10 +138,7 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
                 resetId="autoSlowResetBtn"
               />
             </div>
-          </div>
-
-          {/* Advanced response knobs — revealed on expand. */}
-          <div className={"sync-body" + (open ? " open" : "")} id="autoSlowBody">
+            {/* Global response knobs (apply everywhere) — the target above is per-scope. */}
             <div className="list-group">
               <ParamSlider
                 id="asFloor"

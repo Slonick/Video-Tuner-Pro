@@ -27,6 +27,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   holdSpeed: "speeds",
   // Auto-slow for dense speech: the per-scope enable + the global floor. Grouped
   // with speeds — it resolves per scope and acts on the playback rate.
+  autoSlowEnabled: "speeds",
   autoSlowGlobal: "speeds",
   autoSlowSites: "speeds",
   autoSlowChannels: "speeds",

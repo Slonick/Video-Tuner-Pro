@@ -76,11 +76,11 @@ describe("persist", () => {
   });
 });
 
+// Only the TARGET resolves per scope now; the enable is a separate global flag.
 describe("applyResolvedAutoSlowFromStore", () => {
-  it("resolves the site bundle into S", () => {
+  it("resolves the site bundle's target into S", () => {
     STORE.set({ autoSlowSites: { localhost: { on: true, target: 5 } } });
     applyResolvedAutoSlowFromStore();
-    expect(S.autoSlowEnabled).toBe(true);
     expect(S.autoSlowTarget).toBe(5);
     expect(S.autoSlowScope).toBe("site");
   });
@@ -92,24 +92,23 @@ describe("applyResolvedAutoSlowFromStore", () => {
     });
     h.keys = ["UC1"];
     applyResolvedAutoSlowFromStore();
-    expect(S.autoSlowEnabled).toBe(true);
     expect(S.autoSlowTarget).toBe(9);
     expect(S.autoSlowScope).toBe("channel");
   });
 
-  it("defaults to off when nothing is saved", () => {
+  it("falls back to no scope (default target) when nothing is saved", () => {
     applyResolvedAutoSlowFromStore();
-    expect(S.autoSlowEnabled).toBe(false);
     expect(S.autoSlowScope).toBe(null);
+    expect(S.autoSlowTarget).toBe(6);
   });
 });
 
 describe("resetAutoSlowScope", () => {
-  it("clears the site entry and re-resolves to off", () => {
+  it("clears the site entry and re-resolves to no scope", () => {
     STORE.set({ autoSlowSites: { localhost: { on: true, target: 8 } } });
     resetAutoSlowScope("site");
     expect(sites()).toEqual({});
-    expect(S.autoSlowEnabled).toBe(false);
+    expect(S.autoSlowScope).toBe(null);
   });
 
   it("clears the global entry", () => {
@@ -129,17 +128,9 @@ describe("resetAutoSlowScope", () => {
 });
 
 describe("setAutoSlowPreview", () => {
-  it("applies live without persisting", () => {
+  it("applies the target live without persisting", () => {
     setAutoSlowPreview({ on: true, target: 10 });
-    expect(S.autoSlowEnabled).toBe(true);
     expect(S.autoSlowTarget).toBe(10);
     expect(get(["autoSlowGlobal"]).autoSlowGlobal).toBeUndefined();
-  });
-
-  it("resets the live factor when turned off", () => {
-    S.autoSlowFactor = 0.7;
-    setAutoSlowPreview({ on: false, target: 6 });
-    expect(S.autoSlowEnabled).toBe(false);
-    expect(S.autoSlowFactor).toBe(1);
   });
 });

@@ -79,7 +79,10 @@ export function AutoSlow() {
 
   return (
     <section className="card">
-      <h2>{msg("optAutoSlowTitle") || "Auto-slow dense speech"}</h2>
+      <h2>
+        {msg("optAutoSlowTitle") || "Auto-slow dense speech"}{" "}
+        <span className="beta-pill">beta</span>
+      </h2>
       <p className="card-desc">
         {msg("optAutoSlowDesc") ||
           "Enable it and set the target rate per site/channel from the popup. These global knobs tune the response."}
