@@ -7,12 +7,12 @@ name: CI
 # A Claude code-quality review is NOT run automatically (it burned too much runner
 # time); request one on demand by commenting `@claude` on the PR — see claude.yml.
 #
-# Runs on every push to main (post-merge) and on every pull request. Enable branch
-# protection (Settings → Branches → require the "lint" / "unit" / "e2e" checks) to
-# block merging a PR whose pipeline fails.
+# Runs on every pull request (main only ever changes via PR, so a post-merge push
+# run on main would just re-test code the PR already validated). Enable branch
+# protection (Settings → Branches → require the "lint" / "unit" / "e2e" checks,
+# plus "Require branches to be up to date before merging") to block merging a PR
+# whose pipeline fails and to close the concurrent-merge gap a main run would catch.
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_call: # reused by release.yml as the pre-publish gate
 
