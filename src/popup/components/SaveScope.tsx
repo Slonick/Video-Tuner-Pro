@@ -34,6 +34,7 @@ interface Props {
   savedValues: ScopeValues; // raw stored value per scope (for the menu)
   currentValue: unknown; // the live value, shown in the primary ("Save 1.75× …")
   fmtValue: (value: unknown) => string; // format a stored value for display
+  fmtCurrent?: (value: unknown) => string; // format the live value for the primary (defaults to fmtValue)
   hasChannel: boolean;
   saveLabel: string;
   savedLabel: string; // brief confirm shown after a save
@@ -45,7 +46,8 @@ interface Props {
 }
 
 interface Pos {
-  left: number;
+  left?: number; // anchor to the trigger's left edge…
+  right?: number; // …or its right edge, when the trigger sits in the viewport's right half
   top?: number; // set when opening downward
   bottom?: number; // set when opening upward
   minWidth: number;
@@ -82,6 +84,7 @@ export function SaveScope({
   savedValues,
   currentValue,
   fmtValue,
+  fmtCurrent,
   hasChannel,
   saveLabel,
   savedLabel,
@@ -115,9 +118,12 @@ export function SaveScope({
     if (!r) return;
     const below = window.innerHeight - r.bottom;
     const downward = below >= 250 || below >= r.top;
+    // A narrow trigger near the right edge (e.g. inline beside a slider) would push a
+    // left-anchored menu off-screen, so anchor to its right edge there instead.
+    const anchorRight = r.left > window.innerWidth / 2;
     setPos({
-      left: r.left,
-      minWidth: r.width,
+      minWidth: Math.max(r.width, 200),
+      ...(anchorRight ? { right: Math.max(8, window.innerWidth - r.right) } : { left: r.left }),
       ...(downward ? { top: r.bottom + 6 } : { bottom: window.innerHeight - r.top + 6 }),
     });
   }, [open]);
@@ -195,7 +201,7 @@ export function SaveScope({
 
   // The primary names the value + active scope ("Save 1.75× for this site"); the
   // trigger stays a plain "Save" (the scope lives inside the menu now).
-  const primaryLabel = msg(PRIMARY_KEY[scope], [fmtValue(currentValue)]);
+  const primaryLabel = msg(PRIMARY_KEY[scope], [(fmtCurrent ?? fmtValue)(currentValue)]);
 
   return (
     <div className="scope" ref={rootRef}>
@@ -261,7 +267,13 @@ export function SaveScope({
             role="dialog"
             aria-label={saveLabel}
             onKeyDown={onMenuKeyDown}
-            style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: pos.minWidth }}
+            style={{
+              left: pos.left,
+              right: pos.right,
+              top: pos.top,
+              bottom: pos.bottom,
+              minWidth: pos.minWidth,
+            }}
           >
             <button
               type="button"

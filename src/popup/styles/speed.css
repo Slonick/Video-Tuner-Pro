@@ -482,6 +482,15 @@
   border-top: none;
 }
 
+/* The target+Save row sits as a row of the grouped box too — same inset divider. */
+.list-group .as-target-row {
+  padding: var(--space-2-5) 0;
+  border-top: 1px solid var(--track);
+}
+.list-group .as-target-row:first-child {
+  border-top: none;
+}
+
 /* Shortcut keycaps inside the Keyboard-shortcuts info tooltip. The tooltip
    background is inverted per theme, so the keys use a neutral grey that reads on
    either, and inherit the tooltip's text colour. Two columns — the bare key + its
