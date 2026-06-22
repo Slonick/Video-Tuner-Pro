@@ -105,40 +105,42 @@ describe("auto-slow card", () => {
   });
 });
 
-// The global response knobs (Slowest speed + Soft knee + Reaction) write their own
-// storage keys live — not per-site — via useAutoSlowKnobs.
+// The global response knobs surfaced on the card (Slowest speed + Soft knee) write
+// their own storage keys live — not per-site — via useAutoSlowKnobs. Reaction / Hold
+// / Ease-back live in the options page only.
 describe("auto-slow response knobs (global)", () => {
   // aria-valuenow is rounded to an integer, so the fractional knee is read off its
   // aria-valuetext readout instead (e.g. "±0.5 /s").
   const sliderText = (id: string) =>
     byId(id).querySelector('[role="slider"]')!.getAttribute("aria-valuetext");
 
-  it("loads the stored floor (as a fraction) + knee + reaction into the sliders", async () => {
+  it("loads the stored floor (as a fraction) + knee into the sliders", async () => {
     await mountApp({
       tab: EX,
       replies: reply(),
-      settings: { autoSlowFloor: 0.7, autoSlowKnee: 1.5, autoSlowReaction: 30 },
+      settings: { autoSlowFloor: 0.7, autoSlowKnee: 1.5 },
     });
     expect(sliderValue("asFloor")).toBe(70); // 0.7 → 70%
     expect(sliderText("asKnee")).toBe("±1.5 /s");
-    expect(sliderValue("asReaction")).toBe(30);
   });
 
   it("defaults the knobs when nothing is stored", async () => {
     await mountApp({ tab: EX, replies: reply() });
     expect(sliderValue("asFloor")).toBe(100);
     expect(sliderText("asKnee")).toBe("±0.5 /s");
-    expect(sliderValue("asReaction")).toBe(50);
   });
 
-  it("applies edits from the sliders (setFloor / setKnee / setReaction run their write path)", async () => {
+  it("does not surface the Reaction knob on the card (options-only)", async () => {
+    await mountApp({ tab: EX, replies: reply() });
+    expect(document.getElementById("asReaction")).toBeNull();
+  });
+
+  it("applies edits from the sliders (setFloor / setKnee run their write path)", async () => {
     await mountApp({ tab: EX, replies: reply() });
     setSlider("asFloor", 85);
     setSlider("asKnee", 2); // → max, ±2.0 /s
-    setSlider("asReaction", 60);
     await flush();
     expect(sliderValue("asFloor")).toBe(85);
     expect(sliderText("asKnee")).toBe("±2.0 /s");
-    expect(sliderValue("asReaction")).toBe(60);
   });
 });
