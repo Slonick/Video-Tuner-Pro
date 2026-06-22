@@ -12,7 +12,7 @@ import type { AudioLevels } from "./audio/types.js";
 
 export interface MonitorData {
   audio: AudioLevels;
-  autoSlow: { active: boolean; rate: number; target: number; speed: number };
+  autoSlow: { active: boolean; rate: number; target: number; speed: number; enabled: boolean };
   buffer: number | null;
   bufferAhead: number | null;
   bufLimited: boolean;
@@ -46,7 +46,7 @@ export function monitorData(): MonitorData {
     audio: audioLevels(),
     // target always reflects the current setting, so the graph's target line is
     // right even when auto-slow is idle (no active sample to refresh it).
-    autoSlow: { ...autoSlowLive, target: S.autoSlowTarget },
+    autoSlow: { ...autoSlowLive, target: S.autoSlowTarget, enabled: S.autoSlowEnabled },
     buffer: lag,
     bufferAhead: bufAhead,
     bufLimited: limited,

@@ -16,7 +16,7 @@ interface MonitorResp {
     in?: number;
     out?: number;
   };
-  autoSlow?: { active?: boolean; target?: number; rate: number; speed: number };
+  autoSlow?: { active?: boolean; enabled?: boolean; target?: number; rate: number; speed: number };
   live?: boolean;
   buffer?: number;
   bufferAhead?: number;
@@ -61,6 +61,7 @@ export function startPoll(
 
       const as = resp.autoSlow;
       g.asActive = !!(as && as.active);
+      g.asEnabled = !!(as && as.enabled);
       if (as && typeof as.target === "number") g.asTargetLine = as.target; // always tracks the setting
       if (as && g.asActive) {
         g.asRate = as.rate;

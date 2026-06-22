@@ -70,6 +70,7 @@ export interface GraphState {
   // Auto-slow speech graph: latest polled values, their eased counterparts, and
   // the recorded history.
   asActive: boolean;
+  asEnabled: boolean; // feature turned on for this page (drives the off vs idle hint)
   asRate: number; // latest polled syllable rate (syll/s)
   asSpeed: number; // latest polled effective speed (×)
   asTargetLine: number; // the trigger target (syll/s)
@@ -122,6 +123,7 @@ export function createGraphState(
     yMax: 8,
     yMaxAhead: 8,
     asActive: false,
+    asEnabled: false,
     asRate: 0,
     asSpeed: 1,
     asTargetLine: 6, // placeholder until the first poll reports the real setting

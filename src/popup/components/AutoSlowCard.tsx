@@ -130,8 +130,12 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
                 scope={a.scope}
                 saved={a.saved}
                 savedValues={a.savedValues}
-                currentValue={{ target: a.target }}
-                fmtValue={(v) => `${(v as { target: number }).target.toFixed(1)} /s`}
+                currentValue={{ on: a.enabled, target: a.target }}
+                fmtValue={(v) => {
+                  const b = v as { on?: boolean; target: number };
+                  const state = b.on ? msg("stateOn") || "On" : msg("stateOff") || "Off";
+                  return `${state} · ${b.target.toFixed(1)} /s`;
+                }}
                 hasChannel={!!a.channel}
                 saveLabel={msg("rememberButton")}
                 savedLabel={msg("savedFeedback")}

@@ -78,15 +78,18 @@ export function drawAutoSlow(g: GraphState, t: number): void {
     });
     cx.stroke();
   } else {
-    // No samples yet → the bare target line reads as "broken". A centred hint makes
-    // the idle graph read as "ready, listening" instead. The target line + zone
-    // stay for context.
+    // No samples → a centred hint instead of a bare (broken-looking) target line.
+    // Mirror the audio graph: "off" when the feature is disabled, otherwise the
+    // "listening" idle hint. The target line + zone stay for context.
+    const hint = g.asEnabled
+      ? msg("autoSlowIdle") || "Waiting for speech…"
+      : msg("autoSlowOff") || "Auto-slow off";
     cx.font = "11px -apple-system, sans-serif";
     cx.textAlign = "center";
     cx.textBaseline = "middle";
     cx.fillStyle = muted;
     cx.globalAlpha = 0.7;
-    cx.fillText(msg("autoSlowIdle") || "Waiting for speech…", pw / 2, yTarget);
+    cx.fillText(hint, pw / 2, yTarget);
     cx.globalAlpha = 1;
   }
 
