@@ -59,6 +59,7 @@ describe("loadRegistry — defaults", () => {
     expect(S.audioCompEnabled).toBe(true);
     expect(S.audioCompThreshold).toBe(-60);
     expect(S.autoSlowFloor).toBe(1.0);
+    expect(S.autoSlowKnee).toBe(0.5);
   });
 });
 

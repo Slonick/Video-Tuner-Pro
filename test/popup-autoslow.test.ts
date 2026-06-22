@@ -105,31 +105,40 @@ describe("auto-slow card", () => {
   });
 });
 
-// The global response knobs (Slowest speed + Reaction) write their own storage
-// keys live — not per-site — via useAutoSlowKnobs.
+// The global response knobs (Slowest speed + Soft knee + Reaction) write their own
+// storage keys live — not per-site — via useAutoSlowKnobs.
 describe("auto-slow response knobs (global)", () => {
-  it("loads the stored floor (as a fraction) + reaction into the sliders", async () => {
+  // aria-valuenow is rounded to an integer, so the fractional knee is read off its
+  // aria-valuetext readout instead (e.g. "±0.5 /s").
+  const sliderText = (id: string) =>
+    byId(id).querySelector('[role="slider"]')!.getAttribute("aria-valuetext");
+
+  it("loads the stored floor (as a fraction) + knee + reaction into the sliders", async () => {
     await mountApp({
       tab: EX,
       replies: reply(),
-      settings: { autoSlowFloor: 0.7, autoSlowReaction: 30 },
+      settings: { autoSlowFloor: 0.7, autoSlowKnee: 1.5, autoSlowReaction: 30 },
     });
     expect(sliderValue("asFloor")).toBe(70); // 0.7 → 70%
+    expect(sliderText("asKnee")).toBe("±1.5 /s");
     expect(sliderValue("asReaction")).toBe(30);
   });
 
   it("defaults the knobs when nothing is stored", async () => {
     await mountApp({ tab: EX, replies: reply() });
     expect(sliderValue("asFloor")).toBe(100);
+    expect(sliderText("asKnee")).toBe("±0.5 /s");
     expect(sliderValue("asReaction")).toBe(50);
   });
 
-  it("applies edits from the sliders (setFloor / setReaction run their write path)", async () => {
+  it("applies edits from the sliders (setFloor / setKnee / setReaction run their write path)", async () => {
     await mountApp({ tab: EX, replies: reply() });
     setSlider("asFloor", 85);
+    setSlider("asKnee", 2); // → max, ±2.0 /s
     setSlider("asReaction", 60);
     await flush();
     expect(sliderValue("asFloor")).toBe(85);
+    expect(sliderText("asKnee")).toBe("±2.0 /s");
     expect(sliderValue("asReaction")).toBe(60);
   });
 });

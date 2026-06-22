@@ -22,7 +22,6 @@ export const PACE = {
   ENV_ALPHA: 0.3, // one-pole low-pass envelope, for the silence gate
   MIN_ENERGY: 0.003, // RMS floor — below this is silence, nothing is counted
   TARGET_RATE: 6, // comfort ceiling (syll/sec at sensitivity 50) we slow down to stay under
-  COMP_STRENGTH: 0.7, // 0..1 — how far toward full compensation each step eases (lower = gentler)
 };
 
 // Linear map of a 0..100 setting onto a [lo, hi] range. Backs the "reaction" and
@@ -97,13 +96,16 @@ export class SyllableMeter {
 // effective playback speed.
 //
 // `perceivedRate` already includes the current speed, so the speed-invariant
-// intrinsic rate is `perceivedRate / effSpeed`. `veFull = target / intrinsic` is
-// the speed that would hold the perceived rate exactly at the comfort ceiling —
-// but easing all the way there slams to the floor the moment speech gets dense.
-// Instead we ease only COMP_STRENGTH of the way toward it, so the slowdown grows
-// gradually with density and reaches the floor only on genuinely fast passages.
-// Both `veFull` (and therefore the suggestion) are independent of the current
-// speed, so the controller still converges rather than oscillating.
+// intrinsic rate is `perceivedRate / effSpeed`. `p = intrinsic * userSpeed` is the
+// density we'd hear at the user's full speed — what we decide on.
+//
+// We pass `p` through a soft-knee compressor (the same curve shape as a downward
+// audio limiter, ratio → ∞) to get a comfortable perceived ceiling `q`: below the
+// knee it tracks `p` untouched, across a band of half-width `softKnee` it eases the
+// compression in gradually instead of switching on at a cliff, and above the band
+// it holds `q` at `target`. `softKnee = 0` collapses to a hard clamp at `target`.
+// The speed that delivers `q` is `ve = q / intrinsic`. `q` depends only on `p`
+// (speed-invariant), so the controller converges rather than oscillating.
 //
 // Clamped to [floor, userSpeed]: never speeds up past what the user asked for, nor
 // below their floor. If they're already watching below the floor, nothing to do.
@@ -113,12 +115,22 @@ export function suggestEffectiveSpeed(
   userSpeed: number,
   floor: number,
   target: number = PACE.TARGET_RATE,
+  softKnee: number = 0,
 ): number {
   if (effSpeed <= 0 || userSpeed <= 0) return userSpeed;
   const intrinsic = perceivedRate / effSpeed;
   if (intrinsic <= 0) return userSpeed;
-  const veFull = target / intrinsic; // full compensation
-  if (veFull >= userSpeed) return userSpeed; // not dense enough at this speed → leave it
-  const ve = userSpeed - (userSpeed - veFull) * PACE.COMP_STRENGTH; // partial → gradual
+  const p = intrinsic * userSpeed; // perceived density at the user's full speed
+  const D = softKnee;
+  let q: number; // compressed comfort ceiling
+  if (D <= 0 || p <= target - D) {
+    q = Math.min(p, target); // hard clamp, or below the knee → untouched
+  } else if (p >= target + D) {
+    q = target; // above the knee → fully held at the ceiling
+  } else {
+    const over = p - target + D; // 0..2D across the knee
+    q = p - (over * over) / (4 * D); // C¹ soft-knee bend (slope 1 → 0)
+  }
+  const ve = q / intrinsic; // speed that brings perceived down to q
   return Math.max(Math.min(floor, userSpeed), Math.min(userSpeed, ve));
 }

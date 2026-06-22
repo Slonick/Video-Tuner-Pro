@@ -90,6 +90,7 @@ export const S = {
   autoSlowScope: null as "channel" | "site" | "global" | null,
   autoSlowFloor: 1.0, // min effective speed (fraction), 0.5…2 — scoped with the bundle
   autoSlowTarget: 6, // comfort ceiling (syllables/sec) — scoped; the graph's target line
+  autoSlowKnee: 0.5, // soft-knee half-width (syll/s) around the target, global — 0…2
   autoSlowHold: 1.2, // s, global — how long it stays slowed after speech eases up
   autoSlowReaction: 50, // 0…100, global — how fast it slows down when speech is dense
   autoSlowEaseBack: 25, // 0…100, global — how fast it returns to the user's speed

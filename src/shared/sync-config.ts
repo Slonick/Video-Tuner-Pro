@@ -31,6 +31,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   autoSlowSites: "speeds",
   autoSlowChannels: "speeds",
   autoSlowFloor: "speeds",
+  autoSlowKnee: "speeds",
   autoSlowHold: "speeds",
   autoSlowReaction: "speeds",
   autoSlowEaseBack: "speeds",

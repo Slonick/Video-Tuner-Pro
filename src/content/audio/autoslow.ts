@@ -79,7 +79,14 @@ export function autoSlowSample(): void {
 
   const target = S.autoSlowTarget; // comfort ceiling in syll/s — the graph's target line
   const rate = meter.rate();
-  const desired = suggestEffectiveSpeed(rate, appliedEff, user, S.autoSlowFloor, target);
+  const desired = suggestEffectiveSpeed(
+    rate,
+    appliedEff,
+    user,
+    S.autoSlowFloor,
+    target,
+    S.autoSlowKnee,
+  );
   // "Dense" = perceived rate at/over the comfort ceiling. While it stays dense (or
   // within HOLD_MS of the last dense moment) we never ramp the speed back up — only
   // down — so a breath mid-passage doesn't bounce the speed.
