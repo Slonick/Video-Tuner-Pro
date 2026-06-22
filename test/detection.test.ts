@@ -20,6 +20,15 @@ describe("isLive", () => {
   it("a plain finite VOD → not live", () => {
     expect(isLive(vid({ duration: 600 }))).toBe(false);
   });
+  // Firefox reports a huge INT64_MAX-microseconds sentinel (~9.2e12 s) instead of
+  // Infinity for a loading live edge — must still read as live, or the badge shows
+  // a garbage remaining-time clock until the slow growth probe catches up.
+  it("Firefox's huge sentinel duration → live", () => {
+    expect(isLive(vid({ duration: 9.2e12 }))).toBe(true);
+  });
+  it("NaN duration (VOD before metadata) → not live", () => {
+    expect(isLive(vid({ duration: NaN }))).toBe(false);
+  });
 });
 
 describe("isLive (player-published data-vtp-live flag)", () => {

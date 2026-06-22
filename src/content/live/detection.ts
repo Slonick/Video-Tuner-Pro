@@ -40,6 +40,15 @@ export function resetDvr(): void {
   lastMediaTime = 0;
 }
 
+// A live edge has no real length. Chromium signals that with duration === Infinity;
+// Firefox instead reports a huge INT64_MAX-microseconds sentinel (~9.2e12 s) while
+// the stream loads. Treat either as live. NaN (before metadata) stays excluded so a
+// normal VOD isn't misflagged during its initial load. 1e7 s (~115 days) matches
+// the sentinel cutoff streamEnd already uses.
+function unboundedDuration(d: number): boolean {
+  return d > 1e7;
+}
+
 export function isLive(video: HTMLVideoElement): boolean {
   // The MAIN-world probe (inject.ts) publishes the player's own live flag
   // (YouTube's getVideoData().isLive) to data-vtp-live — authoritative when
@@ -52,7 +61,7 @@ export function isLive(video: HTMLVideoElement): boolean {
   if (flag === "0") return false;
 
   // Most live MSE streams report an infinite duration (Twitch, many players).
-  if (video.duration === Infinity) return true;
+  if (unboundedDuration(video.duration)) return true;
 
   // YouTube live (including DVR streams) reports a FINITE, growing duration, so
   // the duration check alone misses it. YouTube adds the "ytp-live" class to the
@@ -113,7 +122,7 @@ function streamEnd(v: HTMLVideoElement): number {
 export function probeLive(v: HTMLVideoElement): void {
   if (!v) return;
   const t = Date.now();
-  if (v.duration === Infinity) {
+  if (unboundedDuration(v.duration)) {
     liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, hits: 0, live: true });
     return;
   }
