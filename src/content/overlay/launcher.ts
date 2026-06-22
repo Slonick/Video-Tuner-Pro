@@ -414,11 +414,15 @@ function mount(): void {
     "button[aria-expanded='true'] .vtp-ico-close{opacity:1;transform:none}" +
     "@media (prefers-reduced-motion:reduce){.vtp-ico{transition:none}}";
   shadow.append(iconStyle);
-  fab.innerHTML =
+  // Two stacked icons, built via DOMParser rather than innerHTML (the AMO linter
+  // flags every innerHTML assignment; these are static, trusted markup).
+  const FAB_ICONS =
     // Play triangle (brand mark), nudged right to sit optically centred.
     '<span class="vtp-ico vtp-ico-play"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 6.5v11l9-5.5z"/></svg></span>' +
     // Cross (shown while the overlay is open).
     '<span class="vtp-ico vtp-ico-close"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></span>';
+  const icons = new DOMParser().parseFromString(FAB_ICONS, "text/html").body;
+  while (icons.firstChild) fab.appendChild(icons.firstChild);
   shadow.append(fab);
   hookFabDrag(fab);
 }

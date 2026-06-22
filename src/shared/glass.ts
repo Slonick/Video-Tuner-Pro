@@ -57,10 +57,11 @@ const CARD_RULE =
 // that lightningcss dropped; shadow-root callers (badge/FAB) set it inline.
 export function ensureGlassFilter(root: Document | ShadowRoot): void {
   if (root.querySelector(`#${GLASS_FILTER_ID}`)) return;
-  const wrap = document.createElement("div");
-  wrap.innerHTML = FILTER_SVG; // the HTML parser builds the <svg> in the SVG namespace
-  const svg = wrap.firstElementChild;
-  if (!svg) return;
+  // DOMParser, not innerHTML: the AMO linter flags every innerHTML assignment, and
+  // this filter is a static, trusted SVG string anyway. parseFromString builds it in
+  // the SVG namespace; appendChild adopts the node into the target document.
+  const svg = new DOMParser().parseFromString(FILTER_SVG, "image/svg+xml").documentElement;
+  if (!svg || svg.tagName === "parsererror") return;
   const host = root instanceof Document ? (root.body ?? root.documentElement) : root;
   host.appendChild(svg);
   if (root instanceof Document) {
