@@ -1,6 +1,6 @@
 import { byId } from "../dom.js";
 import { msg } from "../i18n.js";
-import { col, fitCanvas, levelMark } from "./draw-util.js";
+import { col, fitCanvas, levelMark, cornerReadout } from "./draw-util.js";
 import { A_MIN, A_MAX, A_WINDOW } from "./state.js";
 import type { GraphState } from "./state.js";
 
@@ -205,45 +205,18 @@ export function drawAudio(g: GraphState, t: number): void {
     acx.globalAlpha = 1;
     acx.textBaseline = "alphabetic";
   } else {
-    const seg = col("--glass-l3", "#2c2c2e"); // readout halo = the panel layer (was --seg)
-    acx.textAlign = "center";
-    acx.lineJoin = "round";
-    // Soft halo (panel-coloured shadow, drawn twice) instead of a hard outline —
-    // reads over the bars but stays glassy/clean.
-    const offA = Math.max(0, Math.min(1, 1 - c * 2.4));
-    if (offA > 0.01) {
-      acx.globalAlpha = offA;
-      acx.font = "700 16px -apple-system, sans-serif";
-      acx.textBaseline = "middle";
-      acx.shadowColor = seg;
-      acx.shadowBlur = 5;
-      const lvl = fmtLevel(inV);
-      acx.fillStyle = "#c7c7cc";
-      acx.fillText(lvl, pw / 2, center);
-      acx.fillText(lvl, pw / 2, center);
-      acx.shadowBlur = 0;
-      acx.globalAlpha = 1;
+    // Level readout — a small backed chip in the top-left corner, off the moving
+    // bars so it stays legible (was two big numbers centred on the waveform).
+    // Labelled In / Out so it's clear which level is which. With the compressor off
+    // the stream is still captured (out runs transparent = in), so only In is shown.
+    // Out on top, In below — matching the graph (output fills up, input down). With
+    // the compressor off the stream is still captured (out runs transparent = in),
+    // so only In is shown.
+    const rows: { label: string; value: string; color: string }[] = [];
+    if (g.audioEnabled) {
+      rows.push({ label: "Out", value: fmtLevel(outV), color: col("--meter-out", "#7fb8ff") });
     }
-    const onA = Math.max(0, Math.min(1, (c - 0.45) * 2.2));
-    if (onA > 0.01) {
-      acx.globalAlpha = onA;
-      const outC = col("--meter-out", "#7fb8ff"),
-        inC = col("--meter-in", "#cfcfd4");
-      acx.font = "700 15px -apple-system, sans-serif";
-      acx.textBaseline = "middle";
-      acx.shadowColor = seg;
-      acx.shadowBlur = 5;
-      const outL = fmtLevel(outV),
-        inL = fmtLevel(inV);
-      acx.fillStyle = outC;
-      acx.fillText(outL, pw / 2, center - 12);
-      acx.fillText(outL, pw / 2, center - 12);
-      acx.fillStyle = inC;
-      acx.fillText(inL, pw / 2, center + 12);
-      acx.fillText(inL, pw / 2, center + 12);
-      acx.shadowBlur = 0;
-      acx.globalAlpha = 1;
-    }
-    acx.textBaseline = "alphabetic";
+    rows.push({ label: "In", value: fmtLevel(inV), color: col("--meter-in", "#cfcfd4") });
+    cornerReadout(acx, rows);
   }
 }

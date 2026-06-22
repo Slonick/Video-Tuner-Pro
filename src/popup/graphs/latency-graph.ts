@@ -3,7 +3,7 @@
 // target line and the download bitrate.
 import { byId } from "../dom.js";
 import { msg } from "../i18n.js";
-import { col, fitCanvas, smoothLine, levelMark } from "./draw-util.js";
+import { col, fitCanvas, smoothLine, levelMark, cornerReadout } from "./draw-util.js";
 import { BUF_WINDOW } from "./state.js";
 import type { GraphState, BufSample } from "./state.js";
 
@@ -63,7 +63,6 @@ export function drawBuffer(g: GraphState, t: number): void {
   const bottom = padT + gh;
   const ampFull = (v: number) => (Math.min(Math.max(v, 0), g.yMaxAhead) / g.yMaxAhead) * gh;
   const fmtS = (val: number) => val.toFixed(2) + "s";
-  const halo = col("--glass-l3", "#eee"); // readout halo = the panel layer (was --seg)
   const v =
     g.bufShown != null
       ? g.bufHist.length
@@ -105,17 +104,6 @@ export function drawBuffer(g: GraphState, t: number): void {
     bcx.textAlign = "right";
     bcx.font = "9px -apple-system, sans-serif";
     bcx.fillText(target + "s", pw - 2, yy - 2);
-  };
-  const put = (s: string, y: number, color: string): void => {
-    // Soft halo (panel-coloured shadow) instead of a hard outline — reads over the
-    // chart line but stays glassy/clean.
-    bcx.save();
-    bcx.shadowColor = halo;
-    bcx.shadowBlur = 5;
-    bcx.fillStyle = color;
-    bcx.fillText(s, pw / 2, y);
-    bcx.fillText(s, pw / 2, y); // twice → the soft halo reads a touch stronger
-    bcx.restore();
   };
   // Amber gradient over the part of a series past the target (like the audio
   // over-threshold fill): faint at the target line, solid toward the scale edge.
@@ -185,14 +173,16 @@ export function drawBuffer(g: GraphState, t: number): void {
       target2(mid - ampBuf(target));
     }
     if (g.bufHist.length) {
-      bcx.font = "700 15px -apple-system, sans-serif";
-      bcx.textAlign = "center";
-      bcx.textBaseline = "middle";
-      bcx.lineWidth = 3.5;
-      bcx.lineJoin = "round";
-      put(fmtS(g.bufAheadShown as number), mid - 12, BUF_COL); // buffer (top)
-      put(fmtS(v), mid + 12, LAT_COL); // latency (bottom)
-      bcx.textBaseline = "alphabetic";
+      cornerReadout(bcx, [
+        // Buffer on top, latency below — matching the graph (buffer fills up, latency
+        // fills down from the centre).
+        {
+          label: msg("meterBuffer") || "Buffer",
+          value: fmtS(g.bufAheadShown as number),
+          color: BUF_COL,
+        },
+        { label: msg("meterLatency") || "Latency", value: fmtS(v), color: LAT_COL },
+      ]);
     }
   } else {
     // One series (buffer only) → fill the FULL height from the bottom (0 = bottom),
@@ -217,13 +207,9 @@ export function drawBuffer(g: GraphState, t: number): void {
     }
     if (!Number.isNaN(target)) target2(bottom - ampFull(target));
     if (g.bufHist.length) {
-      bcx.font = "700 16px -apple-system, sans-serif";
-      bcx.textAlign = "center";
-      bcx.textBaseline = "middle";
-      bcx.lineWidth = 4;
-      bcx.lineJoin = "round";
-      put(fmtS(v), h / 2, BUF_COL);
-      bcx.textBaseline = "alphabetic";
+      cornerReadout(bcx, [
+        { label: msg("meterBuffer") || "Buffer", value: fmtS(v), color: BUF_COL },
+      ]);
     }
   }
   const br = fmtBitrate(g.bufBitrateShown);
