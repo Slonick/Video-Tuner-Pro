@@ -10,13 +10,12 @@ interface Props {
   children?: ReactNode; // structured content (e.g. the keyboard hints)
   below?: boolean; // prefer opening downward (Radix still flips if cramped)
   warn?: boolean; // amber warning variant (uses WarnIcon)
-  beta?: boolean; // a "β" in a ring (marks a beta feature); tooltip explains it
   className?: string; // extra class on the bubble (e.g. "kbd-tip")
   id?: string;
   label?: string; // trigger aria-label
 }
 
-export function InfoTip({ tip, children, below, warn, beta, className, id, label }: Props) {
+export function InfoTip({ tip, children, below, warn, className, id, label }: Props) {
   return (
     <Tooltip
       side={below || warn ? "bottom" : "top"}
@@ -24,12 +23,12 @@ export function InfoTip({ tip, children, below, warn, beta, className, id, label
       content={children ?? tip}
       trigger={
         <span
-          className={"info" + (warn ? " warn" : "") + (beta ? " beta" : "")}
+          className={"info" + (warn ? " warn" : "")}
           id={id}
           tabIndex={0}
-          aria-label={label ?? (beta ? "Beta" : warn ? "Warning" : "Info")}
+          aria-label={label ?? (warn ? "Warning" : "Info")}
         >
-          {beta ? <span className="beta-glyph">β</span> : warn ? <WarnIcon /> : <InfoIcon />}
+          {warn ? <WarnIcon /> : <InfoIcon />}
         </span>
       }
     />

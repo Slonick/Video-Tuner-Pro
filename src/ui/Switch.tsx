@@ -18,13 +18,9 @@ interface Props {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   id?: string;
-  // Marks an experimental feature: the track turns warm orange (instead of accent)
-  // when on, so "beta" lives on the toggle itself — no locale-fragile text tag in
-  // the title row.
-  beta?: boolean;
 }
 
-export function Switch({ checked, onChange, disabled, id, beta }: Props) {
+export function Switch({ checked, onChange, disabled, id }: Props) {
   const [pos, setPos] = useState(checked); // knob side — lags `checked` during the move phase
   const [glass, setGlass] = useState(false);
   const [grown, setGrown] = useState(false);
@@ -60,9 +56,6 @@ export function Switch({ checked, onChange, disabled, id, beta }: Props) {
 
   useEffect(() => () => clearTimers(), []);
 
-  // `beta` only tints the track orange (.switch-beta); the "BETA" badge itself lives
-  // on the card's description line (see the card), so it survives long, wrapping
-  // localized titles.
   return (
     <button
       type="button"
@@ -71,7 +64,7 @@ export function Switch({ checked, onChange, disabled, id, beta }: Props) {
       aria-checked={checked}
       disabled={disabled}
       data-state={checked ? "checked" : "unchecked"}
-      className={"switch switch-track" + (beta ? " switch-beta" : "")}
+      className="switch switch-track"
       onClick={() => onChange(!checked)}
     >
       <span

@@ -271,17 +271,6 @@ html .switch-track[data-state="checked"] {
   box-shadow: none;
 }
 
-/* Beta-feature toggle: warm orange when on (signals "experimental" instead of the
-   accent), with a faint warm ring when off so it still reads as special. Keeps the
-   "beta" cue on the control itself — no locale-fragile text tag in the title. */
-html .switch-beta {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--beta) 45%, transparent);
-}
-
-html .switch-beta[data-state="checked"] {
-  background: var(--beta);
-}
-
 /* The slider thumb scales via --thumb-s (composed with its centring translate in
    Slider's inline transform); ease it so the grow/shrink is smooth. */
 html .slider-thumb {

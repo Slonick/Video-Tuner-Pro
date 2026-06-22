@@ -30,6 +30,13 @@ describe("auto-slow card", () => {
     expect(primary().textContent).toContain("for this site");
   });
 
+  it("carries a BETA badge in the header (the enable toggle lives in the body)", async () => {
+    await mountApp({ tab: EX, replies: reply() });
+    expect(document.querySelector(".beta-badge")?.textContent).toBe("BETA");
+    // The toggle moved into the card body but keeps its id, so it's still reachable.
+    expect(byId("autoSlowToggle")).not.toBeNull();
+  });
+
   it("defaults the save target to Channel when the bundle came from a channel", async () => {
     await mountApp({ tab: EX, replies: reply({ scope: "channel", channel: "twitch:x" }) });
     await openMenu();

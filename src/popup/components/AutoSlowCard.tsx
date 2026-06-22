@@ -1,9 +1,11 @@
-// Auto-slow card (audio group). Mirrors the live-sync card: an enable toggle, the
-// live speech graph, and an always-visible target-rate row (steppers + slider).
-// The target previews live; Save commits the {enable, target} bundle to the chosen
-// scope (channel > site > global), Reset clears it. The expanded body also holds the
-// global response knobs (Slowest speed + Soft knee; Reaction / Hold / Ease-back stay
-// options-only).
+// Auto-slow card (audio group). Mirrors the live-sync card: the live speech graph
+// and an always-visible target-rate row (steppers + slider). Unlike the other cards
+// the enable is NOT global — it's saved per scope with the target — so the toggle
+// lives in the body next to its description, not in the header; the header carries a
+// BETA badge in its place. The target previews live; Save commits the {enable,
+// target} bundle to the chosen scope (channel > site > global), Reset clears it. The
+// expanded body also holds the global response knobs (Slowest speed + Soft knee;
+// Reaction / Hold / Ease-back stay options-only).
 import { useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
@@ -55,18 +57,16 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
             <span className="sec-text">
               <span className="sec-title-row">
                 <strong>{msg("autoSlowLabel") || "Auto-slow dense speech"}</strong>
-                <InfoTip beta tip={msg("betaNote")} />
                 <InfoTip tip={msg("autoSlowHint")} />
-              </span>
-              <span className="switch-sub">
-                {msg("autoSlowSubtitle") || "Ease off when speech gets too fast"}
               </span>
             </span>
           </Button>
           {live && (
             <InfoTip warn id="autoSlowLiveWarn" label="Live stream" tip={msg("autoSlowLiveNote")} />
           )}
-          <Switch id="autoSlowToggle" beta checked={a.enabled} onChange={a.setEnabled} />
+          <span className="beta-badge" title={msg("betaNote")}>
+            BETA
+          </span>
         </div>
 
         <div className="meter autoslow always">
@@ -92,6 +92,10 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
         </div>
 
         <div className="card-scroll">
+          <div className="extra-row">
+            <span>{msg("autoSlowSubtitle") || "Ease off when speech gets too fast"}</span>
+            <Switch id="autoSlowToggle" checked={a.enabled} onChange={a.setEnabled} />
+          </div>
           <div className="sync-delay-row">
             <span>{msg("autoSlowTargetLabel") || "Target rate"}</span>
           </div>
