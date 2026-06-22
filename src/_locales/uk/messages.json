@@ -151,6 +151,7 @@
   "autoSlowOff": { "message": "Авто-сповільнення вимк." },
   "stateOn": { "message": "Увімк." },
   "stateOff": { "message": "Вимк." },
+  "enableLabel": { "message": "Увімкнути" },
   "audioIdle": { "message": "Очікування звуку…" },
   "audioOff": { "message": "Компресія вимкнена" },
   "autoSlowLiveNote": { "message": "Під час прямої трансляції швидкість підбирається сама, тож автоматичне сповільнення тут призупинене." },

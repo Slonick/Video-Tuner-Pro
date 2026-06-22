@@ -151,6 +151,7 @@
   "autoSlowOff": { "message": "Auto-ralentí desactivado" },
   "stateOn": { "message": "Activado" },
   "stateOff": { "message": "Desactivado" },
+  "enableLabel": { "message": "Activar" },
   "audioIdle": { "message": "Esperando audio…" },
   "audioOff": { "message": "Compresión desactivada" },
   "autoSlowLiveNote": { "message": "En un directo la velocidad se ajusta sola, así que la ralentización automática queda en pausa aquí." },

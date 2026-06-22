@@ -151,6 +151,7 @@
   "autoSlowOff": { "message": "Авто-замедление выкл." },
   "stateOn": { "message": "Вкл." },
   "stateOff": { "message": "Выкл." },
+  "enableLabel": { "message": "Включить" },
   "audioIdle": { "message": "Ожидание звука…" },
   "audioOff": { "message": "Компрессия выключена" },
   "autoSlowLiveNote": { "message": "В прямом эфире скорость подбирается сама, поэтому автозамедление здесь приостановлено." },

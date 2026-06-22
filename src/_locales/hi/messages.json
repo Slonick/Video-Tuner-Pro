@@ -151,6 +151,7 @@
   "autoSlowOff": { "message": "ऑटो-धीमा बंद" },
   "stateOn": { "message": "चालू" },
   "stateOff": { "message": "बंद" },
+  "enableLabel": { "message": "सक्षम करें" },
   "audioIdle": { "message": "ऑडियो की प्रतीक्षा…" },
   "audioOff": { "message": "कंप्रेशन बंद" },
   "autoSlowLiveNote": { "message": "लाइव स्ट्रीम पर गति अपने आप तय होती है, इसलिए अपने-आप धीमा करना यहाँ रुका रहता है।" },

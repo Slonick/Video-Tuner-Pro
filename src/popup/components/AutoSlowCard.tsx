@@ -60,6 +60,9 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
                 <strong>{msg("autoSlowLabel") || "Auto-slow dense speech"}</strong>
                 <InfoTip tip={msg("autoSlowHint")} />
               </span>
+              <span className="switch-sub">
+                {msg("autoSlowSubtitle") || "Ease off when speech gets too fast"}
+              </span>
             </span>
           </Button>
           {live && (
@@ -93,61 +96,64 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
         </div>
 
         <div className="card-scroll">
-          <div className="extra-row">
-            <span>{msg("autoSlowSubtitle") || "Ease off when speech gets too fast"}</span>
-            <Switch id="autoSlowToggle" checked={a.enabled} onChange={a.setEnabled} />
+          {/* Always-visible essentials, grouped in one box: the enable toggle and the
+             per-scope target rate (sharing a row with Save). Shown collapsed too. */}
+          <div className="list-group">
+            <div className="extra-row">
+              <span>{msg("enableLabel") || "Enable"}</span>
+              <Switch id="autoSlowToggle" checked={a.enabled} onChange={a.setEnabled} />
+            </div>
+            <div className="as-target-row">
+              <SliderRow
+                sliderId="autoSlowTarget"
+                min={3}
+                max={12}
+                step={0.5}
+                value={a.target}
+                ariaLabel={msg("meterTarget") || "Target rate"}
+                ariaValueText={`${a.target.toFixed(1)} /s`}
+                onChange={(v) => a.setTarget(v)}
+                onDown={() => a.nudge(-0.5)}
+                downId="autoSlowDown"
+                downLabel="Lower target"
+                onUp={() => a.nudge(0.5)}
+                upId="autoSlowUp"
+                upLabel="Raise target"
+                onReset={a.resetManual}
+                resetId="autoSlowReset"
+                resetTitle={msg("tipResetTarget")}
+                valueText={
+                  <>
+                    <b>{a.target.toFixed(1)}</b> /s
+                  </>
+                }
+              />
+              <SaveScope
+                scope={a.scope}
+                saved={a.saved}
+                savedValues={a.savedValues}
+                currentValue={{ on: a.enabled, target: a.target }}
+                fmtCurrent={(v) => `${(v as { target: number }).target.toFixed(1)} /s`}
+                fmtValue={(v) => {
+                  const b = v as { on?: boolean; target: number };
+                  const state = b.on ? msg("stateOn") || "On" : msg("stateOff") || "Off";
+                  return `${state} · ${b.target.toFixed(1)} /s`;
+                }}
+                hasChannel={!!a.channel}
+                saveLabel={msg("rememberButton")}
+                savedLabel={msg("savedFeedback")}
+                onSave={a.save}
+                onReset={a.resetScope}
+                onPick={a.pickScope}
+                saveId="autoSlowSetBtn"
+                resetId="autoSlowResetBtn"
+              />
+            </div>
           </div>
 
+          {/* Advanced response knobs — revealed on expand. */}
           <div className={"sync-body" + (open ? " open" : "")} id="autoSlowBody">
-            {/* Everything in one grouped box: the per-scope target rate (sharing a row
-               with Save), then the global response knobs. */}
             <div className="list-group">
-              <div className="as-target-row">
-                <SliderRow
-                  sliderId="autoSlowTarget"
-                  min={3}
-                  max={12}
-                  step={0.5}
-                  value={a.target}
-                  ariaLabel={msg("meterTarget") || "Target rate"}
-                  ariaValueText={`${a.target.toFixed(1)} /s`}
-                  onChange={(v) => a.setTarget(v)}
-                  onDown={() => a.nudge(-0.5)}
-                  downId="autoSlowDown"
-                  downLabel="Lower target"
-                  onUp={() => a.nudge(0.5)}
-                  upId="autoSlowUp"
-                  upLabel="Raise target"
-                  onReset={a.resetManual}
-                  resetId="autoSlowReset"
-                  resetTitle={msg("tipResetTarget")}
-                  valueText={
-                    <>
-                      <b>{a.target.toFixed(1)}</b> /s
-                    </>
-                  }
-                />
-                <SaveScope
-                  scope={a.scope}
-                  saved={a.saved}
-                  savedValues={a.savedValues}
-                  currentValue={{ on: a.enabled, target: a.target }}
-                  fmtCurrent={(v) => `${(v as { target: number }).target.toFixed(1)} /s`}
-                  fmtValue={(v) => {
-                    const b = v as { on?: boolean; target: number };
-                    const state = b.on ? msg("stateOn") || "On" : msg("stateOff") || "Off";
-                    return `${state} · ${b.target.toFixed(1)} /s`;
-                  }}
-                  hasChannel={!!a.channel}
-                  saveLabel={msg("rememberButton")}
-                  savedLabel={msg("savedFeedback")}
-                  onSave={a.save}
-                  onReset={a.resetScope}
-                  onPick={a.pickScope}
-                  saveId="autoSlowSetBtn"
-                  resetId="autoSlowResetBtn"
-                />
-              </div>
               <ParamSlider
                 id="asFloor"
                 valId="asFloorVal"
