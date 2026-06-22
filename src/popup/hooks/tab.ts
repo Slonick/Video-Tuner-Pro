@@ -1,7 +1,7 @@
 // Active-tab resolution + a typed messaging helper. The popup talks to the
 // content script in the active tab; both are resolved once when the popup opens.
 import { useCallback, useEffect, useState } from "react";
-import { api, getActiveTab } from "../platform/browser.js";
+import { getActiveTab, sendToTab } from "../platform/browser.js";
 import { normalizeHost } from "../core/domain.js";
 
 export interface ActiveTab {
@@ -42,15 +42,7 @@ export type SendToTab = <T = Record<string, unknown>>(
 export function useTabMessaging(tabId: number | null): SendToTab {
   return useCallback(
     <T = Record<string, unknown>>(action: string, payload?: Record<string, unknown>) =>
-      new Promise<T | null>((resolve) => {
-        if (tabId == null) {
-          resolve(null);
-          return;
-        }
-        api.tabs.sendMessage(tabId, { action, ...payload }, (resp) => {
-          resolve(api.runtime.lastError || !resp ? null : (resp as T));
-        });
-      }),
+      tabId == null ? Promise.resolve(null) : sendToTab<T>(tabId, { action, ...payload }),
     [tabId],
   ) as SendToTab;
 }

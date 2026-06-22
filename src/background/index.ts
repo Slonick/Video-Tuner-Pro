@@ -38,13 +38,41 @@ function reset(tabId?: number): void {
   call(() => api.action.setIcon({ path: DEFAULT_ICON, tabId }));
 }
 
-api.runtime.onMessage.addListener((msg, sender) => {
+api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // The gear opens the options page. The popup runs as an in-page iframe behind the
   // on-video overlay, and openOptionsPage() from that embedded extension frame is a
   // no-op on Firefox — so the popup asks the background (which always can) instead.
   if (msg && msg.action === "openOptions") {
     call(() => api.runtime.openOptionsPage());
     return;
+  }
+  // The embedded overlay popup can't resolve its host tab via tabs.query on Firefox,
+  // so it asks who it's in — the background has it from sender.tab.
+  if (msg && msg.action === "whoami") {
+    const t = sender.tab;
+    sendResponse({ tab: t ? { id: t.id, url: t.url } : undefined });
+    return;
+  }
+  // …and it relays its content-script messages through here too (the embedded frame
+  // can't call tabs.sendMessage). Forward to the host tab and pipe the reply back.
+  if (msg && msg.action === "relayToTab" && typeof msg.tabId === "number") {
+    try {
+      api.tabs.sendMessage(msg.tabId, msg.msg, (resp: unknown) => {
+        void api.runtime.lastError; // absorb "no receiver"; the popup treats null as no-reply
+        try {
+          sendResponse(resp);
+        } catch (e) {
+          /* popup closed before the reply */
+        }
+      });
+    } catch (e) {
+      try {
+        sendResponse(undefined);
+      } catch (x) {
+        /* ignore */
+      }
+    }
+    return true; // sendResponse fires asynchronously
   }
   if (!msg || msg.action !== "icon" || !sender.tab) return;
   const tabId = sender.tab.id;
@@ -58,6 +86,7 @@ api.runtime.onMessage.addListener((msg, sender) => {
     call(() => api.action.setBadgeTextColor({ color: "#ffffff", tabId }));
   }
   call(() => api.action.setIcon({ path: msg.live ? RED_ICON : DEFAULT_ICON, tabId }));
+  return false; // no async response (only relayToTab keeps the channel open)
 });
 
 // Clear badge + restore default icon when a tab starts navigating, so stale state
