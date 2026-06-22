@@ -1,15 +1,17 @@
-// Auto-slow card (audio group). Mirrors the live-sync card: the live speech graph
-// and an always-visible target-rate row (steppers + slider). Unlike the other cards
-// the enable is NOT global — it's saved per scope with the target — so the toggle
-// lives in the body next to its description, not in the header; the header carries a
-// BETA badge in its place. The target previews live; Save commits the {enable,
-// target} bundle to the chosen scope (channel > site > global), Reset clears it. The
-// expanded body also holds the global response knobs (Slowest speed + Soft knee;
-// Reaction / Hold / Ease-back stay options-only).
+// Auto-slow card (audio group). The live speech graph, then an always-visible box
+// with one compact row: the enable toggle, the per-scope target slider (+ reset and
+// readout), and Save. Unlike the other cards the enable is NOT global — it's saved
+// per scope with the target — so it sits in the body, and the header carries a BETA
+// badge where a global switch would be. The target previews live; Save commits the
+// {enable, target} bundle to the chosen scope (channel > site > global). The expand
+// reveals the global response knobs (Slowest speed + Soft knee; Reaction / Hold /
+// Ease-back stay options-only).
 import { useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
-import { SliderRow } from "./SliderRow.js";
+import { Slider } from "../../ui/Slider.js";
+import { IconButton } from "../../ui/IconButton.js";
+import { ResetIcon } from "../icons.js";
 import { ParamSlider } from "./ParamSlider.js";
 import { InfoTip } from "./InfoTip.js";
 import { SaveScope } from "./SaveScope.js";
@@ -96,16 +98,19 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
         </div>
 
         <div className="card-scroll">
-          {/* Always-visible essentials, grouped in one box: the enable toggle and the
-             per-scope target rate (sharing a row with Save). Shown collapsed too. */}
+          {/* Always-visible essentials on one compact row: enable toggle, the per-scope
+             target slider, its reset + readout, and Save. Shown collapsed too. */}
           <div className="list-group">
-            <div className="extra-row">
-              <span>{msg("enableLabel") || "Enable"}</span>
-              <Switch id="autoSlowToggle" checked={a.enabled} onChange={a.setEnabled} />
-            </div>
             <div className="as-target-row">
-              <SliderRow
-                sliderId="autoSlowTarget"
+              <Switch
+                id="autoSlowToggle"
+                ariaLabel={msg("enableLabel") || "Enable"}
+                checked={a.enabled}
+                onChange={a.setEnabled}
+              />
+              <Slider
+                className="speed-slider"
+                id="autoSlowTarget"
                 min={3}
                 max={12}
                 step={0.5}
@@ -113,21 +118,19 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
                 ariaLabel={msg("meterTarget") || "Target rate"}
                 ariaValueText={`${a.target.toFixed(1)} /s`}
                 onChange={(v) => a.setTarget(v)}
-                onDown={() => a.nudge(-0.5)}
-                downId="autoSlowDown"
-                downLabel="Lower target"
-                onUp={() => a.nudge(0.5)}
-                upId="autoSlowUp"
-                upLabel="Raise target"
-                onReset={a.resetManual}
-                resetId="autoSlowReset"
-                resetTitle={msg("tipResetTarget")}
-                valueText={
-                  <>
-                    <b>{a.target.toFixed(1)}</b> /s
-                  </>
-                }
               />
+              <IconButton
+                className="spin"
+                id="autoSlowReset"
+                aria-label="Reset"
+                title={msg("tipResetTarget")}
+                onClick={a.resetManual}
+              >
+                <ResetIcon />
+              </IconButton>
+              <span className="slider-row-val">
+                <b>{a.target.toFixed(1)}</b> /s
+              </span>
               <SaveScope
                 scope={a.scope}
                 saved={a.saved}

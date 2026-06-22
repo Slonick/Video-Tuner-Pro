@@ -349,19 +349,23 @@
 .as-target-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2-5);
+  gap: var(--space-2);
 }
-.as-target-row .slider-row {
+/* The slider takes the slack; everything else shrinks to content. */
+.as-target-row .speed-slider {
   flex: 1;
   min-width: 0;
+}
+.as-target-row .slider-row-val {
+  flex: 0 0 auto;
 }
 .as-target-row .scope {
   flex: 0 0 auto;
 }
 .as-target-row .scope-trigger {
   width: auto;
-  padding-left: var(--space-4);
-  padding-right: var(--space-4);
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
 }
 
 /* "Allowed delay" / "Target rate" row: label on the left, a −/value/+ cluster on

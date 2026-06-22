@@ -49,7 +49,6 @@
      back on. Skipped when already locked/blocked — those dim more strongly. */
   &.autoslow-section.is-off:not(.locked):not(.is-disabled) {
     .meter,
-    .as-target-row,
     .sync-body {
       opacity: 0.4;
       pointer-events: none;
