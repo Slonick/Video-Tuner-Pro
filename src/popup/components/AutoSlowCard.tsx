@@ -146,7 +146,7 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
                 label={msg("optAutoSlowFloor") || "Slowest speed"}
                 desc={msg("optAutoSlowFloorHint") || ""}
                 min={50}
-                max={100}
+                max={200}
                 step={5}
                 value={k.floor}
                 animate={false}

@@ -62,7 +62,7 @@ export function AutoSlow() {
       ["autoSlowFloor", "autoSlowKnee", "autoSlowHold", "autoSlowReaction", "autoSlowEaseBack"],
       (r) => {
         const f = Number(r.autoSlowFloor);
-        setFloorPct(Number.isNaN(f) ? 100 : clampNum(f * 100, 50, 100, 100));
+        setFloorPct(Number.isNaN(f) ? 100 : clampNum(f * 100, 50, 200, 100));
         setKnee(clampNum(r.autoSlowKnee, 0, 2, 0.5));
         setHold(clampNum(r.autoSlowHold, 0, 4, 1.2));
         setReaction(clampNum(r.autoSlowReaction, 0, 100, 50));
@@ -96,10 +96,10 @@ export function AutoSlow() {
           value={floorPct}
           display={`${floorPct}%`}
           min={50}
-          max={100}
+          max={200}
           step={5}
           onChange={(v) => {
-            const n = clampNum(v, 50, 100, 100);
+            const n = clampNum(v, 50, 200, 100);
             setFloorPct(n);
             STORE.set({ autoSlowFloor: n / 100 });
           }}

@@ -25,10 +25,39 @@ let appliedEff = 0; // effective speed we last drove toward (0 = uninitialised)
 let lastApplyAt = -Infinity;
 let lastDenseAt = -Infinity; // last time the perceived rate was at/over the ceiling
 
+// Playback speed sampled each tick, kept over the same trailing window as the
+// syllable meter. The perceived rate is a ~4 s average, so to recover a stable
+// intrinsic rate we must divide it by the AVERAGE playback speed over that window —
+// not the instantaneous one. Dividing by the current speed makes the estimate lurch
+// while a speed change is still working its way through the window, which oscillates
+// the controller (slam to the floor, jump back up, repeat).
+const speedT: number[] = []; // sample timestamps (ms)
+const speedV: number[] = []; // playback speed at each sample
+function pushSpeed(s: number, now: number): void {
+  speedT.push(now);
+  speedV.push(s);
+  const cutoff = now - PACE.WINDOW_MS;
+  while (speedT.length && speedT[0] < cutoff) {
+    speedT.shift();
+    speedV.shift();
+  }
+}
+function windowSpeed(): number {
+  if (!speedV.length) return 0;
+  let sum = 0;
+  for (const s of speedV) sum += s;
+  return sum / speedV.length;
+}
+function resetSpeedWindow(): void {
+  speedT.length = 0;
+  speedV.length = 0;
+}
+
 // Hand the rate back to the user's intended speed (factor → 1). Used when the
 // feature is turned off or the analyser goes away mid-play.
 function release(): void {
   meter.reset();
+  resetSpeedWindow();
   appliedEff = 0;
   lastDenseAt = -Infinity;
   autoSlowLive.active = false;
@@ -59,6 +88,7 @@ export function autoSlowSample(): void {
   if (v !== lastPrimary) {
     lastPrimary = v;
     meter.reset();
+    resetSpeedWindow();
     appliedEff = 0;
   }
 
@@ -69,6 +99,8 @@ export function autoSlowSample(): void {
   const now = Date.now();
   // ~23 ms RMS window — the high-pass detector reads the envelope's modulation, not peaks.
   meter.push(rmsLinear(buf), now);
+  // Track the actual playback speed over the same window as the meter.
+  pushSpeed(S.currentSpeed * S.autoSlowFactor, now);
 
   if (now - lastApplyAt < APPLY_MS) return;
   lastApplyAt = now;
@@ -79,9 +111,12 @@ export function autoSlowSample(): void {
 
   const target = S.autoSlowTarget; // comfort ceiling in syll/s — the graph's target line
   const rate = meter.rate();
+  // Divide the windowed rate by the windowed speed (see speedT/speedV above) so the
+  // intrinsic estimate stays steady through a speed change instead of oscillating.
+  const measSpeed = windowSpeed() || appliedEff;
   const desired = suggestEffectiveSpeed(
     rate,
-    appliedEff,
+    measSpeed,
     user,
     S.autoSlowFloor,
     target,
