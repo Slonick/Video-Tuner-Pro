@@ -52,7 +52,11 @@ export function Sync() {
           <span className="sync-cat-label">{msg("optSyncMaster") || "Enable sync"}</span>
           <span className="sync-cat-desc">{msg("optSyncDesc")}</span>
         </div>
-        <Switch checked={master} onChange={toggleMaster} />
+        <Switch
+          checked={master}
+          onChange={toggleMaster}
+          ariaLabel={msg("optSyncMaster") || "Enable sync"}
+        />
       </div>
       <div className={"sync-rows" + (master ? "" : " is-off")} id="syncRows">
         {CATEGORIES.map((cat) => (
@@ -61,7 +65,12 @@ export function Sync() {
               <span className="sync-cat-label">{msg(LABEL_KEY[cat]) || cat}</span>
               <span className="sync-cat-desc">{msg(DESC_KEY[cat])}</span>
             </div>
-            <Switch checked={cfg[cat]} disabled={!master} onChange={(on) => toggleCat(cat, on)} />
+            <Switch
+              checked={cfg[cat]}
+              disabled={!master}
+              onChange={(on) => toggleCat(cat, on)}
+              ariaLabel={msg(LABEL_KEY[cat]) || cat}
+            />
           </div>
         ))}
       </div>

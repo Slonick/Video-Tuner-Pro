@@ -264,7 +264,12 @@ export function SpeedPresets() {
         <div className="opt-param">
           <div className="opt-param-row opt-param-row-toggle">
             <span>{msg("forceRateLabel") || "Force speed"}</span>
-            <StoredToggle id="forceRateToggle" storageKey="forceRate" defaultOn={false} />
+            <StoredToggle
+              id="forceRateToggle"
+              storageKey="forceRate"
+              defaultOn={false}
+              ariaLabel={msg("forceRateLabel") || "Force speed"}
+            />
           </div>
           <p className="opt-param-hint">{msg("forceRateHint")}</p>
         </div>

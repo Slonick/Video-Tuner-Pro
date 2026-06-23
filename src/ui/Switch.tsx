@@ -18,9 +18,12 @@ interface Props {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   id?: string;
+  // Accessible name for the switch — role=switch needs one when the visible label
+  // sits in an adjacent element rather than wrapping the control.
+  ariaLabel?: string;
 }
 
-export function Switch({ checked, onChange, disabled, id }: Props) {
+export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
   const [pos, setPos] = useState(checked); // knob side — lags `checked` during the move phase
   const [glass, setGlass] = useState(false);
   const [grown, setGrown] = useState(false);
@@ -62,6 +65,7 @@ export function Switch({ checked, onChange, disabled, id }: Props) {
       id={id}
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       disabled={disabled}
       data-state={checked ? "checked" : "unchecked"}
       className="switch switch-track"

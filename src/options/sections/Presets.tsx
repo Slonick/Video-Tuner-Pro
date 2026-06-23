@@ -294,7 +294,11 @@ export function Presets() {
               <span>{msg("audioGain") || "Make-up gain"}</span>
               <span className="preset-gain-ctrl">
                 {selP.gain != null && <b className="opt-param-val">{selP.gain} dB</b>}
-                <Switch checked={selP.gain != null} onChange={(on) => togglePresetGain(si, on)} />
+                <Switch
+                  checked={selP.gain != null}
+                  onChange={(on) => togglePresetGain(si, on)}
+                  ariaLabel={msg("audioGain") || "Make-up gain"}
+                />
               </span>
             </div>
             {selP.gain != null && (

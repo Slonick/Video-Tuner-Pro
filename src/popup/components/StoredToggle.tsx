@@ -7,9 +7,10 @@ interface Props {
   id: string;
   storageKey: string;
   defaultOn: boolean;
+  ariaLabel?: string;
 }
 
-export function StoredToggle({ id, storageKey, defaultOn }: Props) {
+export function StoredToggle({ id, storageKey, defaultOn, ariaLabel }: Props) {
   const [on, setOn] = useStoredFlag(storageKey, defaultOn);
-  return <Switch id={id} checked={on} onChange={setOn} />;
+  return <Switch id={id} ariaLabel={ariaLabel} checked={on} onChange={setOn} />;
 }

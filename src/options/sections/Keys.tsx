@@ -140,7 +140,11 @@ export function Keys() {
                     ? codeLabel(keymap[action])
                     : msg("optKeyOff") || "Off"}
               </Button>
-              <Switch checked={!!keymap[action]} onChange={(on) => toggleEnabled(action, on)} />
+              <Switch
+                checked={!!keymap[action]}
+                onChange={(on) => toggleEnabled(action, on)}
+                ariaLabel={msg(labelKey)}
+              />
             </span>
           </div>
         ))}
