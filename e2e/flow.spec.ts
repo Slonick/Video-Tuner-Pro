@@ -35,9 +35,10 @@ test("configure in options → use via popup → persist across reload", async (
   // 2. In the options page: surface the on-video button, double the step, and remap
   //    "faster" to K.
   const opt = await openExtensionPage(context, extensionId, "options/options.html");
-  await opt.locator("#overlayBtnSeg [role=radio]").nth(2).click(); // always
+  await opt.locator("#overlayBtnSeg [role=radio]").nth(2).click(); // always (General pane)
+  await opt.locator("#nav-speed").click(); // step + key remap live under the Speed group
   const stepThumb = opt
-    .locator("section.card", { has: opt.locator(".preset-rows") })
+    .locator("section.opt-group", { has: opt.locator(".preset-rows") })
     .locator(".opt-params-grid .opt-param")
     .nth(1)
     .locator("[role=slider]");

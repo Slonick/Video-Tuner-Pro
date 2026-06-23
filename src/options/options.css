@@ -237,6 +237,31 @@ button {
   margin-bottom: 0;
 }
 
+/* Cards used to hold their title inside, so the content blocks carried a top
+   margin (and the first row its padding) to clear it. The title now sits above the
+   card (group head), so that leading space just doubles the card's own padding into
+   an oversized gap. Collapse the leading/trailing space so every card edge is the
+   card's padding alone. */
+.card > :first-child {
+  margin-top: 0;
+}
+.card > .opt-field:first-child,
+.card > .opt-param:first-child,
+.card > .sync-cat-row:first-child,
+.card > .key-rows:first-child > .key-row:first-child,
+.card > .opt-params-grid:first-child > .opt-param:first-child {
+  padding-top: 0;
+}
+#savedLists > .saved-cat:first-child {
+  margin-top: 0;
+}
+.card > .opt-field:last-child,
+.card > .opt-param:last-child,
+.card > .sync-cat-row:last-child,
+.card > .opt-params-grid:last-child > .opt-param:last-child {
+  padding-bottom: 0;
+}
+
 .card-head {
   display: flex;
   align-items: center;

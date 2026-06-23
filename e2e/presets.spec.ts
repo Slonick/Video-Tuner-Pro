@@ -10,7 +10,7 @@ import {
   openExtensionPage,
   setStorage,
 } from "./fixtures/extension.js";
-import type { Locator, Page } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 
 const OPTIONS = "options/options.html";
 
@@ -25,10 +25,23 @@ async function edge(locator: Locator, key: "Home" | "End") {
 }
 
 function speedSection(page: Page) {
-  return page.locator("section.card", { has: page.locator(".preset-rows") });
+  return page.locator("section.opt-group", { has: page.locator(".preset-rows") });
 }
 function compSection(page: Page) {
-  return page.locator("section.card", { has: page.locator("#presetEditors") });
+  return page.locator("section.opt-group", { has: page.locator("#presetEditors") });
+}
+
+// Speed presets live under the Speed nav group, compressor presets under Audio —
+// both panes are hidden until their sidebar item is selected.
+async function openSpeed(context: BrowserContext, extensionId: string): Promise<Page> {
+  const page = await openExtensionPage(context, extensionId, OPTIONS);
+  await page.locator("#nav-speed").click();
+  return page;
+}
+async function openAudio(context: BrowserContext, extensionId: string): Promise<Page> {
+  const page = await openExtensionPage(context, extensionId, OPTIONS);
+  await page.locator("#nav-audio").click();
+  return page;
 }
 
 test.describe("Options · Speed presets", () => {
@@ -37,7 +50,7 @@ test.describe("Options · Speed presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openSpeed(context, extensionId);
     const params = speedSection(page).locator(".opt-params-grid .opt-param");
     await edge(params.nth(0), "End"); // max → 1600
     await edge(params.nth(1), "End"); // step → 50
@@ -54,7 +67,7 @@ test.describe("Options · Speed presets", () => {
     page,
   }) => {
     await page.goto("/");
-    const opt = await openExtensionPage(context, extensionId, OPTIONS);
+    const opt = await openSpeed(context, extensionId);
     await edge(speedSection(opt).locator(".opt-params-grid .opt-param").nth(1), "End"); // step 50%
     await expect
       .poll(async () => (await readStored(serviceWorker, "speedStep")).speedStep)
@@ -74,7 +87,7 @@ test.describe("Options · Speed presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openSpeed(context, extensionId);
     const first = speedSection(page).locator(".preset-rows input[type=number]").first();
     await first.fill("30");
     await first.press("Enter");
@@ -86,7 +99,7 @@ test.describe("Options · Speed presets", () => {
   });
 
   test("adding a preset grows the list", async ({ context, extensionId, serviceWorker }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openSpeed(context, extensionId);
     const before = speedSection(page).locator(".preset-row");
     await expect(before).toHaveCount(12); // DEFAULT_PRESETS
     await speedSection(page).getByText("Add preset").click();
@@ -104,7 +117,7 @@ test.describe("Options · Speed presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openSpeed(context, extensionId);
     const firstPin = speedSection(page).locator(".preset-row .preset-pin").first();
     expect(await firstPin.getAttribute("aria-pressed")).toBe("false"); // 25% isn't a default pin
     await firstPin.click();
@@ -120,7 +133,7 @@ test.describe("Options · Speed presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openSpeed(context, extensionId);
     await speedSection(page).locator(".preset-row .preset-key").first().click();
     await page.keyboard.press("KeyG");
     await expect
@@ -130,7 +143,7 @@ test.describe("Options · Speed presets", () => {
 
   test("reset restores the default preset set", async ({ context, extensionId, serviceWorker }) => {
     await setStorage(serviceWorker, { speedPresets: [42], presetKeys: [null], presetPins: [true] });
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openSpeed(context, extensionId);
     const reset = speedSection(page).locator(".card-actions .btn-danger");
     await reset.click();
     await reset.click();
@@ -146,7 +159,7 @@ test.describe("Options · Compressor presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openAudio(context, extensionId);
     await edge(compSection(page).locator(".opt-param").first(), "End"); // global gain → 24
     await expect
       .poll(async () => readStored(serviceWorker, ["audioCompBaseGain", "audioCompGain"]))
@@ -158,7 +171,7 @@ test.describe("Options · Compressor presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openAudio(context, extensionId);
     await edge(compSection(page).locator(".comp-detail .opt-param").nth(0), "Home"); // threshold → -100
     await expect
       .poll(
@@ -177,7 +190,7 @@ test.describe("Options · Compressor presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openAudio(context, extensionId);
     await compSection(page).locator(".preset-name-input").fill("My Voice");
     await expect
       .poll(
@@ -194,7 +207,7 @@ test.describe("Options · Compressor presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openAudio(context, extensionId);
     const rows = compSection(page).locator(".comp-list-row");
     await expect(rows).toHaveCount(3); // the three shipped defaults have loaded
     await compSection(page).locator(".comp-list-add").click();
@@ -212,7 +225,7 @@ test.describe("Options · Compressor presets", () => {
     extensionId,
     serviceWorker,
   }) => {
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openAudio(context, extensionId);
     await compSection(page).locator(".comp-detail [role=switch]").click();
     await expect
       .poll(
@@ -232,7 +245,7 @@ test.describe("Options · Compressor presets", () => {
     await setStorage(serviceWorker, {
       compPresets: [{ threshold: -10, knee: 0, ratio: 2, attack: 0, release: 0.5, pin: true }],
     });
-    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const page = await openAudio(context, extensionId);
     const reset = compSection(page).locator(".comp-actions .btn-danger");
     await reset.click();
     await reset.click();
