@@ -64,6 +64,13 @@ export const REGISTRY: Entry<unknown>[] = [
     parse: (raw) => raw === true,
     set: (v) => (S.forceRate = v),
   }),
+  // Live-sync buffer reserve (s) — global scalar read live by the controlLive tick,
+  // so no apply side-effect. Range 1–10, default 3.
+  entry({
+    key: "liveSyncBufferReserve",
+    parse: (raw) => clampNum(raw, 1, 10, 3),
+    set: (v) => (S.liveSyncBufferReserve = v),
+  }),
   entry({
     key: "keyboard",
     parse: (raw) => raw !== false,

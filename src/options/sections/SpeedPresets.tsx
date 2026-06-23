@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Group } from "../Group.js";
+import { StoredToggle } from "../../popup/components/StoredToggle.js";
 import { Slider } from "../../ui/Slider.js";
 import { Button } from "../../ui/Button.js";
 import { ConfirmButton } from "../../ui/ConfirmButton.js";
@@ -209,10 +211,7 @@ export function SpeedPresets() {
   };
 
   return (
-    <section className="card">
-      <h2>{msg("optPresetsTitle") || "Speed presets"}</h2>
-      <p className="card-desc">{msg("optPresetsDesc")}</p>
-
+    <Group head={<h2 className="opt-group-title">{msg("optPresetsTitle") || "Speed presets"}</h2>}>
       <div className="opt-params-grid">
         <div className="opt-param">
           <div className="opt-param-row">
@@ -260,6 +259,14 @@ export function SpeedPresets() {
             ariaLabel={msg("optHoldSpeed") || "Hold speed"}
             onChange={setHold}
           />
+        </div>
+
+        <div className="opt-param">
+          <div className="opt-param-row opt-param-row-toggle">
+            <span>{msg("forceRateLabel") || "Force speed"}</span>
+            <StoredToggle id="forceRateToggle" storageKey="forceRate" defaultOn={false} />
+          </div>
+          <p className="opt-param-hint">{msg("forceRateHint")}</p>
         </div>
       </div>
 
@@ -344,6 +351,6 @@ export function SpeedPresets() {
           {msg("optResetDefaults") || "Reset to defaults"}
         </ConfirmButton>
       </div>
-    </section>
+    </Group>
   );
 }

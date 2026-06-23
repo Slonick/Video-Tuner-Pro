@@ -59,6 +59,10 @@ export const S = {
   holdActive: false,
   holdPrev: 1.0,
   liveSyncTarget: 5, // seconds of allowed lag behind the live edge (1–30)
+  // Stall-safe buffer cushion (s) catch-up won't drain below — global tuning knob,
+  // capped at the allowed delay. Lower = more aggressive catch-up but more risk of
+  // re-buffering; higher = safer but slower to reach the live edge. (1–10, default 3)
+  liveSyncBufferReserve: 3,
   // On-video badge: speed + real remaining time (VODs)
   showRemaining: false,
   // On-video badge on live streams: speed + buffered-ahead seconds

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Group } from "../Group.js";
 import { Switch } from "../../ui/Switch.js";
 import { Slider } from "../../ui/Slider.js";
 import { Button } from "../../ui/Button.js";
@@ -165,10 +166,11 @@ export function Presets() {
   };
 
   return (
-    <section className="card">
-      <h2>{msg("optCompPresetsTitle") || "Compressor presets"}</h2>
-      <p className="card-desc">{msg("optCompPresetsDesc")}</p>
-
+    <Group
+      head={
+        <h2 className="opt-group-title">{msg("optCompPresetsTitle") || "Compressor presets"}</h2>
+      }
+    >
       <div className="opt-param">
         <div className="opt-param-row">
           <span>{msg("optGlobalGain") || "Global gain"}</span>
@@ -319,6 +321,6 @@ export function Presets() {
           {msg("optResetDefaults") || "Reset to defaults"}
         </ConfirmButton>
       </div>
-    </section>
+    </Group>
   );
 }

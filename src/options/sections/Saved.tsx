@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Group as SettingsGroup } from "../Group.js";
 import { Button } from "../../ui/Button.js";
 import { ConfirmButton } from "../../ui/ConfirmButton.js";
 
@@ -202,9 +203,9 @@ export function Saved() {
     .sort(byName);
 
   return (
-    <section className="card">
-      <h2>{msg("optSavedTitle") || "Saved speeds & delays"}</h2>
-      <p className="card-desc">{msg("optSavedDesc")}</p>
+    <SettingsGroup
+      head={<h2 className="opt-group-title">{msg("optSavedTitle") || "Saved speeds & delays"}</h2>}
+    >
       <div id="savedLists">
         <Category
           titleKey="catSpeeds"
@@ -227,6 +228,6 @@ export function Saved() {
           ]}
         />
       </div>
-    </section>
+    </SettingsGroup>
   );
 }

@@ -111,7 +111,13 @@ function runLiveSync(video: HTMLVideoElement): void {
   const dropped = Date.now() - lastRateAssertAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
   const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
 
-  const desired = decideCatchupSpeed({ buffer, latency: lat, dropped, target });
+  const desired = decideCatchupSpeed({
+    buffer,
+    latency: lat,
+    dropped,
+    target,
+    reserve: S.liveSyncBufferReserve,
+  });
 
   const changed = Math.abs(desired - S.currentSpeed) > 0.001;
   if (changed) {

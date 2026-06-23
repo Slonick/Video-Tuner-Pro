@@ -9,7 +9,7 @@ import {
 // CATCHUP_START=2.0 (warning threshold).
 // 105% just past the target (deadband 1s), +5% per full 7s of excess, ≤125%;
 // the buffer caps the step by the same 5% scale.
-const base = { target: 5, dropped: 0, buffer: 60, latency: null as number | null };
+const base = { target: 5, dropped: 0, buffer: 60, latency: null as number | null, reserve: 3 };
 
 describe("decideCatchupSpeed — stepped ramp", () => {
   it("stays 1× at or near the allowed delay", () => {
@@ -64,22 +64,27 @@ describe("decideCatchupSpeed — anti-stall guards", () => {
 
 describe("catchupBufferLimited (the UI warning)", () => {
   it("warns when far behind with a buffer at/below the floor", () => {
-    expect(catchupBufferLimited(30, 3.0, 5)).toBe(true); // latency-based floor = min(3, target)
-    expect(catchupBufferLimited(30, 1.5, 5)).toBe(true);
+    expect(catchupBufferLimited(30, 3.0, 5, 3)).toBe(true); // latency-based floor = min(3, target)
+    expect(catchupBufferLimited(30, 1.5, 5, 3)).toBe(true);
   });
   it("quiet when the buffer sustains some catch-up", () => {
-    expect(catchupBufferLimited(30, 6, 5)).toBe(false);
-    expect(catchupBufferLimited(30, 4, 5)).toBe(false); // above the 3s reserve now
+    expect(catchupBufferLimited(30, 6, 5, 3)).toBe(false);
+    expect(catchupBufferLimited(30, 4, 5, 3)).toBe(false); // above the 3s reserve now
   });
   it("quiet when not behind, however small the buffer", () => {
-    expect(catchupBufferLimited(5.5, 1.0, 5)).toBe(false);
+    expect(catchupBufferLimited(5.5, 1.0, 5, 3)).toBe(false);
+  });
+  it("a larger reserve warns sooner (the cushion is wider)", () => {
+    expect(catchupBufferLimited(30, 4, 5, 3)).toBe(false); // 4s clears the 3s reserve
+    expect(catchupBufferLimited(30, 4, 5, 5)).toBe(true); // but not the 5s reserve
   });
 });
 
 describe("catchupBufferFloor", () => {
-  it("min(3, allowed delay) with latency, bare 1s minimum without", () => {
-    expect(catchupBufferFloor(12, 5)).toBe(3); // delay above the cap → reserve capped at 3
-    expect(catchupBufferFloor(12, 2)).toBe(2); // delay below the cap → the delay itself
-    expect(catchupBufferFloor(null, 5)).toBe(1);
+  it("min(reserve, allowed delay) with latency, bare 1s minimum without", () => {
+    expect(catchupBufferFloor(12, 5, 3)).toBe(3); // delay above the reserve → capped at the reserve
+    expect(catchupBufferFloor(12, 2, 3)).toBe(2); // delay below the reserve → the delay itself
+    expect(catchupBufferFloor(12, 5, 6)).toBe(5); // reserve above the delay → capped at the delay
+    expect(catchupBufferFloor(null, 5, 3)).toBe(1);
   });
 });

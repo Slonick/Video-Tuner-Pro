@@ -20,57 +20,122 @@ button {
   color: inherit;
 }
 
-.wrap {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-/* --- Dashboard grid ------------------------------------------------------- */
-/* Bootstrap-style 12-column responsive grid. Cards declare a span (.opt-col-6 /
-   -12); each row's columns stretch to equal height. Collapses to one column on
-   narrow viewports. */
-.opt-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 14px;
-}
-
-.opt-col {
+/* --- Two-pane shell: sidebar nav + content (macOS System Settings style) ---- */
+.opt-shell {
   display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  max-width: 1080px;
+  margin: 0 auto;
+  /* Lift the whole shell above the fixed .glass-backdrop (z-index:0) — the old
+     .wrap did this; without it the pane/group headers paint behind the blur. */
+  position: relative;
+  z-index: 1;
 }
 
-.opt-col > .card {
-  flex: 1;
-  margin-bottom: 0;
+/* Sticky so the nav stays put while a long pane scrolls. top matches body's
+   padding-top. */
+.opt-sidebar {
+  position: sticky;
+  top: 24px;
+  flex: 0 0 232px;
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.opt-col-6 {
-  grid-column: span 6;
-}
-.opt-col-12 {
-  grid-column: span 12;
+.opt-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 10px 0;
 }
 
-@media (max-width: 860px) {
-  .opt-col-6,
-  .opt-col-12 {
-    grid-column: span 12;
+.opt-brand-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.opt-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opt-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:hover {
+    background: var(--glass-l2);
+  }
+  &.is-active {
+    background: var(--accent);
+    color: #fff;
   }
 }
 
-/* --- Header --------------------------------------------------------------- */
-.opt-header {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2-5);
-  padding: 0 2px 16px;
+.opt-nav-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
 
-  h1 {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    font-size: 20px;
-    font-weight: 700;
+  svg {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+.opt-nav-item.is-active .opt-nav-icon {
+  color: #fff;
+}
+
+.opt-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.opt-pane[hidden] {
+  display: none;
+}
+
+.opt-pane > .card:last-child {
+  margin-bottom: 0;
+}
+
+/* Narrow viewports: drop the sidebar above the content as a horizontal nav. */
+@media (max-width: 760px) {
+  .opt-shell {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .opt-sidebar {
+    position: static;
+    width: auto;
+    flex: none;
+  }
+  .opt-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .opt-nav-item {
+    width: auto;
   }
 }
 
@@ -100,8 +165,48 @@ button {
   text-transform: lowercase;
 }
 
-.opt-subtitle {
+/* --- Content-pane header: the active section's title (macOS-style) --------- */
+.opt-content-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  padding: 0 4px;
+  margin-bottom: 20px;
+
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+  }
+}
+.opt-content-icon {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* --- Settings group: header (title + optional desc/control) sits ABOVE a
+   rounded box, the way macOS System Settings lays out its sections. --------- */
+.opt-group {
+  margin-bottom: 22px;
+}
+.opt-group:last-child {
+  margin-bottom: 0;
+}
+.opt-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 4px 8px;
+}
+.opt-group-title {
   font-size: 13px;
+  font-weight: 600;
   color: var(--muted);
 }
 
@@ -116,6 +221,10 @@ button {
     font-size: 14px;
     font-weight: 600;
   }
+}
+/* Inside a group the box owns no outer margin — the group handles the spacing. */
+.opt-group > .card {
+  margin-bottom: 0;
 }
 
 .card-head {
@@ -421,7 +530,7 @@ button {
 
 /* --- Sync rows (switches, copied from the popup look) --------------------- */
 .sync-rows {
-  margin-top: 14px;
+  border-top: 1px solid var(--track);
   transition: opacity 0.15s;
 
   &.is-off {
@@ -440,6 +549,12 @@ button {
   & + .sync-cat-row {
     border-top: 1px solid var(--track);
   }
+}
+
+/* Backup row sits below the category list (outside #syncRows, so it never dims) —
+   give it the divider the adjacency rule would otherwise skip. */
+.sync-backup-row {
+  border-top: 1px solid var(--track);
 }
 
 .sync-cat-text {
@@ -547,12 +662,10 @@ button {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .comp-list-row.is-sel {
-  background: var(--glass-l1);
+  background: var(--glass-l2);
   border-color: var(--track);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 .comp-list-row.is-sel .comp-list-name {
-  color: var(--accent-text);
   font-weight: 600;
 }
 .comp-list-name {
@@ -623,38 +736,19 @@ button {
   }
 }
 
-/* Each tuning group is its own glass cell so its bounds read clearly (a recessed
-   l1 layer + neutral hairline; the controls inside sit above it). */
+/* Tuning sliders read as plain list rows inside the card — no per-row box — with a
+   hairline divider between them, like the other settings rows (macOS-style list). */
 .opt-param {
-  padding: var(--space-2-5) var(--space-3);
-  background: var(--glass-l1);
-  border: 1px solid var(--track);
-  border-radius: var(--radius-lg);
+  padding: var(--space-3) 0;
 }
 
 .opt-param + .opt-param {
-  margin-top: var(--space-2-5);
+  border-top: 1px solid var(--track);
 }
 
-/* Three speed sliders side by side on the full-width card; gap replaces the
-   stacked margin, so neutralise the adjacency rule inside the grid. */
 .opt-params-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px 20px;
-}
-
-.opt-params-grid .opt-param + .opt-param {
-  margin-top: 0;
-}
-
-@media (max-width: 720px) {
-  .opt-params-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .opt-params-grid .opt-param + .opt-param {
-    margin-top: var(--space-2-5);
-  }
+  display: flex;
+  flex-direction: column;
 }
 
 .opt-param-row {
@@ -665,6 +759,13 @@ button {
   margin-bottom: var(--space-1);
   font-size: 13px;
   color: var(--text);
+}
+
+/* A param row whose control is a switch (Force speed), not a slider — centre it
+   with the label and drop the gap meant for a slider below. */
+.opt-param-row-toggle {
+  align-items: center;
+  margin-bottom: 0;
 }
 
 .opt-param-val {

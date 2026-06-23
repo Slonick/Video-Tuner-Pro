@@ -1,6 +1,7 @@
-// Selective-sync controls: a master switch in the card header over a per-category
-// list. The master turns cross-device sync off entirely (everything stays on this
-// device); each category switch routes that group between sync and local.
+// Selective-sync controls: a master switch as the first row (with its description)
+// over a per-category list. The master turns cross-device sync off entirely
+// (everything stays on this device); each category switch routes that group between
+// sync and local.
 import { useState } from "react";
 import {
   getSyncConfig,
@@ -10,6 +11,8 @@ import {
 } from "../../shared/store.js";
 import { CATEGORIES, type Category } from "../../shared/sync-config.js";
 import { msg } from "../../popup/i18n.js";
+import { Group } from "../Group.js";
+import { Backup } from "./General.js";
 import { Switch } from "../../ui/Switch.js";
 
 const LABEL_KEY: Record<Category, string> = {
@@ -43,15 +46,13 @@ export function Sync() {
   };
 
   return (
-    <section className="card">
-      <div className="card-head">
-        <div>
-          <h2>{msg("optSyncTitle") || "Sync"}</h2>
-          <p className="card-desc">{msg("optSyncDesc")}</p>
+    <Group head={<h2 className="opt-group-title">{msg("optSyncTitle") || "Sync"}</h2>}>
+      <div className="sync-cat-row" id="syncMaster">
+        <div className="sync-cat-text">
+          <span className="sync-cat-label">{msg("optSyncMaster") || "Enable sync"}</span>
+          <span className="sync-cat-desc">{msg("optSyncDesc")}</span>
         </div>
-        <span id="syncMaster">
-          <Switch checked={master} onChange={toggleMaster} />
-        </span>
+        <Switch checked={master} onChange={toggleMaster} />
       </div>
       <div className={"sync-rows" + (master ? "" : " is-off")} id="syncRows">
         {CATEGORIES.map((cat) => (
@@ -64,6 +65,10 @@ export function Sync() {
           </div>
         ))}
       </div>
-    </section>
+      <div className="sync-cat-row sync-backup-row">
+        <span className="sync-cat-label">{msg("optBackupTitle") || "Backup"}</span>
+        <Backup />
+      </div>
+    </Group>
   );
 }

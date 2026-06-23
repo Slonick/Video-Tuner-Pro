@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
+import { Group } from "../Group.js";
 import { Slider } from "../../ui/Slider.js";
 
 const clampNum = (v: unknown, lo: number, hi: number, def: number) => {
@@ -78,16 +79,14 @@ export function AutoSlow() {
   };
 
   return (
-    <section className="card">
-      <h2>
-        {msg("optAutoSlowTitle") || "Auto-slow dense speech"}{" "}
-        <span className="beta-pill">beta</span>
-      </h2>
-      <p className="card-desc">
-        {msg("optAutoSlowDesc") ||
-          "Enable it and set the target rate per site/channel from the popup. These global knobs tune the response."}
-      </p>
-
+    <Group
+      head={
+        <h2 className="opt-group-title">
+          {msg("optAutoSlowTitle") || "Auto-slow dense speech"}{" "}
+          <span className="beta-pill">beta</span>
+        </h2>
+      }
+    >
       <div className="opt-params-grid">
         <Knob
           id="autoSlowFloor"
@@ -156,6 +155,6 @@ export function AutoSlow() {
           onChange={write("autoSlowEaseBack", setEaseBack, 0, 100)}
         />
       </div>
-    </section>
+    </Group>
   );
 }

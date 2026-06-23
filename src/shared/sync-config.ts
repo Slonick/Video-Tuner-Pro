@@ -43,6 +43,8 @@ export const KEY_CATEGORY: Record<string, Category> = {
   syncTargetGlobal: "delays",
   syncTargets: "delays",
   syncTargetChannels: "delays",
+  liveSyncBufferReserve: "delays", // global catch-up buffer cushion
+
   // Audio compressor.
   audioComp: "audio",
   audioCompThreshold: "audio",

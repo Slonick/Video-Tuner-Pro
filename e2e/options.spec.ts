@@ -68,6 +68,7 @@ test.describe("Options · General", () => {
 
   test("force-speed toggle persists", async ({ context, extensionId, serviceWorker }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-speed").click(); // Force speed lives under the Speed group
     await expect
       .poll(async () => (await readStored(serviceWorker, "forceRate")).forceRate)
       .toBe(undefined);
@@ -84,6 +85,7 @@ test.describe("Options · General", () => {
   }) => {
     await setStorage(serviceWorker, { globalSpeed: 1.6 });
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click(); // Backup lives under the Data group
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.locator("#exportBtn").click(),
@@ -105,6 +107,7 @@ test.describe("Options · General", () => {
     serviceWorker,
   }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click(); // Backup lives under the Data group
     await page.locator("#importBtn").click(); // opens the hidden file picker (no-op for us)
     await page.locator("input[type=file]").setInputFiles({
       name: "settings.json",
@@ -126,6 +129,7 @@ test.describe("Options · Keys", () => {
   }) => {
     await page.goto("/"); // a video tab the remap must reach via storage.onChanged
     const opt = await openExtensionPage(context, extensionId, OPTIONS);
+    await opt.locator("#nav-speed").click(); // Keys lives under the Speed group
     await opt.locator("#keyFaster").click(); // arm capture
     await opt.keyboard.press("KeyK"); // bind "faster" → K
     await expect
@@ -144,6 +148,7 @@ test.describe("Options · Keys", () => {
 
   test("a duplicate key is rejected", async ({ context, extensionId, serviceWorker }) => {
     const opt = await openExtensionPage(context, extensionId, OPTIONS);
+    await opt.locator("#nav-speed").click(); // Keys lives under the Speed group
     await opt.locator("#keyReset").click();
     await opt.keyboard.press("KeyA"); // KeyA already belongs to "slower" → rejected
     // reset keeps its default; give the rejection flash time to settle.
@@ -155,6 +160,7 @@ test.describe("Options · Keys", () => {
 
   test("Backspace unbinds an action", async ({ context, extensionId, serviceWorker }) => {
     const opt = await openExtensionPage(context, extensionId, OPTIONS);
+    await opt.locator("#nav-speed").click(); // Keys lives under the Speed group
     await opt.locator("#keyToggle").click();
     await opt.keyboard.press("Backspace");
     await expect
@@ -168,6 +174,7 @@ test.describe("Options · Keys", () => {
     serviceWorker,
   }) => {
     const opt = await openExtensionPage(context, extensionId, OPTIONS);
+    await opt.locator("#nav-speed").click(); // Keys lives under the Speed group
     const slowerSwitch = opt.locator("#keyRows .key-row").first().locator("[role=switch]");
     await slowerSwitch.click(); // off
     await expect
@@ -186,6 +193,7 @@ test.describe("Options · Keys", () => {
   }) => {
     await setStorage(serviceWorker, { keymap: { faster: "KeyK", slower: "KeyA" } });
     const opt = await openExtensionPage(context, extensionId, OPTIONS);
+    await opt.locator("#nav-speed").click(); // Keys lives under the Speed group
     const reset = opt.locator("#keyRows ~ .card-actions .confirm-btn");
     await reset.click(); // arm
     await reset.click(); // confirm
@@ -202,6 +210,7 @@ test.describe("Options · Auto-slow", () => {
     serviceWorker,
   }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-audio").click(); // Auto-slow lives under the Audio group
     await sliderTo(page, "#autoSlowFloor", "Home"); // 50% → 0.5
     await sliderTo(page, "#autoSlowKnee", "End"); // ±2 /s
     await sliderTo(page, "#autoSlowHold", "End"); // 4 s
@@ -230,6 +239,7 @@ test.describe("Options · Auto-slow", () => {
 test.describe("Options · Sync", () => {
   test("the master switch disables the per-category rows", async ({ context, extensionId }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click(); // Sync lives under the Data group
     const firstCat = page.locator("#syncRows .sync-cat-row [role=switch]").first();
     await expect(firstCat).toBeEnabled();
     await page.locator("#syncMaster [role=switch]").click(); // master off
@@ -239,6 +249,7 @@ test.describe("Options · Sync", () => {
 
   test("a category switch toggles off", async ({ context, extensionId }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click(); // Sync lives under the Data group
     const firstCat = page.locator("#syncRows .sync-cat-row [role=switch]").first();
     await expect(firstCat).toHaveAttribute("aria-checked", "true");
     await firstCat.click();
@@ -254,6 +265,7 @@ test.describe("Options · Saved", () => {
   }) => {
     await setStorage(serviceWorker, { domains: { "example.com": 1.5 }, globalSpeed: 1.25 });
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click(); // Saved lives under the Data group
     await expect(page.locator("#savedLists")).toContainText("example.com");
     await page.locator(".saved-row", { hasText: "example.com" }).locator(".saved-del").click();
     await expect.poll(async () => (await readStored(serviceWorker, "domains")).domains).toEqual({});
@@ -268,6 +280,7 @@ test.describe("Options · Saved", () => {
       globalSpeed: 1.25,
     });
     const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click(); // Saved lives under the Data group
     // The first category (speeds) reset button.
     const speedsReset = page.locator(".saved-cat").first().locator(".card-actions .confirm-btn");
     await speedsReset.click();

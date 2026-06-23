@@ -13,6 +13,7 @@ import {
   type Keymap,
 } from "../../shared/keymap.js";
 import { msg } from "../../popup/i18n.js";
+import { Group } from "../Group.js";
 import { Button } from "../../ui/Button.js";
 import { Switch } from "../../ui/Switch.js";
 import { ConfirmButton } from "../../ui/ConfirmButton.js";
@@ -116,9 +117,7 @@ export function Keys() {
   };
 
   return (
-    <section className="card">
-      <h2>{msg("kbdLabel") || "Keyboard shortcuts"}</h2>
-      <p className="card-desc">{msg("optKeysDesc")}</p>
+    <Group head={<h2 className="opt-group-title">{msg("kbdLabel") || "Keyboard shortcuts"}</h2>}>
       <div className="key-rows" id="keyRows">
         {ROWS.map(({ action, labelKey }) => (
           <div className="key-row" key={action}>
@@ -156,6 +155,6 @@ export function Keys() {
           {msg("optResetDefaults") || "Reset to defaults"}
         </ConfirmButton>
       </div>
-    </section>
+    </Group>
   );
 }

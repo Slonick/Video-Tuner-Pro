@@ -20,7 +20,9 @@ beforeEach(() => {
 });
 
 const sectionWith = (sel: string) =>
-  [...document.querySelectorAll("section.card")].find((s) => s.querySelector(sel)) as HTMLElement;
+  [...document.querySelectorAll("section.opt-group")].find((s) =>
+    s.querySelector(sel),
+  ) as HTMLElement;
 const thumbsIn = (root: Element, sel: string) =>
   [...root.querySelectorAll(`${sel} [role="slider"]`)] as HTMLElement[];
 

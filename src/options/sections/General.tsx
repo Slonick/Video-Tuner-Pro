@@ -1,12 +1,13 @@
-// General card: theme (applies live), language (saves + reloads), and JSON
-// backup export/import. Mirrors the old appearance.ts + backup.ts behaviour.
+// General card: theme (applies live) + glass opacity, language (saves + reloads),
+// and the on-video button mode. Also defines the JSON Backup export/import control
+// (exported), which the Sync section renders as a row under Data & sync.
 import { useEffect, useRef, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { THEMES, type Theme, setTheme } from "../../shared/theme.js";
 import { LOCALES, LOCALE_NAMES, getLang, setLang, type Lang } from "../../shared/i18n-config.js";
 import { SYNC_META_KEY } from "../../shared/sync-config.js";
 import { msg } from "../../popup/i18n.js";
-import { StoredToggle } from "../../popup/components/StoredToggle.js";
+import { Group } from "../Group.js";
 import { Button } from "../../ui/Button.js";
 import { Segmented } from "../../ui/Segmented.js";
 import { Slider } from "../../ui/Slider.js";
@@ -129,7 +130,7 @@ function LangGrid() {
 // Briefly turn a button green/red with a confirming label, then restore it.
 type Flash = { key: string; ok: boolean } | null;
 
-function Backup() {
+export function Backup() {
   const [exp, setExp] = useState<Flash>(null);
   const [imp, setImp] = useState<Flash>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -210,8 +211,7 @@ function Backup() {
 
 export function General() {
   return (
-    <section className="card">
-      <h2>{msg("optGeneralTitle") || "General"}</h2>
+    <Group>
       <div className="opt-field">
         <span className="opt-field-label">{msg("optThemeLabel") || "Theme"}</span>
         <ThemeSeg />
@@ -237,17 +237,6 @@ export function General() {
         </span>
         <OverlayBtnSeg />
       </div>
-      <div className="opt-field">
-        <span className="opt-field-text">
-          <span className="opt-field-label">{msg("forceRateLabel") || "Force speed"}</span>
-          <span className="opt-field-desc">{msg("forceRateHint")}</span>
-        </span>
-        <StoredToggle id="forceRateToggle" storageKey="forceRate" defaultOn={false} />
-      </div>
-      <div className="opt-field">
-        <span className="opt-field-label">{msg("optBackupTitle") || "Backup"}</span>
-        <Backup />
-      </div>
-    </section>
+    </Group>
   );
 }
