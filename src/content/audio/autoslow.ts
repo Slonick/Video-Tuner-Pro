@@ -70,8 +70,10 @@ function release(): void {
 // One sample tick (scheduled at PACE.SAMPLE_MS by the content entry). Reads the
 // primary analyser's RMS, feeds the meter, and every APPLY_MS nudges the factor.
 export function autoSlowSample(): void {
-  if (!S.autoSlowEnabled) {
-    release(); // global master off → hand the rate back and reset
+  // Master off, or the hold-to-speed key is held (a deliberate temporary speed) →
+  // stay out of the way and hand the rate back.
+  if (!S.autoSlowEnabled || S.holdActive) {
+    release();
     return;
   }
   const ctx = audioContext();
