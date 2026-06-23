@@ -26,8 +26,16 @@ let shadow: ShadowRoot | null = null;
 let fab: HTMLButtonElement | null = null;
 let backdrop: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
-let panelOverlay: HTMLDivElement | null = null; // transient capture layer while dragging the panel
-let lastHeaderClick = 0; // timestamp of the last no-move header press (for double-click → recentre)
+// Panel-drag state. The press starts inside the popup iframe, which captures the
+// pointer and posts the gesture here; we recompute the clamped centre on each move.
+let pdSX = 0,
+  pdSY = 0; // pointer screen coords at drag start
+let pdCx0 = 0,
+  pdCy0 = 0; // panel centre at drag start
+let pdHW = 0,
+  pdHH = 0; // panel half-extents (clamp bounds)
+let pdCx = 0,
+  pdCy = 0; // current clamped centre (saved on drop)
 let frameH = FALLBACK_H;
 let frameScale = 1; // last fit-scale from layoutFrame, reused by the open animation
 let open = false;
@@ -144,58 +152,33 @@ function resetPanelPos(): void {
   });
 }
 
-// Drag the panel by its header (the embedded popup posts drag-start with screen
-// coords). A transparent capture layer above the iframe tracks the pointer — the
-// iframe would otherwise swallow the moves. Clamped so the panel stays on screen.
-function startPanelDrag(sx: number, sy: number): void {
-  if (!frame || !shadow || panelOverlay) return;
+// Drag the panel by its header. The embedded popup captures the pointer (so the
+// moves keep arriving even when the cursor leaves the iframe) and posts the
+// gesture; we just reposition + clamp the panel so it stays on screen, then save
+// on drop. Screen coords cross the frame boundary unchanged → no scale math.
+function panelDragStart(sx: number, sy: number): void {
+  if (!frame) return;
   const r = frame.getBoundingClientRect();
-  const startCx = r.left + r.width / 2,
-    startCy = r.top + r.height / 2;
-  const hw = r.width / 2,
-    hh = r.height / 2;
-  let cx = startCx,
-    cy = startCy,
-    moved = false;
-  const ov = document.createElement("div");
-  Object.assign(ov.style, {
-    position: "fixed",
-    inset: "0",
-    zIndex: "2147483647",
-    cursor: "grabbing",
-  } as Partial<CSSStyleDeclaration>);
-  const onMove = (e: PointerEvent) => {
-    moved = true;
-    cx = Math.min(window.innerWidth - hw, Math.max(hw, startCx + (e.screenX - sx)));
-    cy = Math.min(window.innerHeight - hh, Math.max(hh, startCy + (e.screenY - sy)));
-    if (frame) {
-      frame.style.left = Math.round(cx) + "px";
-      frame.style.top = Math.round(cy) + "px";
-    }
-  };
-  const onUp = () => {
-    ov.remove();
-    panelOverlay = null;
-    if (moved) {
-      savePanelPos(cx / window.innerWidth, cy / window.innerHeight); // a click ≠ a move
-      lastHeaderClick = 0;
-      return;
-    }
-    // A press with no move is a click; two within 350ms = double-click → recentre.
-    // (The capture layer eats the iframe's own dblclick, so we detect it here.)
-    const now = Date.now();
-    if (now - lastHeaderClick < 350) {
-      lastHeaderClick = 0;
-      resetPanelPos();
-    } else {
-      lastHeaderClick = now;
-    }
-  };
-  ov.addEventListener("pointermove", onMove);
-  ov.addEventListener("pointerup", onUp);
-  ov.addEventListener("pointercancel", onUp);
-  shadow.append(ov);
-  panelOverlay = ov;
+  pdCx0 = r.left + r.width / 2;
+  pdCy0 = r.top + r.height / 2;
+  pdHW = r.width / 2;
+  pdHH = r.height / 2;
+  pdSX = sx;
+  pdSY = sy;
+  pdCx = pdCx0;
+  pdCy = pdCy0;
+}
+
+function panelDragMove(sx: number, sy: number): void {
+  if (!frame) return;
+  pdCx = Math.min(window.innerWidth - pdHW, Math.max(pdHW, pdCx0 + (sx - pdSX)));
+  pdCy = Math.min(window.innerHeight - pdHH, Math.max(pdHH, pdCy0 + (sy - pdSY)));
+  frame.style.left = Math.round(pdCx) + "px";
+  frame.style.top = Math.round(pdCy) + "px";
+}
+
+function panelDragEnd(moved: boolean): void {
+  if (moved) savePanelPos(pdCx / window.innerWidth, pdCy / window.innerHeight);
 }
 
 // The overlay iframe must declare the host's USED color-scheme to stay transparent
@@ -460,11 +443,16 @@ function hookMouse(): void {
       drag?: string;
       sx?: number;
       sy?: number;
+      moved?: boolean;
     } | null;
     if (!d || d.type !== "vtp-overlay") return;
     if (d.close) closePopup();
     else if (d.drag === "start" && typeof d.sx === "number" && typeof d.sy === "number")
-      startPanelDrag(d.sx, d.sy);
+      panelDragStart(d.sx, d.sy);
+    else if (d.drag === "move" && typeof d.sx === "number" && typeof d.sy === "number")
+      panelDragMove(d.sx, d.sy);
+    else if (d.drag === "end") panelDragEnd(d.moved === true);
+    else if (d.drag === "reset") resetPanelPos();
     else if (typeof d.height === "number" && d.height > 0) {
       frameH = Math.round(d.height);
       layoutFrame();

@@ -24,20 +24,64 @@ function wireEmbeddedOverlay(): void {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") post({ close: true });
   });
-  // Drag the panel by its header: the host raises a capture layer that tracks the
-  // pointer (the iframe would otherwise swallow the moves) and saves the spot per
-  // site. Screen coords cross the frame boundary unchanged, so the host needs no
-  // scale math. A double-click recentres it — but since the host's capture layer
-  // eats the clicks, the host detects the double-click itself (two no-move presses);
-  // we just forward the press. Clicks on the gear / Ko-fi controls are left alone.
-  const inHeader = (t: EventTarget | null) =>
-    t instanceof Element && t.closest(".header") && !t.closest("button, a");
+  // Drag the panel by its header. The gesture starts inside this iframe, so we own
+  // it here: setPointerCapture keeps the moves coming even when the cursor leaves
+  // the iframe, and we post the gesture to the host, which repositions the panel.
+  // Screen coords cross the frame boundary unchanged, so the host needs no scale
+  // math. A <4px slop keeps a click from counting as a drag; two no-move clicks
+  // within 350ms recentre the panel. Clicks on the gear / Ko-fi controls are left
+  // alone.
+  const headerHandle = (t: EventTarget | null): HTMLElement | null =>
+    t instanceof Element && t.closest(".header") && !t.closest("button, a")
+      ? (t.closest(".header") as HTMLElement)
+      : null;
+  let dragId: number | null = null;
+  let startSX = 0,
+    startSY = 0,
+    dragMoved = false,
+    lastClick = 0;
   document.addEventListener("pointerdown", (e) => {
-    if (e.button === 0 && inHeader(e.target)) {
-      e.preventDefault(); // no text selection / iframe drag-capture
-      post({ drag: "start", sx: e.screenX, sy: e.screenY });
+    if (e.button !== 0) return;
+    const handle = headerHandle(e.target);
+    if (!handle) return;
+    e.preventDefault(); // no text selection / native iframe drag
+    dragId = e.pointerId;
+    startSX = e.screenX;
+    startSY = e.screenY;
+    dragMoved = false;
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch (x) {
+      /* ignore */
     }
+    post({ drag: "start", sx: e.screenX, sy: e.screenY });
   });
+  document.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== dragId) return;
+    if (!dragMoved && Math.hypot(e.screenX - startSX, e.screenY - startSY) < 4) return;
+    dragMoved = true;
+    post({ drag: "move", sx: e.screenX, sy: e.screenY });
+  });
+  const endDrag = (e: PointerEvent) => {
+    if (e.pointerId !== dragId) return;
+    dragId = null;
+    if (dragMoved) {
+      post({ drag: "end", moved: true });
+      lastClick = 0;
+      return;
+    }
+    // A press with no move is a click; two within 350ms = double-click → recentre.
+    post({ drag: "end", moved: false });
+    const now = Date.now();
+    if (now - lastClick < 350) {
+      lastClick = 0;
+      post({ drag: "reset" });
+    } else {
+      lastClick = now;
+    }
+  };
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
 }
 
 initTheme();
