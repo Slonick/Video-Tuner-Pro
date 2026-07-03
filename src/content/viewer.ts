@@ -66,6 +66,26 @@ let mirrored = false;
 let mirrorStream: MediaStream | null = null;
 
 let fitMenu: HTMLDivElement | null = null;
+let qualityWrap: HTMLSpanElement | null = null;
+let qualityBtn: HTMLButtonElement | null = null;
+let qualityLabelEl: HTMLSpanElement | null = null;
+let qualityMenu: HTMLDivElement | null = null;
+let qualityReq = 0;
+let qualityVideoId = "";
+
+interface QualityOption {
+  id: string;
+  label: string;
+  current?: boolean;
+}
+interface QualityState {
+  options: QualityOption[];
+  current: string;
+}
+const QUALITY_REQ_ATTR = "data-vtp-quality-request";
+const QUALITY_VIDEO_ATTR = "data-vtp-quality-video";
+const QUALITY_PICK_ATTR = "data-vtp-quality-pick";
+const QUALITY_RESP_ATTR = "data-vtp-quality-response";
 
 // A previous instance (extension reload re-injects us) may have left its
 // overlay up — drop it. (Its adopted video can't be returned — the old
@@ -291,6 +311,93 @@ const I_CLOSE =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>';
 const I_FIT =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/></svg>';
+const I_QUALITY =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg>';
+
+function ensureQualityVideoId(): string {
+  if (!video) return "";
+  if (!qualityVideoId) {
+    qualityVideoId = `vtp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+  video.setAttribute("data-vtp-quality-id", qualityVideoId);
+  return qualityVideoId;
+}
+
+function qualityRequest(
+  type: "vtp-quality-request" | "vtp-quality-set",
+  qualityId?: string,
+): Promise<QualityState> {
+  const videoId = ensureQualityVideoId();
+  if (!videoId) return Promise.resolve({ options: [], current: "auto" });
+  const requestId = `q${++qualityReq}`;
+  return new Promise((resolve) => {
+    const done = (state: QualityState) => {
+      document.removeEventListener("vtp-quality-response", onResponse);
+      clearTimeout(timer);
+      resolve(state);
+    };
+    const onResponse = (e: Event) => {
+      let d = (e as CustomEvent).detail || {};
+      const raw = document.documentElement.getAttribute(QUALITY_RESP_ATTR);
+      if (raw) {
+        try {
+          d = JSON.parse(raw);
+        } catch (err) {
+          /* keep detail fallback */
+        }
+      }
+      if (d.requestId !== requestId) return;
+      done({
+        options: Array.isArray(d.options) ? d.options : [],
+        current: typeof d.current === "string" ? d.current : "auto",
+      });
+    };
+    const timer = setTimeout(() => done({ options: [], current: "auto" }), 1200);
+    document.addEventListener("vtp-quality-response", onResponse);
+    const root = document.documentElement;
+    root.setAttribute(QUALITY_REQ_ATTR, requestId);
+    root.setAttribute(QUALITY_VIDEO_ATTR, videoId);
+    if (qualityId) root.setAttribute(QUALITY_PICK_ATTR, qualityId);
+    else root.removeAttribute(QUALITY_PICK_ATTR);
+    document.dispatchEvent(new CustomEvent(type, { detail: { requestId, videoId, qualityId } }));
+  });
+}
+
+function setQualityVisible(visible: boolean): void {
+  if (!qualityWrap) return;
+  qualityWrap.style.display = visible ? "block" : "none";
+}
+
+function renderQuality(state: QualityState): void {
+  const options = state.options.filter((o) => o && o.id && o.label);
+  const selected = options.find((o) => o.current) ?? options.find((o) => o.id === state.current);
+  if (!options.length || options.length < 2) {
+    setQualityVisible(false);
+    return;
+  }
+  setQualityVisible(true);
+  if (qualityLabelEl) qualityLabelEl.textContent = selected?.label || "Auto";
+  if (!qualityMenu) return;
+  qualityMenu.textContent = "";
+  for (const opt of options) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "qitem";
+    item.textContent = opt.label;
+    if (opt.current || opt.id === state.current) item.setAttribute("aria-current", "true");
+    item.addEventListener("click", async () => {
+      qualityMenu?.classList.remove("open");
+      const next = await qualityRequest("vtp-quality-set", opt.id);
+      renderQuality(next);
+    });
+    qualityMenu.appendChild(item);
+  }
+}
+
+async function refreshQuality(): Promise<void> {
+  if (!fmt || !video || !qualityWrap) return;
+  renderQuality(await qualityRequest("vtp-quality-request"));
+}
 
 // Our control bar, inside a shadow-rooted host that spans the overlay (the
 // host itself is click-through; only the bar takes pointer events).
@@ -353,6 +460,7 @@ function mountBar(): void {
     `.vol{width:64px;flex:none}` +
     `.time{flex:none;white-space:nowrap;opacity:.9;font-variant-numeric:tabular-nums}` +
     `.qwrap{position:relative;flex:none}` +
+    `.qwrap[style*="display: none"]{display:none!important}` +
     `.qmenu{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:none;` +
     `flex-direction:column;gap:2px;padding:6px;border-radius:10px;min-width:92px;` +
     `max-height:40vh;overflow:auto;background:rgb(20 20 22 / 0.9);` +
@@ -441,12 +549,34 @@ function mountBar(): void {
     fitMenu.classList.add("open");
   });
   fwrap.append(fitBtn, fitMenu);
+  qualityWrap = document.createElement("span");
+  qualityWrap.className = "qwrap";
+  qualityWrap.style.display = "none";
+  qualityBtn = barButton(I_QUALITY, null, i18n("viewerQualityAria") || "Quality");
+  qualityBtn.classList.add("qbtn");
+  qualityLabelEl = document.createElement("span");
+  qualityLabelEl.className = "qbtn-label";
+  qualityLabelEl.textContent = "Auto";
+  qualityBtn.appendChild(qualityLabelEl);
+  qualityMenu = document.createElement("div");
+  qualityMenu.className = "qmenu";
+  qualityBtn.addEventListener("click", async () => {
+    if (!qualityMenu) return;
+    if (qualityMenu.classList.contains("open")) {
+      qualityMenu.classList.remove("open");
+      return;
+    }
+    const state = await qualityRequest("vtp-quality-request");
+    renderQuality(state);
+    if (state.options.length >= 2) qualityMenu.classList.add("open");
+  });
+  qualityWrap.append(qualityBtn, qualityMenu);
   fmtBtn = barButton(I_GROW, I_SHRINK, i18n("viewerTheaterAria") || "Pop out in theater format");
   fmtBtn.addEventListener("click", () => toggleViewer(fmt === "theater" ? "normal" : "theater"));
   const closeBtn = barButton(I_CLOSE, null, i18n("viewerCloseAria") || "Close the pop-out viewer");
   closeBtn.addEventListener("click", exitViewer);
   seekWrap.append(marksEl, seekEl);
-  bar.append(playBtn, timeEl, seekWrap, muteBtn, volEl, fwrap, fmtBtn, closeBtn);
+  bar.append(playBtn, timeEl, seekWrap, muteBtn, volEl, qualityWrap, fwrap, fmtBtn, closeBtn);
   bar.addEventListener("pointerenter", () => clearTimeout(barTimer));
   bar.addEventListener("pointerleave", showBar);
   shadow.append(bar);
@@ -667,6 +797,7 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   syncTime();
   showBar();
   loadMarkers();
+  refreshQuality();
   guardTimer = setInterval(guard, 500);
 }
 
@@ -700,6 +831,12 @@ export function exitViewer(): void {
   }
   mirrorStream?.getTracks().forEach((t) => t.stop());
   mirrorStream = null;
+  if (video && qualityVideoId) video.removeAttribute("data-vtp-quality-id");
+  qualityVideoId = "";
+  document.documentElement.removeAttribute(QUALITY_REQ_ATTR);
+  document.documentElement.removeAttribute(QUALITY_VIDEO_ATTR);
+  document.documentElement.removeAttribute(QUALITY_PICK_ATTR);
+  document.documentElement.removeAttribute(QUALITY_RESP_ATTR);
   holder?.remove();
   holder = null;
   overlay?.remove();
@@ -709,6 +846,10 @@ export function exitViewer(): void {
   seekEl = seekWrapEl = volEl = null;
   timeEl = null;
   fitMenu = null;
+  qualityWrap = null;
+  qualityBtn = null;
+  qualityLabelEl = null;
+  qualityMenu = null;
   marksEl = null;
   seeking = false;
   normalBox = null;

@@ -82,6 +82,7 @@ const barEl = () => {
 const barButtons = () => Array.from(barEl()?.querySelectorAll("button") ?? []); // play, mute, fmt, close
 const barInputs = () => Array.from(barEl()?.querySelectorAll("input") ?? []) as HTMLInputElement[]; // seek, vol
 const barTime = () => barEl()?.querySelector(".time")?.textContent ?? null;
+const qwraps = () => Array.from(barEl()?.querySelectorAll(".qwrap") ?? []) as HTMLElement[];
 
 function setFullscreen(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
@@ -99,6 +100,36 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
 });
+
+function installQualityBridge(options = [
+  { id: "auto", label: "Auto", current: true },
+  { id: "0", label: "360p" },
+  { id: "1", label: "720p" },
+]) {
+  const picks: string[] = [];
+  document.addEventListener("vtp-quality-request", (e) => {
+    const d = (e as CustomEvent).detail;
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-response", {
+        detail: { requestId: d.requestId, options, current: "auto" },
+      }),
+    );
+  });
+  document.addEventListener("vtp-quality-set", (e) => {
+    const d = (e as CustomEvent).detail;
+    picks.push(d.qualityId);
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-response", {
+        detail: {
+          requestId: d.requestId,
+          options: options.map((o) => ({ ...o, current: o.id === d.qualityId })),
+          current: d.qualityId,
+        },
+      }),
+    );
+  });
+  return picks;
+}
 
 describe("fmtTime", () => {
   it("formats sub-hour and over-hour times", async () => {
@@ -312,9 +343,8 @@ describe("control bar", () => {
     const { v } = makeVideo();
     h.primary = v;
     await openViewer("theater");
-    // Button order: play, mute, fit, format, close.
-    const fit = barButtons()[2];
-    const fwrap = fit.parentElement as HTMLElement;
+    const fwrap = qwraps()[1];
+    const fit = fwrap.querySelector("button") as HTMLButtonElement;
     fit.click();
     const items = Array.from(fwrap.querySelectorAll(".qitem")) as HTMLButtonElement[];
     expect(items.map((i) => i.textContent)).toEqual(["Fit", "Crop", "Stretch"]);
@@ -326,12 +356,33 @@ describe("control bar", () => {
     expect(v.style.objectFit).toBe("contain");
   });
 
+  it("shows quality options from the bridge and sends the selected level", async () => {
+    const picks = installQualityBridge();
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    await flush();
+    const quality = qwraps()[0];
+    expect(quality.style.display).toBe("block");
+    const btn = quality.querySelector("button") as HTMLButtonElement;
+    expect(btn.textContent).toContain("Auto");
+    btn.click();
+    await flush();
+    const items = Array.from(quality.querySelectorAll(".qitem")) as HTMLButtonElement[];
+    expect(items.map((i) => i.textContent)).toEqual(["Auto", "360p", "720p"]);
+    items[2].click();
+    await flush();
+    expect(picks).toEqual(["1"]);
+    expect(btn.textContent).toContain("720p");
+  });
+
   it("the format button switches and the close button exits", async () => {
     const { v } = makeVideo();
     h.primary = v;
     await openViewer("normal");
-    // Button order: play, mute, fit, format, close.
-    const [, , , fmtB, closeB] = barButtons();
+    const buttons = barButtons();
+    const fmtB = buttons.find((b) => b.title === "Pop out in theater format")!;
+    const closeB = buttons.find((b) => b.title === "Close the pop-out viewer")!;
     fmtB.click();
     expect(viewerFormat()).toBe("theater");
     expect(fmtB.getAttribute("aria-pressed")).toBe("true");

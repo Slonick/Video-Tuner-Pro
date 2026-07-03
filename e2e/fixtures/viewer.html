@@ -72,6 +72,16 @@
       v.setAttribute("playsinline", "");
       v.preload = "auto";
       v.style.cssText = "width:660px;height:370px;display:block";
+      v.__vtpFakeHls = {
+        media: v,
+        currentLevel: -1,
+        nextLevel: -1,
+        loadLevel: -1,
+        levels: [
+          { height: 360, bitrate: 800000 },
+          { height: 720, bitrate: 1800000 },
+        ],
+      };
       inner.appendChild(v);
       sr.appendChild(inner);
     </script>

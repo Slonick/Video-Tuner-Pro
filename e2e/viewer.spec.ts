@@ -90,12 +90,27 @@ test("Escape returns the video into the shadow root exactly", async ({ page }) =
     });
 });
 
-test("the viewer bar has no quality picker", async ({ page }) => {
+test("the quality picker drives a generic HLS-like engine", async ({ page }) => {
   await ready(page);
   await page.keyboard.press("KeyT");
   await expect.poll(() => state(page)).toMatchObject({ attr: "theater" });
   await page.mouse.move(400, 400); // wake the auto-hidden bar
-  await expect(page.locator("[data-vtp-viewer-overlay] .qwrap")).toHaveCount(1);
+  await expect(page.locator("[data-vtp-viewer-overlay] .qwrap")).toHaveCount(2);
+  const qwrap = page.locator("[data-vtp-viewer-overlay] .qwrap").nth(0);
+  await expect(qwrap).toBeVisible();
+  await qwrap.locator("> button").click();
+  await expect(qwrap.locator(".qitem", { hasText: "720p" })).toBeVisible();
+  await qwrap.locator(".qitem", { hasText: "720p" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const v = document.getElementById("host")?.shadowRoot?.querySelector("video") as
+          | (HTMLVideoElement & { __vtpFakeHls?: { currentLevel: number } })
+          | null;
+        return v?.__vtpFakeHls?.currentLevel;
+      }),
+    )
+    .toBe(1);
 });
 
 test("switching formats keeps a single overlay, T again exits", async ({ page }) => {
