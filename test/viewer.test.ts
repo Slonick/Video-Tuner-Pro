@@ -138,6 +138,33 @@ describe("toggleViewer — lifecycle", () => {
     expect(barEl()).not.toBeNull();
   });
 
+  it("mirrors through captureStream when available and leaves the source in place", async () => {
+    const { wrap, v } = makeVideo();
+    const mirrorPlay = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    v.controls = true;
+    const stop = vi.fn();
+    const stream = {
+      getVideoTracks: () => [{}],
+      getTracks: () => [{ stop }],
+    } as unknown as MediaStream;
+    Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
+    h.primary = v;
+    await openViewer("normal");
+    const mirror = overlayEl()!.firstElementChild as HTMLVideoElement;
+    expect(v.parentElement).toBe(wrap);
+    expect(v.controls).toBe(true);
+    expect(mirror).toBeInstanceOf(HTMLVideoElement);
+    expect(mirror).not.toBe(v);
+    expect(mirror.srcObject).toBe(stream);
+    mirror.dispatchEvent(new MouseEvent("click"));
+    expect(v.paused).toBe(false);
+    exitViewer();
+    expect(stop).toHaveBeenCalledOnce();
+    expect(v.parentElement).toBe(wrap);
+    expect(v.controls).toBe(true);
+    mirrorPlay.mockRestore();
+  });
+
   it("theater stretches the video to the whole overlay", async () => {
     const { v } = makeVideo();
     h.primary = v;

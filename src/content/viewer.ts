@@ -1,16 +1,8 @@
-// Pop-out video viewer: adopts the page's <video> element itself into our own
-// fixed overlay, in one of two formats — "normal" (a centred box sized to the
-// video's aspect, page dimmed behind, like Safari's video viewer) and
-// "theater" (the video fills the window). Only the bare <video> moves: site
-// players manage it imperatively (not through React), so the move doesn't
-// crash the page the way re-parenting a framework-owned container did, and it
-// sidesteps every stacking/shadow-DOM fight a CSS pin kept losing (trapped
-// z-index under fixed ancestors, styles not reaching shadow trees, site
-// chrome riding above the dim). The site's own controls stay behind with its
-// player — the overlay carries OUR control bar (play/seek/volume/format/
-// close, glass-styled, auto-hiding). A comment node marks the video's
-// original spot; exit puts it back exactly and restores its inline style and
-// controls flag.
+// Pop-out video viewer. It prefers a non-invasive mirror: capture the page's
+// <video> into our own overlay video, while the original player stays in its
+// DOM. That avoids most framework/player fights during quality changes and SPA
+// layer swaps. If captureStream() is unavailable, it falls back to adopting the
+// bare <video> and restoring it on exit.
 import { S } from "./state.js";
 import { primaryVideo } from "./videos.js";
 import {
@@ -30,13 +22,15 @@ const ATTR = "data-vtp-viewer"; // on <html>: "normal" | "theater" — state mar
 const OVERLAY = "data-vtp-viewer-overlay";
 const FRACTION = 0.86; // the normal box's share of the viewport
 const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
+const CLOSE_EVENT = "vtp-viewer-close";
 
 // The overlay sits under the speed badge (…646) and the launcher FAB with its
 // radial menu (…647), so both remain usable over the popped-out video.
 const Z_OVERLAY = "2147483643";
 
 let fmt: ViewerFormat | null = null;
-let video: HTMLVideoElement | null = null;
+let video: HTMLVideoElement | null = null; // the page media element we control
+let surfaceVideo: HTMLVideoElement | null = null; // the overlay video we render/style
 let overlay: HTMLDivElement | null = null;
 let holder: Comment | null = null; // marks the video's original DOM spot
 let prevCss = ""; // the video's inline style before we took over
@@ -68,6 +62,8 @@ let styleGuard: MutationObserver | null = null;
 let desiredCss = "";
 let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boolean } | null =
   null;
+let mirrored = false;
+let mirrorStream: MediaStream | null = null;
 
 let fitMenu: HTMLDivElement | null = null;
 
@@ -80,6 +76,8 @@ try {
 } catch (e) {
   /* ignore */
 }
+
+document.addEventListener(CLOSE_EVENT, () => exitViewer());
 
 export function viewerFormat(): ViewerFormat | null {
   return fmt;
@@ -153,19 +151,22 @@ const FIT_LABEL: Record<FitMode, [string, string]> = {
 const fitLabel = (m: FitMode) => i18n(FIT_LABEL[m][0]) || FIT_LABEL[m][1];
 
 function sizeVideo(): void {
-  if (!fmt || !video) return;
+  const surface = surfaceVideo ?? video;
+  if (!fmt || !surface) return;
   const fit = `object-fit:${fitMode} !important;`;
   if (fmt === "theater") {
     normalBox = null;
-    video.style.cssText =
+    surface.style.cssText =
       "position:absolute !important;inset:0 !important;" +
       "width:100% !important;height:100% !important;" +
       "transform:none !important;border-radius:0 !important;box-shadow:none !important;" +
       fit +
       VIDEO_RESET;
   } else {
-    const hasMetadata = !!(video.videoWidth && video.videoHeight);
-    const ar = hasMetadata ? video.videoWidth / video.videoHeight : 16 / 9;
+    const mediaWidth = surface.videoWidth || video?.videoWidth || 0;
+    const mediaHeight = surface.videoHeight || video?.videoHeight || 0;
+    const hasMetadata = !!(mediaWidth && mediaHeight);
+    const ar = hasMetadata ? mediaWidth / mediaHeight : 16 / 9;
     const viewportChanged =
       !normalBox || normalBox.vw !== window.innerWidth || normalBox.vh !== window.innerHeight;
     const metadataArrived = !!normalBox && !normalBox.fromMetadata && hasMetadata;
@@ -183,7 +184,7 @@ function sizeVideo(): void {
     }
     if (!normalBox) return;
     const box = normalBox;
-    video.style.cssText =
+    surface.style.cssText =
       "position:absolute !important;left:50% !important;top:50% !important;" +
       "transform:translate(-50%,-50%) !important;" +
       `width:${box.w}px !important;height:${box.h}px !important;` +
@@ -193,14 +194,15 @@ function sizeVideo(): void {
   }
   // The browser normalizes cssText on write — keep the normalized form, so the
   // style guard's comparison (and re-assert) converges instead of looping.
-  desiredCss = video.style.cssText;
+  desiredCss = surface.style.cssText;
   layoutBar();
 }
 
 // The bar hugs the video's bottom edge, clamped to a sane width.
 function layoutBar(): void {
-  if (!bar || !video) return;
-  const r = video.getBoundingClientRect();
+  const surface = surfaceVideo ?? video;
+  if (!bar || !surface) return;
+  const r = surface.getBoundingClientRect();
   const w = Math.min(Math.max(r.width - 32, 280), 760);
   bar.style.width = Math.round(w) + "px";
   bar.style.left = Math.round(r.left + r.width / 2) + "px";
@@ -491,7 +493,14 @@ async function loadMarkers(): Promise<void> {
 // over; put everything back (or let it go) and close.
 function guard(): void {
   if (!fmt) return;
-  if (!video || !overlay || video.parentElement !== overlay || (holder && !holder.isConnected)) {
+  if (
+    !video ||
+    !overlay ||
+    !surfaceVideo?.isConnected ||
+    (mirrored && !video.isConnected) ||
+    (!mirrored && video.parentElement !== overlay) ||
+    (holder && !holder.isConnected)
+  ) {
     exitViewer();
   }
 }
@@ -537,15 +546,46 @@ function wireVideo(v: HTMLVideoElement): void {
     },
     opt,
   );
-  v.addEventListener("click", () => (v.paused ? v.play()?.catch(() => {}) : v.pause()), opt);
+  surfaceVideo?.addEventListener(
+    "click",
+    () => (v.paused ? v.play()?.catch(() => {}) : v.pause()),
+    opt,
+  );
   // Sites (YouTube) keep restyling their video — snap ours back on sight.
   styleGuard?.disconnect();
   styleGuard = new MutationObserver(() => {
-    if (fmt && video && video.style.cssText !== desiredCss) {
-      video.style.cssText = desiredCss;
+    const surface = surfaceVideo ?? video;
+    if (fmt && surface && surface.style.cssText !== desiredCss) {
+      surface.style.cssText = desiredCss;
     }
   });
-  styleGuard.observe(v, { attributes: true, attributeFilter: ["style"] });
+  if (surfaceVideo) styleGuard.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
+}
+
+type CaptureVideo = HTMLVideoElement & {
+  captureStream?: () => MediaStream;
+  mozCaptureStream?: () => MediaStream;
+};
+
+function createMirror(v: HTMLVideoElement): HTMLVideoElement | null {
+  const capture = (v as CaptureVideo).captureStream ?? (v as CaptureVideo).mozCaptureStream;
+  if (!capture) return null;
+  try {
+    const stream = capture.call(v);
+    if (!stream || !stream.getVideoTracks().length) return null;
+    const mirror = document.createElement("video");
+    mirrorStream = stream;
+    mirror.srcObject = stream;
+    mirror.muted = true;
+    mirror.playsInline = true;
+    mirror.autoplay = true;
+    mirror.controls = false;
+    mirror.setAttribute("aria-hidden", "true");
+    mirror.play()?.catch(() => {});
+    return mirror;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Auto-open on playback (the `viewerAuto` setting). Once per video element:
@@ -569,8 +609,12 @@ document.addEventListener(
 async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<void> {
   const v = target ?? primaryVideo();
   if (!v || document.fullscreenElement || fmt) return;
+  document.dispatchEvent(new Event(CLOSE_EVENT));
   fmt = format;
   video = v;
+  surfaceVideo = null;
+  mirrored = false;
+  mirrorStream = null;
   normalBox = null;
   prevCss = v.style.cssText;
   prevControls = v.controls;
@@ -589,10 +633,18 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   // leaves it.
   pendingChapters =
     isYouTube() && Number.isFinite(v.duration) ? readYouTubeChapters(v.duration) : [];
-  holder = document.createComment("vtp-viewer-holder");
-  v.parentNode?.insertBefore(holder, v);
-  overlay.appendChild(v);
-  v.controls = false; // ours replace them; the site's flag is restored on exit
+  const mirror = createMirror(v);
+  if (mirror) {
+    mirrored = true;
+    surfaceVideo = mirror;
+    overlay.appendChild(mirror);
+  } else {
+    holder = document.createComment("vtp-viewer-holder");
+    v.parentNode?.insertBefore(holder, v);
+    surfaceVideo = v;
+    overlay.appendChild(v);
+    v.controls = false; // ours replace them; the site's flag is restored on exit
+  }
   mountBar();
   prevOverflow = document.documentElement.style.overflow;
   document.documentElement.style.overflow = "hidden";
@@ -636,14 +688,18 @@ export function exitViewer(): void {
   document.documentElement.style.overflow = prevOverflow;
   if (video) {
     autoSeen.add(video); // closing means "not this one again"
-    video.controls = prevControls;
-    video.style.cssText = prevCss;
+    if (!mirrored) {
+      video.controls = prevControls;
+      video.style.cssText = prevCss;
+    }
     // Back to the exact spot the comment held. If the site tore that spot
     // down, the video is orphaned content — it goes away with the overlay.
-    if (holder?.isConnected && video.parentElement === overlay) {
+    if (!mirrored && holder?.isConnected && video.parentElement === overlay) {
       holder.parentNode?.insertBefore(video, holder);
     }
   }
+  mirrorStream?.getTracks().forEach((t) => t.stop());
+  mirrorStream = null;
   holder?.remove();
   holder = null;
   overlay?.remove();
@@ -656,6 +712,8 @@ export function exitViewer(): void {
   marksEl = null;
   seeking = false;
   normalBox = null;
+  surfaceVideo = null;
+  mirrored = false;
   video = null;
   // Players re-measure on resize — let the restored one lay itself out.
   window.dispatchEvent(new Event("resize"));
