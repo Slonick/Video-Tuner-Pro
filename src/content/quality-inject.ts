@@ -153,7 +153,7 @@
   }
 
   function rootsFor(v: HTMLVideoElement): unknown[] {
-    const out: unknown[] = [v, window];
+    const out: unknown[] = [v];
     let el: Element | null = v;
     for (let i = 0; i < 10 && el; i++) {
       out.push(el);
@@ -186,7 +186,7 @@
       seen.add(value);
       const accepted = accept(value);
       if (accepted) return accepted;
-      if (depth >= 5) continue;
+      if (depth >= 4) continue;
       const preferred = [
         "hls",
         "hlsjs",
@@ -212,7 +212,7 @@
       }
       let keys: string[];
       try {
-        keys = Object.keys(value).slice(0, 80);
+        keys = Object.keys(value).slice(0, 40);
       } catch (e) {
         continue;
       }

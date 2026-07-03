@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   isYouTube,
   hasNativeSponsorBlock,
@@ -113,6 +113,10 @@ describe("readYouTubeChapters", () => {
 });
 
 describe("fetchSponsorSegments", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("maps the API response and filters malformed entries", async () => {
     const fetchFn = vi.fn().mockResolvedValue({
       ok: true,
@@ -133,5 +137,17 @@ describe("fetchSponsorSegments", () => {
     expect(await fetchSponsorSegments("abc", notFound as unknown as typeof fetch)).toEqual([]);
     const boom = vi.fn().mockRejectedValue(new Error("net"));
     expect(await fetchSponsorSegments("abc", boom as unknown as typeof fetch)).toEqual([]);
+  });
+
+  it("times out a stuck request", async () => {
+    vi.useFakeTimers();
+    const fetchFn = vi.fn((_url: string, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    });
+    const promise = fetchSponsorSegments("abc", fetchFn as unknown as typeof fetch);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(await promise).toEqual([]);
   });
 });

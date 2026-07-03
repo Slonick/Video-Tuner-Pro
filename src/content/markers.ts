@@ -123,10 +123,16 @@ export async function fetchSponsorSegments(
   videoId: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<SponsorSegment[]> {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer =
+    controller && typeof setTimeout === "function"
+      ? setTimeout(() => controller.abort(), 1500)
+      : null;
   try {
     const cats = encodeURIComponent(JSON.stringify(Object.keys(SPONSOR_COLORS)));
     const resp = await fetchFn(
       `https://sponsor.ajay.app/api/skipSegments?videoID=${encodeURIComponent(videoId)}&categories=${cats}`,
+      controller ? { signal: controller.signal } : undefined,
     );
     if (!resp.ok) return [];
     const data = (await resp.json()) as Array<{ segment?: [number, number]; category?: string }>;
@@ -136,5 +142,7 @@ export async function fetchSponsorSegments(
       .map((d) => ({ start: d.segment![0], end: d.segment![1], category: d.category! }));
   } catch (e) {
     return [];
+  } finally {
+    if (timer != null) clearTimeout(timer);
   }
 }

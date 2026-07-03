@@ -64,6 +64,7 @@ let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boo
   null;
 let mirrored = false;
 let mirrorStream: MediaStream | null = null;
+let mirrorRecaptureTimer: ReturnType<typeof setTimeout> | null = null;
 
 let fitMenu: HTMLDivElement | null = null;
 let qualityWrap: HTMLSpanElement | null = null;
@@ -389,6 +390,7 @@ function renderQuality(state: QualityState): void {
       qualityMenu?.classList.remove("open");
       const next = await qualityRequest("vtp-quality-set", opt.id);
       renderQuality(next);
+      scheduleMirrorRecapture();
     });
     qualityMenu.appendChild(item);
   }
@@ -718,6 +720,42 @@ function createMirror(v: HTMLVideoElement): HTMLVideoElement | null {
   }
 }
 
+function recaptureMirror(): void {
+  if (!mirrored || !video || !surfaceVideo) return;
+  const capture = (video as CaptureVideo).captureStream ?? (video as CaptureVideo).mozCaptureStream;
+  if (!capture) return;
+  try {
+    const stream = capture.call(video);
+    if (!stream || !stream.getVideoTracks().length) return;
+    mirrorStream?.getTracks().forEach((t) => t.stop());
+    mirrorStream = stream;
+    surfaceVideo.pause();
+    surfaceVideo.srcObject = null;
+    surfaceVideo.srcObject = stream;
+    surfaceVideo.play()?.catch(() => {});
+    sizeVideo();
+  } catch (e) {
+    /* keep the current mirror */
+  }
+}
+
+function scheduleMirrorRecapture(): void {
+  if (!mirrored) return;
+  if (mirrorRecaptureTimer != null) clearTimeout(mirrorRecaptureTimer);
+  recaptureMirror();
+  const delays = [400, 1200, 2500];
+  let i = 0;
+  const next = () => {
+    recaptureMirror();
+    if (i >= delays.length) {
+      mirrorRecaptureTimer = null;
+      return;
+    }
+    mirrorRecaptureTimer = setTimeout(next, delays[i++]);
+  };
+  mirrorRecaptureTimer = setTimeout(next, delays[i++]);
+}
+
 // Auto-open on playback (the `viewerAuto` setting). Once per video element:
 // exiting adds the video to the seen set, so a manual close isn't fought the
 // next time the user hits play.
@@ -807,6 +845,10 @@ export function exitViewer(): void {
   if (guardTimer != null) {
     clearInterval(guardTimer);
     guardTimer = null;
+  }
+  if (mirrorRecaptureTimer != null) {
+    clearTimeout(mirrorRecaptureTimer);
+    mirrorRecaptureTimer = null;
   }
   clearTimeout(barTimer);
   media?.abort();
