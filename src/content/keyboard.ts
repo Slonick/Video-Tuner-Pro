@@ -18,6 +18,7 @@ import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
+import { toggleViewer } from "./viewer.js";
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
 function deepActive(): Element | null {
@@ -40,7 +41,7 @@ document.addEventListener(
   "keydown",
   (e) => {
     if (!S.keyboardEnabled || !ctxValid()) return;
-    const { slower, faster, reset, toggle, hold, overlay } = S.keymap;
+    const { slower, faster, reset, toggle, hold, overlay, viewer, theater } = S.keymap;
     // A preset whose assigned chord matches this exact event (may use modifiers).
     let preset: number | undefined;
     for (let i = 0; i < S.presetKeys.length; i++) {
@@ -60,7 +61,9 @@ document.addEventListener(
         e.code === reset ||
         e.code === toggle ||
         e.code === hold ||
-        e.code === overlay);
+        e.code === overlay ||
+        e.code === viewer ||
+        e.code === theater);
     if (preset === undefined && !actionKey) return;
     // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
     const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
@@ -70,6 +73,14 @@ document.addEventListener(
     e.preventDefault();
     if (e.code === overlay) {
       toggleOverlayPopup();
+      return;
+    }
+    if (e.code === viewer) {
+      toggleViewer("normal");
+      return;
+    }
+    if (e.code === theater) {
+      toggleViewer("theater");
       return;
     }
     if (preset !== undefined) {

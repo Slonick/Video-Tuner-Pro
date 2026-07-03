@@ -7,10 +7,18 @@ import { join, extname, normalize } from "node:path";
 
 const DIR = fileURLToPath(new URL("./fixtures", import.meta.url));
 const PORT = Number(process.env.E2E_PORT || 5599);
-const TYPES = { ".html": "text/html", ".webm": "video/webm", ".js": "text/javascript", ".css": "text/css" };
+const TYPES = {
+  ".html": "text/html",
+  ".webm": "video/webm",
+  ".js": "text/javascript",
+  ".css": "text/css",
+};
 
 createServer(async (req, res) => {
-  const rel = normalize(decodeURIComponent((req.url || "/").split("?")[0])).replace(/^(\.\.[/\\])+/, "");
+  const rel = normalize(decodeURIComponent((req.url || "/").split("?")[0])).replace(
+    /^(\.\.[/\\])+/,
+    "",
+  );
   const file = join(DIR, rel === "/" ? "video.html" : rel);
   try {
     const body = await readFile(file);

@@ -26,6 +26,7 @@
   }
   interface HlsLike {
     latency: number;
+    levels?: unknown;
     media?: unknown;
     attachMedia?: unknown;
     recoverMediaError?: unknown;
@@ -127,26 +128,82 @@
     if (!o || typeof o !== "object") return false;
     const h = o as HlsLike;
     return (
-      typeof h.latency === "number" &&
+      (typeof h.latency === "number" || Array.isArray(h.levels)) &&
       (h.media instanceof HTMLMediaElement ||
         typeof h.attachMedia === "function" ||
         typeof h.recoverMediaError === "function")
     );
   }
+  function readProp(o: object, key: string): unknown {
+    try {
+      return (o as Record<string, unknown>)[key];
+    } catch (e) {
+      return null;
+    }
+  }
+  function findHlsInValue(
+    value: unknown,
+    seen: WeakSet<object>,
+    depth: number,
+    budget: { n: number },
+  ): HlsLike | null {
+    if (isHls(value)) return value;
+    if (!value || typeof value !== "object" || depth <= 0 || budget.n <= 0) return null;
+    if (value === window || value === document) return null;
+    const obj = value as object;
+    if (seen.has(obj)) return null;
+    seen.add(obj);
+    budget.n--;
+
+    if (!(value instanceof Node)) {
+      for (const key of [
+        "hls",
+        "hlsjs",
+        "hlsInstance",
+        "player",
+        "mediaPlayer",
+        "mediaPlayerInstance",
+        "videoPlayer",
+        "engine",
+        "playback",
+        "controller",
+        "state",
+        "props",
+      ]) {
+        const found = findHlsInValue(readProp(obj, key), seen, depth - 1, budget);
+        if (found) return found;
+      }
+    }
+
+    let keys: string[];
+    try {
+      keys = Object.keys(obj).slice(0, 80);
+    } catch (e) {
+      return null;
+    }
+    for (const key of keys) {
+      const found = findHlsInValue(readProp(obj, key), seen, depth - 1, budget);
+      if (found) return found;
+    }
+    return null;
+  }
   function findHls(): HlsLike | null {
-    const roots = document.querySelectorAll("video, .video-player, [class*='player']");
+    const roots = Array.from(document.querySelectorAll("video"));
     for (const el of roots) {
+      const fromNode = findHlsInValue(el, new WeakSet<object>(), 3, { n: 300 });
+      if (fromNode) return fromNode;
       let cur: Element | null = el;
       for (let depth = 0; depth < 30 && cur; depth++) {
+        const fromElementProps = findHlsInValue(cur, new WeakSet<object>(), 3, { n: 300 });
+        if (fromElementProps) return fromElementProps;
         let f = fiberOf(cur);
         for (let i = 0; i < 60 && f; i++) {
           const p = f.memoizedProps || f.stateNode?.props;
-          if (p)
-            for (const pk in p) {
-              if (isHls(p[pk])) return p[pk];
-            }
+          const fromProps = findHlsInValue(p, new WeakSet<object>(), 5, { n: 1200 });
+          if (fromProps) return fromProps;
           const s = f.memoizedState;
-          if (s && isHls(s.hls)) return s.hls;
+          const fromState = findHlsInValue(s, new WeakSet<object>(), 5, { n: 1200 });
+          if (fromState) return fromState;
           f = f.return ?? null;
         }
         cur = cur.parentElement;
@@ -155,9 +212,18 @@
     return null;
   }
   let hlsInst: HlsLike | null = null;
+  let nextHlsScanAt = 0;
+  function ensureHls(): HlsLike | null {
+    if (isHls(hlsInst)) return hlsInst;
+    const now = Date.now();
+    if (now < nextHlsScanAt) return null;
+    hlsInst = findHls();
+    if (!hlsInst) nextHlsScanAt = now + 5000;
+    return hlsInst;
+  }
   function hlsLatency(): number | null {
     try {
-      if (!isHls(hlsInst)) hlsInst = findHls();
+      if (!isHls(hlsInst)) hlsInst = ensureHls();
       const l = hlsInst ? hlsInst.latency : null;
       return typeof l === "number" && isFinite(l) && l > 0 ? l : null;
     } catch (e) {
@@ -264,7 +330,6 @@
       /* ignore */
     }
   }
-
   setInterval(tick, 1000);
   tick();
 })();

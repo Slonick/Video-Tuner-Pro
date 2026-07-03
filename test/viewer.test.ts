@@ -1,0 +1,379 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// The pop-out viewer adopts the page's <video> into its own overlay with our
+// control bar. Mock only the video picker and i18n; the overlay, bar and
+// media wiring run against real jsdom DOM.
+const h = vi.hoisted(() => ({ primary: null as unknown }));
+vi.mock("../src/content/videos.js", () => ({
+  primaryVideo: () => h.primary,
+}));
+vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
+
+import { S } from "../src/content/state.js";
+import {
+  toggleViewer,
+  exitViewer,
+  viewerFormat,
+  ownsViewerNode,
+  fmtTime,
+} from "../src/content/viewer.js";
+
+// A controllable media element: play/pause flip `paused` and fire the real
+// events; currentTime/duration/videoWidth behave like a loaded 720p video.
+function makeVideo(duration = 100) {
+  const wrap = document.createElement("div");
+  const v = document.createElement("video");
+  v.style.cssText = "width: 640px; height: 360px;";
+  Object.defineProperty(v, "videoWidth", { value: 1280, configurable: true });
+  Object.defineProperty(v, "videoHeight", { value: 720, configurable: true });
+  Object.defineProperty(v, "duration", { value: duration, configurable: true });
+  let ct = 0;
+  Object.defineProperty(v, "currentTime", {
+    get: () => ct,
+    set: (x: number) => (ct = x),
+    configurable: true,
+  });
+  let paused = true;
+  Object.defineProperty(v, "paused", { get: () => paused, configurable: true });
+  v.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 }) as DOMRect;
+  v.play = () => {
+    paused = false;
+    v.dispatchEvent(new Event("play"));
+    return Promise.resolve();
+  };
+  v.pause = () => {
+    paused = true;
+    v.dispatchEvent(new Event("pause"));
+  };
+  wrap.appendChild(v);
+  document.body.appendChild(wrap);
+  return { wrap, v };
+}
+
+function setSeekable(v: HTMLVideoElement, start: number, end: number): void {
+  Object.defineProperty(v, "seekable", {
+    value: {
+      length: 1,
+      start: () => start,
+      end: () => end,
+    },
+    configurable: true,
+  });
+}
+
+// open through a microtask flush so the DOM settles before assertions.
+async function openViewer(f: "normal" | "theater") {
+  toggleViewer(f);
+  await flush();
+}
+async function flush() {
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+}
+
+const overlayEl = () => document.querySelector("[data-vtp-viewer-overlay]") as HTMLElement | null;
+const barEl = () => {
+  const host = Array.from(overlayEl()?.children ?? []).find(
+    (c) => (c as HTMLElement).shadowRoot,
+  ) as HTMLElement | undefined;
+  return (host?.shadowRoot?.querySelector(".bar") as HTMLElement | null) ?? null;
+};
+const barButtons = () => Array.from(barEl()?.querySelectorAll("button") ?? []); // play, mute, fmt, close
+const barInputs = () => Array.from(barEl()?.querySelectorAll("input") ?? []) as HTMLInputElement[]; // seek, vol
+const barTime = () => barEl()?.querySelector(".time")?.textContent ?? null;
+
+function setFullscreen(el: Element | null): void {
+  Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
+}
+
+beforeEach(() => {
+  exitViewer();
+  document.body.innerHTML = "";
+  document.documentElement.style.overflow = "";
+  h.primary = null;
+  S.viewerAuto = "off";
+  setFullscreen(null);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("fmtTime", () => {
+  it("formats sub-hour and over-hour times", async () => {
+    expect(fmtTime(0)).toBe("0:00");
+    expect(fmtTime(61)).toBe("1:01");
+    expect(fmtTime(3661)).toBe("1:01:01");
+    expect(fmtTime(Infinity)).toBe("0:00");
+    expect(fmtTime(-5)).toBe("0:00");
+  });
+});
+
+describe("toggleViewer — lifecycle", () => {
+  it("does nothing without a video, or while the page is fullscreen", async () => {
+    await openViewer("normal");
+    expect(viewerFormat()).toBeNull();
+    const { v } = makeVideo();
+    h.primary = v;
+    setFullscreen(document.body);
+    await openViewer("normal");
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("adopts the video into the overlay and marks its old spot", async () => {
+    const { wrap, v } = makeVideo();
+    v.controls = true;
+    h.primary = v;
+    await openViewer("normal");
+    expect(viewerFormat()).toBe("normal");
+    expect(document.documentElement.getAttribute("data-vtp-viewer")).toBe("normal");
+    expect(v.parentElement).toBe(overlayEl());
+    expect(v.controls).toBe(false); // our bar replaces any native/site controls
+    // A comment holds the video's exact return spot.
+    expect(Array.from(wrap.childNodes).some((n) => n.nodeType === Node.COMMENT_NODE)).toBe(true);
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    // Normal format: a centred aspect box in px.
+    expect(v.style.width).toMatch(/px$/);
+    expect(barEl()).not.toBeNull();
+  });
+
+  it("theater stretches the video to the whole overlay", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    expect(v.style.width).toBe("100%");
+    expect(v.style.objectFit).toBe("contain");
+  });
+
+  it("switching formats keeps a single overlay", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    await openViewer("theater");
+    expect(viewerFormat()).toBe("theater");
+    expect(document.querySelectorAll("[data-vtp-viewer-overlay]").length).toBe(1);
+  });
+
+  it("re-toggling the active format exits and restores the video exactly", async () => {
+    const { wrap, v } = makeVideo();
+    v.controls = true;
+    const cssBefore = v.style.cssText;
+    h.primary = v;
+    await openViewer("theater");
+    await openViewer("theater");
+    expect(viewerFormat()).toBeNull();
+    expect(v.parentElement).toBe(wrap);
+    expect(v.style.cssText).toBe(cssBefore);
+    expect(v.controls).toBe(true);
+    expect(overlayEl()).toBeNull();
+    expect(Array.from(wrap.childNodes).some((n) => n.nodeType === Node.COMMENT_NODE)).toBe(false);
+    expect(document.documentElement.hasAttribute("data-vtp-viewer")).toBe(false);
+    expect(document.documentElement.style.overflow).toBe("");
+  });
+
+  it("Escape exits; a press on the dim exits; a press on the video does not", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    v.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(viewerFormat()).toBe("normal");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    expect(viewerFormat()).toBeNull();
+    await openViewer("normal");
+    overlayEl()!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("entering real fullscreen exits the viewer", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    setFullscreen(document.body);
+    document.dispatchEvent(new Event("fullscreenchange"));
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("owns its overlay nodes, nothing else", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    expect(ownsViewerNode(overlayEl())).toBe(true);
+    expect(ownsViewerNode(barEl())).toBe(false); // shadow content isn't reachable, the host is
+    expect(ownsViewerNode(overlayEl()!.children[1])).toBe(true);
+    expect(ownsViewerNode(document.body)).toBe(false);
+    expect(ownsViewerNode(null)).toBe(false);
+  });
+});
+
+describe("control bar", () => {
+  it("play button drives the media element and mirrors its state", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    const [play] = barButtons();
+    expect(play.getAttribute("aria-pressed")).toBe("false");
+    play.click();
+    expect(v.paused).toBe(false);
+    expect(play.getAttribute("aria-pressed")).toBe("true");
+    play.click();
+    expect(v.paused).toBe(true);
+    expect(play.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("clicking the video itself toggles playback", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    v.dispatchEvent(new MouseEvent("click"));
+    expect(v.paused).toBe(false);
+  });
+
+  it("seek maps the slider onto currentTime and the time label follows", async () => {
+    const { v } = makeVideo(100);
+    h.primary = v;
+    await openViewer("normal");
+    const [seek] = barInputs();
+    seek.value = "500";
+    seek.dispatchEvent(new Event("input"));
+    expect(v.currentTime).toBe(50);
+    v.dispatchEvent(new Event("timeupdate"));
+    expect(barTime()).toBe("0:50 / 1:40");
+  });
+
+  it("volume and mute drive the media element", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    const [, vol] = barInputs();
+    vol.value = "40";
+    vol.dispatchEvent(new Event("input"));
+    expect(v.volume).toBeCloseTo(0.4);
+    expect(v.muted).toBe(false);
+    const [, mute] = barButtons();
+    mute.click();
+    expect(v.muted).toBe(true);
+    expect(mute.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("a live stream hides the seek bar and shows LIVE", async () => {
+    const { v } = makeVideo(Infinity);
+    h.primary = v;
+    await openViewer("normal");
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+    expect(seek.style.display).toBe("none");
+    expect(barTime()).toBe("LIVE");
+  });
+
+  it("a live DVR stream uses the seekable window instead of the sentinel duration", async () => {
+    const { v } = makeVideo(9_223_372_036);
+    v.currentTime = 1_090;
+    setSeekable(v, 1_000, 1_120);
+    h.primary = v;
+    await openViewer("normal");
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("flex");
+    expect(Number(seek.value)).toBe(750);
+    expect(barTime()).toBe("1:30 / 2:00");
+    seek.value = "500";
+    seek.dispatchEvent(new Event("input"));
+    expect(v.currentTime).toBe(1_060);
+  });
+
+  it("the fit menu switches object-fit", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    // Button order: play, mute, fit, format, close.
+    const fit = barButtons()[2];
+    const fwrap = fit.parentElement as HTMLElement;
+    fit.click();
+    const items = Array.from(fwrap.querySelectorAll(".qitem")) as HTMLButtonElement[];
+    expect(items.map((i) => i.textContent)).toEqual(["Fit", "Crop", "Stretch"]);
+    items[2].click();
+    expect(v.style.objectFit).toBe("fill");
+    // sticky within the tab — reset for the other tests
+    fit.click();
+    (fwrap.querySelectorAll(".qitem")[0] as HTMLButtonElement).click();
+    expect(v.style.objectFit).toBe("contain");
+  });
+
+  it("the format button switches and the close button exits", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    // Button order: play, mute, fit, format, close.
+    const [, , , fmtB, closeB] = barButtons();
+    fmtB.click();
+    expect(viewerFormat()).toBe("theater");
+    expect(fmtB.getAttribute("aria-pressed")).toBe("true");
+    closeB.click();
+    expect(viewerFormat()).toBeNull();
+  });
+});
+
+describe("auto pop-out on play", () => {
+  it("opens in the configured format when a video starts", async () => {
+    S.viewerAuto = "theater";
+    const { v } = makeVideo();
+    v.play();
+    await flush();
+    expect(viewerFormat()).toBe("theater");
+    expect(v.parentElement).toBe(overlayEl());
+  });
+
+  it("fires once per video — a manual close wins over the next play", async () => {
+    S.viewerAuto = "normal";
+    const { v } = makeVideo();
+    v.play();
+    await flush();
+    expect(viewerFormat()).toBe("normal");
+    exitViewer(); // the user closed it
+    v.pause();
+    v.play();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("ignores small players and stays off when disabled", async () => {
+    S.viewerAuto = "theater";
+    const { v } = makeVideo();
+    v.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 160, height: 90, right: 160, bottom: 90 }) as DOMRect;
+    v.play();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+    S.viewerAuto = "off";
+    const { v: v2 } = makeVideo();
+    v2.play();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+  });
+});
+
+describe("guard", () => {
+  it("exits when the site yanks the video back", async () => {
+    vi.useFakeTimers();
+    const { wrap, v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    wrap.appendChild(v); // the site's player reclaims its element
+    await vi.advanceTimersByTimeAsync(600);
+    expect(viewerFormat()).toBeNull();
+    expect(overlayEl()).toBeNull();
+  });
+
+  it("exits when the video's home is torn down (layer closed)", async () => {
+    vi.useFakeTimers();
+    const { wrap, v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    wrap.remove(); // the marker comment goes with it
+    await vi.advanceTimersByTimeAsync(600);
+    expect(viewerFormat()).toBeNull();
+    // Nowhere to return to — the orphaned video left with the overlay.
+    expect(overlayEl()).toBeNull();
+    expect(v.isConnected).toBe(false);
+  });
+});

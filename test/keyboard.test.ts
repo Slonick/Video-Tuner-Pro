@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const m = vi.hoisted(() => ({
   setSpeed: vi.fn(),
   resetToSaved: vi.fn(),
+  toggleViewer: vi.fn(),
   hasVideo: true,
 }));
 
@@ -14,6 +15,11 @@ vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => (m.hasVideo ? ({} as HTMLVideoElement) : null),
 }));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
+vi.mock("../src/content/viewer.js", () => ({
+  toggleViewer: m.toggleViewer,
+  exitViewer: vi.fn(),
+  viewerFormat: () => null,
+}));
 
 import { S } from "../src/content/state.js";
 import "../src/content/keyboard.js"; // registers the keydown listener on import
@@ -97,6 +103,23 @@ describe("keyboard shortcuts", () => {
     m.hasVideo = false;
     press("KeyD");
     expect(m.setSpeed).not.toHaveBeenCalled();
+  });
+
+  it("V pops the video out in the normal format", () => {
+    press("KeyV");
+    expect(m.toggleViewer).toHaveBeenCalledWith("normal");
+  });
+
+  it("T pops the video out in the theater format", () => {
+    press("KeyT");
+    expect(m.toggleViewer).toHaveBeenCalledWith("theater");
+  });
+
+  it("viewer keys are ignored without a video", () => {
+    m.hasVideo = false;
+    press("KeyV");
+    press("KeyT");
+    expect(m.toggleViewer).not.toHaveBeenCalled();
   });
 
   it("a preset's assigned chord jumps to that preset speed", () => {

@@ -111,26 +111,44 @@ if (api.tabs && api.tabs.onUpdated) {
 // (their extension context is dead) and the browser won't re-inject until the page
 // navigates — so the page silently stops responding to the popup/shortcuts until a
 // manual refresh. Re-inject the isolated content script into every open http(s) tab
-// so it keeps working without a refresh. (The MAIN-world latency probe is plain
-// page JS with no extension dependency, so it survives the reload and isn't
-// re-injected; the fresh content script removes any leftover badge and the old
-// instance tears itself down on its next tick.)
+// so it keeps working without a refresh. The MAIN-world probes also publish fresh
+// DOM bridges (YouTube/HLS quality, latency), so they must be refreshed too.
+function reinjectOpenTabs(): void {
+  if (!api.scripting || !api.tabs) return;
+  call(() =>
+    api.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
+      for (const tab of tabs || []) {
+        if (tab.id == null) continue;
+        const tabId = tab.id as number;
+        call(() =>
+          api.scripting.executeScript({
+            target: { tabId, allFrames: true },
+            files: ["content.js"],
+          }),
+        );
+        call(() =>
+          api.scripting.executeScript({
+            target: { tabId, allFrames: true },
+            files: ["inject.js"],
+            world: "MAIN",
+          }),
+        );
+        call(() =>
+          api.scripting.executeScript({
+            target: { tabId, allFrames: true },
+            files: ["audio-inject.js"],
+            world: "MAIN",
+          }),
+        );
+      }
+    }),
+  );
+}
+
 if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
-  api.runtime.onInstalled.addListener(() => {
-    call(() =>
-      api.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
-        for (const tab of tabs || []) {
-          if (tab.id == null) continue;
-          call(() =>
-            api.scripting.executeScript({
-              target: { tabId: tab.id as number, allFrames: true },
-              files: ["content.js"],
-            }),
-          );
-        }
-      }),
-    );
-  });
+  api.runtime.onInstalled.addListener(reinjectOpenTabs);
+  if (api.runtime.onStartup) api.runtime.onStartup.addListener(reinjectOpenTabs);
+  setTimeout(reinjectOpenTabs, 250);
 }
 
 // First-run seeding: persist the shipped global defaults — playback speed 100%

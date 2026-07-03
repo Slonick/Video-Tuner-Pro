@@ -19,6 +19,7 @@ import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
+import { ownsViewerNode } from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
@@ -341,7 +342,7 @@ function startObserver() {
   startTracking({
     onMediaChange: scheduleReapply,
     onContextDead: teardown,
-    isOwnNode: (n) => ownsBadgeNode(n) || ownsLauncherNode(n),
+    isOwnNode: (n) => ownsBadgeNode(n) || ownsLauncherNode(n) || ownsViewerNode(n),
   });
 }
 if (document.documentElement) {

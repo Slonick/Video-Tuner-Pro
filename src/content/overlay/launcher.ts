@@ -11,11 +11,16 @@ import { STORE } from "../platform/storage.js";
 import { api, ctxValid } from "../platform/browser.js";
 import { i18n } from "../platform/i18n.js";
 import { primaryVideo } from "../videos.js";
+import { toggleViewer, exitViewer, viewerFormat } from "../viewer.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../../shared/glass.js";
 
 type Timer = ReturnType<typeof setTimeout>;
 
 const FAB_SIZE = 44; // px — the button's box
+const R_ITEM = 36; // px — one radial-menu item's box
+const R_DIST = 62; // px — item centre's distance from the FAB centre
+const R_SPREAD = Math.PI / 3.6; // 50° between neighbouring radial items
+const R_HIDE_MS = 350; // grace period for the pointer to travel FAB → item
 const MARGIN = 16; // px — default inset from the video's right edge
 const POPUP_W = 684; // px — the popup's fixed width (popup base.css)
 const FIT_MARGIN = 24; // px — keep the overlay this far from the viewport edges
@@ -24,6 +29,16 @@ const FALLBACK_H = 520; // px — height before the popup reports its real one
 let host: HTMLDivElement | null = null; // shadow host (light DOM) we re-parent + mark
 let shadow: ShadowRoot | null = null;
 let fab: HTMLButtonElement | null = null;
+// Radial menu around the FAB (revealed on hover): pop-out normal, pop-out
+// theater, and — only while the viewer is open — exit.
+let rItems: {
+  normal: HTMLButtonElement;
+  theater: HTMLButtonElement;
+  exit: HTMLButtonElement;
+} | null = null;
+let radialOpen = false;
+let radialTimer: Timer | undefined;
+let radialIdleTimer: Timer | undefined;
 let backdrop: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
 // Panel-drag state. The press starts inside the popup iframe, which captures the
@@ -56,10 +71,18 @@ export function ownsLauncherNode(node: Node | null): boolean {
   return !!(host && (host === node || host.contains(node)));
 }
 
+function removeStaleHosts(): void {
+  document.querySelectorAll("[data-vtp-launcher]").forEach((node) => {
+    if (node !== host) node.remove();
+  });
+}
+
 function eligible(): boolean {
   if (!fabVideo) return false;
   if (S.overlayButton === "always") return true;
-  if (S.overlayButton === "fullscreen") return !!document.fullscreenElement;
+  // In fullscreen mode the FAB also surfaces while the pop-out viewer is open,
+  // so its radial menu (switch format / exit) stays reachable by mouse.
+  if (S.overlayButton === "fullscreen") return !!document.fullscreenElement || !!viewerFormat();
   return false;
 }
 
@@ -75,6 +98,90 @@ function positionFab(v: HTMLVideoElement): void {
     fab.style.left = Math.round(r.right - FAB_SIZE - MARGIN) + "px";
     fab.style.top = Math.round(r.top + (r.height - FAB_SIZE) / 2) + "px";
   }
+  if (radialOpen) layoutRadial();
+}
+
+// The radial items currently on offer: both formats, plus exit while the viewer
+// is open.
+function radialList(): HTMLButtonElement[] {
+  if (!rItems) return [];
+  const items = [rItems.normal, rItems.theater];
+  if (viewerFormat()) items.push(rItems.exit);
+  return items;
+}
+
+// Fan the items around the FAB, centred on the direction toward the video's
+// middle — so the menu opens into the frame wherever the FAB was dragged.
+function layoutRadial(): void {
+  if (!fab) return;
+  const fx = parseFloat(fab.style.left) + FAB_SIZE / 2;
+  const fy = parseFloat(fab.style.top) + FAB_SIZE / 2;
+  let base = Math.PI; // fan left when there's no bearing to compute
+  if (fabVideo) {
+    const r = fabVideo.getBoundingClientRect();
+    const dx = r.left + r.width / 2 - fx;
+    const dy = r.top + r.height / 2 - fy;
+    if (dx || dy) base = Math.atan2(dy, dx);
+  }
+  const items = radialList();
+  items.forEach((b, i) => {
+    const a = base + (i - (items.length - 1) / 2) * R_SPREAD;
+    b.style.left = Math.round(fx + Math.cos(a) * R_DIST - R_ITEM / 2) + "px";
+    b.style.top = Math.round(fy + Math.sin(a) * R_DIST - R_ITEM / 2) + "px";
+  });
+}
+
+// Reflect the viewer's state on the items: the active format reads as pressed,
+// and exit is only offered while something is open.
+function syncRadial(): void {
+  if (!rItems) return;
+  const f = viewerFormat();
+  rItems.normal.setAttribute("aria-pressed", f === "normal" ? "true" : "false");
+  rItems.theater.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
+  rItems.exit.style.display = f ? "flex" : "none";
+}
+
+function openRadial(): void {
+  if (!rItems || !fab) return;
+  clearTimeout(radialTimer);
+  clearTimeout(radialIdleTimer);
+  radialOpen = true;
+  syncRadial();
+  layoutRadial();
+  for (const b of radialList()) {
+    b.style.opacity = "1";
+    b.style.pointerEvents = "auto";
+  }
+  radialIdleTimer = setTimeout(() => closeRadial(true), 2600);
+  flashFab(); // the menu holds the FAB up too
+}
+
+// `resumeHide` restarts the FAB's auto-hide countdown — wanted when the pointer
+// wandered off (the FAB shouldn't stay lit forever), but not from the auto-hide
+// timeout itself, which would re-show the FAB it just hid.
+function closeRadial(resumeHide = false): void {
+  radialOpen = false;
+  clearTimeout(radialTimer);
+  clearTimeout(radialIdleTimer);
+  if (rItems) {
+    for (const b of Object.values(rItems)) {
+      b.style.opacity = "0";
+      b.style.pointerEvents = "none";
+    }
+  }
+  if (resumeHide) flashFab();
+}
+
+// Leaving the FAB or an item starts a short countdown, so the pointer can hop
+// between them without the menu collapsing mid-travel.
+function scheduleRadialClose(): void {
+  clearTimeout(radialTimer);
+  radialTimer = setTimeout(() => closeRadial(true), R_HIDE_MS);
+}
+
+function ownsRadialEvent(e: Event): boolean {
+  const path = e.composedPath();
+  return !!(fab && path.includes(fab)) || radialList().some((b) => path.includes(b));
 }
 
 function saveFabPos(fx: number, fy: number): void {
@@ -100,11 +207,12 @@ function flashFab(): void {
   fab.style.opacity = "1";
   fab.style.pointerEvents = "auto";
   clearTimeout(hideTimer);
-  if (open || dragging) return; // popup open or mid-drag → stay lit
+  if (open || dragging || radialOpen) return; // popup/menu open or mid-drag → stay lit
   hideTimer = setTimeout(() => {
-    if (!fab || dragging || open) return;
+    if (!fab || dragging || open || radialOpen) return;
     fab.style.opacity = "0";
     fab.style.pointerEvents = "none";
+    closeRadial();
   }, 2600);
 }
 
@@ -209,6 +317,7 @@ function overlaySchemeHash(): string {
 
 function openPopup(): void {
   if (open || !shadow) return;
+  closeRadial();
   open = true;
   fab?.setAttribute("aria-expanded", "true"); // morphs the icon play → ✕
   if (!backdrop) {
@@ -330,6 +439,7 @@ function hookFabDrag(el: HTMLElement): void {
     // not a drag (reposition).
     if (!moved && Math.hypot(e.clientX - downX, e.clientY - downY) < 4) return;
     moved = true;
+    closeRadial(); // repositioning — the menu would lag behind the button
     el.style.left = Math.round(e.clientX - dragDX) + "px";
     el.style.top = Math.round(e.clientY - dragDY) + "px";
     flashFab();
@@ -360,6 +470,7 @@ function hookFabDrag(el: HTMLElement): void {
 }
 
 function mount(): void {
+  removeStaleHosts();
   host = document.createElement("div");
   host.setAttribute("data-vtp-launcher", "");
   host.style.setProperty("--glass-opacity", String(S.glassOpacity)); // scales the FAB glass
@@ -415,6 +526,75 @@ function mount(): void {
   while (icons.firstChild) fab.appendChild(icons.firstChild);
   shadow.append(fab);
   hookFabDrag(fab);
+  // The radial menu items (same glass as the FAB, revealed on hover). Clicking
+  // an item acts and re-opens the menu so its state (pressed format, the exit
+  // item appearing/disappearing) refreshes in place.
+  const act = (fn: () => void) => () => {
+    fn();
+    openRadial();
+  };
+  rItems = {
+    normal: radialButton(
+      // Pop-out mark: a frame with an arrow leaving through its top-right corner.
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5M14 4h6v6M20 4l-9 9"/></svg>',
+      i18n("viewerBtnAria") || "Pop out video",
+      act(() => toggleViewer("normal")),
+    ),
+    theater: radialButton(
+      // Theater mark: a wide letterboxed frame.
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/></svg>',
+      i18n("viewerTheaterAria") || "Pop out in theater format",
+      act(() => toggleViewer("theater")),
+    ),
+    exit: radialButton(
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+      i18n("viewerCloseAria") || "Close the pop-out viewer",
+      act(exitViewer),
+    ),
+  };
+  shadow.append(rItems.normal, rItems.theater, rItems.exit);
+  fab.addEventListener("mouseenter", openRadial);
+  fab.addEventListener("mouseleave", scheduleRadialClose);
+}
+
+// One radial-menu item: a smaller glass sibling of the FAB, hidden until the
+// menu opens. Hovering an item keeps the menu up (cancels the pending close).
+function radialButton(svg: string, label: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.setAttribute("aria-label", label);
+  b.title = label;
+  Object.assign(b.style, {
+    position: "fixed",
+    zIndex: "2147483647",
+    width: R_ITEM + "px",
+    height: R_ITEM + "px",
+    padding: "0",
+    margin: "0",
+    border: "0",
+    borderRadius: "50%",
+    cursor: "pointer",
+    color: "#fff",
+    background: "rgb(20 20 22 / calc(0.32 * var(--glass-opacity, 1)))",
+    boxShadow: "0 0 0 1px rgba(255,255,255,0.14)",
+    WebkitBackdropFilter: "blur(7px) saturate(180%) brightness(1.04)",
+    backdropFilter: "blur(7px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: "0",
+    transition: "opacity .2s",
+    pointerEvents: "none",
+  } as Partial<CSSStyleDeclaration>);
+  const body = new DOMParser().parseFromString(svg, "text/html").body;
+  while (body.firstChild) b.appendChild(body.firstChild);
+  b.addEventListener("mouseenter", openRadial);
+  b.addEventListener("mouseleave", scheduleRadialClose);
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+  return b;
 }
 
 function hookMouse(): void {
@@ -462,7 +642,9 @@ function hookMouse(): void {
   document.addEventListener(
     "keydown",
     (e) => {
-      if (e.key === "Escape" && open) closePopup();
+      if (e.key !== "Escape") return;
+      if (open) closePopup();
+      else closeRadial();
     },
     true,
   );
@@ -476,8 +658,28 @@ function hookMouse(): void {
     { passive: true },
   );
   document.addEventListener("fullscreenchange", () => {
+    closeRadial();
     updateLauncher();
     if (eligible()) flashFab(); // surface it the moment fullscreen begins
+  });
+  document.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!radialOpen) return;
+      if (ownsRadialEvent(e)) openRadial();
+      else scheduleRadialClose();
+    },
+    { passive: true, capture: true },
+  );
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (radialOpen && !ownsRadialEvent(e)) closeRadial(true);
+    },
+    true,
+  );
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) closeRadial();
   });
 }
 
@@ -488,6 +690,7 @@ function hideFab(): void {
   if (!fab) return;
   fab.style.opacity = "0";
   fab.style.pointerEvents = "none";
+  closeRadial();
 }
 
 // Re-apply the glass-opacity multiplier (General setting) to the launcher glass.
@@ -496,6 +699,7 @@ export function applyLauncherGlass(): void {
 }
 
 export function updateLauncher(): void {
+  removeStaleHosts();
   fabVideo = primaryVideo();
   // No video to overlay → nothing can show; close any open popup and hide the FAB.
   if (!fabVideo) {
@@ -521,5 +725,8 @@ export function updateLauncher(): void {
   const parent: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
   if (host && host.parentNode !== parent) parent.appendChild(host);
   if (fabVideo && !dragging) positionFab(fabVideo);
+  // The viewer can close behind our back (Esc, backdrop click) — refresh an
+  // open menu so its pressed states and exit item stay honest.
+  if (radialOpen) openRadial();
   if (open) flashFab(); // keep it up while the popup is showing
 }

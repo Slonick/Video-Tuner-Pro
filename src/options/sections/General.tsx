@@ -11,6 +11,7 @@ import { Group } from "../Group.js";
 import { Button } from "../../ui/Button.js";
 import { Segmented } from "../../ui/Segmented.js";
 import { Slider } from "../../ui/Slider.js";
+import { Switch } from "../../ui/Switch.js";
 import {
   applyGlassOpacity,
   clampGlassOpacity,
@@ -74,6 +75,55 @@ function OverlayBtnSeg() {
       items={OVERLAY_MODES.map((m) => ({ value: m, label: msg(OVERLAY_LABEL[m]) || m }))}
       value={mode}
       onChange={pick}
+    />
+  );
+}
+
+type ViewerAuto = "off" | "normal" | "theater";
+const VIEWER_AUTO_MODES: ViewerAuto[] = ["off", "normal", "theater"];
+const VIEWER_AUTO_LABEL: Record<ViewerAuto, string> = {
+  off: "overlayBtnOff",
+  normal: "viewerAutoNormal",
+  theater: "viewerAutoTheater",
+};
+
+function ViewerAutoSeg() {
+  const [mode, setMode] = useState<ViewerAuto>("off");
+  useEffect(() => {
+    STORE.get(["viewerAuto"], (r) => {
+      const v = r.viewerAuto;
+      setMode(v === "normal" || v === "theater" ? v : "off");
+    });
+  }, []);
+  const pick = (m: ViewerAuto) => {
+    setMode(m);
+    STORE.set({ viewerAuto: m });
+  };
+  return (
+    <Segmented
+      id="viewerAutoSeg"
+      ariaLabel={msg("optViewerAutoLabel") || "Auto pop-out on play"}
+      items={VIEWER_AUTO_MODES.map((m) => ({ value: m, label: msg(VIEWER_AUTO_LABEL[m]) || m }))}
+      value={mode}
+      onChange={pick}
+    />
+  );
+}
+
+function SponsorSwitch() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    STORE.get(["sponsorMarks"], (r) => setOn(r.sponsorMarks === true));
+  }, []);
+  const toggle = (v: boolean) => {
+    setOn(v);
+    STORE.set({ sponsorMarks: v });
+  };
+  return (
+    <Switch
+      checked={on}
+      onChange={toggle}
+      ariaLabel={msg("optSponsorLabel") || "SponsorBlock markers"}
     />
   );
 }
@@ -236,6 +286,24 @@ export function General() {
           <span className="opt-field-desc">{msg("overlayBtnHint")}</span>
         </span>
         <OverlayBtnSeg />
+      </div>
+      <div className="opt-field opt-field-block">
+        <span className="opt-field-text">
+          <span className="opt-field-label">
+            {msg("optViewerAutoLabel") || "Auto pop-out on play"}
+          </span>
+          <span className="opt-field-desc">{msg("optViewerAutoHint")}</span>
+        </span>
+        <ViewerAutoSeg />
+      </div>
+      <div className="opt-field">
+        <span className="opt-field-text">
+          <span className="opt-field-label">
+            {msg("optSponsorLabel") || "SponsorBlock markers"}
+          </span>
+          <span className="opt-field-desc">{msg("optSponsorHint")}</span>
+        </span>
+        <SponsorSwitch />
       </div>
     </Group>
   );

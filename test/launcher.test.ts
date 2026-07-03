@@ -12,6 +12,18 @@ vi.mock("../src/content/platform/browser.js", () => ({
   ctxValid: () => true,
 }));
 vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
+// The pop-out viewer behind the radial menu — spied so clicks are observable
+// and the viewer state is controllable per test.
+const v = vi.hoisted(() => ({
+  toggleViewer: vi.fn(),
+  exitViewer: vi.fn(),
+  format: null as string | null,
+}));
+vi.mock("../src/content/viewer.js", () => ({
+  toggleViewer: v.toggleViewer,
+  exitViewer: v.exitViewer,
+  viewerFormat: () => v.format,
+}));
 
 import { S } from "../src/content/state.js";
 import { updateLauncher, ownsLauncherNode } from "../src/content/overlay/launcher.js";
@@ -47,6 +59,8 @@ function fire(el: EventTarget, type: string, x = 0, y = 0) {
 beforeEach(() => {
   host()?.remove();
   h.primary = null;
+  v.format = null;
+  vi.clearAllMocks();
   S.overlayButton = "fullscreen";
   S.overlayBtnPos = null;
   // jsdom has no fullscreen — force the property the launcher reads.
@@ -84,6 +98,18 @@ describe("updateLauncher — eligibility", () => {
     h.primary = fakeVideo();
     updateLauncher();
     expect(fabEl()).not.toBeNull();
+  });
+
+  it("removes a stale launcher host left by a previous content script", () => {
+    S.overlayButton = "always";
+    const stale = document.createElement("div");
+    stale.setAttribute("data-vtp-launcher", "");
+    document.body.append(stale);
+    h.primary = fakeVideo();
+    updateLauncher();
+    const hosts = document.querySelectorAll("[data-vtp-launcher]");
+    expect(hosts.length).toBe(1);
+    expect(hosts[0]).not.toBe(stale);
   });
 });
 
@@ -160,6 +186,104 @@ describe("launcher — open / close", () => {
     fire(fab, "pointerup", 100, 100);
     expect(frameEl()?.style.display ?? "none").not.toBe("block"); // dragged → not opened
     expect(S.overlayBtnPos).not.toBeNull();
+  });
+});
+
+describe("launcher — radial viewer menu", () => {
+  // The three radial items follow the FAB in the shadow root: normal, theater, exit.
+  const items = () =>
+    Array.from(host()?.shadowRoot?.querySelectorAll("button") ?? []).slice(
+      1,
+    ) as HTMLButtonElement[];
+  const shown = (b: HTMLButtonElement) => b.style.opacity === "1";
+
+  function openMenu() {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    fire(fabEl()!, "mouseenter");
+  }
+
+  it("hovering the FAB reveals both formats; exit stays hidden while closed", () => {
+    openMenu();
+    const [normal, theater, exit] = items();
+    expect(shown(normal)).toBe(true);
+    expect(shown(theater)).toBe(true);
+    expect(exit.style.display).toBe("none");
+  });
+
+  it("while the viewer is open the menu offers exit and marks the active format", () => {
+    v.format = "theater";
+    openMenu();
+    const [normal, theater, exit] = items();
+    expect(exit.style.display).toBe("flex");
+    expect(shown(exit)).toBe(true);
+    expect(theater.getAttribute("aria-pressed")).toBe("true");
+    expect(normal.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("the items act on the viewer: formats toggle, exit closes", () => {
+    v.format = "normal";
+    openMenu();
+    const [normal, theater, exit] = items();
+    normal.click();
+    expect(v.toggleViewer).toHaveBeenCalledWith("normal");
+    theater.click();
+    expect(v.toggleViewer).toHaveBeenCalledWith("theater");
+    exit.click();
+    expect(v.exitViewer).toHaveBeenCalled();
+  });
+
+  it("leaving the FAB closes the menu after the grace period", () => {
+    vi.useFakeTimers();
+    openMenu();
+    fire(fabEl()!, "mouseleave");
+    vi.advanceTimersByTime(400);
+    expect(items().some(shown)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("hopping from the FAB onto an item keeps the menu open", () => {
+    vi.useFakeTimers();
+    openMenu();
+    const [normal] = items();
+    fire(fabEl()!, "mouseleave");
+    fire(normal, "mouseenter");
+    vi.advanceTimersByTime(400);
+    expect(shown(normal)).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("moving outside closes the menu even if mouseleave was missed", () => {
+    vi.useFakeTimers();
+    openMenu();
+    fire(document, "pointermove", 900, 900);
+    vi.advanceTimersByTime(400);
+    expect(items().some(shown)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("clicking outside closes the menu immediately", () => {
+    openMenu();
+    fire(document.body, "pointerdown", 900, 900);
+    expect(items().some(shown)).toBe(false);
+  });
+
+  it("opening the popup closes the radial menu", () => {
+    openMenu();
+    fire(fabEl()!, "pointerdown", 580, 158);
+    fire(fabEl()!, "pointerup", 580, 158);
+    expect(frameEl()?.style.display).toBe("block");
+    expect(items().some(shown)).toBe(false);
+  });
+
+  it("in fullscreen mode the FAB surfaces while the viewer is open, even windowed", () => {
+    v.format = "normal";
+    h.primary = fakeVideo();
+    updateLauncher(); // overlayButton stays "fullscreen", no fullscreen active
+    expect(fabEl()).not.toBeNull();
+    fire(document, "mousemove", 100, 100);
+    expect(fabShown()).toBe(true);
   });
 });
 

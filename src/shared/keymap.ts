@@ -3,8 +3,25 @@
 // under storage key "keymap". Pure + unit-tested; shared by the content listener
 // and the options-page editor.
 
-export type Action = "slower" | "faster" | "reset" | "toggle" | "hold" | "overlay";
-export const ACTIONS: Action[] = ["slower", "faster", "reset", "toggle", "hold", "overlay"];
+export type Action =
+  | "slower"
+  | "faster"
+  | "reset"
+  | "toggle"
+  | "hold"
+  | "overlay"
+  | "viewer"
+  | "theater";
+export const ACTIONS: Action[] = [
+  "slower",
+  "faster",
+  "reset",
+  "toggle",
+  "hold",
+  "overlay",
+  "viewer",
+  "theater",
+];
 
 export interface Keymap {
   slower: string;
@@ -17,6 +34,11 @@ export interface Keymap {
   // Open/close the on-video overlay popup — works even with the launcher button
   // hidden, for people who turned it off or prefer the keyboard.
   overlay: string;
+  // Pop the video out above the page: viewer = the centred "normal" format,
+  // theater = full-window. Each toggles its own format and switches from the
+  // other, so the two keys jump straight between the views.
+  viewer: string;
+  theater: string;
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -27,6 +49,8 @@ export const DEFAULT_KEYMAP: Keymap = {
   // X, not F — many players use F for fullscreen.
   hold: "KeyX",
   overlay: "KeyO",
+  viewer: "KeyV",
+  theater: "KeyT",
 };
 
 // A code is bindable if it's a plain letter/digit position — enough to avoid

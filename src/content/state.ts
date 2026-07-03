@@ -41,6 +41,8 @@ export const S = {
     toggle: "KeyS",
     hold: "KeyF",
     overlay: "KeyO",
+    viewer: "KeyV",
+    theater: "KeyT",
   } as {
     slower: string;
     faster: string;
@@ -48,6 +50,8 @@ export const S = {
     toggle: string;
     hold: string;
     overlay: string;
+    viewer: string;
+    theater: string;
   },
   // How much one slower/faster press changes the speed (fraction; Shift doubles).
   speedStep: 0.05,
@@ -76,6 +80,12 @@ export const S = {
   // surface it: "off", "fullscreen" (only while a video is fullscreen), or
   // "always" (whenever the pointer is over a video). Default: fullscreen only.
   overlayButton: "fullscreen" as "off" | "fullscreen" | "always",
+  // Auto-open the pop-out viewer when a video starts playing (once per video;
+  // a manual close wins). "off" | "normal" | "theater".
+  viewerAuto: "off" as "off" | "normal" | "theater",
+  // Opt-in: fetch SponsorBlock segments for the current YouTube video and show
+  // them on the viewer's seek bar (a third-party API request — hence opt-in).
+  sponsorMarks: false,
   // Where the launcher button sits, as a fraction of the video frame — per site,
   // set by dragging it. null = the default right-center spot.
   overlayBtnPos: null as { fx: number; fy: number } | null,

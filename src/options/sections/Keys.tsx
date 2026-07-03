@@ -25,6 +25,8 @@ const ROWS: Array<{ action: Action; labelKey: string }> = [
   { action: "toggle", labelKey: "optKeyToggle" },
   { action: "hold", labelKey: "optKeyHold" },
   { action: "overlay", labelKey: "optKeyOverlay" },
+  { action: "viewer", labelKey: "optKeyViewer" },
+  { action: "theater", labelKey: "optKeyTheater" },
 ];
 
 export function Keys() {

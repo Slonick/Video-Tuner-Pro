@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VTP viewer fixture</title>
+    <!-- Boosty-shaped page: a sticky header, a fixed modal (a stacking context in
+       Blink even at z-index:auto) and a player whose guts live in an open
+       shadow root — the exact stack the pop-out viewer must escape. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #eee;
+        height: 2000px;
+      }
+      .top {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        height: 56px;
+        background: #fff;
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        overflow: auto;
+        background: rgba(0, 0, 0, 0.4);
+      }
+      .wrap {
+        width: 660px;
+        height: 370px;
+        margin: 80px auto 0;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top" id="top">header</div>
+    <div class="modal" id="modal">
+      <div class="wrap" id="wrap"><div id="host"></div></div>
+      <div id="post">post title, chat, comments — the modal chrome around the player</div>
+      <!-- A player-style settings menu: empty until the gear is clicked, wiped on
+         close — the shape the universal quality probe has to work through. -->
+      <button id="gear" aria-label="Settings">⚙</button>
+      <ul id="qmenu"></ul>
+    </div>
+    <script>
+      const gear = document.getElementById("gear");
+      const qm = document.getElementById("qmenu");
+      let menuOpen = false;
+      gear.addEventListener("click", () => {
+        menuOpen = !menuOpen;
+        if (menuOpen) {
+          for (const q of ["Auto", "1080p", "720p"]) {
+            const li = document.createElement("li");
+            li.textContent = q;
+            li.addEventListener("click", () => {
+              document.body.dataset.picked = q;
+            });
+            qm.appendChild(li);
+          }
+        } else {
+          qm.textContent = "";
+        }
+      });
+      const host = document.getElementById("host");
+      const sr = host.attachShadow({ mode: "open" });
+      const inner = document.createElement("div");
+      inner.style.cssText = "width:660px;height:370px";
+      const v = document.createElement("video");
+      v.src = "sample.webm";
+      v.setAttribute("playsinline", "");
+      v.preload = "auto";
+      v.style.cssText = "width:660px;height:370px;display:block";
+      inner.appendChild(v);
+      sr.appendChild(inner);
+    </script>
+  </body>
+</html>
