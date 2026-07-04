@@ -104,4 +104,28 @@ describe("probeLive (generic real-time-edge detection)", () => {
     } // flat edge
     expect(isLive(v)).toBe(false);
   });
+
+  it("clears a temporary live probe once a finite VOD duration appears", () => {
+    let edge = 10;
+    let duration = NaN;
+    const v = vid({
+      buffered: { length: 1, start: () => 0, end: () => edge } as unknown as TimeRanges,
+    });
+    Object.defineProperty(v, "duration", {
+      configurable: true,
+      get: () => duration,
+    });
+    probeLive(v);
+    for (let i = 1; i <= 4; i++) {
+      vi.setSystemTime(i * 500);
+      edge += 0.5;
+      probeLive(v);
+    }
+    expect(isLive(v)).toBe(true);
+
+    duration = 3600;
+    vi.setSystemTime(3000);
+    probeLive(v);
+    expect(isLive(v)).toBe(false);
+  });
 });

@@ -230,6 +230,153 @@ describe("scope control", () => {
   });
 });
 
+describe("viewer auto-open scope control", () => {
+  const pickViewerAuto = (label: string) => {
+    const btn = Array.from(byId("viewerAutoVisual").querySelectorAll("button")).find(
+      (el) => el.textContent === label,
+    ) as HTMLElement | undefined;
+    btn?.click();
+  };
+  const openViewerAutoMenu = async () => {
+    click("viewerAutoSetBtn");
+    await flush();
+  };
+
+  it("saves the selected auto-open mode to a chosen scope", async () => {
+    const { lastCall } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerAuto: { mode: "off", scope: null, channel: "UCabc", channelName: "Ch" },
+        setViewerState: { success: true, mode: "theater" },
+      },
+    });
+    pickViewerAuto("Theater");
+    await flush();
+    await openViewerAutoMenu();
+    row("channel")!.click();
+    await flush();
+    expect(lastCall("rememberViewerAuto")).toMatchObject({
+      action: "rememberViewerAuto",
+      scope: "channel",
+      mode: "theater",
+    });
+  });
+
+  it("keeps the mode buttons in sync with the page viewer state", async () => {
+    const { emitRuntimeMessage, lastCall } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerState: { mode: "normal" },
+        setViewerState: { success: true, mode: "theater" },
+      },
+    });
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Viewer",
+    );
+    pickViewerAuto("Theater");
+    await flush();
+    expect(lastCall("setViewerState")).toMatchObject({
+      action: "setViewerState",
+      mode: "theater",
+    });
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Theater",
+    );
+    emitRuntimeMessage({ action: "viewerStateChanged", mode: "off" }, { tab: { id: YT.id } });
+    await flush();
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Off",
+    );
+  });
+
+  it("does not poll stale page state after a just-picked mode", async () => {
+    const { replies } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerState: { mode: "normal" },
+        setViewerState: { success: true, mode: "theater" },
+      },
+    });
+    pickViewerAuto("Theater");
+    await flush();
+    replies.getViewerState = { mode: "normal" };
+    await wait(760);
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Theater",
+    );
+  });
+
+  it("uses the switch as a global master toggle without changing page state", async () => {
+    const { lastCall, saved } = await mountApp({
+      tab: YT,
+      settings: { viewerAutoEnabled: true },
+      replies: {
+        getViewerState: { mode: "normal" },
+      },
+    });
+    click("viewerAutoToggle");
+    await flush();
+    expect(saved().viewerAutoEnabled).toBe(false);
+    expect(lastCall("setViewerState")).toBeUndefined();
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Viewer",
+    );
+  });
+
+  it("resets the saved viewer auto mode for the active scope", async () => {
+    const { replies, lastCall } = await mountApp({
+      tab: YT,
+      settings: { viewerAutoSites: { "youtube.com": "normal" } },
+      replies: {
+        getViewerAuto: { mode: "normal", scope: "site", channel: null, channelName: "" },
+      },
+    });
+    await openViewerAutoMenu();
+    expect(primary().textContent).toContain("for this site");
+    replies.resetViewerAuto = { success: true };
+    replies.getViewerAuto = { mode: "off", scope: null, channel: null, channelName: "" };
+    click("viewerAutoResetBtn");
+    await flush();
+    click("viewerAutoResetBtn");
+    await wait(120);
+    expect(lastCall("resetViewerAuto")).toMatchObject({
+      action: "resetViewerAuto",
+      scope: "site",
+    });
+  });
+
+  it("saves the selected viewer fill mode to a chosen scope", async () => {
+    const { lastCall } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerFit: { mode: "contain", scope: null, channel: "UCabc", channelName: "Ch" },
+      },
+    });
+    const btn = Array.from(byId("viewerFitSeg").querySelectorAll("button")).find(
+      (el) => el.textContent === "Crop",
+    ) as HTMLElement | undefined;
+    btn?.click();
+    await flush();
+    click("viewerFitSetBtn");
+    await flush();
+    row("channel")!.click();
+    await flush();
+    expect(lastCall("setViewerFit")).toMatchObject({ action: "setViewerFit", mode: "cover" });
+    expect(lastCall("rememberViewerFit")).toMatchObject({
+      action: "rememberViewerFit",
+      scope: "channel",
+      mode: "cover",
+    });
+  });
+
+  it("stores the viewer background video toggle globally", async () => {
+    const { saved } = await mountApp({ tab: YT, settings: { viewerBackdropVideo: false } });
+    click("viewerBackdropVideoToggle");
+    await flush();
+    expect(saved().viewerBackdropVideo).toBe(true);
+  });
+});
+
 // chrome:// / store pages have no content script — getSpeed never answers, so the
 // card resolves and persists straight to storage (site > global > 100%).
 describe("no content script (storage fallback)", () => {

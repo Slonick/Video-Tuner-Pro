@@ -99,18 +99,21 @@ export const REGISTRY: Entry<unknown>[] = [
     set: (v) => (S.overlayButton = v),
     apply: () => updateLauncher(),
   }),
-  // Auto-open the pop-out viewer on playback — read live by the play listener.
-  entry({
-    key: "viewerAuto",
-    parse: (raw): "off" | "normal" | "theater" =>
-      raw === "normal" || raw === "theater" ? raw : "off",
-    set: (v) => (S.viewerAuto = v),
-  }),
   // Opt-in SponsorBlock markers on the viewer's seek bar (third-party request).
   entry({
     key: "sponsorMarks",
     parse: (raw) => raw === true,
     set: (v) => (S.sponsorMarks = v),
+  }),
+  entry({
+    key: "viewerAutoEnabled",
+    parse: (raw) => raw !== false,
+    set: (v) => (S.viewerAutoEnabled = v),
+  }),
+  entry({
+    key: "viewerBackdropVideo",
+    parse: (raw) => raw === true,
+    set: (v) => (S.viewerBackdropVideo = v),
   }),
   // Glass opacity multiplier — scales the on-video badge + launcher glass live.
   entry({

@@ -90,14 +90,14 @@ const VIEWER_AUTO_LABEL: Record<ViewerAuto, string> = {
 function ViewerAutoSeg() {
   const [mode, setMode] = useState<ViewerAuto>("off");
   useEffect(() => {
-    STORE.get(["viewerAuto"], (r) => {
-      const v = r.viewerAuto;
+    STORE.get(["viewerAutoGlobal", "viewerAuto"], (r) => {
+      const v = r.viewerAutoGlobal ?? r.viewerAuto;
       setMode(v === "normal" || v === "theater" ? v : "off");
     });
   }, []);
   const pick = (m: ViewerAuto) => {
     setMode(m);
-    STORE.set({ viewerAuto: m });
+    STORE.set({ viewerAutoGlobal: m });
   };
   return (
     <Segmented

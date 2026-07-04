@@ -5,6 +5,28 @@
 (function () {
   "use strict";
 
+  interface CapturedPlayer {
+    player: unknown;
+    video: HTMLVideoElement | null;
+  }
+  interface CapturedHls {
+    hls: HlsLike;
+    video: HTMLVideoElement | null;
+  }
+
+  const BRIDGE_VERSION = "2026-07-04-vidstack";
+  const win = window as typeof window & {
+    __vtpQualityBridgeInstalled?: boolean | string;
+    __vtpQualityPlayers?: CapturedPlayer[];
+    __vtpQualityHls?: CapturedHls[];
+    IVSPlayer?: unknown;
+    Hls?: unknown;
+  };
+  if (win.__vtpQualityBridgeInstalled === BRIDGE_VERSION) return;
+  win.__vtpQualityBridgeInstalled = BRIDGE_VERSION;
+  win.__vtpQualityPlayers ||= [];
+  win.__vtpQualityHls ||= [];
+
   const REQ = "vtp-quality-request";
   const RESP = "vtp-quality-response";
   const SET = "vtp-quality-set";
@@ -13,6 +35,7 @@
   const ROOT_VIDEO_ATTR = "data-vtp-quality-video";
   const ROOT_PICK_ATTR = "data-vtp-quality-pick";
   const ROOT_RESP_ATTR = "data-vtp-quality-response";
+  const ROOT_DEBUG_ATTR = "data-vtp-quality-debug";
 
   interface QualityOption {
     id: string;
@@ -30,10 +53,127 @@
     qualityId?: unknown;
   }
   interface Adapter {
-    options: () => QualityOption[];
-    current: () => string;
-    set: (id: string) => void;
+    options: () => QualityOption[] | Promise<QualityOption[]>;
+    current: () => string | Promise<string>;
+    set: (id: string) => void | Promise<void>;
   }
+
+  function capturePlayer(player: unknown): unknown {
+    if (!player || typeof player !== "object") return player;
+    const existing = win.__vtpQualityPlayers!.find((entry) => entry.player === player);
+    if (!existing) win.__vtpQualityPlayers!.push({ player, video: null });
+    const entry = existing || win.__vtpQualityPlayers![win.__vtpQualityPlayers!.length - 1];
+    const rec = player as Record<string, unknown>;
+    const attach = rec.attachHTMLVideoElement;
+    if (typeof attach === "function" && !(attach as { __vtpWrapped?: boolean }).__vtpWrapped) {
+      const wrapped = function (this: unknown, videoEl: HTMLVideoElement) {
+        if (videoEl instanceof HTMLVideoElement) entry.video = videoEl;
+        return attach.apply(this, arguments as unknown as [HTMLVideoElement]);
+      };
+      (wrapped as { __vtpWrapped?: boolean }).__vtpWrapped = true;
+      try {
+        rec.attachHTMLVideoElement = wrapped;
+      } catch (e) {
+        /* read-only player */
+      }
+    }
+    const getVideo = rec.getHTMLVideoElement;
+    if (!entry.video && typeof getVideo === "function") {
+      try {
+        const videoEl = getVideo.call(player);
+        if (videoEl instanceof HTMLVideoElement) entry.video = videoEl;
+      } catch (e) {
+        /* not ready */
+      }
+    }
+    return player;
+  }
+
+  function hookIvsLibrary(lib: unknown): unknown {
+    if (!lib || typeof lib !== "object") return lib;
+    const rec = lib as Record<string, unknown>;
+    const create = rec.create;
+    if (typeof create !== "function" || (create as { __vtpWrapped?: boolean }).__vtpWrapped) return lib;
+    const wrapped = function (this: unknown) {
+      const player = create.apply(this, arguments as unknown as []);
+      capturePlayer(player);
+      return player;
+    };
+    (wrapped as { __vtpWrapped?: boolean }).__vtpWrapped = true;
+    try {
+      rec.create = wrapped;
+    } catch (e) {
+      /* read-only library */
+    }
+    return lib;
+  }
+
+  function installIvsHook(): void {
+    let current: unknown;
+    const descriptor = Object.getOwnPropertyDescriptor(window, "IVSPlayer");
+    if (descriptor && !descriptor.configurable) {
+      hookIvsLibrary(win.IVSPlayer);
+      return;
+    }
+    if (descriptor && "value" in descriptor) current = descriptor.value;
+    if (current !== undefined) hookIvsLibrary(current);
+    try {
+      Object.defineProperty(window, "IVSPlayer", {
+        configurable: true,
+        get() {
+          return current;
+        },
+        set(value) {
+          current = hookIvsLibrary(value);
+        },
+      });
+    } catch (e) {
+      hookIvsLibrary(win.IVSPlayer);
+    }
+  }
+
+  installIvsHook();
+
+  interface HlsCtor {
+    prototype?: {
+      attachMedia?: (media: HTMLMediaElement) => unknown;
+      __vtpWrapped?: boolean;
+    };
+  }
+
+  function captureHls(hls: HlsLike, video: HTMLVideoElement | null): void {
+    const existing = win.__vtpQualityHls!.find((entry) => entry.hls === hls);
+    if (existing) {
+      if (video) existing.video = video;
+      return;
+    }
+    win.__vtpQualityHls!.push({ hls, video });
+  }
+
+  function hookHlsConstructor(value: unknown): boolean {
+    if (typeof value !== "function") return false;
+    const proto = (value as HlsCtor).prototype;
+    const attach = proto?.attachMedia;
+    if (!proto || typeof attach !== "function" || proto.__vtpWrapped) return !!proto?.__vtpWrapped;
+    proto.attachMedia = function (this: HlsLike, media: HTMLMediaElement) {
+      if (media instanceof HTMLVideoElement) captureHls(this, media);
+      return attach.apply(this, arguments as unknown as [HTMLMediaElement]);
+    };
+    proto.__vtpWrapped = true;
+    return true;
+  }
+
+  function installHlsHook(): void {
+    if (hookHlsConstructor(win.Hls)) return;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts++;
+      if (hookHlsConstructor(win.Hls) || attempts >= 40) window.clearInterval(timer);
+    }, 250);
+  }
+
+  installHlsHook();
+
 
   function detailOf(e: Event): Detail {
     const detail = (e as CustomEvent).detail || {};
@@ -51,20 +191,42 @@
     try {
       const direct = document.querySelector<HTMLVideoElement>(selector);
       if (direct) return direct;
-      const roots: ParentNode[] = [document];
-      let budget = 2500;
-      for (let i = 0; i < roots.length && budget-- > 0; i++) {
-        const root = roots[i];
-        const found = root.querySelector<HTMLVideoElement>(selector);
-        if (found) return found;
-        for (const el of Array.from(root.querySelectorAll<Element>("*")).slice(0, 500)) {
-          if (el.shadowRoot) roots.push(el.shadowRoot);
-        }
-      }
     } catch (e) {
       return null;
     }
+    const queue: ParentNode[] = [document];
+    const seen = new WeakSet<object>();
+    let budget = 250;
+    while (queue.length && budget-- > 0) {
+      const root = queue.shift()!;
+      if (seen.has(root)) continue;
+      seen.add(root);
+      try {
+        const found = root.querySelector<HTMLVideoElement>(selector);
+        if (found) return found;
+        for (const el of root.querySelectorAll("*")) {
+          const sr = el.shadowRoot;
+          if (sr) queue.push(sr);
+        }
+      } catch (e) {
+        /* inaccessible root */
+      }
+    }
     return null;
+  }
+
+  function videoFromEvent(e: Event, id: unknown): HTMLVideoElement | null {
+    if (typeof id !== "string" || !id) return null;
+    const path = typeof e.composedPath === "function" ? e.composedPath() : [];
+    for (const item of path) {
+      if (
+        item instanceof HTMLVideoElement &&
+        item.getAttribute(VIDEO_ATTR) === id
+      ) {
+        return item;
+      }
+    }
+    return videoById(id);
   }
 
   function labelFromHeight(h: unknown, bitrate?: unknown): string {
@@ -110,7 +272,7 @@
           getAvailableQualityLevels?: () => string[];
           getPlaybackQuality?: () => string;
           setPlaybackQuality?: (q: string) => void;
-          setPlaybackQualityRange?: (q: string) => void;
+          setPlaybackQualityRange?: (min: string, max?: string) => void;
         })
       | null;
     if (!p || typeof p.getAvailableQualityLevels !== "function") return null;
@@ -134,14 +296,19 @@
           p.setPlaybackQuality?.("auto");
           return;
         }
-        p.setPlaybackQualityRange?.(id);
-        p.setPlaybackQuality?.(id);
+        const apply = () => {
+          p.setPlaybackQualityRange?.(id, id);
+          p.setPlaybackQuality?.(id);
+        };
+        apply();
+        window.setTimeout(apply, 250);
+        window.setTimeout(apply, 900);
       },
     };
   }
 
   function isObj(x: unknown): x is Record<string, unknown> {
-    return !!x && typeof x === "object";
+    return !!x && (typeof x === "object" || typeof x === "function");
   }
 
   function read(o: Record<string, unknown>, key: string): unknown {
@@ -152,23 +319,22 @@
     }
   }
 
+  function pushElementRoots(out: unknown[], el: Element | null): void {
+    if (!el) return;
+    out.push(el);
+  }
+
   function rootsFor(v: HTMLVideoElement): unknown[] {
     const out: unknown[] = [v];
     let el: Element | null = v;
-    for (let i = 0; i < 10 && el; i++) {
-      out.push(el);
-      const rec = el as unknown as Record<string, unknown>;
-      for (const k in rec) {
-        if (
-          k.startsWith("__reactFiber$") ||
-          k.startsWith("__reactInternalInstance$") ||
-          k.startsWith("__vue") ||
-          k.startsWith("__svelte")
-        ) {
-          out.push(rec[k]);
-        }
+    for (let i = 0; i < 16 && el; i++) {
+      pushElementRoots(out, el);
+      if (el.parentElement) {
+        el = el.parentElement;
+        continue;
       }
-      el = el.parentElement;
+      const root = el.getRootNode();
+      el = root instanceof ShadowRoot ? root.host : null;
     }
     return out;
   }
@@ -179,14 +345,14 @@
   ): T | null {
     const seen = new WeakSet<object>();
     const queue = roots.filter(isObj).map((value) => ({ value, depth: 0 }));
-    let budget = 1800;
+    let budget = 160;
     while (queue.length && budget-- > 0) {
       const { value, depth } = queue.shift()!;
       if (seen.has(value)) continue;
       seen.add(value);
       const accepted = accept(value);
       if (accepted) return accepted;
-      if (depth >= 4) continue;
+      if (depth >= 3) continue;
       const preferred = [
         "hls",
         "hlsjs",
@@ -200,23 +366,10 @@
         "videoPlayer",
         "tech_",
         "vhs",
-        "stateNode",
-        "memoizedProps",
-        "memoizedState",
-        "props",
-        "state",
+        "api",
+        "value",
       ];
       for (const key of preferred) {
-        const child = read(value, key);
-        if (isObj(child)) queue.push({ value: child, depth: depth + 1 });
-      }
-      let keys: string[];
-      try {
-        keys = Object.keys(value).slice(0, 40);
-      } catch (e) {
-        continue;
-      }
-      for (const key of keys) {
         const child = read(value, key);
         if (isObj(child)) queue.push({ value: child, depth: depth + 1 });
       }
@@ -232,7 +385,15 @@
     media?: unknown;
   }
   function hlsAdapter(v: HTMLVideoElement): Adapter | null {
-    const hls = findValue(rootsFor(v), (o): HlsLike | null => {
+    let hls: HlsLike | null = null;
+    for (const entry of win.__vtpQualityHls || []) {
+      if (!entry.video && entry.hls.media instanceof HTMLVideoElement) entry.video = entry.hls.media;
+      if (entry.video === v) {
+        hls = entry.hls;
+        break;
+      }
+    }
+    hls ||= findValue(rootsFor(v), (o): HlsLike | null => {
       const levels = read(o, "levels");
       if (!Array.isArray(levels) || !levels.length) return null;
       if (read(o, "media") === v || "currentLevel" in o || "nextLevel" in o || "loadLevel" in o) {
@@ -359,6 +520,95 @@
     };
   }
 
+  interface VidstackQuality {
+    height?: number;
+    bitrate?: number;
+    label?: string;
+    selected?: boolean;
+  }
+  interface VidstackQualityList {
+    auto?: boolean;
+    autoSelect?: () => void;
+    length?: number;
+    [Symbol.iterator]?: () => IterableIterator<VidstackQuality>;
+    [n: number]: VidstackQuality;
+  }
+  interface VidstackPlayerElement extends HTMLElement {
+    qualities?: VidstackQualityList;
+  }
+  function vidstackAdapter(v: HTMLVideoElement): Adapter | null {
+    const host = rootsFor(v).find(
+      (root): root is VidstackPlayerElement =>
+        root instanceof HTMLElement &&
+        root.localName === "media-player" &&
+        typeof (root as VidstackPlayerElement).qualities === "object",
+    );
+    const list = host?.qualities;
+    const qualities = (): VidstackQuality[] => {
+      if (!list) return [];
+      if (typeof list[Symbol.iterator] === "function") {
+        return Array.from(list as Iterable<VidstackQuality>);
+      }
+      return Array.from({ length: list.length || 0 }, (_x, i) => list[i]).filter(Boolean);
+    };
+    if (!host || qualities().length < 2) return null;
+    const qualityId = (quality: VidstackQuality, index: number): string => {
+      const height = typeof quality.height === "number" && isFinite(quality.height)
+        ? Math.round(quality.height)
+        : 0;
+      return height > 0 ? `h${height}` : `index:${index}`;
+    };
+    const label = (quality: VidstackQuality, index: number): string =>
+      quality.label || labelFromHeight(quality.height, quality.bitrate) || `Quality ${index + 1}`;
+    return {
+      options() {
+        const current = this.current();
+        return [
+          { id: "auto", label: "Auto", current: current === "auto" },
+          ...qualities().map((quality, index) => ({
+            id: qualityId(quality, index),
+            label: label(quality, index),
+            current: qualityId(quality, index) === current,
+          })),
+        ];
+      },
+      current() {
+        if (list?.auto === true) return "auto";
+        const selected = qualities().findIndex((quality) => quality?.selected === true);
+        return selected >= 0 ? qualityId(qualities()[selected], selected) : "auto";
+      },
+      set(id: string) {
+        if (!list) return;
+        if (id === "auto") {
+          try {
+            list.autoSelect?.();
+          } catch (e) {
+            /* optional player API */
+          }
+          try {
+            list.auto = true;
+          } catch (e) {
+            /* read-only player API */
+          }
+          return;
+        }
+        const items = qualities();
+        const index = items.findIndex((quality, i) => qualityId(quality, i) === id);
+        if (index < 0) return;
+        try {
+          items[index].selected = true;
+        } catch (e) {
+          /* read-only player API */
+        }
+        try {
+          list.auto = false;
+        } catch (e) {
+          /* read-only player API */
+        }
+      },
+    };
+  }
+
   interface VideoJsQuality {
     height?: number;
     bitrate?: number;
@@ -405,9 +655,202 @@
     };
   }
 
+  interface StoreLike<T = unknown> {
+    subscribe?: (fn: (value: T) => void) => (() => void) | void;
+  }
+  interface VkQuality {
+    value?: string;
+    displayValue?: string;
+    selected?: boolean;
+  }
+  interface VkPlayerLike {
+    info?: Record<string, StoreLike>;
+    setQuality?: (quality: string) => void;
+    setAutoQuality?: (enabled: boolean) => void;
+  }
+  interface VkVideoPlayerElement extends HTMLElement {
+    store?: {
+      state?: Record<string, StoreLike>;
+      getPlayer?: () => VkPlayerLike;
+    };
+  }
+  function readStoreValue<T>(store: StoreLike<T> | undefined): T | null {
+    if (!store || typeof store.subscribe !== "function") return null;
+    let value: T | null = null;
+    try {
+      const unsubscribe = store.subscribe((next) => {
+        value = next;
+      });
+      if (typeof unsubscribe === "function") unsubscribe();
+    } catch (e) {
+      return null;
+    }
+    return value;
+  }
+  function vkVideoPlayerAdapter(v: HTMLVideoElement): Adapter | null {
+    const host = rootsFor(v).find(
+      (root): root is VkVideoPlayerElement =>
+        root instanceof HTMLElement &&
+        root.localName === "vk-video-player" &&
+        typeof (root as VkVideoPlayerElement).store?.getPlayer === "function",
+    );
+    const player = host?.store?.getPlayer?.();
+    const state = host?.store?.state;
+    if (!host || !player || typeof player.setQuality !== "function") return null;
+    const qualities = (): VkQuality[] => {
+      const rich = readStoreValue<VkQuality[]>(
+        state?.availableQualities$ as StoreLike<VkQuality[]> | undefined,
+      );
+      if (Array.isArray(rich) && rich.length) return rich;
+      const simple = readStoreValue<string[]>(
+        player.info?.availableQualities$ as StoreLike<string[]> | undefined,
+      );
+      if (!Array.isArray(simple) || !simple.length) return [];
+      const current = readStoreValue<string>(
+        player.info?.currentQuality$ as StoreLike<string> | undefined,
+      );
+      const auto =
+        readStoreValue<boolean>(
+          player.info?.isAutoQualityEnabled$ as StoreLike<boolean> | undefined,
+        ) === true;
+      return [
+        { value: "auto", displayValue: "Auto", selected: auto },
+        ...simple.map((quality) => ({
+          value: quality,
+          displayValue: quality,
+          selected: !auto && quality === current,
+        })),
+      ];
+    };
+    if (qualities().length < 2) return null;
+    return {
+      options() {
+        return uniqueOptions(
+          qualities()
+            .filter((quality) => typeof quality.value === "string" && quality.value)
+            .map((quality) => ({
+              id: quality.value!,
+              label: quality.displayValue || quality.value!,
+              current: quality.selected === true,
+            })),
+        );
+      },
+      current() {
+        if (
+          readStoreValue<boolean>(
+            player.info?.isAutoQualityEnabled$ as StoreLike<boolean> | undefined,
+          ) === true
+        ) {
+          return "auto";
+        }
+        return (
+          readStoreValue<string>(player.info?.currentQuality$ as StoreLike<string> | undefined) ||
+          "auto"
+        );
+      },
+      set(id: string) {
+        if (id === "auto") {
+          player.setAutoQuality?.(true);
+          return;
+        }
+        player.setAutoQuality?.(false);
+        player.setQuality?.(id);
+      },
+    };
+  }
+
+  interface IvsQuality {
+    name?: string;
+    codecs?: string;
+    width?: number;
+    height?: number;
+    bitrate?: number;
+    framerate?: number;
+  }
+  interface IvsLike {
+    getQualities?: () => IvsQuality[];
+    getQuality?: () => IvsQuality | null;
+    setQuality?: (quality: IvsQuality, adaptive?: boolean) => void;
+    isAutoQualityMode?: () => boolean;
+    setAutoQualityMode?: (enabled: boolean) => void;
+    getHTMLVideoElement?: () => HTMLVideoElement;
+  }
+  function ivsLabel(q: IvsQuality): string {
+    if (q.name) return q.name;
+    if (q.height) return `${Math.round(q.height)}p${q.framerate ? Math.round(q.framerate) : ""}`;
+    return labelFromHeight(q.height, q.bitrate);
+  }
+  function ivsId(q: IvsQuality, index: number): string {
+    return [
+      q.name || "",
+      q.width || "",
+      q.height || "",
+      q.bitrate || "",
+      q.framerate || "",
+      index,
+    ].join(":");
+  }
+  function ivsAdapter(v: HTMLVideoElement): Adapter | null {
+    let player: IvsLike | null = null;
+    for (const entry of win.__vtpQualityPlayers || []) {
+      const p = entry.player as IvsLike;
+      if (typeof p?.getQualities !== "function" || typeof p?.setQuality !== "function") continue;
+      let pv = entry.video;
+      if (!pv && typeof p.getHTMLVideoElement === "function") {
+        try {
+          pv = p.getHTMLVideoElement();
+          if (pv instanceof HTMLVideoElement) entry.video = pv;
+        } catch (e) {
+          /* not ready */
+        }
+      }
+      if (!pv || pv === v) {
+        player = p;
+        break;
+      }
+    }
+    const qualities = player?.getQualities?.() || [];
+    if (!player || qualities.length < 2) return null;
+    const idForQuality = (quality: IvsQuality | null | undefined): string => {
+      if (!quality) return "auto";
+      const index = qualities.indexOf(quality);
+      if (index >= 0) return ivsId(quality, index);
+      const match = qualities.findIndex((q) => ivsLabel(q) === ivsLabel(quality));
+      return match >= 0 ? ivsId(qualities[match], match) : "auto";
+    };
+    return {
+      options() {
+        const current = this.current();
+        return [
+          { id: "auto", label: "Auto", current: current === "auto" },
+          ...qualities.map((quality, i) => {
+            const id = ivsId(quality, i);
+            return { id, label: ivsLabel(quality), current: id === current };
+          }),
+        ];
+      },
+      current() {
+        const auto = player.isAutoQualityMode?.();
+        if (auto) return "auto";
+        return idForQuality(player.getQuality?.());
+      },
+      set(id: string) {
+        if (id === "auto") {
+          player.setAutoQualityMode?.(true);
+          return;
+        }
+        const quality = qualities.find((q, i) => ivsId(q, i) === id);
+        if (quality) player.setQuality?.(quality, true);
+      },
+    };
+  }
+
   function adapterFor(v: HTMLVideoElement): Adapter | null {
     return (
       youtubeAdapter(v) ||
+      ivsAdapter(v) ||
+      vkVideoPlayerAdapter(v) ||
+      vidstackAdapter(v) ||
       hlsAdapter(v) ||
       dashAdapter(v) ||
       shakaAdapter(v) ||
@@ -415,29 +858,154 @@
     );
   }
 
-  function respond(requestId: string, adapter: Adapter | null): void {
+  function debugFor(v: HTMLVideoElement, adapter: Adapter | null): string {
+    const now = (): number => window.performance?.now?.() ?? Date.now();
+    const started = now();
+    const seen = new WeakSet<object>();
+    const queue = rootsFor(v).filter(isObj).map((value) => ({ value, depth: 0, path: "video" }));
+    const hits: Array<Record<string, unknown>> = [];
+    const preferred = [
+      "hls",
+      "hlsjs",
+      "hlsInstance",
+      "dash",
+      "dashjs",
+      "shaka",
+      "player",
+      "mediaPlayer",
+      "mediaPlayerInstance",
+      "videoPlayer",
+      "tech_",
+      "vhs",
+      "api",
+      "value",
+    ];
+    let budget = 80;
+    while (queue.length && budget-- > 0) {
+      const { value, depth, path } = queue.shift()!;
+      if (seen.has(value)) continue;
+      seen.add(value);
+      const levels = read(value, "levels");
+      const hit: Record<string, unknown> = { path };
+      let matched = false;
+      if (Array.isArray(levels)) {
+        hit.levels = levels.length;
+        hit.currentLevel = read(value, "currentLevel");
+        hit.hasMedia = !!read(value, "media");
+        matched = true;
+      }
+      if (typeof read(value, "qualityLevels") === "function") {
+        hit.videoJs = true;
+        matched = true;
+      }
+      if (typeof read(value, "getVariantTracks") === "function") {
+        hit.shaka = true;
+        matched = true;
+      }
+      if (typeof read(value, "getBitrateInfoListFor") === "function") {
+        hit.dash = true;
+        matched = true;
+      }
+      if (typeof read(value, "getQualities") === "function" || typeof read(value, "setQuality") === "function") {
+        hit.qualityMethods = {
+          get: typeof read(value, "getQualities") === "function",
+          set: typeof read(value, "setQuality") === "function",
+        };
+        matched = true;
+      }
+      if (matched) hits.push(hit);
+      if (depth >= 2) continue;
+      for (const key of preferred) {
+        const child = read(value, key);
+        if (isObj(child)) queue.push({ value: child, depth: depth + 1, path: `${path}.${key}` });
+      }
+    }
+    return JSON.stringify({
+      adapter: !!adapter,
+      ms: Math.round((now() - started) * 10) / 10,
+      capturedPlayers: (win.__vtpQualityPlayers || []).map((entry) => {
+        const player = entry.player as Record<string, unknown>;
+        return {
+          ctor: isObj(player) ? player.constructor?.name : typeof player,
+          video: entry.video
+            ? {
+                w: entry.video.videoWidth,
+                h: entry.video.videoHeight,
+                paused: entry.video.paused,
+              }
+            : null,
+          hasQualities: typeof player.getQualities === "function",
+          hasQuality: typeof player.getQuality === "function",
+          hasSetQuality: typeof player.setQuality === "function",
+        };
+      }),
+      hits: hits.slice(0, 20),
+    });
+  }
+
+  async function respond(
+    requestId: string,
+    adapter: Adapter | null,
+    presetOptions?: QualityOption[],
+    presetCurrent?: string,
+  ): Promise<void> {
+    const options = presetOptions || (adapter ? await adapter.options() : []);
+    let current = presetCurrent || (adapter ? await adapter.current() : "auto");
+    const selected = options.find((opt) => opt.current);
+    if (selected && !options.some((opt) => opt.id === current && opt.current)) current = selected.id;
     const payload: QualityResponse = {
       requestId,
-      options: adapter ? adapter.options() : [],
-      current: adapter ? adapter.current() : "auto",
+      options,
+      current,
     };
     document.documentElement.setAttribute(ROOT_RESP_ATTR, JSON.stringify(payload));
+    if (!adapter) {
+      try {
+        const video = videoById(document.documentElement.getAttribute(ROOT_VIDEO_ATTR));
+        if (video) {
+          const debug = debugFor(video, adapter);
+          document.documentElement.setAttribute(ROOT_DEBUG_ATTR, debug);
+        }
+      } catch (e) {
+        document.documentElement.setAttribute(ROOT_DEBUG_ATTR, JSON.stringify({ error: String(e) }));
+      }
+    } else {
+      document.documentElement.removeAttribute(ROOT_DEBUG_ATTR);
+    }
     document.dispatchEvent(new CustomEvent(RESP, { detail: payload }));
   }
 
-  document.addEventListener(REQ, (e) => {
-    const d = detailOf(e);
-    if (typeof d.requestId !== "string") return;
-    const v = videoById(d.videoId);
-    respond(d.requestId, v ? adapterFor(v) : null);
-  });
+  let handledRequest = "";
 
-  document.addEventListener(SET, (e) => {
-    const d = detailOf(e);
+  async function handleRequest(e: Event, d: Detail, type: typeof REQ | typeof SET): Promise<void> {
     if (typeof d.requestId !== "string") return;
-    const v = videoById(d.videoId);
+    if (d.requestId === handledRequest) return;
+    handledRequest = d.requestId;
+    const v = videoFromEvent(e, d.videoId);
     const adapter = v ? adapterFor(v) : null;
-    if (adapter && typeof d.qualityId === "string") adapter.set(d.qualityId);
-    respond(d.requestId, adapter);
+    if (type === SET && adapter && typeof d.qualityId === "string") {
+      const before = await adapter.options();
+      try {
+        await adapter.set(d.qualityId);
+      } catch (error) {
+        /* keep the viewer responsive even if a player rejects a level switch */
+      }
+      const current = d.qualityId;
+      const selected = before.map((opt) => ({ ...opt, current: opt.id === current }));
+      await respond(d.requestId, adapter, selected.length ? selected : undefined, current);
+      return;
+    }
+    await respond(d.requestId, adapter);
+  }
+
+  document.addEventListener(REQ, (e) => {
+    void handleRequest(e, detailOf(e), REQ);
   });
+  document.addEventListener(SET, (e) => {
+    void handleRequest(e, detailOf(e), SET);
+  });
+  new MutationObserver(() => {
+    const d = detailOf(new Event(REQ));
+    void handleRequest(new Event(REQ), d, document.documentElement.hasAttribute(ROOT_PICK_ATTR) ? SET : REQ);
+  }).observe(document.documentElement, { attributes: true, attributeFilter: [ROOT_REQ_ATTR] });
 })();

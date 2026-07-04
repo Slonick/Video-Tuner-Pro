@@ -103,6 +103,15 @@ describe("media registry — incremental tracking", () => {
     expect(collectVideos()).toHaveLength(0);
   });
 
+  it("never tracks media inside our own light-DOM overlay", async () => {
+    const overlay = document.createElement("div");
+    const mirror = document.createElement("video");
+    overlay.appendChild(mirror);
+    document.body.appendChild(overlay);
+    track((n) => n === overlay || overlay.contains(n));
+    expect(collectVideos()).toHaveLength(0);
+  });
+
   it("tracks <audio> too", async () => {
     track();
     const a = document.createElement("audio");

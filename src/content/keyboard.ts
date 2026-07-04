@@ -18,7 +18,7 @@ import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
-import { toggleViewer } from "./viewer.js";
+import { toggleViewer, viewerFormat } from "./viewer.js";
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
 function deepActive(): Element | null {
@@ -40,6 +40,7 @@ function typingIn(el: EventTarget | null): boolean {
 document.addEventListener(
   "keydown",
   (e) => {
+    if (e.defaultPrevented) return;
     if (!S.keyboardEnabled || !ctxValid()) return;
     const { slower, faster, reset, toggle, hold, overlay, viewer, theater } = S.keymap;
     // A preset whose assigned chord matches this exact event (may use modifiers).
@@ -68,7 +69,8 @@ document.addEventListener(
     // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
     const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
     if (typingIn(target) || typingIn(deepActive())) return;
-    if (!primaryVideo()) return; // nothing to act on — leave the key to the page
+    const viewerAction = e.code === viewer || e.code === theater;
+    if (!primaryVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
 
     e.preventDefault();
     if (e.code === overlay) {

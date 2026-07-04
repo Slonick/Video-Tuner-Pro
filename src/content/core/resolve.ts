@@ -78,3 +78,45 @@ export function resolveAutoSlow(
   if (global != null) return bundle(global, "global");
   return { enabled: false, target: 6, scope: null };
 }
+
+export type ViewerAutoMode = "off" | "normal" | "theater";
+export type ViewerAutoScope = "channel" | "site" | "global" | null;
+
+export function normalizeViewerAuto(raw: unknown): ViewerAutoMode {
+  return raw === "normal" || raw === "theater" ? raw : "off";
+}
+
+export function resolveViewerAuto(
+  channelKeys: string[],
+  domain: string,
+  sites: Record<string, ViewerAutoMode>,
+  channels: Record<string, ViewerAutoMode>,
+  global: unknown,
+): { mode: ViewerAutoMode; scope: ViewerAutoScope } {
+  const chKey = channelKeys.find((k) => channels[k] != null);
+  if (chKey != null) return { mode: normalizeViewerAuto(channels[chKey]), scope: "channel" };
+  if (sites[domain] != null) return { mode: normalizeViewerAuto(sites[domain]), scope: "site" };
+  if (global != null) return { mode: normalizeViewerAuto(global), scope: "global" };
+  return { mode: "off", scope: null };
+}
+
+export type ViewerFitMode = "contain" | "cover" | "fill";
+export type ViewerFitScope = "channel" | "site" | "global" | null;
+
+export function normalizeViewerFit(raw: unknown): ViewerFitMode {
+  return raw === "cover" || raw === "fill" ? raw : "contain";
+}
+
+export function resolveViewerFit(
+  channelKeys: string[],
+  domain: string,
+  sites: Record<string, ViewerFitMode>,
+  channels: Record<string, ViewerFitMode>,
+  global: unknown,
+): { mode: ViewerFitMode; scope: ViewerFitScope } {
+  const chKey = channelKeys.find((k) => channels[k] != null);
+  if (chKey != null) return { mode: normalizeViewerFit(channels[chKey]), scope: "channel" };
+  if (sites[domain] != null) return { mode: normalizeViewerFit(sites[domain]), scope: "site" };
+  if (global != null) return { mode: normalizeViewerFit(global), scope: "global" };
+  return { mode: "contain", scope: null };
+}

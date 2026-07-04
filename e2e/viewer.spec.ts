@@ -1,4 +1,4 @@
-import { test, expect, clearStorage } from "./fixtures/extension.js";
+import { test, expect, clearAll } from "./fixtures/extension.js";
 
 // The pop-out viewer against a Boosty-shaped page (viewer.html): sticky
 // header, fixed modal, player guts in an open shadow root. In modern Chromium
@@ -34,7 +34,7 @@ const state = (page: import("@playwright/test").Page) =>
   });
 
 test.beforeEach(async ({ serviceWorker }) => {
-  await clearStorage(serviceWorker);
+  await clearAll(serviceWorker);
 });
 
 // The hotkey only acts once the media registry has picked up the shadow-DOM
@@ -44,6 +44,11 @@ async function ready(page: import("@playwright/test").Page) {
   await page.goto("/viewer.html");
   await page.waitForSelector("[data-vtp-badge]", { state: "attached" });
   await page.locator("#modal").click({ position: { x: 20, y: 600 } }); // focus gesture off the player
+}
+
+async function readyLiveWithQuality(page: import("@playwright/test").Page) {
+  await page.goto("/live.html");
+  await page.waitForSelector("[data-vtp-badge]", { state: "attached" });
 }
 
 test("T mirrors the shadow-DOM video into the overlay over the whole window", async ({ page }) => {
@@ -111,6 +116,43 @@ test("the quality picker drives a generic HLS-like engine", async ({ page }) => 
       }),
     )
     .toBe(1);
+});
+
+test("live viewer keeps a compact bar and compact quality label", async ({ page }) => {
+  await readyLiveWithQuality(page);
+  await page.keyboard.press("KeyT");
+  await expect(page.locator("[data-vtp-viewer-overlay]")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const overlay = document.querySelector("[data-vtp-viewer-overlay]");
+        const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find(
+          (el) => el.shadowRoot,
+        )?.shadowRoot;
+        const bar = shadow?.querySelector(".bar") as HTMLElement | null;
+        const qwrap = shadow?.querySelector(".qwrap") as HTMLElement | null;
+        return {
+          barWidth: bar?.getBoundingClientRect().width ?? 0,
+          live: bar?.classList.contains("live") ?? false,
+          label: qwrap?.querySelector(".qbtn-label")?.textContent?.trim() || "",
+          time: shadow?.querySelector(".time")?.textContent?.trim() || "",
+          qualityVisible: qwrap?.style.display === "block",
+        };
+      }),
+    )
+    .toMatchObject({
+      live: true,
+      label: "1440p",
+      time: "LIVE",
+      qualityVisible: true,
+    });
+  const barWidth = await page.evaluate(() => {
+    const overlay = document.querySelector("[data-vtp-viewer-overlay]");
+    const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) => el.shadowRoot)
+      ?.shadowRoot;
+    return (shadow?.querySelector(".bar") as HTMLElement | null)?.getBoundingClientRect().width ?? 0;
+  });
+  expect(barWidth).toBeLessThanOrEqual(460);
 });
 
 test("switching formats keeps a single overlay, T again exits", async ({ page }) => {

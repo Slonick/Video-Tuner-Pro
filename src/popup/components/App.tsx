@@ -5,6 +5,8 @@ import { useActiveTab, useTabMessaging } from "../hooks/tab.js";
 import { useSpeed } from "../hooks/useSpeed.js";
 import { useLiveSync } from "../hooks/useLiveSync.js";
 import { useAutoSlow } from "../hooks/useAutoSlow.js";
+import { useViewerAuto } from "../hooks/useViewerAuto.js";
+import { useViewerFit } from "../hooks/useViewerFit.js";
 import { useAudioCompressor } from "../hooks/useAudioCompressor.js";
 import { useGraphs } from "../hooks/useGraphs.js";
 import { useStored } from "../hooks/useStored.js";
@@ -21,6 +23,7 @@ import {
 import { Header } from "./Header.js";
 import { SpeedCard } from "./SpeedCard.js";
 import { LiveSyncCard } from "./LiveSyncCard.js";
+import { ViewerAutoControl } from "./ViewerAutoControl.js";
 import { AutoSlowCard } from "./AutoSlowCard.js";
 import { AudioCard } from "./AudioCard.js";
 import { GuideTour } from "./GuideTour.js";
@@ -31,6 +34,8 @@ export function App() {
   const speed = useSpeed(tab, send);
   const sync = useLiveSync(tab, send);
   const autoSlow = useAutoSlow(tab, send);
+  const viewerAuto = useViewerAuto(tab, send);
+  const viewerFit = useViewerFit(tab, send);
   const audio = useAudioCompressor();
   const [translating, setTranslating] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState<string | null>(null);
@@ -89,6 +94,7 @@ export function App() {
           forceOpen={forceOpen(0)}
         />
         <LiveSyncCard sync={sync} live={syncLive} forceOpen={forceOpen(1)} />
+        <ViewerAutoControl viewerAuto={viewerAuto} viewerFit={viewerFit} />
 
         <div className={"group-label" + (audioBlk ? " has-warn" : "")}>
           <span>{msg("groupAudio") || "Audio"}</span>

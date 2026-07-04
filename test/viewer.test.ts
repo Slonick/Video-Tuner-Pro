@@ -93,7 +93,9 @@ beforeEach(() => {
   document.body.innerHTML = "";
   document.documentElement.style.overflow = "";
   h.primary = null;
+  S.viewerAutoEnabled = true;
   S.viewerAuto = "off";
+  S.viewerBackdropVideo = false;
   setFullscreen(null);
 });
 
@@ -159,13 +161,13 @@ describe("toggleViewer — lifecycle", () => {
     await openViewer("normal");
     expect(viewerFormat()).toBe("normal");
     expect(document.documentElement.getAttribute("data-vtp-viewer")).toBe("normal");
-    expect(v.parentElement).toBe(overlayEl());
+    expect(overlayEl()?.contains(v)).toBe(true);
     expect(v.controls).toBe(false); // our bar replaces any native/site controls
     // A comment holds the video's exact return spot.
     expect(Array.from(wrap.childNodes).some((n) => n.nodeType === Node.COMMENT_NODE)).toBe(true);
     expect(document.documentElement.style.overflow).toBe("hidden");
     // Normal format: a centred aspect box in px.
-    expect(v.style.width).toMatch(/px$/);
+    expect((v.parentElement as HTMLElement).style.width).toMatch(/px$/);
     expect(barEl()).not.toBeNull();
   });
 
@@ -181,7 +183,7 @@ describe("toggleViewer — lifecycle", () => {
     Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
     h.primary = v;
     await openViewer("normal");
-    const mirror = overlayEl()!.firstElementChild as HTMLVideoElement;
+    const mirror = overlayEl()!.querySelector("video") as HTMLVideoElement;
     expect(v.parentElement).toBe(wrap);
     expect(v.controls).toBe(true);
     expect(mirror).toBeInstanceOf(HTMLVideoElement);
@@ -356,6 +358,94 @@ describe("control bar", () => {
     expect(v.style.objectFit).toBe("contain");
   });
 
+  it("can mirror the video under the normal viewer glass", async () => {
+    const { v } = makeVideo();
+    const stop = vi.fn();
+    const stream = {
+      getVideoTracks: () => [{}],
+      getTracks: () => [{ stop }],
+    } as unknown as MediaStream;
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
+    S.viewerBackdropVideo = true;
+    h.primary = v;
+
+    await openViewer("normal");
+
+    const bg = overlayEl()?.querySelector(
+      "[data-vtp-viewer-backdrop-video]",
+    ) as HTMLVideoElement | null;
+    expect(bg).toBeTruthy();
+    expect(bg?.srcObject).toBe(stream);
+    expect(bg?.style.filter).toContain("blur");
+    const backdrop = overlayEl()?.querySelector("div") as HTMLElement | null;
+    expect(backdrop?.style.backdropFilter).toBe("");
+    toggleViewer("theater");
+    await flush();
+    expect(overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]")).toBeNull();
+    exitViewer();
+    expect(stop).toHaveBeenCalled();
+    play.mockRestore();
+    pause.mockRestore();
+  });
+
+  it("animates the background video from the source frame slower than the viewer video", async () => {
+    const { v } = makeVideo();
+    v.getBoundingClientRect = () =>
+      ({ left: 12, top: 34, width: 640, height: 360, right: 652, bottom: 394 }) as DOMRect;
+    const stream = {
+      getVideoTracks: () => [{}],
+      getTracks: () => [{ stop: vi.fn() }],
+    } as unknown as MediaStream;
+    Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
+    S.viewerBackdropVideo = true;
+    h.primary = v;
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    const originalAnimate = Element.prototype.animate;
+    const animate = vi.fn(function (
+      this: Element,
+      keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+      options?: number | KeyframeAnimationOptions,
+    ) {
+      const anim = { onfinish: null, oncancel: null } as unknown as Animation;
+      setTimeout(() => {
+        const done = anim.onfinish;
+        if (typeof done === "function") done.call(anim, new Event("finish") as AnimationPlaybackEvent);
+      }, 0);
+      return anim;
+    });
+    Object.defineProperty(Element.prototype, "animate", { value: animate, configurable: true });
+
+    await openViewer("normal");
+
+    const bgCall = animate.mock.calls.find((_, i) =>
+      (animate.mock.contexts[i] as Element).hasAttribute("data-vtp-viewer-backdrop-video"),
+    );
+    expect(bgCall).toBeTruthy();
+    expect((bgCall?.[0] as Keyframe[])[0]).toMatchObject({
+      transform: expect.stringContaining("translate(12px, 34px)"),
+    });
+    expect((bgCall?.[0] as Keyframe[])[1]).toMatchObject({
+      transform: "none",
+    });
+    expect((bgCall?.[1] as KeyframeAnimationOptions).duration).toBeGreaterThan(420);
+    await flush();
+    if (originalAnimate) {
+      Object.defineProperty(Element.prototype, "animate", {
+        value: originalAnimate,
+        configurable: true,
+      });
+    } else {
+      delete (Element.prototype as { animate?: Element["animate"] }).animate;
+    }
+    exitViewer();
+    await flush();
+    play.mockRestore();
+    pause.mockRestore();
+  });
+
   it("shows quality options from the bridge and sends the selected level", async () => {
     const picks = installQualityBridge();
     const { v } = makeVideo();
@@ -398,7 +488,7 @@ describe("auto pop-out on play", () => {
     v.play();
     await flush();
     expect(viewerFormat()).toBe("theater");
-    expect(v.parentElement).toBe(overlayEl());
+    expect(overlayEl()?.contains(v)).toBe(true);
   });
 
   it("fires once per video — a manual close wins over the next play", async () => {
@@ -425,6 +515,12 @@ describe("auto pop-out on play", () => {
     S.viewerAuto = "off";
     const { v: v2 } = makeVideo();
     v2.play();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+    S.viewerAuto = "theater";
+    S.viewerAutoEnabled = false;
+    const { v: v3 } = makeVideo();
+    v3.play();
     await flush();
     expect(viewerFormat()).toBeNull();
   });

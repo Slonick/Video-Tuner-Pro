@@ -46,19 +46,21 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
       }),
     );
   });
-  // Mimic the user's environment: a third-party "VOT Settings" button inside
-  // the player chrome (the VOT extension injects one) that opens its own panel.
+  // Mimic a third-party control inside the player chrome; quality probing must
+  // ignore unrelated buttons.
   await page.evaluate(() => {
     const controls =
       document.querySelector(".ytp-right-controls") ?? document.querySelector("#movie_player");
     const b = document.createElement("button");
-    b.className = "vot-icon-button";
-    b.setAttribute("aria-label", "VOT Settings");
+    b.className = "third-party-icon-button";
+    b.setAttribute("aria-label", "Third-party settings");
     const panel = document.createElement("div");
     panel.style.display = "none";
-    panel.textContent = "VOT панель без качеств";
+    panel.textContent = "Third-party panel without quality controls";
     b.addEventListener("click", () => {
-      document.body.dataset.votClicks = String(Number(document.body.dataset.votClicks || 0) + 1);
+      document.body.dataset.thirdPartyClicks = String(
+        Number(document.body.dataset.thirdPartyClicks || 0) + 1,
+      );
       panel.style.display = panel.style.display === "none" ? "" : "none";
     });
     controls!.prepend(b);
@@ -89,7 +91,7 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
         Math.round(r.width) === window.innerWidth &&
         Math.round(r.height) === window.innerHeight,
       qualityShown:
-        (barSh?.querySelectorAll(".qwrap")[1] as HTMLElement | undefined)?.style.display ===
+        (barSh?.querySelectorAll(".qwrap")[0] as HTMLElement | undefined)?.style.display ===
         "block",
       ticks: barSh?.querySelectorAll(".mark-tick").length ?? -1,
       bands: barSh?.querySelectorAll(".mark-seg").length ?? -1,
@@ -130,7 +132,7 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
       (c) => (c as HTMLElement).shadowRoot,
     )?.shadowRoot;
     return (
-      (barSh?.querySelectorAll(".qwrap")[1] as HTMLElement | undefined)?.style.display === "block"
+      (barSh?.querySelectorAll(".qwrap")[0] as HTMLElement | undefined)?.style.display === "block"
     );
   });
   console.log("QUALITY SHOWN (first look):", qualityShown);
@@ -144,7 +146,7 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
             (c) => c.shadowRoot,
           )?.shadowRoot;
           return (
-            (barSh?.querySelectorAll(".qwrap")[1] as HTMLElement | undefined)?.style.display ===
+            (barSh?.querySelectorAll(".qwrap")[0] as HTMLElement | undefined)?.style.display ===
             "block"
           );
         }),
@@ -152,11 +154,11 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
     )
     .toBe(true);
   await page.mouse.move(500, 500);
-  const qbtn = page.locator("[data-vtp-viewer-overlay] .qwrap").nth(1).locator("> button");
+  const qbtn = page.locator("[data-vtp-viewer-overlay] .qwrap").nth(0).locator("> button");
   await qbtn.click();
   const items = await page
     .locator("[data-vtp-viewer-overlay] .qwrap")
-    .nth(1)
+    .nth(0)
     .locator(".qitem")
     .allTextContents();
   console.log("QUALITY OPTIONS:", JSON.stringify(items));
@@ -166,7 +168,7 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
   );
   await page
     .locator("[data-vtp-viewer-overlay] .qwrap")
-    .nth(1)
+    .nth(0)
     .locator(".qitem", { hasText: /^144p/ })
     .click();
   await page.waitForTimeout(9000); // dance + the player switching rungs
@@ -175,9 +177,9 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
     return { h: v.videoHeight, playing: !v.paused, inOverlay: !!v };
   });
   console.log("PICK 144p:", JSON.stringify({ before, after }));
-  const votClicks = await page.evaluate(() => Number(document.body.dataset.votClicks || 0));
-  console.log("VOT CLICKS:", votClicks);
-  expect(votClicks).toBe(0); // foreign buttons must never be poked
+  const thirdPartyClicks = await page.evaluate(() => Number(document.body.dataset.thirdPartyClicks || 0));
+  console.log("THIRD-PARTY CLICKS:", thirdPartyClicks);
+  expect(thirdPartyClicks).toBe(0); // foreign buttons must never be poked
   await page.screenshot({ path: testInfo.outputPath("yt-quality.png") });
   expect(after.inOverlay).toBe(true);
   expect(after.h).toBeLessThan(before);

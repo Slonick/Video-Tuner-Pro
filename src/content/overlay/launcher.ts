@@ -11,7 +11,14 @@ import { STORE } from "../platform/storage.js";
 import { api, ctxValid } from "../platform/browser.js";
 import { i18n } from "../platform/i18n.js";
 import { primaryVideo } from "../videos.js";
-import { toggleViewer, exitViewer, viewerFormat } from "../viewer.js";
+import {
+  VIEWER_LAYOUT_EVENT,
+  toggleViewer,
+  exitViewer,
+  viewerAnchorVideo,
+  viewerFormat,
+  viewerLayoutPaused,
+} from "../viewer.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../../shared/glass.js";
 
 type Timer = ReturnType<typeof setTimeout>;
@@ -56,7 +63,7 @@ let frameScale = 1; // last fit-scale from layoutFrame, reused by the open anima
 let open = false;
 let hideTimer: Timer | undefined;
 let mouseHooked = false;
-let fabVideo: HTMLVideoElement | null = null; // cached primary video so mousemove stays cheap
+let fabVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let dragging = false;
 let moved = false;
 let dragDX = 0,
@@ -88,7 +95,7 @@ function eligible(): boolean {
 
 // Place the button at its saved per-site fraction of the video, or the default
 // right-center spot when it's never been moved.
-function positionFab(v: HTMLVideoElement): void {
+function positionFab(v: HTMLElement): void {
   if (!fab) return;
   const r = v.getBoundingClientRect();
   if (S.overlayBtnPos) {
@@ -355,11 +362,11 @@ function openPopup(): void {
     position: "fixed",
     left: "50%",
     top: "50%",
-    border: "1px solid rgba(255,255,255,0.14)", // hairline edge for the glass panel
+    border: "1px solid rgba(255,255,255,0.16)", // hairline edge for the glass panel
     borderRadius: "16px",
-    WebkitBackdropFilter: "blur(10px) saturate(180%) brightness(1.04)",
-    backdropFilter: "blur(10px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
-    boxShadow: "0 24px 70px rgba(0,0,0,0.5)",
+    WebkitBackdropFilter: GLASS_REFRACTION + "blur(10px) saturate(180%) brightness(1.04)",
+    backdropFilter: GLASS_REFRACTION + "blur(10px) saturate(180%) brightness(1.04)",
+    boxShadow: "0 24px 70px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)",
     colorScheme: "normal",
     zIndex: "2147483647",
   } as Partial<CSSStyleDeclaration>);
@@ -402,7 +409,7 @@ function togglePopup(): void {
 // works even when the button is turned off.
 export function toggleOverlayPopup(): void {
   if (!ctxValid()) return;
-  fabVideo = primaryVideo();
+  fabVideo = viewerAnchorVideo() ?? primaryVideo();
   if (!fabVideo) return; // nothing to overlay
   if (!host) mount();
   hookMouse();
@@ -494,8 +501,8 @@ function mount(): void {
     color: "#fff",
     background: "rgb(20 20 22 / calc(0.32 * var(--glass-opacity, 1)))",
     boxShadow: "0 0 0 1px rgba(255,255,255,0.14)",
-    WebkitBackdropFilter: "blur(7px) saturate(180%) brightness(1.04)",
-    backdropFilter: "blur(7px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
+    WebkitBackdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
+    backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -526,12 +533,10 @@ function mount(): void {
   while (icons.firstChild) fab.appendChild(icons.firstChild);
   shadow.append(fab);
   hookFabDrag(fab);
-  // The radial menu items (same glass as the FAB, revealed on hover). Clicking
-  // an item acts and re-opens the menu so its state (pressed format, the exit
-  // item appearing/disappearing) refreshes in place.
   const act = (fn: () => void) => () => {
+    closePopup();
+    closeRadial();
     fn();
-    openRadial();
   };
   rItems = {
     normal: radialButton(
@@ -577,8 +582,8 @@ function radialButton(svg: string, label: string, onClick: () => void): HTMLButt
     color: "#fff",
     background: "rgb(20 20 22 / calc(0.32 * var(--glass-opacity, 1)))",
     boxShadow: "0 0 0 1px rgba(255,255,255,0.14)",
-    WebkitBackdropFilter: "blur(7px) saturate(180%) brightness(1.04)",
-    backdropFilter: "blur(7px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
+    WebkitBackdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
+    backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -643,6 +648,9 @@ function hookMouse(): void {
     "keydown",
     (e) => {
       if (e.key !== "Escape") return;
+      if (!open && !radialOpen) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       if (open) closePopup();
       else closeRadial();
     },
@@ -651,9 +659,11 @@ function hookMouse(): void {
   window.addEventListener(
     "resize",
     () => {
-      if (!open) return;
-      layoutFrame();
-      positionPanel();
+      if (open) {
+        layoutFrame();
+        positionPanel();
+      }
+      updateLauncher();
     },
     { passive: true },
   );
@@ -700,7 +710,10 @@ export function applyLauncherGlass(): void {
 
 export function updateLauncher(): void {
   removeStaleHosts();
-  fabVideo = primaryVideo();
+  const paused = viewerLayoutPaused();
+  if (!paused || !fabVideo) {
+    fabVideo = viewerAnchorVideo() ?? primaryVideo();
+  }
   // No video to overlay → nothing can show; close any open popup and hide the FAB.
   if (!fabVideo) {
     if (open) closePopup();
@@ -724,9 +737,11 @@ export function updateLauncher(): void {
   const fsEl = document.fullscreenElement;
   const parent: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
   if (host && host.parentNode !== parent) parent.appendChild(host);
-  if (fabVideo && !dragging) positionFab(fabVideo);
+  if (fabVideo && !dragging && !paused) positionFab(fabVideo);
   // The viewer can close behind our back (Esc, backdrop click) — refresh an
   // open menu so its pressed states and exit item stay honest.
   if (radialOpen) openRadial();
   if (open) flashFab(); // keep it up while the popup is showing
 }
+
+document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateLauncher());

@@ -16,9 +16,11 @@ vi.mock("../src/content/videos.js", () => ({
 }));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
 vi.mock("../src/content/viewer.js", () => ({
+  VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
   toggleViewer: m.toggleViewer,
   exitViewer: vi.fn(),
   viewerFormat: () => null,
+  viewerAnchorVideo: () => null,
 }));
 
 import { S } from "../src/content/state.js";

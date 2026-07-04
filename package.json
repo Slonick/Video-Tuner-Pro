@@ -21,6 +21,7 @@
     "bench": "node tools/bench-dom.mjs",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && playwright test",
+    "test:real-chrome": "npm run build && REAL_CHROME=1 playwright test e2e/real-chrome-quality.spec.ts",
     "screenshot": "node tools/screenshot.mjs",
     "promo": "node tools/promo.mjs",
     "promo:gif": "node tools/promo-gif.mjs",

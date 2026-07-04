@@ -5,6 +5,7 @@ import { badgeFraction } from "../core/badge-pos.js";
 import { STORE } from "../platform/storage.js";
 import { ctxValid } from "../platform/browser.js";
 import { primaryVideo } from "../videos.js";
+import { VIEWER_LAYOUT_EVENT, viewerAnchorVideo } from "../viewer.js";
 import { onStreamPage } from "../live/detection.js";
 import { catchupBufferLimited } from "../live/catchup.js";
 import { forwardBuffer, streamLatency } from "../live/metrics.js";
@@ -50,7 +51,7 @@ let badgeDotEl: HTMLElement | null = null; // video/stream indicator dot (left o
 let badgeTextEl: HTMLSpanElement | null = null; // holds the speed/time text (so the pin stays put)
 let badgePinEl: HTMLSpanElement | null = null;
 let timeBadgeHideTimer: Timer | undefined;
-let badgeVideo: HTMLVideoElement | null = null; // cached primary video so mousemove stays cheap
+let badgeVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let badgeMoveHooked = false;
 let dragging = false;
 let dragDX = 0,
@@ -67,7 +68,7 @@ export function ownsBadgeNode(node: Node | null): boolean {
 
 // Place the badge at its saved per-site fraction of the video, or the default
 // top-left corner when it's never been moved.
-function positionBadge(el: HTMLElement, v: HTMLVideoElement): void {
+function positionBadge(el: HTMLElement, v: HTMLElement): void {
   const r = v.getBoundingClientRect();
   if (S.badgePos) {
     el.style.left = Math.round(r.left + S.badgePos.fx * r.width) + "px";
@@ -193,11 +194,11 @@ function hookBadgeDrag(el: HTMLElement): void {
   });
 }
 
-function renderBadge(v: HTMLVideoElement): void {
+function renderBadge(v: HTMLVideoElement, anchor: HTMLElement): void {
   const el = timeBadgeEl;
   const txt = badgeTextEl;
   if (!el || !txt) return;
-  if (!dragging) positionBadge(el, v);
+  if (!dragging) positionBadge(el, anchor);
   const speed = v.playbackRate || S.currentSpeed || 1;
   const sp = Math.round(speed * 100) / 100;
   const stream = onStreamPage();
@@ -272,17 +273,18 @@ export function applyBadgeGlass(): void {
 // video and auto-hides after a moment.
 export function updateTimeBadge(): void {
   const v = primaryVideo();
+  const anchor = viewerAnchorVideo() ?? v;
   const stream = onStreamPage();
   // Two independent toggles: streamBadge for live, showRemaining for VODs. VODs
   // also need a real finite duration (to compute remaining); streams don't —
   // they show latency/buffer seconds, so skip the duration check there.
   const enabled = stream ? S.streamBadge : S.showRemaining;
-  if (!enabled || !v || (!stream && (!isFinite(v.duration) || v.duration <= 0))) {
+  if (!enabled || !v || !anchor || (!stream && (!isFinite(v.duration) || v.duration <= 0))) {
     if (timeBadgeEl) timeBadgeEl.style.display = "none";
     badgeVideo = null;
     return;
   }
-  badgeVideo = v;
+  badgeVideo = anchor;
   hookBadgeMouse();
   let el = timeBadgeEl;
   if (!el) {
@@ -304,7 +306,7 @@ export function updateTimeBadge(): void {
   const host: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
   if (badgeHost && badgeHost.parentNode !== host) host.appendChild(badgeHost);
   el.style.display = "flex";
-  renderBadge(v);
+  renderBadge(v, anchor);
   // Pinned: keep it shown regardless of mouse movement, and reflect the state on
   // the pin (covers cross-tab changes pushed in via onChanged → updateTimeBadge).
   setPinVisual(S.badgePinned);
@@ -313,3 +315,6 @@ export function updateTimeBadge(): void {
     el.style.pointerEvents = "auto";
   }
 }
+
+document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateTimeBadge());
+window.addEventListener("resize", () => updateTimeBadge(), { passive: true });

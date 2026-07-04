@@ -30,8 +30,8 @@ const BADGE_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
   opacity: 0,
   transition: "opacity .25s",
-  WebkitBackdropFilter: "blur(7px) saturate(180%) brightness(1.04)",
-  backdropFilter: "blur(7px) saturate(180%) brightness(1.04)" + GLASS_REFRACTION,
+  WebkitBackdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
+  backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
 };
 
 // Small red dot left of the speed, shown only on live streams (the value that

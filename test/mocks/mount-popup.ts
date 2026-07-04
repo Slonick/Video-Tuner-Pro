@@ -61,6 +61,7 @@ export interface Mounted {
   sendSpy: ReturnType<typeof vi.fn>;
   saved: () => Record<string, unknown>;
   lastCall: (action: string) => Record<string, unknown> | undefined;
+  emitRuntimeMessage: (msg: Record<string, unknown>, sender?: Record<string, unknown>) => void;
 }
 
 let root: Root | null = null;
@@ -79,13 +80,27 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
     tab: opts.tab,
     settings: { popupGuideSeen: true, ...opts.settings },
   });
+  const runtimeListeners: Array<(msg: Record<string, unknown>, sender?: Record<string, unknown>) => void> =
+    [];
+  chrome.runtime.onMessage.addListener = ((fn: (msg: Record<string, unknown>, sender?: Record<string, unknown>) => void) => {
+    runtimeListeners.push(fn);
+  }) as typeof chrome.runtime.onMessage.addListener;
+  chrome.runtime.onMessage.removeListener = ((fn: (msg: Record<string, unknown>, sender?: Record<string, unknown>) => void) => {
+    const i = runtimeListeners.indexOf(fn);
+    if (i >= 0) runtimeListeners.splice(i, 1);
+  }) as typeof chrome.runtime.onMessage.removeListener;
   (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = chrome;
   (globalThis as unknown as { browser?: unknown }).browser = undefined;
 
   const replies: Record<string, unknown> = {
     getSpeed: { speed: 1, domain: "", channel: null, channelName: "", live: false },
     getTarget: { target: 5, scope: null, channel: null, channelName: "", live: false },
+    getViewerAuto: { mode: "off", scope: null, channel: null, channelName: "" },
+    getViewerState: { mode: "off" },
+    setViewerState: { success: true, mode: "off" },
+    getViewerFit: { mode: "contain", scope: null, channel: null, channelName: "" },
     setSpeed: { success: true, speed: undefined, live: false },
+    setViewerFit: { success: true, mode: "contain" },
     ...opts.replies,
   };
 
@@ -129,5 +144,12 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
       | Record<string, unknown>
       | undefined;
 
-  return { replies, sendSpy, saved, lastCall };
+  const emitRuntimeMessage = (
+    msg: Record<string, unknown>,
+    sender: Record<string, unknown> = { tab: opts.tab },
+  ) => {
+    for (const fn of [...runtimeListeners]) fn(msg, sender);
+  };
+
+  return { replies, sendSpy, saved, lastCall, emitRuntimeMessage };
 }

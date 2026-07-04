@@ -72,6 +72,15 @@ export const KEY_CATEGORY: Record<string, Category> = {
   // show it, and its dragged per-site position.
   overlayButton: "general",
   overlayBtnPos: "general",
+  viewerAutoEnabled: "general",
+  viewerAuto: "general", // legacy global fallback
+  viewerAutoGlobal: "general",
+  viewerAutoSites: "general",
+  viewerAutoChannels: "general",
+  viewerFitGlobal: "general",
+  viewerFitSites: "general",
+  viewerFitChannels: "general",
+  viewerBackdropVideo: "general",
   liveSyncSeen: "general",
   audioSeen: "general",
   popupGuideSeen: "general",

@@ -134,6 +134,8 @@
   "viewerFitContain": { "message": "Вписать" },
   "viewerFitCover": { "message": "Обрезать" },
   "viewerFitFill": { "message": "Растянуть" },
+  "viewerBackdropVideo": { "message": "Видео на фоне" },
+  "viewerBackdropVideoHint": { "message": "Дублировать под стеклом вьюера" },
   "optSponsorLabel": { "message": "Метки SponsorBlock" },
   "optSponsorHint": { "message": "Показывать сегменты спонсоров на полосе перемотки вьюера (YouTube). Отправляет запрос о текущем видео в публичный сервис SponsorBlock." },
   "optKeyPress": { "message": "Нажмите клавишу…" },

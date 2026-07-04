@@ -182,6 +182,12 @@ html .seg-btn.is-active {
   color: #fff;
 }
 
+html .seg:not(.has-pill) .seg-btn.is-active,
+html .lang-grid:not(.has-pill) .seg-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* The segmented groups: a simple translucent capsule with a hairline outline
    (like the overlay panel) — no light-fall / shimmer. */
 html .seg,

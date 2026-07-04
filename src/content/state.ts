@@ -82,7 +82,14 @@ export const S = {
   overlayButton: "fullscreen" as "off" | "fullscreen" | "always",
   // Auto-open the pop-out viewer when a video starts playing (once per video;
   // a manual close wins). "off" | "normal" | "theater".
+  viewerAutoEnabled: true,
   viewerAuto: "off" as "off" | "normal" | "theater",
+  viewerAutoScope: null as "channel" | "site" | "global" | null,
+  // How the pop-out viewer fits video inside its frame.
+  viewerFit: "contain" as "contain" | "cover" | "fill",
+  viewerFitScope: null as "channel" | "site" | "global" | null,
+  // In normal Viewer mode, mirror the video behind the glass backdrop.
+  viewerBackdropVideo: false,
   // Opt-in: fetch SponsorBlock segments for the current YouTube video and show
   // them on the viewer's seek bar (a third-party API request — hence opt-in).
   sponsorMarks: false,

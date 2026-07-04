@@ -30,6 +30,7 @@ export function Segmented<T extends string>({
   id,
   className = "seg",
 }: Props<T>) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const btns = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
   const [pill, setPill] = useState<{
     left: number;
@@ -45,13 +46,36 @@ export function Segmented<T extends string>({
   const firstSlide = useRef(true);
   const slideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  useLayoutEffect(() => {
+  const measure = () => {
     const b = btns.current[value];
     if (!b) {
       setPill(null);
       return;
     }
-    setPill({ left: b.offsetLeft, top: b.offsetTop, width: b.offsetWidth, height: b.offsetHeight });
+    const width = b.offsetWidth;
+    const height = b.offsetHeight;
+    if (width <= 0 || height <= 0) {
+      setPill(null);
+      return;
+    }
+    setPill({ left: b.offsetLeft, top: b.offsetTop, width, height });
+  };
+
+  useLayoutEffect(() => {
+    measure();
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [value, items.length]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const root = rootRef.current;
+    const active = btns.current[value];
+    if (!root || !active) return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    ro.observe(active);
+    return () => ro.disconnect();
   }, [value, items.length]);
 
   useEffect(() => {
@@ -81,7 +105,8 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       id={id}
-      className={className + (sliding ? " sliding" : "")}
+      ref={rootRef}
+      className={className + (pill ? " has-pill" : "") + (sliding ? " sliding" : "")}
       onKeyDown={onKeyDown}
     >
       {pill && (

@@ -181,6 +181,8 @@
   "viewerFitContain": { "message": "Fit" },
   "viewerFitCover": { "message": "Crop" },
   "viewerFitFill": { "message": "Stretch" },
+  "viewerBackdropVideo": { "message": "Background video" },
+  "viewerBackdropVideoHint": { "message": "Mirror it under the Viewer glass" },
   "optSponsorLabel": { "message": "SponsorBlock markers" },
   "optSponsorHint": { "message": "Show sponsor segments on the viewer's seek bar (YouTube). Asks the public SponsorBlock service about the current video." },
   "optKeyPress": { "message": "Press a key…" },

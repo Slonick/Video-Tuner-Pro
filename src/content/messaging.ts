@@ -31,6 +31,21 @@ import {
   setAutoSlowPreview,
   applyResolvedAutoSlowFromStore,
 } from "./audio/autoslow-config.js";
+import {
+  persistSiteViewerAuto,
+  persistChannelViewerAuto,
+  persistGlobalViewerAuto,
+  resetViewerAutoScope,
+  applyResolvedViewerAutoFromStore,
+} from "./viewer-auto.js";
+import {
+  persistSiteViewerFit,
+  persistChannelViewerFit,
+  persistGlobalViewerFit,
+  resetViewerFitScope,
+  applyResolvedViewerFitFromStore,
+} from "./viewer-fit.js";
+import { setViewerFitMode, setViewerState, viewerFormat } from "./viewer.js";
 import { AUTO_SLOW_DEFAULTS, type AutoSlowSettings } from "./core/resolve.js";
 import { monitorData } from "./monitor.js";
 import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
@@ -44,6 +59,14 @@ function autoSlowFromRequest(req: { enabled?: unknown; target?: unknown }): Auto
     on: req.enabled === true,
     target: Number.isNaN(target) ? AUTO_SLOW_DEFAULTS.target : Math.min(12, Math.max(3, target)),
   };
+}
+
+function viewerAutoFromRequest(req: { mode?: unknown }): "off" | "normal" | "theater" {
+  return req.mode === "normal" || req.mode === "theater" ? req.mode : "off";
+}
+
+function viewerFitFromRequest(req: { mode?: unknown }): "contain" | "cover" | "fill" {
+  return req.mode === "cover" || req.mode === "fill" ? req.mode : "contain";
 }
 
 function replyFromVideoFrame(
@@ -170,6 +193,77 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       enabled: S.autoSlowEnabled,
       target: S.autoSlowTarget,
       scope: S.autoSlowScope,
+      channel: currentChannel(),
+      channelName: currentChannelName(),
+    }));
+  }
+  if (request.action === "rememberViewerAuto") {
+    const mode = viewerAutoFromRequest(request);
+    if (request.scope === "channel") persistChannelViewerAuto(mode);
+    else if (request.scope === "global") persistGlobalViewerAuto(mode);
+    else persistSiteViewerAuto(mode);
+    sendResponse({ success: true, mode });
+    return true;
+  }
+  if (request.action === "resetViewerAuto") {
+    resetViewerAutoScope(
+      request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+    );
+    sendResponse({ success: true });
+    return true;
+  }
+  if (request.action === "resetViewerAutoToSaved") {
+    applyResolvedViewerAutoFromStore();
+    sendResponse({ success: true });
+    return true;
+  }
+  if (request.action === "getViewerAuto") {
+    return replyFromVideoFrame(sendResponse, () => ({
+      mode: S.viewerAuto,
+      scope: S.viewerAutoScope,
+      channel: currentChannel(),
+      channelName: currentChannelName(),
+    }));
+  }
+  if (request.action === "setViewerState") {
+    const mode = viewerAutoFromRequest(request);
+    setViewerState(mode);
+    return replyFromVideoFrame(sendResponse, () => ({
+      success: true,
+      mode: viewerFormat() ?? "off",
+    }));
+  }
+  if (request.action === "getViewerState") {
+    return replyFromVideoFrame(sendResponse, () => ({ mode: viewerFormat() ?? "off" }));
+  }
+  if (request.action === "setViewerFit") {
+    const mode = setViewerFitMode(request.mode);
+    return replyFromVideoFrame(sendResponse, () => ({ success: true, mode }));
+  }
+  if (request.action === "rememberViewerFit") {
+    const mode = viewerFitFromRequest(request);
+    if (request.scope === "channel") persistChannelViewerFit(mode);
+    else if (request.scope === "global") persistGlobalViewerFit(mode);
+    else persistSiteViewerFit(mode);
+    sendResponse({ success: true, mode });
+    return true;
+  }
+  if (request.action === "resetViewerFit") {
+    resetViewerFitScope(
+      request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+    );
+    sendResponse({ success: true });
+    return true;
+  }
+  if (request.action === "resetViewerFitToSaved") {
+    applyResolvedViewerFitFromStore();
+    sendResponse({ success: true });
+    return true;
+  }
+  if (request.action === "getViewerFit") {
+    return replyFromVideoFrame(sendResponse, () => ({
+      mode: S.viewerFit,
+      scope: S.viewerFitScope,
       channel: currentChannel(),
       channelName: currentChannelName(),
     }));

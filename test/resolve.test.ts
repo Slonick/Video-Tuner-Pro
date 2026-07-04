@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resolveSpeed, resolveSyncTarget, resolveAutoSlow } from "../src/content/core/resolve.js";
+import {
+  resolveSpeed,
+  resolveSyncTarget,
+  resolveAutoSlow,
+  resolveViewerAuto,
+  resolveViewerFit,
+} from "../src/content/core/resolve.js";
 
 // The priority chain (below the manual in-tab override, which the caller owns):
 // channel > site > global > 100%.
@@ -133,5 +139,70 @@ describe("resolveAutoSlow", () => {
       target: 6,
       scope: null,
     });
+  });
+});
+
+describe("resolveViewerAuto", () => {
+  const D = "youtube.com";
+
+  it("a channel mode wins over site + global", () => {
+    expect(resolveViewerAuto(["UC1"], D, { [D]: "off" }, { UC1: "theater" }, "normal")).toEqual({
+      mode: "theater",
+      scope: "channel",
+    });
+  });
+
+  it("an explicit channel off overrides a broader mode", () => {
+    expect(resolveViewerAuto(["UC1"], D, { [D]: "normal" }, { UC1: "off" }, "theater")).toEqual({
+      mode: "off",
+      scope: "channel",
+    });
+  });
+
+  it("falls to the site mode when no channel entry", () => {
+    expect(resolveViewerAuto(["UC1"], D, { [D]: "normal" }, {}, "theater")).toEqual({
+      mode: "normal",
+      scope: "site",
+    });
+  });
+
+  it("falls to the global mode when no channel/site entry", () => {
+    expect(resolveViewerAuto([], D, {}, {}, "theater")).toEqual({
+      mode: "theater",
+      scope: "global",
+    });
+  });
+
+  it("defaults to off with nothing saved", () => {
+    expect(resolveViewerAuto([], D, {}, {}, undefined)).toEqual({ mode: "off", scope: null });
+  });
+});
+
+describe("resolveViewerFit", () => {
+  const D = "youtube.com";
+
+  it("a channel mode wins over site + global", () => {
+    expect(resolveViewerFit(["UC1"], D, { [D]: "cover" }, { UC1: "fill" }, "contain")).toEqual({
+      mode: "fill",
+      scope: "channel",
+    });
+  });
+
+  it("falls to the site mode when no channel entry", () => {
+    expect(resolveViewerFit(["UC1"], D, { [D]: "cover" }, {}, "fill")).toEqual({
+      mode: "cover",
+      scope: "site",
+    });
+  });
+
+  it("falls to the global mode when no channel/site entry", () => {
+    expect(resolveViewerFit([], D, {}, {}, "fill")).toEqual({
+      mode: "fill",
+      scope: "global",
+    });
+  });
+
+  it("defaults to contain with nothing saved", () => {
+    expect(resolveViewerFit([], D, {}, {}, undefined)).toEqual({ mode: "contain", scope: null });
   });
 });

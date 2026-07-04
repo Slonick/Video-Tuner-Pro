@@ -26,6 +26,7 @@ let onContextDead: () => void = () => {};
 let isOwnNode: (n: Node) => boolean = () => false;
 
 function addMedia(el: Element): boolean {
+  if (isOwnNode(el)) return false;
   if (el instanceof HTMLVideoElement) {
     if (trackedVideos.has(el)) return false;
     trackedVideos.add(el);
@@ -61,6 +62,7 @@ function handleShadow(el: Element): boolean {
 function scanTree(root: ParentNode): boolean {
   let added = false;
   if (root instanceof Element) {
+    if (isOwnNode(root)) return false;
     if (addMedia(root)) added = true;
     if (handleShadow(root)) added = true;
   }
@@ -133,7 +135,7 @@ export function collectVideos(): HTMLVideoElement[] {
   if (!tracking) scanTree(document);
   const out: HTMLVideoElement[] = [];
   for (const v of trackedVideos) {
-    if (v.isConnected) out.push(v);
+    if (v.isConnected && !isOwnNode(v)) out.push(v);
     else trackedVideos.delete(v);
   }
   return out;
@@ -144,7 +146,7 @@ export function collectAudios(): HTMLAudioElement[] {
   if (!tracking) scanTree(document);
   const out: HTMLAudioElement[] = [];
   for (const a of trackedAudios) {
-    if (a.isConnected) out.push(a);
+    if (a.isConnected && !isOwnNode(a)) out.push(a);
     else trackedAudios.delete(a);
   }
   return out;

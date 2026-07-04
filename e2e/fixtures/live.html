@@ -29,7 +29,18 @@
         ctx.fillStyle = "#" + ((Math.random() * 0xffffff) | 0).toString(16).padStart(6, "0");
         ctx.fillRect(0, 0, 160, 120);
       }, 100);
-      document.getElementById("v").srcObject = c.captureStream(10);
+      const v = document.getElementById("v");
+      v.srcObject = c.captureStream(10);
+      v.__vtpFakeHls = {
+        media: v,
+        currentLevel: 1,
+        nextLevel: 1,
+        loadLevel: 1,
+        levels: [
+          { height: 720, name: "720p60" },
+          { height: 1440, name: "1440p60" },
+        ],
+      };
     </script>
   </body>
 </html>

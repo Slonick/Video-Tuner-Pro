@@ -40,7 +40,17 @@ describe("REGISTRY_KEYS", () => {
     expect(REGISTRY_KEYS).toContain("overlayButton");
     expect(REGISTRY_KEYS).toContain("audioCompGain");
     // Cross-scope / per-domain keys must NOT be in the registry.
-    for (const k of ["domains", "syncTargets", "autoSlowSites", "badgePos", "overlayBtnPos"]) {
+    for (const k of [
+      "domains",
+      "syncTargets",
+      "autoSlowSites",
+      "viewerAutoSites",
+      "viewerAutoChannels",
+      "viewerFitSites",
+      "viewerFitChannels",
+      "badgePos",
+      "overlayBtnPos",
+    ]) {
       expect(REGISTRY_KEYS).not.toContain(k);
     }
   });

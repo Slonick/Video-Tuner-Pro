@@ -13,16 +13,22 @@ import {
   hasNativeSponsorBlock,
   SPONSOR_COLORS,
 } from "./markers.js";
+import { api } from "./platform/browser.js";
 import { i18n } from "./platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
+import { isLive } from "./live/detection.js";
+import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
 
 export type ViewerFormat = "normal" | "theater";
+export const VIEWER_LAYOUT_EVENT = "vtp-viewer-layout";
 
 const ATTR = "data-vtp-viewer"; // on <html>: "normal" | "theater" — state marker
 const OVERLAY = "data-vtp-viewer-overlay";
 const FRACTION = 0.86; // the normal box's share of the viewport
 const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
+const VIEWER_ANIM_MS = 420;
+const VIEWER_BACKDROP_VIDEO_ANIM_MS = 680;
 
 // The overlay sits under the speed badge (…646) and the launcher FAB with its
 // radial menu (…647), so both remain usable over the popped-out video.
@@ -32,6 +38,9 @@ let fmt: ViewerFormat | null = null;
 let video: HTMLVideoElement | null = null; // the page media element we control
 let surfaceVideo: HTMLVideoElement | null = null; // the overlay video we render/style
 let overlay: HTMLDivElement | null = null;
+let backdropEl: HTMLDivElement | null = null;
+let backdropVideo: HTMLVideoElement | null = null;
+let surfaceShell: HTMLDivElement | null = null;
 let holder: Comment | null = null; // marks the video's original DOM spot
 let prevCss = ""; // the video's inline style before we took over
 let prevControls = false;
@@ -60,11 +69,13 @@ let pendingChapters: { start: number; title: string }[] = [];
 // a plain style write drops even !important declarations. Re-assert on sight.
 let styleGuard: MutationObserver | null = null;
 let desiredCss = "";
+let desiredShellCss = "";
 let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boolean } | null =
   null;
 let mirrored = false;
 let mirrorStream: MediaStream | null = null;
-let mirrorRecaptureTimer: ReturnType<typeof setTimeout> | null = null;
+let sourceRect: DOMRect | null = null;
+let layoutPaused = false;
 
 let fitMenu: HTMLDivElement | null = null;
 let qualityWrap: HTMLSpanElement | null = null;
@@ -73,6 +84,9 @@ let qualityLabelEl: HTMLSpanElement | null = null;
 let qualityMenu: HTMLDivElement | null = null;
 let qualityReq = 0;
 let qualityVideoId = "";
+let pendingQuality: QualityOption | null = null;
+let pendingQualityUntil = 0;
+let lastTimelineKind: Timeline["kind"] | null = null;
 
 interface QualityOption {
   id: string;
@@ -99,9 +113,355 @@ try {
 }
 
 document.addEventListener(CLOSE_EVENT, () => exitViewer());
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (!fmt) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      exitViewer();
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const format =
+      e.code === S.keymap.viewer || e.code === "KeyV"
+        ? "normal"
+        : e.code === S.keymap.theater || e.code === "KeyT"
+          ? "theater"
+          : null;
+    if (!format) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    toggleViewer(format);
+  },
+  true,
+);
 
 export function viewerFormat(): ViewerFormat | null {
   return fmt;
+}
+
+export function setViewerState(format: ViewerFormat | "off"): void {
+  if (format === "off") {
+    exitViewer();
+    return;
+  }
+  if (fmt === format) return;
+  if (fmt) setFormat(format);
+  else void enter(format);
+}
+
+export function viewerAnchorVideo(): HTMLElement | null {
+  if (!fmt) return null;
+  if (surfaceShell?.isConnected) return surfaceShell;
+  return surfaceVideo?.isConnected ? surfaceVideo : null;
+}
+
+export function viewerLayoutPaused(): boolean {
+  return layoutPaused;
+}
+
+function notifyViewerState(): void {
+  try {
+    void api.runtime.sendMessage({ action: "viewerStateChanged", mode: fmt ?? "off" });
+  } catch (e) {}
+}
+
+function notifyViewerLayout(): void {
+  if (layoutPaused) return;
+  document.dispatchEvent(new Event(VIEWER_LAYOUT_EVENT));
+  const raf =
+    window.requestAnimationFrame ?? ((fn: FrameRequestCallback) => window.setTimeout(fn, 0));
+  raf(() => document.dispatchEvent(new Event(VIEWER_LAYOUT_EVENT)));
+}
+
+function applyOverlayBackdrop(): void {
+  if (!backdropEl || !fmt) return;
+  backdropEl.style.setProperty("--glass-opacity", String(S.glassOpacity));
+  if (fmt === "theater") {
+    backdropEl.style.background = "rgba(0, 0, 0, 0.92)";
+    backdropEl.style.removeProperty("-webkit-backdrop-filter");
+    backdropEl.style.backdropFilter = "";
+  } else {
+    backdropEl.style.background = "rgb(28 28 32 / calc(0.24 * var(--glass-opacity,1)))";
+    if (S.viewerBackdropVideo && mirrorStream) {
+      backdropEl.style.removeProperty("-webkit-backdrop-filter");
+      backdropEl.style.backdropFilter = "";
+    } else {
+      ensureGlassFilter(document);
+      backdropEl.style.setProperty(
+        "-webkit-backdrop-filter",
+        `${GLASS_REFRACTION}blur(14px) saturate(180%) brightness(1.04)`,
+      );
+      backdropEl.style.backdropFilter = `${GLASS_REFRACTION}blur(14px) saturate(180%) brightness(1.04)`;
+    }
+  }
+  syncViewerBackdropVideo();
+}
+
+function removeBackdropVideo(): void {
+  backdropVideo?.pause();
+  backdropVideo?.remove();
+  if (backdropVideo) backdropVideo.srcObject = null;
+  backdropVideo = null;
+}
+
+export function syncViewerBackdropVideo(): void {
+  if (!overlay || !backdropEl || fmt !== "normal" || !S.viewerBackdropVideo || !mirrorStream) {
+    removeBackdropVideo();
+    return;
+  }
+  if (!backdropVideo) {
+    backdropVideo = document.createElement("video");
+    backdropVideo.srcObject = mirrorStream;
+    backdropVideo.muted = true;
+    backdropVideo.playsInline = true;
+    backdropVideo.autoplay = true;
+    backdropVideo.controls = false;
+    backdropVideo.setAttribute("aria-hidden", "true");
+    backdropVideo.setAttribute("data-vtp-viewer-backdrop-video", "");
+    Object.assign(backdropVideo.style, {
+      position: "absolute",
+      inset: "0",
+      width: "100%",
+      height: "100%",
+      transform: "none",
+      transformOrigin: "0 0",
+      borderRadius: "0",
+      objectFit: "cover",
+      filter: "blur(22px) saturate(135%) brightness(0.9)",
+      opacity: backdropEl.style.opacity === "0" ? "0" : "1",
+      pointerEvents: "none",
+      willChange: "transform, opacity",
+      zIndex: "0",
+    } as Partial<CSSStyleDeclaration>);
+    overlay.insertBefore(backdropVideo, backdropEl);
+  }
+  backdropVideo.play()?.catch(() => {});
+}
+
+function canAnimate(el: Element | null): el is Element & { animate: Element["animate"] } {
+  return !!el && typeof el.animate === "function";
+}
+
+function visibleRect(r: DOMRect | null): r is DOMRect {
+  return !!r && r.width > 1 && r.height > 1;
+}
+
+function animateBackdropLayer(
+  el: HTMLElement | null,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions,
+  finalOpacity: string,
+): Animation | null {
+  if (!el) return null;
+  if (!canAnimate(el)) {
+    (el as HTMLElement).style.opacity = finalOpacity;
+    return null;
+  }
+  const anim = el.animate(keyframes, options);
+  anim.onfinish = () => {
+    if (el.isConnected) el.style.opacity = finalOpacity;
+  };
+  return anim;
+}
+
+function backdropVideoTransformFrame(r: DOMRect, opacity: number): Keyframe {
+  const vw = Math.max(window.innerWidth, 1);
+  const vh = Math.max(window.innerHeight, 1);
+  return {
+    transform: `translate(${r.left}px, ${r.top}px) scale(${r.width / vw}, ${r.height / vh})`,
+    borderRadius: "0px",
+    opacity,
+  };
+}
+
+function viewportFrame(opacity: number): Keyframe {
+  return {
+    transform: "none",
+    borderRadius: "0px",
+    opacity,
+  };
+}
+
+function setBackdropVideoViewport(opacity = "1"): void {
+  if (!backdropVideo) return;
+  Object.assign(backdropVideo.style, {
+    transform: "none",
+    borderRadius: "0",
+    opacity,
+  } as Partial<CSSStyleDeclaration>);
+}
+
+function animateBackdropVideoIn(first: DOMRect | null): Animation | null {
+  if (!canAnimate(backdropVideo) || !visibleRect(first)) {
+    setBackdropVideoViewport("1");
+    return null;
+  }
+  backdropVideo.style.transform = backdropVideoTransformFrame(first, 0).transform as string;
+  backdropVideo.style.opacity = "0";
+  backdropVideo.getBoundingClientRect();
+  const anim = backdropVideo.animate([backdropVideoTransformFrame(first, 0), viewportFrame(1)], {
+    duration: VIEWER_BACKDROP_VIDEO_ANIM_MS,
+    easing: "cubic-bezier(0.2, 0, 0, 1)",
+    fill: "forwards",
+  });
+  anim.onfinish = () => setBackdropVideoViewport("1");
+  anim.oncancel = () => setBackdropVideoViewport("1");
+  return anim;
+}
+
+function animateBackdropVideoOut(target: DOMRect | null): Animation | null {
+  if (!canAnimate(backdropVideo)) return null;
+  if (!visibleRect(target)) {
+    return backdropVideo.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: VIEWER_BACKDROP_VIDEO_ANIM_MS,
+      easing: "cubic-bezier(0.4, 0, 1, 1)",
+      fill: "forwards",
+    });
+  }
+  setBackdropVideoViewport("1");
+  backdropVideo.getBoundingClientRect();
+  const anim = backdropVideo.animate([viewportFrame(1), backdropVideoTransformFrame(target, 0)], {
+    duration: VIEWER_BACKDROP_VIDEO_ANIM_MS,
+    easing: "cubic-bezier(0.4, 0, 1, 1)",
+    fill: "forwards",
+  });
+  anim.onfinish = () => {
+    if (backdropVideo) backdropVideo.style.opacity = "0";
+  };
+  return anim;
+}
+
+function animateBackdropIn(delay = 190): void {
+  const keyframes: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
+  const options: KeyframeAnimationOptions = {
+    delay,
+    duration: VIEWER_ANIM_MS - Math.min(delay, VIEWER_ANIM_MS - 80),
+    easing: "cubic-bezier(0.2, 0, 0, 1)",
+    fill: "forwards",
+  };
+  backdropEl?.style.setProperty("opacity", "0");
+  animateBackdropLayer(backdropEl, keyframes, options, "1");
+  animateBackdropVideoIn(sourceRect);
+}
+
+function animateBackdropOut(target: DOMRect | null): Animation | null {
+  const keyframes: Keyframe[] = [{ opacity: 1 }, { opacity: 0 }];
+  const options: KeyframeAnimationOptions = {
+    duration: VIEWER_ANIM_MS,
+    easing: "cubic-bezier(0.4, 0, 1, 1)",
+    fill: "forwards",
+  };
+  const bgAnim = animateBackdropVideoOut(target);
+  return animateBackdropLayer(backdropEl, keyframes, options, "0") ?? bgAnim;
+}
+
+function rectFrame(r: DOMRect, radius = "0px"): Keyframe {
+  return {
+    left: `${r.left}px`,
+    top: `${r.top}px`,
+    width: `${r.width}px`,
+    height: `${r.height}px`,
+    transform: "none",
+    borderRadius: radius,
+  };
+}
+
+function animateSurfaceFrom(first: DOMRect | null): Animation | null {
+  const shell = surfaceShell;
+  if (!canAnimate(shell) || !visibleRect(first)) return null;
+  const last = shell.getBoundingClientRect();
+  if (!visibleRect(last)) return null;
+  const finalCss = desiredShellCss;
+  const finalRadius = shell.style.borderRadius || "0px";
+  layoutPaused = true;
+  if (bar) {
+    bar.style.opacity = "0";
+    bar.style.pointerEvents = "none";
+  }
+  Object.assign(shell.style, {
+    left: `${first.left}px`,
+    top: `${first.top}px`,
+    width: `${first.width}px`,
+    height: `${first.height}px`,
+    transform: "none",
+    borderRadius: "0px",
+  } as Partial<CSSStyleDeclaration>);
+  shell.getBoundingClientRect();
+  const anim = shell.animate([rectFrame(first, "0px"), rectFrame(last, finalRadius)], {
+    duration: VIEWER_ANIM_MS,
+    easing: "cubic-bezier(0.2, 0, 0, 1)",
+  });
+  let settled = false;
+  const settle = () => {
+    if (settled || surfaceShell !== shell) return;
+    settled = true;
+    shell.style.cssText = finalCss;
+    layoutPaused = false;
+    layoutBar();
+    notifyViewerLayout();
+    showBar();
+  };
+  anim.onfinish = settle;
+  window.setTimeout(settle, VIEWER_ANIM_MS + 80);
+  return anim;
+}
+
+function animateSurfaceTo(target: DOMRect | null): Animation | null {
+  const shell = surfaceShell;
+  if (!canAnimate(shell)) return null;
+  const first = shell.getBoundingClientRect();
+  if (!visibleRect(first) || !visibleRect(target)) {
+    return shell.animate(
+      [
+        { opacity: 1, transform: shell.style.transform || "none" },
+        { opacity: 0, transform: `${shell.style.transform || "none"} scale(.96)` },
+      ],
+      {
+        duration: VIEWER_ANIM_MS,
+        easing: "cubic-bezier(0.4, 0, 1, 1)",
+        fill: "forwards",
+      },
+    );
+  }
+  const startRadius = shell.style.borderRadius || "0px";
+  Object.assign(shell.style, {
+    left: `${first.left}px`,
+    top: `${first.top}px`,
+    width: `${first.width}px`,
+    height: `${first.height}px`,
+    transform: "none",
+    borderRadius: startRadius,
+    boxShadow: shell.style.boxShadow,
+    overflow: "hidden",
+    background: "#000",
+    zIndex: "1",
+  } as Partial<CSSStyleDeclaration>);
+  shell.getBoundingClientRect();
+  const anim = shell.animate([rectFrame(first, startRadius), rectFrame(target, "0px")], {
+    duration: VIEWER_ANIM_MS,
+    easing: "cubic-bezier(0.4, 0, 1, 1)",
+    fill: "forwards",
+  });
+  return anim;
+}
+
+function waitAnimation(anim: Animation | null): Promise<void> {
+  if (!anim) return Promise.resolve();
+  const finish = anim.onfinish;
+  const cancel = anim.oncancel;
+  return new Promise((resolve) => {
+    anim.onfinish = (e) => {
+      if (typeof finish === "function") finish.call(anim, e);
+      resolve();
+    };
+    anim.oncancel = (e) => {
+      if (typeof cancel === "function") cancel.call(anim, e);
+      resolve();
+    };
+  });
 }
 
 // True if a node belongs to the viewer's own DOM — the media observer ignores
@@ -124,7 +484,8 @@ export function fmtTime(s: number): string {
 type Timeline =
   | { kind: "vod"; start: 0; pos: number; len: number }
   | { kind: "dvr"; start: number; pos: number; len: number }
-  | { kind: "live" };
+  | { kind: "live" }
+  | { kind: "loading"; pos: number };
 
 const MAX_REAL_DURATION = 60 * 60 * 24 * 30;
 
@@ -143,7 +504,8 @@ function mediaTimeline(v: HTMLVideoElement): Timeline {
       return { kind: "dvr", start, pos, len };
     }
   }
-  return { kind: "live" };
+  if (isLive(v)) return { kind: "live" };
+  return { kind: "loading", pos: v.currentTime };
 }
 
 // Size the video for the current format. Theater fills the overlay; normal is
@@ -156,33 +518,48 @@ function mediaTimeline(v: HTMLVideoElement): Timeline {
 const VIDEO_RESET =
   "margin:0 !important;padding:0 !important;border:0 !important;" +
   "max-width:none !important;max-height:none !important;" +
-  "min-width:0 !important;min-height:0 !important;background:#000 !important;";
+  "min-width:0 !important;min-height:0 !important;background:#000 !important;" +
+  "z-index:1 !important;";
 
 // How the picture fills its box: letterboxed, cropped to the edges, or
 // stretched (for squeezing 4:3 out to the borders). Picked from a bar menu,
 // sticky for the tab's lifetime.
 const FIT_MODES = ["contain", "cover", "fill"] as const;
-type FitMode = (typeof FIT_MODES)[number];
-let fitMode: FitMode = "contain";
-const FIT_LABEL: Record<FitMode, [string, string]> = {
+const FIT_LABEL: Record<ViewerFitMode, [string, string]> = {
   contain: ["viewerFitContain", "Fit"],
   cover: ["viewerFitCover", "Crop"],
   fill: ["viewerFitFill", "Stretch"],
 };
-const fitLabel = (m: FitMode) => i18n(FIT_LABEL[m][0]) || FIT_LABEL[m][1];
+const fitLabel = (m: ViewerFitMode) => i18n(FIT_LABEL[m][0]) || FIT_LABEL[m][1];
+
+export function viewerFitMode(): ViewerFitMode {
+  return S.viewerFit;
+}
+
+export function setViewerFitMode(mode: unknown): ViewerFitMode {
+  S.viewerFit = normalizeViewerFit(mode);
+  sizeVideo();
+  return S.viewerFit;
+}
 
 function sizeVideo(): void {
   const surface = surfaceVideo ?? video;
-  if (!fmt || !surface) return;
-  const fit = `object-fit:${fitMode} !important;`;
+  const shell = surfaceShell;
+  if (!fmt || !surface || !shell) return;
+  const fit = `object-fit:${S.viewerFit} !important;`;
+  surface.style.cssText =
+    "position:absolute !important;inset:0 !important;" +
+    "width:100% !important;height:100% !important;" +
+    "transform:none !important;border-radius:inherit !important;box-shadow:none !important;" +
+    fit +
+    VIDEO_RESET;
   if (fmt === "theater") {
     normalBox = null;
-    surface.style.cssText =
+    shell.style.cssText =
       "position:absolute !important;inset:0 !important;" +
       "width:100% !important;height:100% !important;" +
       "transform:none !important;border-radius:0 !important;box-shadow:none !important;" +
-      fit +
-      VIDEO_RESET;
+      "overflow:hidden !important;background:#000 !important;z-index:1 !important;";
   } else {
     const mediaWidth = surface.videoWidth || video?.videoWidth || 0;
     const mediaHeight = surface.videoHeight || video?.videoHeight || 0;
@@ -205,36 +582,59 @@ function sizeVideo(): void {
     }
     if (!normalBox) return;
     const box = normalBox;
-    surface.style.cssText =
+    shell.style.cssText =
       "position:absolute !important;left:50% !important;top:50% !important;" +
       "transform:translate(-50%,-50%) !important;" +
       `width:${box.w}px !important;height:${box.h}px !important;` +
       "border-radius:12px !important;box-shadow:0 24px 80px rgba(0,0,0,0.55) !important;" +
-      fit +
-      VIDEO_RESET;
+      "overflow:hidden !important;background:#000 !important;z-index:1 !important;";
   }
   // The browser normalizes cssText on write — keep the normalized form, so the
   // style guard's comparison (and re-assert) converges instead of looping.
   desiredCss = surface.style.cssText;
+  desiredShellCss = shell.style.cssText;
   layoutBar();
 }
 
 // The bar hugs the video's bottom edge, clamped to a sane width.
 function layoutBar(): void {
-  const surface = surfaceVideo ?? video;
+  const surface = surfaceShell ?? surfaceVideo ?? video;
   if (!bar || !surface) return;
   const r = surface.getBoundingClientRect();
-  const w = Math.min(Math.max(r.width - 32, 280), 760);
+  const timeline = video ? mediaTimeline(video) : null;
+  const live = timeline?.kind === "live";
+  bar.classList.toggle("live", live);
+  let w = Math.min(Math.max(r.width - 32, 280), 760);
+  if (live) {
+    const visible = Array.from(bar.children).filter((el) => {
+      return getComputedStyle(el).display !== "none";
+    });
+    const gap = 6;
+    const padding = 20;
+    const content = visible.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0);
+    const max = qualityWrap?.style.display === "none" ? 320 : 380;
+    w = Math.min(
+      Math.max(Math.ceil(content + gap * Math.max(visible.length - 1, 0) + padding), 260),
+      max,
+    );
+  }
   bar.style.width = Math.round(w) + "px";
   bar.style.left = Math.round(r.left + r.width / 2) + "px";
   bar.style.bottom = Math.max(Math.round(window.innerHeight - r.bottom + 14), 14) + "px";
 }
 
 function setFormat(f: ViewerFormat): void {
+  const surface = surfaceVideo ?? video;
+  const firstRect = fmt && fmt !== f && surface ? surface.getBoundingClientRect() : null;
   fmt = f;
   document.documentElement.setAttribute(ATTR, f);
   fmtBtn?.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
+  applyOverlayBackdrop();
   sizeVideo();
+  if (firstRect) animateSurfaceFrom(firstRect);
+  overlay?.focus({ preventScroll: true });
+  notifyViewerState();
+  notifyViewerLayout();
 }
 
 function showBar(): void {
@@ -263,8 +663,12 @@ function syncVolume(): void {
 function syncTime(): void {
   if (!video) return;
   const timeline = mediaTimeline(video);
+  const prevTimelineKind = lastTimelineKind;
+  lastTimelineKind = timeline.kind;
+  bar?.classList.toggle("live", timeline.kind === "live");
+  const prevSeekDisplay = seekWrapEl?.style.display;
   if (seekEl) {
-    const seekable = timeline.kind !== "live";
+    const seekable = timeline.kind === "vod" || timeline.kind === "dvr";
     if (seekWrapEl) seekWrapEl.style.display = seekable ? "flex" : "none";
     seekEl.style.display = seekable ? "" : "none";
     if (seekable && !seeking && timeline.len > 0) {
@@ -275,7 +679,12 @@ function syncTime(): void {
     timeEl.textContent =
       timeline.kind === "live"
         ? "LIVE"
-        : `${fmtTime(timeline.pos)} / ${fmtTime(timeline.len)}`;
+        : timeline.kind === "loading"
+          ? fmtTime(timeline.pos)
+          : `${fmtTime(timeline.pos)} / ${fmtTime(timeline.len)}`;
+  }
+  if (timeline.kind !== prevTimelineKind || seekWrapEl?.style.display !== prevSeekDisplay) {
+    layoutBar();
   }
 }
 
@@ -353,31 +762,58 @@ function qualityRequest(
         current: typeof d.current === "string" ? d.current : "auto",
       });
     };
-    const timer = setTimeout(() => done({ options: [], current: "auto" }), 1200);
+    const timer = setTimeout(() => done({ options: [], current: "auto" }), 4000);
     document.addEventListener("vtp-quality-response", onResponse);
     const root = document.documentElement;
     root.setAttribute(QUALITY_REQ_ATTR, requestId);
     root.setAttribute(QUALITY_VIDEO_ATTR, videoId);
     if (qualityId) root.setAttribute(QUALITY_PICK_ATTR, qualityId);
     else root.removeAttribute(QUALITY_PICK_ATTR);
-    document.dispatchEvent(new CustomEvent(type, { detail: { requestId, videoId, qualityId } }));
+    video?.dispatchEvent(
+      new CustomEvent(type, {
+        bubbles: true,
+        composed: true,
+        detail: { requestId, videoId, qualityId },
+      }),
+    );
   });
 }
 
 function setQualityVisible(visible: boolean): void {
   if (!qualityWrap) return;
   qualityWrap.style.display = visible ? "block" : "none";
+  layoutBar();
+}
+
+function qualityButtonLabel(label: string): string {
+  const clean = label.trim();
+  const paren = clean.match(/\((\d{3,4})p(?:\d+)?\)/i);
+  const direct = clean.match(/(\d{3,4})p(?:\d+)?/i);
+  const height = paren?.[1] || direct?.[1];
+  if (height) return `${height}p`;
+  return (
+    clean
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || clean
+  );
 }
 
 function renderQuality(state: QualityState): void {
   const options = state.options.filter((o) => o && o.id && o.label);
-  const selected = options.find((o) => o.current) ?? options.find((o) => o.id === state.current);
+  const confirmed = options.find((o) => o.current) ?? options.find((o) => o.id === state.current);
+  const pending =
+    pendingQuality && Date.now() < pendingQualityUntil
+      ? options.find((o) => o.id === pendingQuality?.id)
+      : null;
+  const selected = pending && confirmed?.id !== pending.id ? pending : (confirmed ?? pending);
   if (!options.length || options.length < 2) {
     setQualityVisible(false);
     return;
   }
+  if (confirmed && confirmed.id !== "auto" && !pending) pendingQuality = confirmed;
   setQualityVisible(true);
-  if (qualityLabelEl) qualityLabelEl.textContent = selected?.label || "Auto";
+  if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(selected?.label || "Auto");
   if (!qualityMenu) return;
   qualityMenu.textContent = "";
   for (const opt of options) {
@@ -388,9 +824,20 @@ function renderQuality(state: QualityState): void {
     if (opt.current || opt.id === state.current) item.setAttribute("aria-current", "true");
     item.addEventListener("click", async () => {
       qualityMenu?.classList.remove("open");
+      pendingQuality = opt;
+      pendingQualityUntil = Date.now() + 12_000;
+      if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(opt.label);
       const next = await qualityRequest("vtp-quality-set", opt.id);
-      renderQuality(next);
-      scheduleMirrorRecapture();
+      pendingQuality = null;
+      pendingQualityUntil = 0;
+      renderQuality({
+        ...next,
+        current: opt.id,
+        options: next.options.map((o) => ({ ...o, current: o.id === opt.id })),
+      });
+      refreshMirrorStream();
+      window.setTimeout(() => refreshMirrorStream(), 700);
+      window.setTimeout(() => refreshQuality(), 700);
     });
     qualityMenu.appendChild(item);
   }
@@ -418,13 +865,15 @@ function mountBar(): void {
     // The bar mirrors the popup's glass cards: same tint/blur family, rounded
     // rectangle buttons with a quiet hover, 13px system type.
     `.bar{position:fixed;transform:translateX(-50%);display:flex;align-items:center;gap:12px;` +
+    `box-sizing:border-box;max-width:calc(100vw - 32px);min-width:0;` +
     `padding:12px 16px;border-radius:16px;color:#fff;` +
     `background:rgb(20 20 22 / calc(0.4 * var(--glass-opacity,1)));` +
     `box-shadow:0 0 0 1px rgba(255,255,255,0.14),0 12px 40px rgba(0,0,0,0.4);` +
-    `-webkit-backdrop-filter:blur(10px) saturate(180%) brightness(1.04);` +
-    `backdrop-filter:blur(10px) saturate(180%) brightness(1.04)${GLASS_REFRACTION};` +
+    `-webkit-backdrop-filter:${GLASS_REFRACTION}blur(10px) saturate(180%) brightness(1.04);` +
+    `backdrop-filter:${GLASS_REFRACTION}blur(10px) saturate(180%) brightness(1.04);` +
     `font:13px/1.2 -apple-system,system-ui,sans-serif;` +
     `opacity:0;pointer-events:none;transition:opacity .25s;z-index:1}` +
+    `.bar.live{gap:6px;padding:8px 10px}` +
     `button{position:relative;width:32px;height:32px;flex:none;padding:0;border:0;border-radius:10px;` +
     `cursor:pointer;color:#fff;background:transparent;display:flex;align-items:center;justify-content:center;` +
     `transition:background .15s}` +
@@ -432,10 +881,12 @@ function mountBar(): void {
     `button:active{background:rgba(255,255,255,0.2)}` +
     `.ico{position:absolute;inset:0;display:grid;place-items:center}` +
     `.ico svg{display:block}` +
-    `.qbtn{width:auto;min-width:32px;max-width:86px;padding:0 8px;gap:5px}` +
+    `.qbtn{width:auto;min-width:32px;max-width:104px;padding:0 9px;gap:5px}` +
     `.qbtn .ico{position:static;inset:auto;flex:none}` +
-    `.qbtn-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;` +
+    `.qbtn-label{overflow:hidden;text-overflow:clip;white-space:nowrap;font-size:12px;` +
     `font-variant-numeric:tabular-nums}` +
+    `.bar.live .qbtn{max-width:82px;padding:0 7px}` +
+    `.bar.live .qbtn-label{max-width:40px}` +
     `button .ico-b{visibility:hidden}` +
     `button[aria-pressed="true"] .ico-a{visibility:hidden}` +
     `button[aria-pressed="true"] .ico-b{visibility:visible}` +
@@ -451,7 +902,7 @@ function mountBar(): void {
     `input[type="range"]::-moz-range-track{height:6px;border-radius:3px;background:rgba(255,255,255,0.22)}` +
     `input[type="range"]::-moz-range-thumb{width:20px;height:16px;border-radius:8px;background:#fff;` +
     `box-shadow:0 1px 3px rgba(0,0,0,0.4);border:0}` +
-    `.seekwrap{position:relative;flex:1;min-width:60px;display:flex;align-items:center}` +
+    `.seekwrap{position:relative;flex:1 1 120px;min-width:0;display:flex;align-items:center}` +
     `.seek{flex:1;min-width:0;position:relative;z-index:1}` +
     // Chapter boundaries read like YouTube's: dark notches CUT INTO the groove
     // (hover shows the chapter title); sponsor segments tint the groove itself.
@@ -460,12 +911,13 @@ function mountBar(): void {
     `.mark-tick{position:absolute;top:50%;transform:translateY(-50%);height:8px;width:2.5px;` +
     `background:rgba(0,0,0,0.65);pointer-events:auto;z-index:2}` +
     `.vol{width:64px;flex:none}` +
+    `.bar.live .vol{width:44px}` +
     `.time{flex:none;white-space:nowrap;opacity:.9;font-variant-numeric:tabular-nums}` +
-    `.qwrap{position:relative;flex:none}` +
+    `.qwrap{position:relative;flex:none;z-index:3}` +
     `.qwrap[style*="display: none"]{display:none!important}` +
     `.qmenu{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:none;` +
     `flex-direction:column;gap:2px;padding:6px;border-radius:10px;min-width:92px;` +
-    `max-height:40vh;overflow:auto;background:rgb(20 20 22 / 0.9);` +
+    `max-height:40vh;overflow:auto;background:rgb(20 20 22 / 0.9);pointer-events:auto;z-index:4;` +
     `box-shadow:0 0 0 1px rgba(255,255,255,0.14),0 12px 40px rgba(0,0,0,0.4)}` +
     `.qmenu.open{display:flex}` +
     `.qitem{padding:6px 10px;border:0;border-radius:6px;cursor:pointer;white-space:nowrap;` +
@@ -501,7 +953,7 @@ function mountBar(): void {
   seekEl.addEventListener("input", () => {
     if (!video) return;
     const timeline = mediaTimeline(video);
-    if (timeline.kind === "live") return;
+    if (timeline.kind !== "vod" && timeline.kind !== "dvr") return;
     video.currentTime = timeline.start + (Number(seekEl!.value) / 1000) * timeline.len;
     syncTime();
   });
@@ -540,11 +992,10 @@ function mountBar(): void {
       item.type = "button";
       item.className = "qitem";
       item.textContent = fitLabel(m);
-      if (m === fitMode) item.setAttribute("aria-current", "true");
+      if (m === S.viewerFit) item.setAttribute("aria-current", "true");
       item.addEventListener("click", () => {
-        fitMode = m;
+        setViewerFitMode(m);
         fitMenu?.classList.remove("open");
-        sizeVideo();
       });
       fitMenu.appendChild(item);
     }
@@ -629,8 +1080,9 @@ function guard(): void {
     !video ||
     !overlay ||
     !surfaceVideo?.isConnected ||
+    !surfaceShell?.isConnected ||
     (mirrored && !video.isConnected) ||
-    (!mirrored && video.parentElement !== overlay) ||
+    (!mirrored && video.parentElement !== surfaceShell) ||
     (holder && !holder.isConnected)
   ) {
     exitViewer();
@@ -640,17 +1092,14 @@ function guard(): void {
 function hookGlobal(): void {
   if (hooked) return;
   hooked = true;
-  document.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key !== "Escape" || !fmt) return;
-      e.preventDefault();
-      e.stopPropagation();
-      exitViewer();
+  window.addEventListener(
+    "resize",
+    () => {
+      sizeVideo();
+      notifyViewerLayout();
     },
-    true,
+    { passive: true },
   );
-  window.addEventListener("resize", () => sizeVideo(), { passive: true });
   // Real fullscreen supersedes the viewer — the two fight over the same video.
   document.addEventListener("fullscreenchange", () => {
     if (document.fullscreenElement) exitViewer();
@@ -691,7 +1140,8 @@ function wireVideo(v: HTMLVideoElement): void {
       surface.style.cssText = desiredCss;
     }
   });
-  if (surfaceVideo) styleGuard.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
+  if (surfaceVideo)
+    styleGuard.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
 }
 
 type CaptureVideo = HTMLVideoElement & {
@@ -720,7 +1170,7 @@ function createMirror(v: HTMLVideoElement): HTMLVideoElement | null {
   }
 }
 
-function recaptureMirror(): void {
+function refreshMirrorStream(): void {
   if (!mirrored || !video || !surfaceVideo) return;
   const capture = (video as CaptureVideo).captureStream ?? (video as CaptureVideo).mozCaptureStream;
   if (!capture) return;
@@ -729,31 +1179,13 @@ function recaptureMirror(): void {
     if (!stream || !stream.getVideoTracks().length) return;
     mirrorStream?.getTracks().forEach((t) => t.stop());
     mirrorStream = stream;
-    surfaceVideo.pause();
-    surfaceVideo.srcObject = null;
     surfaceVideo.srcObject = stream;
+    if (backdropVideo) backdropVideo.srcObject = stream;
     surfaceVideo.play()?.catch(() => {});
-    sizeVideo();
+    backdropVideo?.play()?.catch(() => {});
   } catch (e) {
-    /* keep the current mirror */
+    /* keep the existing mirror */
   }
-}
-
-function scheduleMirrorRecapture(): void {
-  if (!mirrored) return;
-  if (mirrorRecaptureTimer != null) clearTimeout(mirrorRecaptureTimer);
-  recaptureMirror();
-  const delays = [400, 1200, 2500];
-  let i = 0;
-  const next = () => {
-    recaptureMirror();
-    if (i >= delays.length) {
-      mirrorRecaptureTimer = null;
-      return;
-    }
-    mirrorRecaptureTimer = setTimeout(next, delays[i++]);
-  };
-  mirrorRecaptureTimer = setTimeout(next, delays[i++]);
 }
 
 // Auto-open on playback (the `viewerAuto` setting). Once per video element:
@@ -765,7 +1197,7 @@ document.addEventListener(
   (e) => {
     const t = e.target;
     if (!(t instanceof HTMLVideoElement)) return;
-    if (S.viewerAuto === "off" || fmt || autoSeen.has(t)) return;
+    if (!S.viewerAutoEnabled || S.viewerAuto === "off" || fmt || autoSeen.has(t)) return;
     const r = t.getBoundingClientRect();
     if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
     autoSeen.add(t);
@@ -777,12 +1209,16 @@ document.addEventListener(
 async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<void> {
   const v = target ?? primaryVideo();
   if (!v || document.fullscreenElement || fmt) return;
+  const firstRect = v.getBoundingClientRect();
   document.dispatchEvent(new Event(CLOSE_EVENT));
   fmt = format;
   video = v;
   surfaceVideo = null;
+  backdropEl = null;
+  surfaceShell = null;
   mirrored = false;
   mirrorStream = null;
+  sourceRect = firstRect;
   normalBox = null;
   prevCss = v.style.cssText;
   prevControls = v.controls;
@@ -793,9 +1229,25 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
     inset: "0",
     zIndex: Z_OVERLAY,
     overflow: "hidden",
-    background: "rgba(0, 0, 0, 0.92)",
   } as Partial<CSSStyleDeclaration>);
+  overlay.tabIndex = -1;
   document.body.appendChild(overlay);
+  backdropEl = document.createElement("div");
+  Object.assign(backdropEl.style, {
+    position: "absolute",
+    inset: "0",
+    opacity: "0",
+    pointerEvents: "none",
+  } as Partial<CSSStyleDeclaration>);
+  overlay.appendChild(backdropEl);
+  surfaceShell = document.createElement("div");
+  Object.assign(surfaceShell.style, {
+    position: "absolute",
+    overflow: "hidden",
+    zIndex: "1",
+    background: "#000",
+  } as Partial<CSSStyleDeclaration>);
+  overlay.appendChild(surfaceShell);
   hookGlobal();
   // Chapters depend on the SITE player's UI, so read them before the video
   // leaves it.
@@ -805,12 +1257,12 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   if (mirror) {
     mirrored = true;
     surfaceVideo = mirror;
-    overlay.appendChild(mirror);
+    surfaceShell.appendChild(mirror);
   } else {
     holder = document.createComment("vtp-viewer-holder");
     v.parentNode?.insertBefore(holder, v);
     surfaceVideo = v;
-    overlay.appendChild(v);
+    surfaceShell.appendChild(v);
     v.controls = false; // ours replace them; the site's flag is restored on exit
   }
   mountBar();
@@ -829,11 +1281,18 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
     },
     opt,
   );
+  layoutPaused = true;
   setFormat(format);
+  animateBackdropIn();
+  const enterAnim = animateSurfaceFrom(firstRect);
   syncPlay();
   syncVolume();
   syncTime();
-  showBar();
+  if (!enterAnim) {
+    layoutPaused = false;
+    notifyViewerLayout();
+    showBar();
+  }
   loadMarkers();
   refreshQuality();
   guardTimer = setInterval(guard, 500);
@@ -841,65 +1300,89 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
 
 export function exitViewer(): void {
   if (!fmt) return;
+  layoutPaused = false;
+  const exitingOverlay = overlay;
+  const targetRect = mirrored && video ? video.getBoundingClientRect() : sourceRect;
+  const surfaceAnim = animateSurfaceTo(targetRect);
+  const backdropAnim = animateBackdropOut(targetRect);
+  const animated = !!surfaceAnim || !!backdropAnim;
   fmt = null;
-  if (guardTimer != null) {
-    clearInterval(guardTimer);
-    guardTimer = null;
-  }
-  if (mirrorRecaptureTimer != null) {
-    clearTimeout(mirrorRecaptureTimer);
-    mirrorRecaptureTimer = null;
-  }
-  clearTimeout(barTimer);
-  media?.abort();
-  media = null;
-  styleGuard?.disconnect();
-  styleGuard = null;
-  pendingChapters = [];
-  marksLoaded = false;
   document.documentElement.removeAttribute(ATTR);
   document.documentElement.style.overflow = prevOverflow;
-  if (video) {
-    autoSeen.add(video); // closing means "not this one again"
-    if (!mirrored) {
-      video.controls = prevControls;
-      video.style.cssText = prevCss;
+  notifyViewerState();
+  bar?.animate?.([{ opacity: 1 }, { opacity: 0 }], {
+    duration: Math.min(160, VIEWER_ANIM_MS),
+    easing: "ease",
+    fill: "forwards",
+  });
+
+  const finish = () => {
+    if (guardTimer != null) {
+      clearInterval(guardTimer);
+      guardTimer = null;
     }
-    // Back to the exact spot the comment held. If the site tore that spot
-    // down, the video is orphaned content — it goes away with the overlay.
-    if (!mirrored && holder?.isConnected && video.parentElement === overlay) {
-      holder.parentNode?.insertBefore(video, holder);
+    clearTimeout(barTimer);
+    media?.abort();
+    media = null;
+    styleGuard?.disconnect();
+    styleGuard = null;
+    pendingChapters = [];
+    marksLoaded = false;
+    if (video) {
+      autoSeen.add(video); // closing means "not this one again"
+      if (!mirrored) {
+        video.controls = prevControls;
+        video.style.cssText = prevCss;
+      }
+      // Back to the exact spot the comment held. If the site tore that spot
+      // down, the video is orphaned content — it goes away with the overlay.
+      if (!mirrored && holder?.isConnected && video.parentElement === surfaceShell) {
+        holder.parentNode?.insertBefore(video, holder);
+      }
     }
-  }
-  mirrorStream?.getTracks().forEach((t) => t.stop());
-  mirrorStream = null;
-  if (video && qualityVideoId) video.removeAttribute("data-vtp-quality-id");
-  qualityVideoId = "";
-  document.documentElement.removeAttribute(QUALITY_REQ_ATTR);
-  document.documentElement.removeAttribute(QUALITY_VIDEO_ATTR);
-  document.documentElement.removeAttribute(QUALITY_PICK_ATTR);
-  document.documentElement.removeAttribute(QUALITY_RESP_ATTR);
-  holder?.remove();
-  holder = null;
-  overlay?.remove();
-  overlay = null;
-  bar = null;
-  playBtn = muteBtn = fmtBtn = null;
-  seekEl = seekWrapEl = volEl = null;
-  timeEl = null;
-  fitMenu = null;
-  qualityWrap = null;
-  qualityBtn = null;
-  qualityLabelEl = null;
-  qualityMenu = null;
-  marksEl = null;
-  seeking = false;
-  normalBox = null;
-  surfaceVideo = null;
-  mirrored = false;
-  video = null;
-  // Players re-measure on resize — let the restored one lay itself out.
-  window.dispatchEvent(new Event("resize"));
+    mirrorStream?.getTracks().forEach((t) => t.stop());
+    mirrorStream = null;
+    removeBackdropVideo();
+    if (video && qualityVideoId) video.removeAttribute("data-vtp-quality-id");
+    qualityVideoId = "";
+    document.documentElement.removeAttribute(QUALITY_REQ_ATTR);
+    document.documentElement.removeAttribute(QUALITY_VIDEO_ATTR);
+    document.documentElement.removeAttribute(QUALITY_PICK_ATTR);
+    document.documentElement.removeAttribute(QUALITY_RESP_ATTR);
+    holder?.remove();
+    holder = null;
+    exitingOverlay?.remove();
+    if (overlay === exitingOverlay) overlay = null;
+    backdropEl = null;
+    backdropVideo = null;
+    surfaceShell = null;
+    bar = null;
+    playBtn = muteBtn = fmtBtn = null;
+    seekEl = seekWrapEl = volEl = null;
+    timeEl = null;
+    fitMenu = null;
+    qualityWrap = null;
+    qualityBtn = null;
+    qualityLabelEl = null;
+    qualityMenu = null;
+    pendingQuality = null;
+    pendingQualityUntil = 0;
+    marksEl = null;
+    seeking = false;
+    normalBox = null;
+    sourceRect = null;
+    layoutPaused = false;
+    surfaceVideo = null;
+    mirrored = false;
+    video = null;
+    // Players re-measure on resize — let the restored one lay itself out.
+    window.dispatchEvent(new Event("resize"));
+    notifyViewerLayout();
+  };
+
+  if (animated)
+    void Promise.all([waitAnimation(surfaceAnim), waitAnimation(backdropAnim)]).then(finish);
+  else finish();
 }
 
 // The hotkey/button entry point. Closed → open in `format`; open in the other

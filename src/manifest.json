@@ -62,7 +62,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup/popup.html"],
+      "resources": ["popup/popup.html", "quality-inject.js"],
       "matches": ["<all_urls>"]
     }
   ],

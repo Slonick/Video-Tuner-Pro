@@ -8,6 +8,8 @@ import {
   resolveSpeed,
   resolveSyncTarget,
   resolveAutoSlow,
+  resolveViewerAuto,
+  resolveViewerFit,
   type AutoSlowSettings,
 } from "./core/resolve.js";
 import { normalizePresetSet } from "../shared/presets.js";
@@ -19,17 +21,29 @@ import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
-import { ownsViewerNode } from "./viewer.js";
+import { ownsViewerNode, syncViewerBackdropVideo } from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
 import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
+import { applyResolvedViewerAutoFromStore } from "./viewer-auto.js";
+import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
 import { collectVideos, startTracking, stopTracking, reconcile } from "./videos.js";
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
 import { currentChannel, channelKeys } from "./channel.js";
+
+try {
+  const s = document.createElement("script");
+  s.src = api.runtime.getURL("quality-inject.js");
+  s.async = false;
+  (document.documentElement || document.head || document.body)?.appendChild(s);
+  s.remove();
+} catch (e) {
+  /* manifest MAIN world covers browsers that block page-script injection */
+}
 
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
@@ -127,6 +141,13 @@ function loadSpeed() {
       "autoSlowSites",
       "autoSlowChannels",
       "autoSlowGlobal",
+      "viewerAutoGlobal",
+      "viewerAuto",
+      "viewerAutoSites",
+      "viewerAutoChannels",
+      "viewerFitGlobal",
+      "viewerFitSites",
+      "viewerFitChannels",
       "speedPresets",
       "presetKeys",
       ...REGISTRY_KEYS,
@@ -176,6 +197,24 @@ function loadSpeed() {
       );
       S.autoSlowScope = rs.scope;
       S.autoSlowTarget = rs.target;
+      const va = resolveViewerAuto(
+        channelKeys(),
+        getDomain(),
+        (result.viewerAutoSites || {}) as Record<string, "off" | "normal" | "theater">,
+        (result.viewerAutoChannels || {}) as Record<string, "off" | "normal" | "theater">,
+        result.viewerAutoGlobal ?? result.viewerAuto,
+      );
+      S.viewerAuto = va.mode;
+      S.viewerAutoScope = va.scope;
+      const vf = resolveViewerFit(
+        channelKeys(),
+        getDomain(),
+        (result.viewerFitSites || {}) as Record<string, "contain" | "cover" | "fill">,
+        (result.viewerFitChannels || {}) as Record<string, "contain" | "cover" | "fill">,
+        result.viewerFitGlobal,
+      );
+      S.viewerFit = vf.mode;
+      S.viewerFitScope = vf.scope;
       applyResolved(domains, channels, result.globalSpeed as number | undefined);
       applyAll();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
@@ -204,6 +243,8 @@ function reresolve() {
   });
   applyResolvedTargetFromStore(); // the channel changed — its allowed-delay may differ
   applyResolvedAutoSlowFromStore(); // ...and its auto-slow enable may differ too
+  applyResolvedViewerAutoFromStore(); // ...and its viewer auto-open mode may differ too
+  applyResolvedViewerFitFromStore(); // ...and its viewer fit mode may differ too
 }
 
 // Wait for the selective-sync config so the first resolve reads each setting from
@@ -413,6 +454,20 @@ api.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.autoSlowSites || changes.autoSlowChannels || changes.autoSlowGlobal) {
     applyResolvedAutoSlowFromStore(); // re-resolve the scoped bundle (enable + target)
+  }
+  if (
+    changes.viewerAutoGlobal ||
+    changes.viewerAuto ||
+    changes.viewerAutoSites ||
+    changes.viewerAutoChannels
+  ) {
+    applyResolvedViewerAutoFromStore();
+  }
+  if (changes.viewerFitGlobal || changes.viewerFitSites || changes.viewerFitChannels) {
+    applyResolvedViewerFitFromStore();
+  }
+  if (changes.viewerBackdropVideo) {
+    syncViewerBackdropVideo();
   }
   if (changes.speedPresets || changes.presetKeys) {
     // Both arrays sort together, so re-read both and recompute the pair set.

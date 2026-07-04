@@ -18,11 +18,16 @@ const v = vi.hoisted(() => ({
   toggleViewer: vi.fn(),
   exitViewer: vi.fn(),
   format: null as string | null,
+  anchor: null as unknown,
+  paused: false,
 }));
 vi.mock("../src/content/viewer.js", () => ({
+  VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
   toggleViewer: v.toggleViewer,
   exitViewer: v.exitViewer,
   viewerFormat: () => v.format,
+  viewerAnchorVideo: () => v.anchor,
+  viewerLayoutPaused: () => v.paused,
 }));
 
 import { S } from "../src/content/state.js";
@@ -60,6 +65,8 @@ beforeEach(() => {
   host()?.remove();
   h.primary = null;
   v.format = null;
+  v.anchor = null;
+  v.paused = false;
   vi.clearAllMocks();
   S.overlayButton = "fullscreen";
   S.overlayBtnPos = null;
@@ -122,6 +129,66 @@ describe("updateLauncher — default position", () => {
     // right(640) - size(44) - margin(16) = 580 ; top = (360-44)/2 = 158
     expect(fab.style.left).toBe("580px");
     expect(fab.style.top).toBe("158px");
+  });
+
+  it("uses the viewer anchor while the pop-out viewer is open", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    v.anchor = fakeVideo({ left: 100, top: 50, width: 800, height: 450, right: 900, bottom: 500 });
+    updateLauncher();
+    const fab = fabEl()!;
+    expect(fab.style.left).toBe("840px"); // anchor right(900) - size(44) - margin(16)
+    expect(fab.style.top).toBe("253px"); // anchor top(50) + (450-44)/2
+  });
+
+  it("repositions on window resize outside the pop-out viewer", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    updateLauncher();
+    h.primary = fakeVideo({ left: 20, top: 30, width: 800, height: 450, right: 820, bottom: 480 });
+    window.dispatchEvent(new Event("resize"));
+    const fab = fabEl()!;
+    expect(fab.style.left).toBe("760px");
+    expect(fab.style.top).toBe("233px");
+  });
+
+  it("repositions immediately when the viewer anchor changes", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    v.anchor = fakeVideo({ left: 100, top: 50, width: 800, height: 450, right: 900, bottom: 500 });
+    updateLauncher();
+    v.anchor = null;
+    document.dispatchEvent(new Event("vtp-viewer-layout"));
+    const fab = fabEl()!;
+    expect(fab.style.left).toBe("580px");
+    expect(fab.style.top).toBe("158px");
+  });
+
+  it("keeps the launcher pinned while the viewer layout is animating", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    updateLauncher();
+    const fab = fabEl()!;
+    expect(fab.style.left).toBe("580px");
+    expect(fab.style.top).toBe("158px");
+
+    v.anchor = fakeVideo({
+      left: 100,
+      top: 50,
+      width: 800,
+      height: 450,
+      right: 900,
+      bottom: 500,
+    });
+    v.paused = true;
+    updateLauncher();
+    expect(fab.style.left).toBe("580px");
+    expect(fab.style.top).toBe("158px");
+
+    v.paused = false;
+    updateLauncher();
+    expect(fab.style.left).toBe("840px");
+    expect(fab.style.top).toBe("253px");
   });
 });
 

@@ -6,12 +6,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // (live). Mock the video/live data sources and inspect the rendered element.
 const h = vi.hoisted(() => ({
   primary: null as unknown,
+  anchor: null as unknown,
   onStream: false,
   latency: null as number | null,
   buffer: 0,
   limited: false,
 }));
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => h.primary }));
+vi.mock("../src/content/viewer.js", () => ({
+  VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
+  viewerAnchorVideo: () => h.anchor,
+}));
 vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream }));
 vi.mock("../src/content/live/metrics.js", () => ({
   forwardBuffer: () => h.buffer,
@@ -55,6 +60,7 @@ const badgeShown = () => {
 
 beforeEach(() => {
   h.primary = null;
+  h.anchor = null;
   h.onStream = false;
   h.latency = null;
   h.buffer = 0;
@@ -157,6 +163,39 @@ describe("updateTimeBadge — positioning", () => {
     const el = badgeEl() as HTMLElement;
     expect(el.style.left).toBe("320px"); // 0 + 0.5 * 640
     expect(el.style.top).toBe("180px"); // 0 + 0.5 * 360
+  });
+
+  it("repositions on window resize outside the pop-out viewer", () => {
+    S.badgePos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    updateTimeBadge();
+    h.primary = fakeVideo({ left: 20, top: 30, width: 800, height: 450, right: 820, bottom: 480 });
+    window.dispatchEvent(new Event("resize"));
+    const el = badgeEl() as HTMLElement;
+    expect(el.style.left).toBe("420px");
+    expect(el.style.top).toBe("255px");
+  });
+
+  it("positions against the viewer anchor while the pop-out viewer is open", () => {
+    S.badgePos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    h.anchor = fakeVideo({ left: 100, top: 50, width: 800, height: 450, right: 900, bottom: 500 });
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    expect(el.style.left).toBe("500px");
+    expect(el.style.top).toBe("275px");
+  });
+
+  it("repositions immediately when the viewer anchor changes", () => {
+    S.badgePos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    h.anchor = fakeVideo({ left: 100, top: 50, width: 800, height: 450, right: 900, bottom: 500 });
+    updateTimeBadge();
+    h.anchor = null;
+    document.dispatchEvent(new Event("vtp-viewer-layout"));
+    const el = badgeEl() as HTMLElement;
+    expect(el.style.left).toBe("320px");
+    expect(el.style.top).toBe("180px");
   });
 });
 

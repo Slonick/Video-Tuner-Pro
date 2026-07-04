@@ -49,6 +49,10 @@ function unboundedDuration(d: number): boolean {
   return d > 1e7;
 }
 
+function finiteVodDuration(d: number): boolean {
+  return Number.isFinite(d) && d > 0 && d < 1e7;
+}
+
 export function isLive(video: HTMLVideoElement): boolean {
   // The MAIN-world probe (inject.ts) publishes the player's own live flag
   // (YouTube's getVideoData().isLive) to data-vtp-live — authoritative when
@@ -59,9 +63,6 @@ export function isLive(video: HTMLVideoElement): boolean {
   if (isYouTube() && flag === "1") return !dvrMode;
   if (flag === "1") return true;
   if (flag === "0") return false;
-
-  // Most live MSE streams report an infinite duration (Twitch, many players).
-  if (unboundedDuration(video.duration)) return true;
 
   // YouTube live (including DVR streams) reports a FINITE, growing duration, so
   // the duration check alone misses it. YouTube adds the "ytp-live" class to the
@@ -82,6 +83,14 @@ export function isLive(video: HTMLVideoElement): boolean {
       if (badge && badge.offsetParent !== null) return true; // visible = live
     }
   }
+
+  // Once a non-YouTube player exposes a real finite duration, treat it as VOD.
+  // Some VOD players briefly look unbounded while metadata/quality reloads settle;
+  // an earlier probe sample must not keep the whole extension in live mode.
+  if (finiteVodDuration(video.duration)) return false;
+
+  // Most live MSE streams report an infinite duration (Twitch, many players).
+  if (unboundedDuration(video.duration)) return true;
 
   // Generic fallback (covers Twitch low-latency etc., where duration isn't
   // Infinity): a stream whose media edge advances in real time, set by probeLive.
@@ -122,6 +131,10 @@ function streamEnd(v: HTMLVideoElement): number {
 export function probeLive(v: HTMLVideoElement): void {
   if (!v) return;
   const t = Date.now();
+  if (finiteVodDuration(v.duration)) {
+    liveProbe.set(v, { lastEnd: streamEnd(v), lastT: t, lastGrow: 0, hits: 0, live: false });
+    return;
+  }
   if (unboundedDuration(v.duration)) {
     liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, hits: 0, live: true });
     return;

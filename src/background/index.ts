@@ -136,6 +136,13 @@ function reinjectOpenTabs(): void {
         call(() =>
           api.scripting.executeScript({
             target: { tabId, allFrames: true },
+            files: ["quality-inject.js"],
+            world: "MAIN",
+          }),
+        );
+        call(() =>
+          api.scripting.executeScript({
+            target: { tabId, allFrames: true },
             files: ["audio-inject.js"],
             world: "MAIN",
           }),
