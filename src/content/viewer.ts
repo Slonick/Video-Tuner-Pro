@@ -29,6 +29,13 @@ const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
 const VIEWER_ANIM_MS = 420;
 const VIEWER_BACKDROP_VIDEO_ANIM_MS = 680;
+// A CSS/backdrop-filter blur can't invent pixels past its own box, so an element
+// blurred exactly at the viewport edge fades toward whatever's behind it there —
+// a visible vignette right at the screen border. Overscanning the box (then
+// letting the overlay's overflow:hidden crop it back to the viewport) hides that
+// fade off-screen instead. Comfortably more than 2× the largest blur radius used
+// (14/22px) so the fade-out never reaches the visible edge.
+const BACKDROP_OVERSCAN = 48;
 
 // The overlay sits under the speed badge (…646) and the launcher FAB with its
 // radial menu (…647), so both remain usable over the popped-out video.
@@ -42,6 +49,8 @@ let backdropEl: HTMLDivElement | null = null;
 let backdropVideo: HTMLVideoElement | null = null;
 let surfaceShell: HTMLDivElement | null = null;
 let holder: Comment | null = null; // marks the video's original DOM spot
+let sourceParent: Node | null = null;
+let sourceNextSibling: Node | null = null;
 let prevCss = ""; // the video's inline style before we took over
 let prevControls = false;
 let prevOverflow = ""; // <html>'s inline overflow (scroll lock restore)
@@ -139,23 +148,33 @@ document.addEventListener(
 );
 
 export function viewerFormat(): ViewerFormat | null {
-  return fmt;
+  const dom = document.documentElement.getAttribute(ATTR);
+  return fmt ?? (dom === "normal" || dom === "theater" ? dom : null);
 }
 
 export function setViewerState(format: ViewerFormat | "off"): void {
   if (format === "off") {
-    exitViewer();
+    if (fmt) exitViewer();
+    else document.dispatchEvent(new Event(CLOSE_EVENT));
     return;
   }
-  if (fmt === format) return;
+  if (viewerFormat() === format) return;
   if (fmt) setFormat(format);
-  else void enter(format);
+  else {
+    document.dispatchEvent(new Event(CLOSE_EVENT));
+    void enter(format);
+  }
 }
 
 export function viewerAnchorVideo(): HTMLElement | null {
-  if (!fmt) return null;
+  if (!viewerFormat()) return null;
   if (surfaceShell?.isConnected) return surfaceShell;
-  return surfaceVideo?.isConnected ? surfaceVideo : null;
+  if (surfaceVideo?.isConnected) return surfaceVideo;
+  const overlayEl = document.querySelector(`[${OVERLAY}]`);
+  const fallback = Array.from(overlayEl?.children ?? []).find(
+    (el) => el instanceof HTMLElement && el.querySelector("video:not([data-vtp-viewer-backdrop-video])"),
+  );
+  return fallback instanceof HTMLElement ? fallback : null;
 }
 
 export function viewerLayoutPaused(): boolean {
@@ -168,12 +187,16 @@ function notifyViewerState(): void {
   } catch (e) {}
 }
 
-function notifyViewerLayout(): void {
-  if (layoutPaused) return;
+function dispatchViewerLayout(): void {
   document.dispatchEvent(new Event(VIEWER_LAYOUT_EVENT));
   const raf =
     window.requestAnimationFrame ?? ((fn: FrameRequestCallback) => window.setTimeout(fn, 0));
   raf(() => document.dispatchEvent(new Event(VIEWER_LAYOUT_EVENT)));
+}
+
+function notifyViewerLayout(): void {
+  if (layoutPaused) return;
+  dispatchViewerLayout();
 }
 
 function applyOverlayBackdrop(): void {
@@ -223,9 +246,13 @@ export function syncViewerBackdropVideo(): void {
     backdropVideo.setAttribute("data-vtp-viewer-backdrop-video", "");
     Object.assign(backdropVideo.style, {
       position: "absolute",
-      inset: "0",
-      width: "100%",
-      height: "100%",
+      // A <video> is a replaced element: with inset alone and width/height auto it
+      // falls back to its own intrinsic size (the source's resolution) instead of
+      // stretching to fill, unlike a plain div — so size it explicitly via calc().
+      top: `-${BACKDROP_OVERSCAN}px`,
+      left: `-${BACKDROP_OVERSCAN}px`,
+      width: `calc(100% + ${BACKDROP_OVERSCAN * 2}px)`,
+      height: `calc(100% + ${BACKDROP_OVERSCAN * 2}px)`,
       transform: "none",
       transformOrigin: "0 0",
       borderRadius: "0",
@@ -268,10 +295,18 @@ function animateBackdropLayer(
 }
 
 function backdropVideoTransformFrame(r: DOMRect, opacity: number): Keyframe {
-  const vw = Math.max(window.innerWidth, 1);
-  const vh = Math.max(window.innerHeight, 1);
+  // The box is overscanned by BACKDROP_OVERSCAN on every side (see its inset), so
+  // scale/translate must target that larger box, not the viewport itself, for the
+  // transform to still land exactly on `r`. transform-origin ("0 0") is the box's
+  // own top-left, which already sits BACKDROP_OVERSCAN above/left of the viewport
+  // — scale leaves that origin point fixed, so translate only needs to shift it by
+  // the plain (unscaled) overscan, not overscan*scale.
+  const vw = Math.max(window.innerWidth, 1) + BACKDROP_OVERSCAN * 2;
+  const vh = Math.max(window.innerHeight, 1) + BACKDROP_OVERSCAN * 2;
+  const sx = r.width / vw;
+  const sy = r.height / vh;
   return {
-    transform: `translate(${r.left}px, ${r.top}px) scale(${r.width / vw}, ${r.height / vh})`,
+    transform: `translate(${r.left + BACKDROP_OVERSCAN}px, ${r.top + BACKDROP_OVERSCAN}px) scale(${sx}, ${sy})`,
     borderRadius: "0px",
     opacity,
   };
@@ -1133,12 +1168,19 @@ function wireVideo(v: HTMLVideoElement): void {
     opt,
   );
   // Sites (YouTube) keep restyling their video — snap ours back on sight.
+  // Disconnect while writing rather than trust a string comparison to converge:
+  // the browser doesn't guarantee re-serializing an already-normalized cssText
+  // yields byte-identical output every time, and a callback that reasserts a
+  // style on the very node it's observing can otherwise re-trigger itself
+  // indefinitely.
   styleGuard?.disconnect();
   styleGuard = new MutationObserver(() => {
     const surface = surfaceVideo ?? video;
-    if (fmt && surface && surface.style.cssText !== desiredCss) {
-      surface.style.cssText = desiredCss;
-    }
+    if (!fmt || !surface || surface.style.cssText === desiredCss) return;
+    styleGuard?.disconnect();
+    surface.style.cssText = desiredCss;
+    if (surfaceVideo)
+      styleGuard?.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
   });
   if (surfaceVideo)
     styleGuard.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
@@ -1197,19 +1239,32 @@ document.addEventListener(
   (e) => {
     const t = e.target;
     if (!(t instanceof HTMLVideoElement)) return;
+    // Our own mirror/backdrop videos live inside the overlay and are started
+    // with .play() during enter() — their own (async) "play" event bubbles
+    // right back to this same document-level listener. Without this check,
+    // that self-generated event re-enters the viewer, which creates a new
+    // mirror, whose play event re-enters again — a confirmed infinite loop
+    // (reproduced: 43 stacked overlays within 500ms without this guard).
+    if (t.closest(`[${OVERLAY}]`)) return;
     if (!S.viewerAutoEnabled || S.viewerAuto === "off" || fmt || autoSeen.has(t)) return;
     const r = t.getBoundingClientRect();
     if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
     autoSeen.add(t);
-    enter(S.viewerAuto, t);
+    enter(S.viewerAuto, t, { mirrorOnly: true });
   },
   true,
 );
 
-async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<void> {
+async function enter(
+  format: ViewerFormat,
+  target?: HTMLVideoElement,
+  opts: { mirrorOnly?: boolean } = {},
+): Promise<void> {
   const v = target ?? primaryVideo();
   if (!v || document.fullscreenElement || fmt) return;
   const firstRect = v.getBoundingClientRect();
+  const mirror = createMirror(v);
+  if (!mirror && opts.mirrorOnly) return;
   document.dispatchEvent(new Event(CLOSE_EVENT));
   fmt = format;
   video = v;
@@ -1217,7 +1272,9 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   backdropEl = null;
   surfaceShell = null;
   mirrored = false;
-  mirrorStream = null;
+  if (!mirror) mirrorStream = null;
+  sourceParent = null;
+  sourceNextSibling = null;
   sourceRect = firstRect;
   normalBox = null;
   prevCss = v.style.cssText;
@@ -1235,7 +1292,7 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   backdropEl = document.createElement("div");
   Object.assign(backdropEl.style, {
     position: "absolute",
-    inset: "0",
+    inset: `-${BACKDROP_OVERSCAN}px`,
     opacity: "0",
     pointerEvents: "none",
   } as Partial<CSSStyleDeclaration>);
@@ -1253,12 +1310,13 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   // leaves it.
   pendingChapters =
     isYouTube() && Number.isFinite(v.duration) ? readYouTubeChapters(v.duration) : [];
-  const mirror = createMirror(v);
   if (mirror) {
     mirrored = true;
     surfaceVideo = mirror;
     surfaceShell.appendChild(mirror);
   } else {
+    sourceParent = v.parentNode;
+    sourceNextSibling = v.nextSibling;
     holder = document.createComment("vtp-viewer-holder");
     v.parentNode?.insertBefore(holder, v);
     surfaceVideo = v;
@@ -1283,6 +1341,7 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
   );
   layoutPaused = true;
   setFormat(format);
+  dispatchViewerLayout();
   animateBackdropIn();
   const enterAnim = animateSurfaceFrom(firstRect);
   syncPlay();
@@ -1300,7 +1359,10 @@ async function enter(format: ViewerFormat, target?: HTMLVideoElement): Promise<v
 
 export function exitViewer(): void {
   if (!fmt) return;
-  layoutPaused = false;
+  // Stays paused for the whole close transition — same as enter() — so the
+  // launcher doesn't reposition itself off a video mid-shrink/mid-restore.
+  // finish() below clears it once the video is truly back in its original spot.
+  layoutPaused = true;
   const exitingOverlay = overlay;
   const targetRect = mirrored && video ? video.getBoundingClientRect() : sourceRect;
   const surfaceAnim = animateSurfaceTo(targetRect);
@@ -1334,10 +1396,17 @@ export function exitViewer(): void {
         video.controls = prevControls;
         video.style.cssText = prevCss;
       }
-      // Back to the exact spot the comment held. If the site tore that spot
-      // down, the video is orphaned content — it goes away with the overlay.
+      // Prefer the exact comment spot. If a site removed only that marker while
+      // keeping the original parent, fall back to the saved parent/sibling so
+      // closing the viewer does not discard the only page video with the overlay.
       if (!mirrored && holder?.isConnected && video.parentElement === surfaceShell) {
         holder.parentNode?.insertBefore(video, holder);
+      } else if (!mirrored && sourceParent?.isConnected && video.parentElement === surfaceShell) {
+        if (sourceNextSibling?.parentNode === sourceParent) {
+          sourceParent.insertBefore(video, sourceNextSibling);
+        } else {
+          sourceParent.appendChild(video);
+        }
       }
     }
     mirrorStream?.getTracks().forEach((t) => t.stop());
@@ -1351,6 +1420,8 @@ export function exitViewer(): void {
     document.documentElement.removeAttribute(QUALITY_RESP_ATTR);
     holder?.remove();
     holder = null;
+    sourceParent = null;
+    sourceNextSibling = null;
     exitingOverlay?.remove();
     if (overlay === exitingOverlay) overlay = null;
     backdropEl = null;
@@ -1378,6 +1449,11 @@ export function exitViewer(): void {
     // Players re-measure on resize — let the restored one lay itself out.
     window.dispatchEvent(new Event("resize"));
     notifyViewerLayout();
+    // Some site players (YouTube's included) don't finish re-laying the
+    // returned video out in the same tick — a launcher position measured right
+    // now can grab a transitional rect and stick there. One more pass shortly
+    // after catches it once the page has actually settled.
+    setTimeout(notifyViewerLayout, 300);
   };
 
   if (animated)
@@ -1392,6 +1468,12 @@ export function toggleViewer(format: ViewerFormat): void {
   if (fmt) {
     if (fmt === format) exitViewer();
     else setFormat(format);
+    return;
+  }
+  const active = viewerFormat();
+  if (active) {
+    document.dispatchEvent(new Event(CLOSE_EVENT));
+    if (active !== format) setTimeout(() => void enter(format), 0);
     return;
   }
   enter(format);

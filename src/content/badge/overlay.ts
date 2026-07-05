@@ -66,6 +66,12 @@ export function ownsBadgeNode(node: Node | null): boolean {
   return !!(badgeHost && (badgeHost === node || badgeHost.contains(node)));
 }
 
+function removeStaleBadgeHosts(): void {
+  document.querySelectorAll("[data-vtp-badge]").forEach((node) => {
+    if (node !== badgeHost) node.remove();
+  });
+}
+
 // Place the badge at its saved per-site fraction of the video, or the default
 // top-left corner when it's never been moved.
 function positionBadge(el: HTMLElement, v: HTMLElement): void {
@@ -272,6 +278,7 @@ export function applyBadgeGlass(): void {
 
 // video and auto-hides after a moment.
 export function updateTimeBadge(): void {
+  removeStaleBadgeHosts();
   const v = primaryVideo();
   const anchor = viewerAnchorVideo() ?? v;
   const stream = onStreamPage();

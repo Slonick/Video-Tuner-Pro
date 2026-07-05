@@ -70,6 +70,12 @@ let dragDX = 0,
   dragDY = 0;
 let downX = 0,
   downY = 0;
+// Captured at drag start, not re-read at drop: the viewer can close mid-drag
+// (e.g. a site player's own DOM churn tripping our connectivity guard), which
+// would otherwise silently swap fabVideo out from under an in-progress drag and
+// save a fraction computed against the wrong box.
+let dragVideo: HTMLElement | null = null;
+let dragWasViewerOpen = false;
 
 // True if a node belongs to our launcher — the media observer ignores our own
 // DOM writes so they don't feed back into applyAll (mirrors ownsBadgeNode).
@@ -427,6 +433,8 @@ function hookFabDrag(el: HTMLElement): void {
     if (e.button !== 0) return;
     dragging = true;
     moved = false;
+    dragVideo = fabVideo;
+    dragWasViewerOpen = !!dragVideo && dragVideo !== primaryVideo();
     try {
       el.setPointerCapture(e.pointerId);
     } catch (x) {
@@ -459,11 +467,28 @@ function hookFabDrag(el: HTMLElement): void {
       togglePopup();
       return;
     }
-    if (!fabVideo) return;
-    const pos = badgeFraction(el.getBoundingClientRect(), fabVideo.getBoundingClientRect());
-    S.overlayBtnPos = pos;
-    positionFab(fabVideo); // snap to the clamped spot
-    saveFabPos(pos.fx, pos.fy);
+    // Use what was true when the drag STARTED, not a fresh read: the viewer can
+    // close mid-drag (a site player's own DOM churn tripping our connectivity
+    // guard), which would otherwise silently swap fabVideo to the page video
+    // while el's on-screen position still reflects the popped-out box — an
+    // end-of-drag re-check would then compute garbage against a box the drag
+    // never actually happened over.
+    if (!dragVideo) return;
+    const r = dragVideo.getBoundingClientRect();
+    const pos = badgeFraction(el.getBoundingClientRect(), r);
+    // While the viewer is open, fabVideo is the popped-out surface, not the page
+    // video — a fraction saved against that box is meaningless (and would
+    // misplace the button) once the viewer closes and positioning reverts to
+    // the real video's differently sized rect. Snap to the clamped drop spot
+    // either way, but only persist a drag that happened against the real video.
+    if (dragWasViewerOpen) {
+      el.style.left = Math.round(r.left + pos.fx * r.width) + "px";
+      el.style.top = Math.round(r.top + pos.fy * r.height) + "px";
+    } else {
+      S.overlayBtnPos = pos;
+      saveFabPos(pos.fx, pos.fy);
+      if (fabVideo) positionFab(fabVideo);
+    }
   };
   el.addEventListener("pointerup", drop);
   el.addEventListener("pointercancel", drop);
@@ -540,19 +565,21 @@ function mount(): void {
   };
   rItems = {
     normal: radialButton(
-      // Pop-out mark: a frame with an arrow leaving through its top-right corner.
-      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5M14 4h6v6M20 4l-9 9"/></svg>',
+      // Picture-in-picture mark: the standard "pop out video" glyph (a frame
+      // with a small filled window in its corner) — reads at a glance, unlike
+      // the previous generic external-link arrow.
+      '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12.5" y="11.5" width="7" height="5" rx="1" fill="currentColor" stroke="none"/></svg>',
       i18n("viewerBtnAria") || "Pop out video",
       act(() => toggleViewer("normal")),
     ),
     theater: radialButton(
-      // Theater mark: a wide letterboxed frame.
-      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/></svg>',
+      // Theater mark: a bold wide letterboxed frame.
+      '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/></svg>',
       i18n("viewerTheaterAria") || "Pop out in theater format",
       act(() => toggleViewer("theater")),
     ),
     exit: radialButton(
-      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>',
       i18n("viewerCloseAria") || "Close the pop-out viewer",
       act(exitViewer),
     ),
@@ -613,6 +640,13 @@ function hookMouse(): void {
       const r = v.getBoundingClientRect();
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
         return;
+      // Self-heal here, not just on resize/viewer-layout events: a site player
+      // can resize/relayout its video for reasons we have no hook into (an ad,
+      // a quality switch, its own transition), silently leaving the button
+      // stuck over stale geometry until something else happens to trigger a
+      // reposition. Hovering the video is the one moment we know for certain
+      // the real, current rect is worth reading.
+      if (!dragging) positionFab(v);
       flashFab();
     },
     { passive: true },
@@ -711,8 +745,11 @@ export function applyLauncherGlass(): void {
 export function updateLauncher(): void {
   removeStaleHosts();
   const paused = viewerLayoutPaused();
-  if (!paused || !fabVideo) {
-    fabVideo = viewerAnchorVideo() ?? primaryVideo();
+  const viewerAnchor = viewerAnchorVideo();
+  if (viewerAnchor) {
+    fabVideo = viewerAnchor;
+  } else if (!paused || !fabVideo) {
+    fabVideo = primaryVideo();
   }
   // No video to overlay → nothing can show; close any open popup and hide the FAB.
   if (!fabVideo) {
@@ -737,7 +774,7 @@ export function updateLauncher(): void {
   const fsEl = document.fullscreenElement;
   const parent: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
   if (host && host.parentNode !== parent) parent.appendChild(host);
-  if (fabVideo && !dragging && !paused) positionFab(fabVideo);
+  if (fabVideo && !dragging && (!paused || viewerAnchor)) positionFab(fabVideo);
   // The viewer can close behind our back (Esc, backdrop click) — refresh an
   // open menu so its pressed states and exit item stay honest.
   if (radialOpen) openRadial();

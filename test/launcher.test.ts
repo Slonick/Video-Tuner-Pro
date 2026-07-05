@@ -164,7 +164,7 @@ describe("updateLauncher — default position", () => {
     expect(fab.style.top).toBe("158px");
   });
 
-  it("keeps the launcher pinned while the viewer layout is animating", () => {
+  it("uses the viewer anchor as soon as it exists during the viewer animation", () => {
     S.overlayButton = "always";
     h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
     updateLauncher();
@@ -182,8 +182,8 @@ describe("updateLauncher — default position", () => {
     });
     v.paused = true;
     updateLauncher();
-    expect(fab.style.left).toBe("580px");
-    expect(fab.style.top).toBe("158px");
+    expect(fab.style.left).toBe("840px");
+    expect(fab.style.top).toBe("253px");
 
     v.paused = false;
     updateLauncher();
@@ -200,6 +200,26 @@ describe("launcher — open / close", () => {
     expect(fabShown()).toBe(false);
     fire(document, "mousemove", 100, 100);
     expect(fabShown()).toBe(true);
+  });
+
+  it("self-heals its position on hover when the video moves with no other trigger", () => {
+    // A site player can resize/relayout its video for reasons we have no hook
+    // into (an ad, a quality switch, its own transition) — nothing calls
+    // updateLauncher() again on its own. Hovering the video is the one moment
+    // we're guaranteed a chance to notice and correct a stale position.
+    S.overlayButton = "always";
+    const video = fakeVideo();
+    h.primary = video;
+    updateLauncher();
+    fire(document, "mousemove", 100, 100);
+    const fab = fabEl()!;
+    expect(fab.style.left).toBe("580px"); // right-aligned default for a 640×360 box at (0,0)
+    video.getBoundingClientRect = () =>
+      ({ left: 100, top: 50, width: 400, height: 225, right: 500, bottom: 275 }) as DOMRect;
+    // No resize/viewer-layout event, no re-mount — only a hover.
+    fire(document, "mousemove", 300, 250);
+    expect(fab.style.left).toBe("440px");
+    expect(fab.style.top).toBe("141px");
   });
 
   it("opens the popup iframe on a click (no drag) and closes on backdrop click", () => {

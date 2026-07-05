@@ -52,11 +52,40 @@ describe("primaryVideo", () => {
     expect(primaryVideo()).toBeNull();
   });
 
-  it("prefers a playing video over a larger paused one", () => {
+  it("prefers a similarly sized playing video over a paused one", () => {
     const paused = vid(1000, 1000, true);
-    const playing = vid(100, 100, false);
+    const playing = vid(800, 600, false);
     expect(primaryVideo()).toBe(playing);
     expect(primaryVideo()).not.toBe(paused);
+  });
+
+  it("does not let a tiny playing preview beat the main video", () => {
+    const main = vid(1000, 1000, true);
+    vid(160, 90, false);
+    expect(primaryVideo()).toBe(main);
+  });
+
+  it("ignores videos inside the extension viewer overlay", () => {
+    const main = vid(1000, 1000, true);
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-vtp-viewer-overlay", "");
+    document.body.appendChild(overlay);
+    const background = document.createElement("video");
+    background.getBoundingClientRect = () =>
+      ({
+        width: 2000,
+        height: 1200,
+        left: -48,
+        top: -48,
+        right: 1952,
+        bottom: 1152,
+        x: -48,
+        y: -48,
+        toJSON() {},
+      }) as DOMRect;
+    Object.defineProperty(background, "paused", { value: false, configurable: true });
+    overlay.appendChild(background);
+    expect(primaryVideo()).toBe(main);
   });
 
   it("among playing videos, picks the largest by area", () => {

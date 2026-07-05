@@ -27,6 +27,7 @@ let isOwnNode: (n: Node) => boolean = () => false;
 
 function addMedia(el: Element): boolean {
   if (isOwnNode(el)) return false;
+  if (el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")) return false;
   if (el instanceof HTMLVideoElement) {
     if (trackedVideos.has(el)) return false;
     trackedVideos.add(el);
@@ -135,7 +136,12 @@ export function collectVideos(): HTMLVideoElement[] {
   if (!tracking) scanTree(document);
   const out: HTMLVideoElement[] = [];
   for (const v of trackedVideos) {
-    if (v.isConnected && !isOwnNode(v)) out.push(v);
+    if (
+      v.isConnected &&
+      !isOwnNode(v) &&
+      !v.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")
+    )
+      out.push(v);
     else trackedVideos.delete(v);
   }
   return out;
@@ -152,17 +158,26 @@ export function collectAudios(): HTMLAudioElement[] {
   return out;
 }
 
-// Largest playing video — what the overlay/badge anchors to.
+// Main playback surface — what the overlay/badge anchors to.
 export function primaryVideo(): HTMLVideoElement | null {
-  let best: HTMLVideoElement | null = null,
-    bestScore = -1;
+  const candidates: { video: HTMLVideoElement; area: number }[] = [];
+  let largestArea = 0;
   for (const v of collectVideos()) {
     const r = v.getBoundingClientRect();
     if (r.width < 40 || r.height < 40) continue;
-    const score = (v.paused ? 0 : 1e9) + r.width * r.height;
+    const area = r.width * r.height;
+    candidates.push({ video: v, area });
+    if (area > largestArea) largestArea = area;
+  }
+
+  let best: HTMLVideoElement | null = null,
+    bestScore = -1;
+  const viableArea = largestArea * 0.25;
+  for (const { video, area } of candidates) {
+    const score = (area >= viableArea && !video.paused ? largestArea : 0) + area;
     if (score > bestScore) {
       bestScore = score;
-      best = v;
+      best = video;
     }
   }
   return best;

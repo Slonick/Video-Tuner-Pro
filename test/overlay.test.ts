@@ -75,6 +75,17 @@ beforeEach(() => {
 });
 
 describe("updateTimeBadge — visibility", () => {
+  it("removes a stale badge host left by a previous content script", () => {
+    const stale = document.createElement("div");
+    stale.setAttribute("data-vtp-badge", "");
+    document.body.append(stale);
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const hosts = document.querySelectorAll("[data-vtp-badge]");
+    expect(hosts.length).toBe(1);
+    expect(hosts[0]).not.toBe(stale);
+  });
+
   it("hides when the badge is disabled for this context", () => {
     S.showRemaining = false;
     h.primary = fakeVideo();
