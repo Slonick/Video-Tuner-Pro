@@ -29,7 +29,7 @@ import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
 import { applyResolvedViewerAutoFromStore } from "./viewer-auto.js";
 import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
-import { collectVideos, startTracking, stopTracking, reconcile } from "./videos.js";
+import { collectVideos, startTracking, stopTracking, reconcile, markDrmVideo } from "./videos.js";
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
@@ -338,6 +338,18 @@ for (const ev of ["play", "loadedmetadata"]) {
     true,
   );
 }
+
+document.addEventListener(
+  "encrypted",
+  (e) => {
+    const t = e.target;
+    if (t instanceof HTMLVideoElement) {
+      markDrmVideo(t);
+      updateLauncher();
+    }
+  },
+  true,
+);
 
 // Hard-capture mode (opt-in, default off): swallow the page's ratechange in the
 // capture phase so site scripts never see — and can't undo — our speed, then

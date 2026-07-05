@@ -13,6 +13,7 @@ export const seenAudios = new WeakSet<HTMLAudioElement>();
 // left and runs only as a rare backstop (see index.ts).
 const trackedVideos = new Set<HTMLVideoElement>();
 const trackedAudios = new Set<HTMLAudioElement>();
+const drmVideos = new WeakSet<HTMLVideoElement>();
 const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
 let observer: MutationObserver | null = null;
 let tracking = false;
@@ -181,4 +182,13 @@ export function primaryVideo(): HTMLVideoElement | null {
     }
   }
   return best;
+}
+
+export function markDrmVideo(video: HTMLVideoElement): void {
+  drmVideos.add(video);
+}
+
+export function isDrmVideo(video: HTMLVideoElement | null | undefined): boolean {
+  if (!video) return false;
+  return drmVideos.has(video) || video.mediaKeys != null;
 }

@@ -23,6 +23,21 @@ describe("popup · live stream", () => {
   });
 });
 
+describe("popup · protected video", () => {
+  it("disables the viewer card when the active video is DRM-protected", async () => {
+    await mountApp({
+      tab: YT,
+      replies: {
+        getSpeed: { speed: 1, domain: "youtube.com", channel: null, channelName: "", drm: true },
+      },
+    });
+    await flush();
+    expect(byId("viewerAutoToggle")).toHaveProperty("disabled", true);
+    expect(document.querySelector(".viewer-auto-section")!.className).toMatch(/locked/);
+    expect(document.querySelector(".viewer-drm-note")?.textContent).toContain("Protected video");
+  });
+});
+
 describe("popup · SaveScope remember", () => {
   it("opens the save menu and remembers the speed for a scope", async () => {
     const { lastCall } = await mountApp({ tab: YT });

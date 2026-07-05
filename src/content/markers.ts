@@ -66,9 +66,11 @@ export function youTubeVideoId(href: string = location.href): string | null {
 // "0:00 Intro" / "1:02:33 — Deep dive" lines from a description-like text.
 export function parseTimestampList(text: string): Chapter[] {
   const out: Chapter[] = [];
-  const re = /(?:^|\n)\s*((?:\d{1,2}:)?\d{1,2}:\d{2})\s*[-–—:]?\s*(\S[^\n]*)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
+  for (const line of text.split(/\n+/)) {
+    const m = line
+      .trim()
+      .match(/^(?:[-–—•*·▶]\s*|\d+[.)]\s*)*((?:\d{1,2}:)?\d{1,2}:\d{2})\s*[-–—:]?\s*(\S.*)$/);
+    if (!m) continue;
     const parts = m[1].split(":").map(Number);
     const s =
       parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
@@ -81,6 +83,44 @@ export function parseTimestampList(text: string): Chapter[] {
     if (out[i].start <= out[i - 1].start) return [];
   }
   return out;
+}
+
+function cleanChapterTitle(text: string | null | undefined): string {
+  return (text ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/^[-–—•*·▶\s]+/, "")
+    .trim();
+}
+
+function chapterTitleFromElement(el: Element): string {
+  for (const attr of ["title", "aria-label", "data-title"]) {
+    const title = cleanChapterTitle(el.getAttribute(attr));
+    if (title) return title;
+  }
+  const titleEl = el.querySelector(
+    ".ytp-chapter-title-content,.ytp-chapter-title,[class*='chapter'][class*='title'],[aria-label],[title]",
+  );
+  if (!titleEl) return "";
+  return cleanChapterTitle(
+    titleEl.getAttribute("title") || titleEl.getAttribute("aria-label") || titleEl.textContent,
+  );
+}
+
+function descriptionText(root: ParentNode): string {
+  return [
+    "#description-inline-expander",
+    "#description",
+    "ytd-watch-metadata",
+    "ytd-video-secondary-info-renderer",
+    "ytd-expandable-video-description-body-renderer",
+  ]
+    .map((sel) => root.querySelector(sel)?.textContent ?? "")
+    .find((text) => parseTimestampList(text).length > 0) ?? "";
+}
+
+function titleForStart(titled: Chapter[], start: number): string {
+  const hit = titled.find((ch) => Math.abs(ch.start - start) <= 1);
+  return hit?.title ?? "";
 }
 
 // Chapter start times from the player's own progress bar: each container child
@@ -100,20 +140,17 @@ export function chapterStartsFromWidths(widths: number[], duration: number): num
 }
 
 // Chapters of the current YouTube video: boundaries from the player DOM,
-// titles from the description when the counts agree.
+// titles from that DOM when exposed, otherwise from timestamp lists in metadata.
 export function readYouTubeChapters(duration: number, root: ParentNode = document): Chapter[] {
-  const widths = Array.from(root.querySelectorAll(".ytp-chapters-container > *")).map(
-    (el) => el.getBoundingClientRect().width,
-  );
+  const els = Array.from(root.querySelectorAll(".ytp-chapters-container > *"));
+  const widths = els.map((el) => el.getBoundingClientRect().width);
   const starts = chapterStartsFromWidths(widths, duration);
   if (!starts.length) return [];
-  const desc =
-    (root.querySelector("#description-inline-expander") ?? root.querySelector("#description"))
-      ?.textContent ?? "";
-  const titled = parseTimestampList(desc);
+  const domTitles = els.map(chapterTitleFromElement);
+  const titled = parseTimestampList(descriptionText(root));
   return starts.map((s, i) => ({
     start: s,
-    title: titled.length === starts.length ? titled[i].title : "",
+    title: domTitles[i] || titleForStart(titled, s),
   }));
 }
 

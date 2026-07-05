@@ -40,6 +40,7 @@ export interface UseSpeed {
   speedMax: number; // configurable upper bound for the slider (percent)
   speedStep: number; // per ± tap / keyboard step, as a fraction (e.g. 0.05)
   live: boolean;
+  drm: boolean;
   channel: string | null;
   channelName: string;
   scope: Scope;
@@ -81,6 +82,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   const [speedMax, setSpeedMax] = useState<number>(SPEED_MAX_DEFAULT);
   const [speedStep, setSpeedStep] = useState<number>(STEP_DEFAULT / 100);
   const [live, setLive] = useState(false);
+  const [drm, setDrm] = useState(false);
   // Synchronous mirror so back-to-back nudges / a save right after one see the
   // latest value (no re-render between them).
   const speedRef = useRef(1);
@@ -246,6 +248,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
           resolved = true;
           apply(resp.speed, false);
           setLive(!!resp.live);
+          setDrm(!!resp.drm);
           applyChannel(resp.channel, resp.channelName);
           defaultScope(resp.scope, !!resp.channel);
           refreshSaved();
@@ -273,6 +276,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
       void send<SpeedResponse>("getSpeed").then((resp) => {
         if (!resp) return;
         applyChannel(resp.channel, resp.channelName);
+        setDrm(!!resp.drm);
         if (resp.live) {
           missesRef.current = 0;
           setLive(true);
@@ -293,6 +297,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     speedMax,
     speedStep,
     live,
+    drm,
     channel: sc.channel,
     channelName: sc.channelName,
     scope,

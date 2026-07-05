@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const h = vi.hoisted(() => ({ primary: null as unknown }));
 vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => h.primary,
+  isDrmVideo: (v: HTMLVideoElement | null | undefined) => !!v && v.hasAttribute("data-drm"),
 }));
 vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
 
@@ -155,6 +156,19 @@ describe("fmtTime", () => {
 });
 
 describe("toggleViewer — lifecycle", () => {
+  it("ignores stale viewer state when the overlay is gone", () => {
+    document.documentElement.setAttribute("data-vtp-viewer", "normal");
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("can read viewer state left by another content-script instance", () => {
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-vtp-viewer-overlay", "");
+    document.body.appendChild(overlay);
+    document.documentElement.setAttribute("data-vtp-viewer", "normal");
+    expect(viewerFormat()).toBe("normal");
+  });
+
   it("does nothing without a video, or while the page is fullscreen", async () => {
     await openViewer("normal");
     expect(viewerFormat()).toBeNull();
@@ -163,6 +177,15 @@ describe("toggleViewer — lifecycle", () => {
     setFullscreen(document.body);
     await openViewer("normal");
     expect(viewerFormat()).toBeNull();
+  });
+
+  it("does not open on protected video", async () => {
+    const { v } = makeVideo();
+    v.setAttribute("data-drm", "");
+    h.primary = v;
+    await openViewer("normal");
+    expect(viewerFormat()).toBeNull();
+    expect(overlayEl()).toBeNull();
   });
 
   it("adopts the video into the overlay and marks its old spot", async () => {

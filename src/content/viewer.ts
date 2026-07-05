@@ -4,7 +4,7 @@
 // layer swaps. If captureStream() is unavailable, it falls back to adopting the
 // bare <video> and restoring it on exit.
 import { S } from "./state.js";
-import { primaryVideo } from "./videos.js";
+import { isDrmVideo, primaryVideo } from "./videos.js";
 import {
   isYouTube,
   youTubeVideoId,
@@ -70,7 +70,10 @@ let barTimer: ReturnType<typeof setTimeout> | undefined;
 let seeking = false; // mid-drag on the seek slider — don't fight the user
 let media: AbortController | null = null; // per-session media/UI listeners
 let marksEl: HTMLDivElement | null = null; // chapter ticks + sponsor bands layer
+let markerTipEl: HTMLDivElement | null = null;
 let marksLoaded = false; // duration arrived and the layer was populated
+let markerRanges: MarkerRange[] = [];
+let activeMarker: MarkerRange | null = null;
 // Chapters are read from the site player's own progress bar BEFORE the video
 // is adopted — YouTube tears its player UI down once the element leaves.
 let pendingChapters: { start: number; title: string }[] = [];
@@ -105,6 +108,12 @@ interface QualityOption {
 interface QualityState {
   options: QualityOption[];
   current: string;
+}
+interface MarkerRange {
+  start: number;
+  end: number;
+  label: string;
+  el: HTMLElement;
 }
 const QUALITY_REQ_ATTR = "data-vtp-quality-request";
 const QUALITY_VIDEO_ATTR = "data-vtp-quality-video";
@@ -149,7 +158,9 @@ document.addEventListener(
 
 export function viewerFormat(): ViewerFormat | null {
   const dom = document.documentElement.getAttribute(ATTR);
-  return fmt ?? (dom === "normal" || dom === "theater" ? dom : null);
+  if (fmt) return fmt;
+  if ((dom === "normal" || dom === "theater") && document.querySelector(`[${OVERLAY}]`)) return dom;
+  return null;
 }
 
 export function setViewerState(format: ViewerFormat | "off"): void {
@@ -594,7 +605,8 @@ function sizeVideo(): void {
       "position:absolute !important;inset:0 !important;" +
       "width:100% !important;height:100% !important;" +
       "transform:none !important;border-radius:0 !important;box-shadow:none !important;" +
-      "overflow:hidden !important;background:#000 !important;z-index:1 !important;";
+      "overflow:hidden !important;background:#000 !important;z-index:1 !important;" +
+      "will-change:transform,width,height,left,top,opacity !important;contain:paint !important;";
   } else {
     const mediaWidth = surface.videoWidth || video?.videoWidth || 0;
     const mediaHeight = surface.videoHeight || video?.videoHeight || 0;
@@ -622,7 +634,8 @@ function sizeVideo(): void {
       "transform:translate(-50%,-50%) !important;" +
       `width:${box.w}px !important;height:${box.h}px !important;` +
       "border-radius:12px !important;box-shadow:0 24px 80px rgba(0,0,0,0.55) !important;" +
-      "overflow:hidden !important;background:#000 !important;z-index:1 !important;";
+      "overflow:hidden !important;background:#000 !important;z-index:1 !important;" +
+      "will-change:transform,width,height,left,top,opacity !important;contain:paint !important;";
   }
   // The browser normalizes cssText on write — keep the normalized form, so the
   // style guard's comparison (and re-assert) converges instead of looping.
@@ -942,9 +955,21 @@ function mountBar(): void {
     // Chapter boundaries read like YouTube's: dark notches CUT INTO the groove
     // (hover shows the chapter title); sponsor segments tint the groove itself.
     `.marks{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:16px;pointer-events:none}` +
-    `.mark-seg{position:absolute;top:50%;transform:translateY(-50%);height:6px;border-radius:3px;opacity:0.8;z-index:1}` +
+    `.mark-seg{position:absolute;top:50%;transform:translateY(-50%);height:6px;border-radius:3px;` +
+    `opacity:0.8;z-index:1;transition:height .12s ease,opacity .12s ease,box-shadow .12s ease}` +
+    `.mark-chapter{position:absolute;top:50%;transform:translateY(-50%);height:16px;border-radius:4px;` +
+    `background:transparent;z-index:0;transition:background .12s ease}` +
+    `.mark-seg.active{height:10px;opacity:1;box-shadow:0 0 0 1px rgba(255,255,255,0.55),` +
+    `0 0 12px currentColor}` +
+    `.mark-chapter.active{background:rgba(255,255,255,0.16)}` +
     `.mark-tick{position:absolute;top:50%;transform:translateY(-50%);height:8px;width:2.5px;` +
     `background:rgba(0,0,0,0.65);pointer-events:auto;z-index:2}` +
+    `.mark-tip{position:absolute;left:0;bottom:22px;max-width:220px;padding:5px 8px;border-radius:8px;` +
+    `background:rgb(20 20 22 / 0.92);color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,0.14),` +
+    `0 8px 24px rgba(0,0,0,0.35);font:12px/1.2 -apple-system,system-ui,sans-serif;` +
+    `white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:5;` +
+    `opacity:0;transform:translateX(-50%) translateY(4px);transition:opacity .12s ease,transform .12s ease}` +
+    `.mark-tip.show{opacity:1;transform:translateX(-50%) translateY(0)}` +
     `.vol{width:64px;flex:none}` +
     `.bar.live .vol{width:44px}` +
     `.time{flex:none;white-space:nowrap;opacity:.9;font-variant-numeric:tabular-nums}` +
@@ -976,6 +1001,8 @@ function mountBar(): void {
   seekWrapEl = seekWrap;
   marksEl = document.createElement("div");
   marksEl.className = "marks";
+  markerTipEl = document.createElement("div");
+  markerTipEl.className = "mark-tip";
   seekEl = document.createElement("input");
   seekEl.type = "range";
   seekEl.className = "seek";
@@ -992,6 +1019,8 @@ function mountBar(): void {
     video.currentTime = timeline.start + (Number(seekEl!.value) / 1000) * timeline.len;
     syncTime();
   });
+  seekWrap.addEventListener("pointermove", showMarkerHover);
+  seekWrap.addEventListener("pointerleave", clearMarkerHover);
   muteBtn = barButton(I_SOUND, I_MUTED, i18n("viewerMuteAria") || "Mute");
   muteBtn.addEventListener("click", () => {
     if (video) video.muted = !video.muted;
@@ -1063,7 +1092,7 @@ function mountBar(): void {
   fmtBtn.addEventListener("click", () => toggleViewer(fmt === "theater" ? "normal" : "theater"));
   const closeBtn = barButton(I_CLOSE, null, i18n("viewerCloseAria") || "Close the pop-out viewer");
   closeBtn.addEventListener("click", exitViewer);
-  seekWrap.append(marksEl, seekEl);
+  seekWrap.append(marksEl, seekEl, markerTipEl);
   bar.append(playBtn, timeEl, seekWrap, muteBtn, volEl, qualityWrap, fwrap, fmtBtn, closeBtn);
   bar.addEventListener("pointerenter", () => clearTimeout(barTimer));
   bar.addEventListener("pointerleave", showBar);
@@ -1074,12 +1103,61 @@ function mountBar(): void {
 
 // Chapter ticks (captured pre-adoption) and opt-in SponsorBlock bands on the
 // seek bar. Waits for a real duration; bands render under the ticks.
+function segmentLabel(category: string): string {
+  return category
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function chapterLabel(title: string, index: number): string {
+  return title || `${i18n("viewerChapterFallback") || "Chapter"} ${index + 1}`;
+}
+
+function addMarkerRange(start: number, end: number, label: string, el: HTMLElement): void {
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !label) return;
+  markerRanges.push({ start, end, label, el });
+}
+
+function clearMarkerHover(): void {
+  activeMarker?.el.classList.remove("active");
+  activeMarker = null;
+  markerTipEl?.classList.remove("show");
+}
+
+function showMarkerHover(e: PointerEvent): void {
+  if (!seekWrapEl || !markerTipEl || !video || !markerRanges.length) return;
+  const timeline = mediaTimeline(video);
+  if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
+  const r = seekWrapEl.getBoundingClientRect();
+  if (r.width <= 0) return;
+  const x = Math.min(r.width, Math.max(0, e.clientX - r.left));
+  const t = timeline.start + (x / r.width) * timeline.len;
+  const next =
+    markerRanges
+      .filter((m) => t >= m.start && t <= m.end)
+      .sort((a, b) => a.end - a.start - (b.end - b.start))[0] ?? null;
+  if (!next) {
+    clearMarkerHover();
+    return;
+  }
+  if (activeMarker !== next) {
+    activeMarker?.el.classList.remove("active");
+    activeMarker = next;
+    next.el.classList.add("active");
+    markerTipEl.textContent = next.label;
+  }
+  markerTipEl.style.left = Math.round(x) + "px";
+  markerTipEl.classList.add("show");
+}
+
 async function loadMarkers(): Promise<void> {
   if (!marksEl || !video) return;
   const dur = video.duration;
   if (!Number.isFinite(dur) || dur <= 0) return;
   marksLoaded = true;
   marksEl.textContent = "";
+  markerRanges = [];
+  clearMarkerHover();
   if ((S.sponsorMarks || hasNativeSponsorBlock()) && isYouTube()) {
     const id = youTubeVideoId();
     if (id) {
@@ -1091,17 +1169,27 @@ async function loadMarkers(): Promise<void> {
         d.style.left = (sg.start / dur) * 100 + "%";
         d.style.width = Math.max(((sg.end - sg.start) / dur) * 100, 0.3) + "%";
         d.style.background = SPONSOR_COLORS[sg.category] || "#888";
-        d.title = sg.category;
+        d.style.color = SPONSOR_COLORS[sg.category] || "#888";
+        addMarkerRange(sg.start, sg.end, segmentLabel(sg.category), d);
         marksEl.appendChild(d);
       }
     }
   }
-  for (const ch of pendingChapters) {
+  for (let i = 0; i < pendingChapters.length; i++) {
+    const ch = pendingChapters[i];
+    const end = pendingChapters[i + 1]?.start ?? dur;
+    if (end > ch.start) {
+      const s = document.createElement("div");
+      s.className = "mark-chapter";
+      s.style.left = (ch.start / dur) * 100 + "%";
+      s.style.width = Math.max(((end - ch.start) / dur) * 100, 0.3) + "%";
+      addMarkerRange(ch.start, end, chapterLabel(ch.title, i), s);
+      marksEl.appendChild(s);
+    }
     if (ch.start <= 0) continue;
     const t = document.createElement("div");
     t.className = "mark-tick";
     t.style.left = (ch.start / dur) * 100 + "%";
-    if (ch.title) t.title = ch.title;
     marksEl.appendChild(t);
   }
 }
@@ -1261,7 +1349,7 @@ async function enter(
   opts: { mirrorOnly?: boolean } = {},
 ): Promise<void> {
   const v = target ?? primaryVideo();
-  if (!v || document.fullscreenElement || fmt) return;
+  if (!v || document.fullscreenElement || fmt || isDrmVideo(v)) return;
   const firstRect = v.getBoundingClientRect();
   const mirror = createMirror(v);
   if (!mirror && opts.mirrorOnly) return;
@@ -1286,6 +1374,7 @@ async function enter(
     inset: "0",
     zIndex: Z_OVERLAY,
     overflow: "hidden",
+    contain: "layout style paint",
   } as Partial<CSSStyleDeclaration>);
   overlay.tabIndex = -1;
   document.body.appendChild(overlay);
@@ -1295,6 +1384,7 @@ async function enter(
     inset: `-${BACKDROP_OVERSCAN}px`,
     opacity: "0",
     pointerEvents: "none",
+    willChange: "opacity, backdrop-filter",
   } as Partial<CSSStyleDeclaration>);
   overlay.appendChild(backdropEl);
   surfaceShell = document.createElement("div");
@@ -1390,6 +1480,8 @@ export function exitViewer(): void {
     styleGuard = null;
     pendingChapters = [];
     marksLoaded = false;
+    markerRanges = [];
+    activeMarker = null;
     if (video) {
       autoSeen.add(video); // closing means "not this one again"
       if (!mirrored) {
@@ -1439,6 +1531,7 @@ export function exitViewer(): void {
     pendingQuality = null;
     pendingQualityUntil = 0;
     marksEl = null;
+    markerTipEl = null;
     seeking = false;
     normalBox = null;
     sourceRect = null;
@@ -1473,7 +1566,10 @@ export function toggleViewer(format: ViewerFormat): void {
   const active = viewerFormat();
   if (active) {
     document.dispatchEvent(new Event(CLOSE_EVENT));
-    if (active !== format) setTimeout(() => void enter(format), 0);
+    if (active !== format)
+      setTimeout(() => {
+        if (!viewerFormat()) void enter(format);
+      }, 0);
     return;
   }
   enter(format);

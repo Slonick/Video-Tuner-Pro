@@ -94,7 +94,7 @@ export function App() {
           forceOpen={forceOpen(0)}
         />
         <LiveSyncCard sync={sync} live={syncLive} forceOpen={forceOpen(1)} />
-        <ViewerAutoControl viewerAuto={viewerAuto} viewerFit={viewerFit} />
+        <ViewerAutoControl viewerAuto={viewerAuto} viewerFit={viewerFit} blocked={speed.drm} />
 
         <div className={"group-label" + (audioBlk ? " has-warn" : "")}>
           <span>{msg("groupAudio") || "Audio"}</span>

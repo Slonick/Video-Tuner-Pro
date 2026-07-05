@@ -55,6 +55,14 @@ describe("parseTimestampList", () => {
     ]);
   });
 
+  it("parses timestamp lists with bullets and numbered prefixes", () => {
+    expect(parseTimestampList("• 0:00 Старт\n1) 0:30 Середина\n- 1:00 Финал")).toEqual([
+      { start: 0, title: "Старт" },
+      { start: 30, title: "Середина" },
+      { start: 60, title: "Финал" },
+    ]);
+  });
+
   it("rejects lists that don't start at 0:00 or aren't increasing", () => {
     expect(parseTimestampList("2:00 a\n3:00 b")).toEqual([]);
     expect(parseTimestampList("0:00 a\n5:00 b\n4:00 c")).toEqual([]);
@@ -101,8 +109,24 @@ describe("readYouTubeChapters", () => {
     ]);
   });
 
-  it("keeps boundaries untitled when the description doesn't line up", () => {
+  it("matches titles by start time instead of exact list length", () => {
     buildBar([50, 50], "0:00 Один\n0:10 Х\n0:50 Два");
+    expect(readYouTubeChapters(100).map((c) => c.title)).toEqual(["Один", "Два"]);
+  });
+
+  it("takes titles from chapter DOM when YouTube exposes them there", () => {
+    buildBar([50, 50]);
+    const [first, second] = Array.from(document.querySelectorAll(".ytp-chapters-container > *"));
+    first.setAttribute("aria-label", "Один");
+    const title = document.createElement("span");
+    title.className = "ytp-chapter-title-content";
+    title.textContent = "Два";
+    second.appendChild(title);
+    expect(readYouTubeChapters(100).map((c) => c.title)).toEqual(["Один", "Два"]);
+  });
+
+  it("keeps boundaries untitled when no source has matching titles", () => {
+    buildBar([50, 50], "0:10 Х");
     expect(readYouTubeChapters(100).map((c) => c.title)).toEqual(["", ""]);
   });
 

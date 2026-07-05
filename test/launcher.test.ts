@@ -4,8 +4,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // The on-video launcher: a draggable button over the video that opens the popup
 // as an in-page overlay (an iframe). updateLauncher mounts/positions it by mode
 // ("off"/"fullscreen"/"always"); a click without a drag toggles the iframe.
-const h = vi.hoisted(() => ({ primary: null as unknown }));
-vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => h.primary }));
+const h = vi.hoisted(() => ({ primary: null as unknown, drm: false }));
+vi.mock("../src/content/videos.js", () => ({
+  primaryVideo: () => h.primary,
+  isDrmVideo: () => h.drm,
+}));
 // runtime.getURL is the only browser API the launcher touches at mount/open time.
 vi.mock("../src/content/platform/browser.js", () => ({
   api: { runtime: { getURL: (p: string) => "chrome-extension://test/" + p } },
@@ -46,6 +49,25 @@ function fakeVideo(rect: Partial<DOMRect> = {}) {
   return { getBoundingClientRect: () => r } as unknown as HTMLVideoElement;
 }
 
+function fakeNativeVideo(rect: Partial<DOMRect> = {}) {
+  const el = document.createElement("video");
+  const r = {
+    left: 0,
+    top: 0,
+    width: 640,
+    height: 360,
+    right: 640,
+    bottom: 360,
+    ...rect,
+  } as DOMRect;
+  el.getBoundingClientRect = () => r;
+  Object.defineProperty(el, "requestPictureInPicture", {
+    value: vi.fn().mockResolvedValue({}),
+    configurable: true,
+  });
+  return el;
+}
+
 const host = () => document.querySelector("[data-vtp-launcher]");
 const fabEl = () =>
   (host()?.shadowRoot?.querySelector("button") as HTMLButtonElement | null) ?? null;
@@ -61,15 +83,24 @@ function fire(el: EventTarget, type: string, x = 0, y = 0) {
   el.dispatchEvent(new MouseEvent(type, { button: 0, clientX: x, clientY: y, bubbles: true }));
 }
 
+const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
 beforeEach(() => {
   host()?.remove();
   h.primary = null;
+  h.drm = false;
   v.format = null;
   v.anchor = null;
   v.paused = false;
   vi.clearAllMocks();
   S.overlayButton = "fullscreen";
   S.overlayBtnPos = null;
+  Object.defineProperty(document, "pictureInPictureEnabled", { value: false, configurable: true });
+  Object.defineProperty(document, "pictureInPictureElement", { value: null, configurable: true });
+  Object.defineProperty(document, "exitPictureInPicture", {
+    value: vi.fn().mockResolvedValue(undefined),
+    configurable: true,
+  });
   // jsdom has no fullscreen — force the property the launcher reads.
   Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
 });
@@ -193,16 +224,17 @@ describe("updateLauncher — default position", () => {
 });
 
 describe("launcher — open / close", () => {
-  it("starts hidden, reveals on mousemove over the video", () => {
+  it("starts hidden, reveals on mousemove over the video", async () => {
     S.overlayButton = "always";
     h.primary = fakeVideo();
     updateLauncher();
     expect(fabShown()).toBe(false);
     fire(document, "mousemove", 100, 100);
+    await frame();
     expect(fabShown()).toBe(true);
   });
 
-  it("self-heals its position on hover when the video moves with no other trigger", () => {
+  it("self-heals its position on hover when the video moves with no other trigger", async () => {
     // A site player can resize/relayout its video for reasons we have no hook
     // into (an ad, a quality switch, its own transition) — nothing calls
     // updateLauncher() again on its own. Hovering the video is the one moment
@@ -212,12 +244,14 @@ describe("launcher — open / close", () => {
     h.primary = video;
     updateLauncher();
     fire(document, "mousemove", 100, 100);
+    await frame();
     const fab = fabEl()!;
     expect(fab.style.left).toBe("580px"); // right-aligned default for a 640×360 box at (0,0)
     video.getBoundingClientRect = () =>
       ({ left: 100, top: 50, width: 400, height: 225, right: 500, bottom: 275 }) as DOMRect;
     // No resize/viewer-layout event, no re-mount — only a hover.
     fire(document, "mousemove", 300, 250);
+    await frame();
     expect(fab.style.left).toBe("440px");
     expect(fab.style.top).toBe("141px");
   });
@@ -277,42 +311,83 @@ describe("launcher — open / close", () => {
 });
 
 describe("launcher — radial viewer menu", () => {
-  // The three radial items follow the FAB in the shadow root: normal, theater, exit.
+  // The radial items follow the FAB in the shadow root: viewer, theater, PiP, exit.
   const items = () =>
     Array.from(host()?.shadowRoot?.querySelectorAll("button") ?? []).slice(
       1,
     ) as HTMLButtonElement[];
   const shown = (b: HTMLButtonElement) => b.style.opacity === "1";
 
-  function openMenu() {
+  async function openMenu(video: HTMLVideoElement = fakeVideo()) {
     S.overlayButton = "always";
-    h.primary = fakeVideo();
+    h.primary = video;
     updateLauncher();
     fire(fabEl()!, "mouseenter");
+    await frame();
   }
 
-  it("hovering the FAB reveals both formats; exit stays hidden while closed", () => {
-    openMenu();
-    const [normal, theater, exit] = items();
+  it("hovering the FAB reveals both formats; exit stays hidden while closed", async () => {
+    await openMenu();
+    const [normal, theater, pip, exit] = items();
     expect(shown(normal)).toBe(true);
     expect(shown(theater)).toBe(true);
+    expect(shown(pip)).toBe(false);
     expect(exit.style.display).toBe("none");
   });
 
-  it("while the viewer is open the menu offers exit and marks the active format", () => {
+  it("hides viewer format actions on protected video", async () => {
+    h.drm = true;
+    await openMenu();
+    const [normal, theater, pip, exit] = items();
+    expect(shown(normal)).toBe(false);
+    expect(shown(theater)).toBe(false);
+    expect(shown(pip)).toBe(false);
+    expect(exit.style.display).toBe("none");
+  });
+
+  it("offers native Picture in Picture only when the video supports it", async () => {
+    Object.defineProperty(document, "pictureInPictureEnabled", { value: true, configurable: true });
+    const video = fakeNativeVideo();
+    await openMenu(video);
+    const [, , pip] = items();
+    expect(shown(pip)).toBe(true);
+    pip.click();
+    expect(video.requestPictureInPicture).toHaveBeenCalled();
+  });
+
+  it("animates radial items out from the FAB", async () => {
+    await openMenu();
+    const [normal] = items();
+    expect(normal.style.transform).toBe("scale(1)");
+    fire(document.body, "pointerdown", 900, 900);
+    expect(normal.style.transform).toBe("scale(0.72)");
+  });
+
+  it("keeps open items at their fanned position when the menu refreshes", async () => {
+    await openMenu();
+    const [normal] = items();
+    const left = normal.style.left;
+    const top = normal.style.top;
+    fire(normal, "mouseenter");
+    expect(normal.style.left).toBe(left);
+    expect(normal.style.top).toBe(top);
+    expect(normal.style.transform).toBe("scale(1)");
+  });
+
+  it("while the viewer is open the menu offers exit and marks the active format", async () => {
     v.format = "theater";
-    openMenu();
-    const [normal, theater, exit] = items();
+    await openMenu();
+    const [normal, theater, , exit] = items();
     expect(exit.style.display).toBe("flex");
     expect(shown(exit)).toBe(true);
     expect(theater.getAttribute("aria-pressed")).toBe("true");
     expect(normal.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("the items act on the viewer: formats toggle, exit closes", () => {
+  it("the items act on the viewer: formats toggle, exit closes", async () => {
     v.format = "normal";
-    openMenu();
-    const [normal, theater, exit] = items();
+    await openMenu();
+    const [normal, theater, , exit] = items();
     normal.click();
     expect(v.toggleViewer).toHaveBeenCalledWith("normal");
     theater.click();
@@ -321,18 +396,28 @@ describe("launcher — radial viewer menu", () => {
     expect(v.exitViewer).toHaveBeenCalled();
   });
 
-  it("leaving the FAB closes the menu after the grace period", () => {
+  it("fans actions in theater, viewer, PiP order", async () => {
+    Object.defineProperty(document, "pictureInPictureEnabled", { value: true, configurable: true });
+    await openMenu(fakeNativeVideo());
+    const [viewer, theater, pip] = items();
+    expect(parseFloat(theater.style.top)).toBeGreaterThan(parseFloat(viewer.style.top));
+    expect(parseFloat(viewer.style.top)).toBeGreaterThan(parseFloat(pip.style.top));
+    expect(parseFloat(viewer.style.left)).toBeLessThan(parseFloat(theater.style.left));
+    expect(parseFloat(viewer.style.left)).toBeLessThan(parseFloat(pip.style.left));
+  });
+
+  it("leaving the FAB closes the menu after the grace period", async () => {
+    await openMenu();
     vi.useFakeTimers();
-    openMenu();
     fire(fabEl()!, "mouseleave");
     vi.advanceTimersByTime(400);
     expect(items().some(shown)).toBe(false);
     vi.useRealTimers();
   });
 
-  it("hopping from the FAB onto an item keeps the menu open", () => {
+  it("hopping from the FAB onto an item keeps the menu open", async () => {
+    await openMenu();
     vi.useFakeTimers();
-    openMenu();
     const [normal] = items();
     fire(fabEl()!, "mouseleave");
     fire(normal, "mouseenter");
@@ -341,23 +426,23 @@ describe("launcher — radial viewer menu", () => {
     vi.useRealTimers();
   });
 
-  it("moving outside closes the menu even if mouseleave was missed", () => {
+  it("moving outside closes the menu even if mouseleave was missed", async () => {
+    await openMenu();
     vi.useFakeTimers();
-    openMenu();
     fire(document, "pointermove", 900, 900);
     vi.advanceTimersByTime(400);
     expect(items().some(shown)).toBe(false);
     vi.useRealTimers();
   });
 
-  it("clicking outside closes the menu immediately", () => {
-    openMenu();
+  it("clicking outside closes the menu immediately", async () => {
+    await openMenu();
     fire(document.body, "pointerdown", 900, 900);
     expect(items().some(shown)).toBe(false);
   });
 
-  it("opening the popup closes the radial menu", () => {
-    openMenu();
+  it("opening the popup closes the radial menu", async () => {
+    await openMenu();
     fire(fabEl()!, "pointerdown", 580, 158);
     fire(fabEl()!, "pointerup", 580, 158);
     expect(frameEl()?.style.display).toBe("block");

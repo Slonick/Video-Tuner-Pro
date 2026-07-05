@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   onStream: false,
   channel: "UCabc" as string | null,
   channelName: "Cool Channel",
+  drm: false,
 }));
 
 vi.mock("../src/content/platform/browser.js", () => ({
@@ -29,7 +30,11 @@ vi.mock("../src/content/channel.js", () => ({
   currentChannel: () => h.channel,
   currentChannelName: () => h.channelName,
 }));
-vi.mock("../src/content/videos.js", () => ({ collectVideos: () => (h.hasVideo ? [{}] : []) }));
+vi.mock("../src/content/videos.js", () => ({
+  collectVideos: () => (h.hasVideo ? [{}] : []),
+  primaryVideo: () => (h.hasVideo ? ({} as HTMLVideoElement) : null),
+  isDrmVideo: () => h.drm,
+}));
 vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream }));
 const speed = vi.hoisted(() => ({
   setSpeed: vi.fn(),
@@ -86,6 +91,7 @@ beforeEach(() => {
   h.onStream = false;
   h.channel = "UCabc";
   h.channelName = "Cool Channel";
+  h.drm = false;
   S.currentSpeed = 1.0;
   try {
     Object.defineProperty(window, "top", { value: window, configurable: true });
@@ -155,6 +161,12 @@ describe("getSpeed", () => {
       scope: "channel",
       live: false,
     });
+  });
+
+  it("includes DRM status only when the active video is protected", () => {
+    h.drm = true;
+    const { resp } = send({ action: "getSpeed" });
+    expect(resp).toMatchObject({ drm: true });
   });
 });
 

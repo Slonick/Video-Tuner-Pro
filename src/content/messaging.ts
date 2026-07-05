@@ -5,7 +5,7 @@ import { getDomain } from "./core/domain.js";
 import { currentChannel, currentChannelName } from "./channel.js";
 import { clamp, clampTarget } from "./core/clamp.js";
 import { S } from "./state.js";
-import { collectVideos } from "./videos.js";
+import { collectVideos, isDrmVideo, primaryVideo } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
 import {
   setSpeed,
@@ -90,6 +90,14 @@ function replyFromVideoFrame(
   return false; // subframe without a video stays silent
 }
 
+function currentDrmProtected(): boolean {
+  try {
+    return isDrmVideo(primaryVideo());
+  } catch (e) {
+    return false;
+  }
+}
+
 api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "setSpeed") {
     // Every frame applies it; only the video frame answers.
@@ -126,6 +134,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       channelName: currentChannelName(),
       scope: S.speedScope,
       live: onStreamPage(),
+      ...(currentDrmProtected() ? { drm: true } : {}),
     }));
   }
   // --- Live-sync allowed delay (buffer target), per scope — mirrors speed above.

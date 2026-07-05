@@ -10,7 +10,7 @@ import { badgeFraction } from "../core/badge-pos.js";
 import { STORE } from "../platform/storage.js";
 import { api, ctxValid } from "../platform/browser.js";
 import { i18n } from "../platform/i18n.js";
-import { primaryVideo } from "../videos.js";
+import { isDrmVideo, primaryVideo } from "../videos.js";
 import {
   VIEWER_LAYOUT_EVENT,
   toggleViewer,
@@ -28,6 +28,8 @@ const R_ITEM = 36; // px — one radial-menu item's box
 const R_DIST = 62; // px — item centre's distance from the FAB centre
 const R_SPREAD = Math.PI / 3.6; // 50° between neighbouring radial items
 const R_HIDE_MS = 350; // grace period for the pointer to travel FAB → item
+const RADIAL_TRANSITION =
+  "left .22s cubic-bezier(.2,0,0,1), top .22s cubic-bezier(.2,0,0,1), opacity .18s ease, transform .22s cubic-bezier(.2,0,0,1)";
 const MARGIN = 16; // px — default inset from the video's right edge
 const POPUP_W = 684; // px — the popup's fixed width (popup base.css)
 const FIT_MARGIN = 24; // px — keep the overlay this far from the viewport edges
@@ -41,11 +43,13 @@ let fab: HTMLButtonElement | null = null;
 let rItems: {
   normal: HTMLButtonElement;
   theater: HTMLButtonElement;
+  pip: HTMLButtonElement;
   exit: HTMLButtonElement;
 } | null = null;
 let radialOpen = false;
 let radialTimer: Timer | undefined;
 let radialIdleTimer: Timer | undefined;
+let radialFrame = 0;
 let backdrop: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
 // Panel-drag state. The press starts inside the popup iframe, which captures the
@@ -63,6 +67,7 @@ let frameScale = 1; // last fit-scale from layoutFrame, reused by the open anima
 let open = false;
 let hideTimer: Timer | undefined;
 let mouseHooked = false;
+let hoverRaf = 0;
 let fabVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let dragging = false;
 let moved = false;
@@ -118,9 +123,57 @@ function positionFab(v: HTMLElement): void {
 // is open.
 function radialList(): HTMLButtonElement[] {
   if (!rItems) return [];
-  const items = [rItems.normal, rItems.theater];
+  if (isDrmVideo(primaryVideo())) return viewerFormat() ? [rItems.exit] : [];
+  const items = [rItems.theater, rItems.normal];
+  if (canUseNativePiP()) items.push(rItems.pip);
   if (viewerFormat()) items.push(rItems.exit);
   return items;
+}
+
+function nativePiPVideo(): HTMLVideoElement | null {
+  const v = primaryVideo();
+  return v instanceof HTMLVideoElement ? v : null;
+}
+
+function canUseNativePiP(v = nativePiPVideo()): v is HTMLVideoElement {
+  return !!(
+    v &&
+    !isDrmVideo(v) &&
+    document.pictureInPictureEnabled !== false &&
+    !v.disablePictureInPicture &&
+    typeof v.requestPictureInPicture === "function"
+  );
+}
+
+function positionRadialAtFab(items = Object.values(rItems ?? {})): void {
+  if (!fab) return;
+  const fabLeft = parseFloat(fab.style.left);
+  const fabTop = parseFloat(fab.style.top);
+  if (!Number.isFinite(fabLeft) || !Number.isFinite(fabTop)) return;
+  const left = fabLeft + (FAB_SIZE - R_ITEM) / 2;
+  const top = fabTop + (FAB_SIZE - R_ITEM) / 2;
+  for (const b of items) {
+    b.style.left = Math.round(left) + "px";
+    b.style.top = Math.round(top) + "px";
+    b.style.transform = "scale(0.72)";
+  }
+}
+
+function snapRadialAtFab(items = Object.values(rItems ?? {})): void {
+  if (!fab) return;
+  cancelAnimationFrame(radialFrame);
+  radialFrame = 0;
+  for (const b of items) {
+    b.style.transition = "none";
+    b.style.opacity = "0";
+    b.style.visibility = "hidden";
+    b.style.pointerEvents = "none";
+  }
+  positionRadialAtFab(items);
+  // Commit the hidden origin before transitions return. Otherwise Chrome may
+  // paint one frame at stale coordinates when YouTube churns the page.
+  fab.getBoundingClientRect();
+  for (const b of items) b.style.transition = RADIAL_TRANSITION;
 }
 
 // Fan the items around the FAB, centred on the direction toward the video's
@@ -141,6 +194,7 @@ function layoutRadial(): void {
     const a = base + (i - (items.length - 1) / 2) * R_SPREAD;
     b.style.left = Math.round(fx + Math.cos(a) * R_DIST - R_ITEM / 2) + "px";
     b.style.top = Math.round(fy + Math.sin(a) * R_DIST - R_ITEM / 2) + "px";
+    b.style.transform = "scale(1)";
   });
 }
 
@@ -151,18 +205,67 @@ function syncRadial(): void {
   const f = viewerFormat();
   rItems.normal.setAttribute("aria-pressed", f === "normal" ? "true" : "false");
   rItems.theater.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
+  rItems.pip.setAttribute(
+    "aria-pressed",
+    nativePiPVideo() && document.pictureInPictureElement === nativePiPVideo() ? "true" : "false",
+  );
   rItems.exit.style.display = f ? "flex" : "none";
+}
+
+function toggleNativePiP(): void {
+  const v = nativePiPVideo();
+  if (!canUseNativePiP(v)) return;
+  void (async () => {
+    try {
+      if (document.pictureInPictureElement === v) await document.exitPictureInPicture();
+      else await v.requestPictureInPicture();
+    } catch {
+      // Browsers/sites can reject PiP for policy/user-activation reasons.
+    }
+  })();
 }
 
 function openRadial(): void {
   if (!rItems || !fab) return;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
-  radialOpen = true;
   syncRadial();
-  layoutRadial();
-  for (const b of radialList()) {
-    b.style.opacity = "1";
+  const items = radialList();
+  for (const b of Object.values(rItems)) {
+    if (items.includes(b)) continue;
+    b.style.opacity = "0";
+    b.style.visibility = "hidden";
+    b.style.pointerEvents = "none";
+  }
+  if (!items.length) {
+    radialOpen = false;
+    snapRadialAtFab();
+    return;
+  }
+  if (radialOpen) {
+    for (const b of items) {
+      b.style.visibility = "visible";
+      b.style.opacity = "1";
+      b.style.pointerEvents = "auto";
+    }
+    layoutRadial();
+    radialIdleTimer = setTimeout(() => closeRadial(true), 2600);
+    flashFab();
+    return;
+  }
+  radialOpen = true;
+  snapRadialAtFab(items);
+  radialFrame = requestAnimationFrame(() => {
+    radialFrame = 0;
+    if (!radialOpen) return;
+    for (const b of items) {
+      b.style.visibility = "visible";
+      b.style.opacity = "1";
+      b.style.pointerEvents = "auto";
+    }
+    layoutRadial();
+  });
+  for (const b of items) {
     b.style.pointerEvents = "auto";
   }
   radialIdleTimer = setTimeout(() => closeRadial(true), 2600);
@@ -176,11 +279,15 @@ function closeRadial(resumeHide = false): void {
   radialOpen = false;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
+  cancelAnimationFrame(radialFrame);
+  radialFrame = 0;
   if (rItems) {
     for (const b of Object.values(rItems)) {
       b.style.opacity = "0";
+      b.style.visibility = "hidden";
       b.style.pointerEvents = "none";
     }
+    positionRadialAtFab();
   }
   if (resumeHide) flashFab();
 }
@@ -565,10 +672,7 @@ function mount(): void {
   };
   rItems = {
     normal: radialButton(
-      // Picture-in-picture mark: the standard "pop out video" glyph (a frame
-      // with a small filled window in its corner) — reads at a glance, unlike
-      // the previous generic external-link arrow.
-      '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12.5" y="11.5" width="7" height="5" rx="1" fill="currentColor" stroke="none"/></svg>',
+      '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><rect x="7" y="8" width="10" height="7" rx="1.5" fill="currentColor" stroke="none" opacity=".9"/></svg>',
       i18n("viewerBtnAria") || "Pop out video",
       act(() => toggleViewer("normal")),
     ),
@@ -578,13 +682,18 @@ function mount(): void {
       i18n("viewerTheaterAria") || "Pop out in theater format",
       act(() => toggleViewer("theater")),
     ),
+    pip: radialButton(
+      '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12.5" y="11.5" width="7" height="5" rx="1" fill="currentColor" stroke="none"/></svg>',
+      i18n("viewerPiPAria") || "Picture in Picture",
+      act(toggleNativePiP),
+    ),
     exit: radialButton(
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>',
       i18n("viewerCloseAria") || "Close the pop-out viewer",
       act(exitViewer),
     ),
   };
-  shadow.append(rItems.normal, rItems.theater, rItems.exit);
+  shadow.append(rItems.normal, rItems.theater, rItems.pip, rItems.exit);
   fab.addEventListener("mouseenter", openRadial);
   fab.addEventListener("mouseleave", scheduleRadialClose);
 }
@@ -615,7 +724,10 @@ function radialButton(svg: string, label: string, onClick: () => void): HTMLButt
     alignItems: "center",
     justifyContent: "center",
     opacity: "0",
-    transition: "opacity .2s",
+    transform: "scale(0.72)",
+    transformOrigin: "50% 50%",
+    transition: RADIAL_TRANSITION,
+    visibility: "hidden",
     pointerEvents: "none",
   } as Partial<CSSStyleDeclaration>);
   const body = new DOMParser().parseFromString(svg, "text/html").body;
@@ -646,8 +758,13 @@ function hookMouse(): void {
       // stuck over stale geometry until something else happens to trigger a
       // reposition. Hovering the video is the one moment we know for certain
       // the real, current rect is worth reading.
-      if (!dragging) positionFab(v);
-      flashFab();
+      if (hoverRaf) return;
+      hoverRaf = requestAnimationFrame(() => {
+        hoverRaf = 0;
+        if (fabVideo !== v) return;
+        if (!dragging) positionFab(v);
+        flashFab();
+      });
     },
     { passive: true },
   );

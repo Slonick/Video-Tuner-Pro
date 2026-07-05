@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
-import { collectVideos, primaryVideo } from "../src/content/videos.js";
+import { collectVideos, isDrmVideo, markDrmVideo, primaryVideo } from "../src/content/videos.js";
 
 // Helper: a <video> with a stubbed bounding box and paused state (jsdom returns
 // a zero-size rect and no real playback).
@@ -98,5 +98,20 @@ describe("primaryVideo", () => {
     vid(200, 200, true);
     const big = vid(800, 450, true);
     expect(primaryVideo()).toBe(big);
+  });
+});
+
+describe("DRM detection", () => {
+  it("marks a video as protected", () => {
+    const v = vid(640, 360, false);
+    expect(isDrmVideo(v)).toBe(false);
+    markDrmVideo(v);
+    expect(isDrmVideo(v)).toBe(true);
+  });
+
+  it("treats mediaKeys as protected even before the encrypted event reaches us", () => {
+    const v = vid(640, 360, false);
+    Object.defineProperty(v, "mediaKeys", { value: {}, configurable: true });
+    expect(isDrmVideo(v)).toBe(true);
   });
 });

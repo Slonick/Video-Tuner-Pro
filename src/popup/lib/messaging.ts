@@ -9,6 +9,7 @@ export interface SpeedResponse {
   channel?: string | null;
   channelName?: string | null;
   scope?: Scope | null;
+  drm?: boolean;
 }
 
 export interface TargetResponse {

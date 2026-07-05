@@ -13,6 +13,7 @@ import type { UseViewerFit, ViewerFitMode } from "../hooks/useViewerFit.js";
 interface Props {
   viewerAuto: UseViewerAuto;
   viewerFit: UseViewerFit;
+  blocked?: boolean;
 }
 
 const VIEWER_AUTO_LABEL: Record<ViewerAutoMode, string> = {
@@ -27,7 +28,7 @@ const VIEWER_FIT_LABEL: Record<ViewerFitMode, string> = {
   fill: "viewerFitFill",
 };
 
-export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
+export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = false }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [backdropVideo, setBackdropVideoState] = useState(false);
@@ -40,10 +41,12 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
   });
 
   const setEnabled = (on: boolean) => {
+    if (blocked) return;
     va.setEnabled(on);
   };
 
   const setBackdropVideo = (on: boolean) => {
+    if (blocked) return;
     setBackdropVideoState(on);
     STORE.set({ viewerBackdropVideo: on });
   };
@@ -52,7 +55,11 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
     <div ref={slotRef} className="viewer-auto-slot card-slot">
       <div
         ref={sectionRef}
-        className={"sync-section viewer-auto-section overlay-card" + (open ? " is-overlay" : "")}
+        className={
+          "sync-section viewer-auto-section overlay-card" +
+          (open ? " is-overlay" : "") +
+          (blocked ? " locked" : "")
+        }
       >
         <div className="sec-head">
           <Button className="sec-main" aria-expanded={open} onClick={toggle}>
@@ -69,7 +76,9 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
                             ? msg("scopeEverywhere")
                             : msg("optViewerAutoHint")
                     }`
-                  : msg("optViewerAutoHint")}
+                  : blocked
+                    ? msg("viewerDrmBlocked") || "Unavailable on protected video"
+                    : msg("optViewerAutoHint")}
               </span>
             </span>
           </Button>
@@ -77,6 +86,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
             id="viewerAutoToggle"
             checked={va.enabled}
             ariaLabel={label}
+            disabled={blocked}
             onChange={setEnabled}
           />
         </div>
@@ -96,6 +106,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
                 }
                 role="radio"
                 aria-checked={va.pageMode === "off"}
+                disabled={blocked}
                 onClick={() => va.setPageMode("off")}
               >
                 <span className="viewer-auto-window">
@@ -115,6 +126,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
                 }
                 role="radio"
                 aria-checked={va.pageMode === "normal"}
+                disabled={blocked}
                 onClick={() => va.setPageMode("normal")}
               >
                 <span className="viewer-auto-window viewer-auto-overlay-window">
@@ -130,6 +142,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
                 }
                 role="radio"
                 aria-checked={va.pageMode === "theater"}
+                disabled={blocked}
                 onClick={() => va.setPageMode("theater")}
               >
                 <span className="viewer-auto-window">
@@ -166,13 +179,20 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit }: Props) {
                 id="viewerBackdropVideoToggle"
                 checked={backdropVideo}
                 ariaLabel={backdropLabel}
+                disabled={blocked}
                 onChange={setBackdropVideo}
               />
             </div>
+            {blocked && (
+              <div className="viewer-drm-note" role="status">
+                {msg("viewerDrmBlocked") || "Unavailable on protected video"}
+              </div>
+            )}
             <Segmented
               id="viewerFitSeg"
               className="seg viewer-auto-seg"
               ariaLabel={msg("viewerFitAria") || "Fill mode"}
+              disabled={blocked}
               items={VIEWER_FIT_MODES.map((m) => ({
                 value: m,
                 label: msg(VIEWER_FIT_LABEL[m]) || m,

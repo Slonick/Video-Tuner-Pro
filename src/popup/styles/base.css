@@ -105,6 +105,19 @@ html.vtp-embedded .group-label::after {
   min-width: 0;
 }
 
+.viewer-auto-section.locked .viewer-auto-state,
+.viewer-auto-section.locked .viewer-backdrop-option,
+.viewer-auto-section.locked .viewer-auto-seg,
+.viewer-auto-section.locked .viewer-auto-save {
+  opacity: 0.45;
+  filter: var(--lock-filter, grayscale(0.3));
+}
+
+.viewer-auto-state:disabled,
+.viewer-auto-seg.is-disabled .seg-btn {
+  cursor: default;
+}
+
 .viewer-auto-section:not(.is-overlay) {
   padding: var(--space-2);
 }
@@ -193,6 +206,16 @@ html.vtp-embedded .group-label::after {
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.viewer-drm-note {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, #ff9f0a 55%, var(--track));
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  background: color-mix(in srgb, #ff9f0a 18%, transparent);
 }
 
 .viewer-auto-visual {
