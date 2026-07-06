@@ -35,16 +35,6 @@ import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
 import { currentChannel, channelKeys } from "./channel.js";
 
-try {
-  const s = document.createElement("script");
-  s.src = api.runtime.getURL("quality-inject.js");
-  s.async = false;
-  (document.documentElement || document.head || document.body)?.appendChild(s);
-  s.remove();
-} catch (e) {
-  /* manifest MAIN world covers browsers that block page-script injection */
-}
-
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;

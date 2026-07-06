@@ -261,6 +261,42 @@ describe("toggleViewer — lifecycle", () => {
     expect(document.documentElement.style.overflow).toBe("");
   });
 
+  it("does not reopen while the close animation is restoring the video", async () => {
+    vi.useFakeTimers();
+    const { wrap, v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+
+    const originalAnimate = Element.prototype.animate;
+    const animate = vi.fn(function () {
+      const anim = { onfinish: null, oncancel: null } as unknown as Animation;
+      setTimeout(() => {
+        const done = anim.onfinish;
+        if (typeof done === "function") done.call(anim, new Event("finish") as AnimationPlaybackEvent);
+      }, 100);
+      return anim;
+    });
+    Object.defineProperty(Element.prototype, "animate", { value: animate, configurable: true });
+
+    exitViewer();
+    expect(overlayEl()).not.toBeNull();
+    toggleViewer("normal");
+    expect(document.querySelectorAll("[data-vtp-viewer-overlay]").length).toBe(1);
+    await vi.advanceTimersByTimeAsync(120);
+    await flush();
+    expect(overlayEl()).toBeNull();
+    expect(v.parentElement).toBe(wrap);
+
+    if (originalAnimate) {
+      Object.defineProperty(Element.prototype, "animate", {
+        value: originalAnimate,
+        configurable: true,
+      });
+    } else {
+      delete (Element.prototype as { animate?: Element["animate"] }).animate;
+    }
+  });
+
   it("Escape exits; a press on the dim exits; a press on the video does not", async () => {
     const { v } = makeVideo();
     h.primary = v;

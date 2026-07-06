@@ -12,6 +12,9 @@
 // internals, so we describe narrow shapes for exactly the fields we read.
 (function () {
   "use strict";
+  const win = window as typeof window & { __vtpLatencyBridgeInstalled?: boolean };
+  if (win.__vtpLatencyBridgeInstalled) return;
+  win.__vtpLatencyBridgeInstalled = true;
   const ATTR = "data-vtp-latency";
   const LIVE_ATTR = "data-vtp-live";
 
@@ -213,8 +216,14 @@
   }
   let hlsInst: HlsLike | null = null;
   let nextHlsScanAt = 0;
+  function activeHls(hls: HlsLike | null): hls is HlsLike {
+    if (!isHls(hls)) return false;
+    const media = hls.media;
+    return !(media instanceof HTMLMediaElement) || media.isConnected;
+  }
   function ensureHls(): HlsLike | null {
-    if (isHls(hlsInst)) return hlsInst;
+    if (activeHls(hlsInst)) return hlsInst;
+    hlsInst = null;
     const now = Date.now();
     if (now < nextHlsScanAt) return null;
     hlsInst = findHls();
@@ -223,7 +232,7 @@
   }
   function hlsLatency(): number | null {
     try {
-      if (!isHls(hlsInst)) hlsInst = ensureHls();
+      if (!activeHls(hlsInst)) hlsInst = ensureHls();
       const l = hlsInst ? hlsInst.latency : null;
       return typeof l === "number" && isFinite(l) && l > 0 ? l : null;
     } catch (e) {

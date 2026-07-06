@@ -107,7 +107,7 @@ describe("normalizeHoldSpeed", () => {
 describe("normalizeKeymap", () => {
   it("defaults missing/invalid bindings", () => {
     expect(normalizeKeymap(undefined)).toEqual(DEFAULT_KEYMAP);
-    expect(normalizeKeymap({ slower: "Shift", faster: 42 })).toEqual(DEFAULT_KEYMAP);
+    expect(normalizeKeymap("bad")).toEqual(DEFAULT_KEYMAP);
   });
   it("accepts valid bindable codes", () => {
     expect(normalizeKeymap({ slower: "KeyJ", faster: "KeyK", reset: "Digit0" })).toEqual({
@@ -115,7 +115,21 @@ describe("normalizeKeymap", () => {
       slower: "KeyJ",
       faster: "KeyK",
       reset: "Digit0",
+      viewer: "",
+      theater: "",
     });
+  });
+  it("does not add viewer shortcuts to an existing stored keymap", () => {
+    const km = normalizeKeymap({
+      slower: "KeyJ",
+      faster: "KeyK",
+      reset: "Digit0",
+      toggle: "KeyS",
+      hold: "KeyX",
+      overlay: "KeyO",
+    });
+    expect(km.viewer).toBe("");
+    expect(km.theater).toBe("");
   });
   it("drops a duplicate binding back to its default", () => {
     const km = normalizeKeymap({ slower: "KeyZ", faster: "KeyZ" });

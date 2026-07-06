@@ -160,6 +160,9 @@ export function chordLabel(spec: string | null, mac: boolean = IS_MAC): string {
 export function normalizeKeymap(raw: unknown): Keymap {
   const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const out: Keymap = { ...DEFAULT_KEYMAP };
+  const legacy = !!raw && typeof raw === "object";
+  if (legacy && !("viewer" in src)) out.viewer = "";
+  if (legacy && !("theater" in src)) out.theater = "";
   const used = new Set<string>();
   for (const a of ACTIONS) {
     const code = src[a];

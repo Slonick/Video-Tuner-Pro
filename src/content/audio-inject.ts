@@ -89,6 +89,9 @@ export function refreshTracked(): void {
 // createElement). The capture runs before the native call and never affects its
 // result.
 export function install(): void {
+  const win = window as typeof window & { __vtpAudioBridgeInstalled?: boolean };
+  if (win.__vtpAudioBridgeInstalled) return;
+  win.__vtpAudioBridgeInstalled = true;
   try {
     const proto = HTMLMediaElement.prototype;
     const nativePlay = proto.play;

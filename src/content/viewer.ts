@@ -24,6 +24,7 @@ export const VIEWER_LAYOUT_EVENT = "vtp-viewer-layout";
 
 const ATTR = "data-vtp-viewer"; // on <html>: "normal" | "theater" — state marker
 const OVERLAY = "data-vtp-viewer-overlay";
+const ADOPTED_VIDEO = "data-vtp-viewer-adopted-video";
 const FRACTION = 0.86; // the normal box's share of the viewport
 const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
@@ -88,6 +89,7 @@ let mirrored = false;
 let mirrorStream: MediaStream | null = null;
 let sourceRect: DOMRect | null = null;
 let layoutPaused = false;
+let exiting = false;
 
 let fitMenu: HTMLDivElement | null = null;
 let qualityWrap: HTMLSpanElement | null = null;
@@ -141,17 +143,6 @@ document.addEventListener(
       exitViewer();
       return;
     }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const format =
-      e.code === S.keymap.viewer || e.code === "KeyV"
-        ? "normal"
-        : e.code === S.keymap.theater || e.code === "KeyT"
-          ? "theater"
-          : null;
-    if (!format) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    toggleViewer(format);
   },
   true,
 );
@@ -1338,6 +1329,7 @@ const autoSeen = new WeakSet<HTMLVideoElement>();
 document.addEventListener(
   "play",
   (e) => {
+    if (window.top !== window) return;
     const t = e.target;
     if (!(t instanceof HTMLVideoElement)) return;
     // Our own mirror/backdrop videos live inside the overlay and are started
@@ -1361,8 +1353,9 @@ async function enter(
   target?: HTMLVideoElement,
   opts: { mirrorOnly?: boolean } = {},
 ): Promise<void> {
+  if (window.top !== window) return;
   const v = target ?? primaryVideo();
-  if (!v || document.fullscreenElement || fmt || isDrmVideo(v)) return;
+  if (!v || document.fullscreenElement || fmt || exiting || overlay || isDrmVideo(v)) return;
   const firstRect = v.getBoundingClientRect();
   const mirror = createMirror(v);
   if (!mirror && opts.mirrorOnly) return;
@@ -1423,6 +1416,7 @@ async function enter(
     holder = document.createComment("vtp-viewer-holder");
     v.parentNode?.insertBefore(holder, v);
     surfaceVideo = v;
+    v.setAttribute(ADOPTED_VIDEO, "");
     surfaceShell.appendChild(v);
     v.controls = false; // ours replace them; the site's flag is restored on exit
   }
@@ -1461,7 +1455,8 @@ async function enter(
 }
 
 export function exitViewer(): void {
-  if (!fmt) return;
+  if (!fmt || exiting) return;
+  exiting = true;
   // Stays paused for the whole close transition — same as enter() — so the
   // launcher doesn't reposition itself off a video mid-shrink/mid-restore.
   // finish() below clears it once the video is truly back in its original spot.
@@ -1498,6 +1493,7 @@ export function exitViewer(): void {
     if (video) {
       autoSeen.add(video); // closing means "not this one again"
       if (!mirrored) {
+        video.removeAttribute(ADOPTED_VIDEO);
         video.controls = prevControls;
         video.style.cssText = prevCss;
       }
@@ -1549,6 +1545,7 @@ export function exitViewer(): void {
     normalBox = null;
     sourceRect = null;
     layoutPaused = false;
+    exiting = false;
     surfaceVideo = null;
     mirrored = false;
     video = null;

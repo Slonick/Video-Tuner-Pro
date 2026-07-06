@@ -155,7 +155,6 @@ function reinjectOpenTabs(): void {
 if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
   api.runtime.onInstalled.addListener(reinjectOpenTabs);
   if (api.runtime.onStartup) api.runtime.onStartup.addListener(reinjectOpenTabs);
-  setTimeout(reinjectOpenTabs, 250);
 }
 
 // First-run seeding: persist the shipped global defaults — playback speed 100%

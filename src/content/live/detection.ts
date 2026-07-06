@@ -84,18 +84,18 @@ export function isLive(video: HTMLVideoElement): boolean {
     }
   }
 
-  // Once a non-YouTube player exposes a real finite duration, treat it as VOD.
-  // Some VOD players briefly look unbounded while metadata/quality reloads settle;
-  // an earlier probe sample must not keep the whole extension in live mode.
-  if (finiteVodDuration(video.duration)) return false;
-
   // Most live MSE streams report an infinite duration (Twitch, many players).
   if (unboundedDuration(video.duration)) return true;
 
-  // Generic fallback (covers Twitch low-latency etc., where duration isn't
-  // Infinity): a stream whose media edge advances in real time, set by probeLive.
+  // Generic fallback (covers Twitch low-latency and players that expose a finite
+  // but growing live edge): a stream whose media edge advances in real time.
   const s = liveProbe.get(video);
   if (s && s.live) return true;
+
+  // Otherwise a real finite duration is a VOD. Some VOD players briefly look
+  // unbounded while metadata/quality reloads settle; probeLive clears those
+  // samples as soon as the finite edge stops growing like a live stream.
+  if (finiteVodDuration(video.duration)) return false;
   return false;
 }
 
@@ -131,14 +131,11 @@ function streamEnd(v: HTMLVideoElement): number {
 export function probeLive(v: HTMLVideoElement): void {
   if (!v) return;
   const t = Date.now();
-  if (finiteVodDuration(v.duration)) {
-    liveProbe.set(v, { lastEnd: streamEnd(v), lastT: t, lastGrow: 0, hits: 0, live: false });
-    return;
-  }
   if (unboundedDuration(v.duration)) {
     liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, hits: 0, live: true });
     return;
   }
+  const finite = finiteVodDuration(v.duration);
   const end = streamEnd(v);
   const s = liveProbe.get(v);
   if (!s) {
@@ -156,6 +153,7 @@ export function probeLive(v: HTMLVideoElement): void {
     if (s.hits >= 3) s.lastGrow = t;
   } else {
     s.hits = 0;
+    if (finite) s.lastGrow = 0;
   }
   s.live = s.lastGrow > 0 && t - s.lastGrow < 8000; // sticky through brief stalls
 }

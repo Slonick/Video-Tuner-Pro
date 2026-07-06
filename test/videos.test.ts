@@ -88,6 +88,53 @@ describe("primaryVideo", () => {
     expect(primaryVideo()).toBe(main);
   });
 
+  it("keeps an adopted viewer video controllable inside the overlay", () => {
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-vtp-viewer-overlay", "");
+    document.body.appendChild(overlay);
+    const adopted = document.createElement("video");
+    adopted.setAttribute("data-vtp-viewer-adopted-video", "");
+    adopted.getBoundingClientRect = () =>
+      ({
+        width: 1000,
+        height: 600,
+        left: 0,
+        top: 0,
+        right: 1000,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON() {},
+      }) as DOMRect;
+    Object.defineProperty(adopted, "paused", { value: false, configurable: true });
+    overlay.appendChild(adopted);
+    expect(collectVideos()).toContain(adopted);
+    expect(primaryVideo()).toBe(adopted);
+  });
+
+  it("does not keep mirror or backdrop videos in the overlay", () => {
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-vtp-viewer-overlay", "");
+    document.body.appendChild(overlay);
+    const mirror = document.createElement("video");
+    mirror.getBoundingClientRect = () =>
+      ({
+        width: 1000,
+        height: 600,
+        left: 0,
+        top: 0,
+        right: 1000,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON() {},
+      }) as DOMRect;
+    Object.defineProperty(mirror, "paused", { value: false, configurable: true });
+    overlay.appendChild(mirror);
+    expect(collectVideos()).not.toContain(mirror);
+    expect(primaryVideo()).toBeNull();
+  });
+
   it("among playing videos, picks the largest by area", () => {
     vid(200, 200, false);
     const big = vid(800, 450, false);

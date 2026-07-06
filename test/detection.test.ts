@@ -93,6 +93,22 @@ describe("probeLive (generic real-time-edge detection)", () => {
     expect(isLive(v)).toBe(true);
   });
 
+  it("marks a finite but growing media edge live", () => {
+    let duration = 10;
+    const v = vid();
+    Object.defineProperty(v, "duration", {
+      configurable: true,
+      get: () => duration,
+    });
+    probeLive(v);
+    for (let i = 1; i <= 4; i++) {
+      vi.setSystemTime(i * 500);
+      duration += 0.5;
+      probeLive(v);
+    }
+    expect(isLive(v)).toBe(true);
+  });
+
   it("does NOT mark a VOD (edge already far ahead, no real-time growth) live", () => {
     const v = vid({
       buffered: { length: 1, start: () => 0, end: () => 1000 } as unknown as TimeRanges,

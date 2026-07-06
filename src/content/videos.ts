@@ -15,6 +15,7 @@ const trackedVideos = new Set<HTMLVideoElement>();
 const trackedAudios = new Set<HTMLAudioElement>();
 const drmVideos = new WeakSet<HTMLVideoElement>();
 const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
+const ADOPTED_VIEWER_VIDEO = "data-vtp-viewer-adopted-video";
 let observer: MutationObserver | null = null;
 let tracking = false;
 
@@ -28,12 +29,17 @@ let isOwnNode: (n: Node) => boolean = () => false;
 
 function addMedia(el: Element): boolean {
   if (isOwnNode(el)) return false;
-  if (el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")) return false;
   if (el instanceof HTMLVideoElement) {
+    if (
+      el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]") &&
+      !el.hasAttribute(ADOPTED_VIEWER_VIDEO)
+    )
+      return false;
     if (trackedVideos.has(el)) return false;
     trackedVideos.add(el);
     return true;
   }
+  if (el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")) return false;
   if (el instanceof HTMLAudioElement) {
     if (trackedAudios.has(el)) return false;
     trackedAudios.add(el);
@@ -140,7 +146,8 @@ export function collectVideos(): HTMLVideoElement[] {
     if (
       v.isConnected &&
       !isOwnNode(v) &&
-      !v.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")
+      (!v.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]") ||
+        v.hasAttribute(ADOPTED_VIEWER_VIDEO))
     )
       out.push(v);
     else trackedVideos.delete(v);

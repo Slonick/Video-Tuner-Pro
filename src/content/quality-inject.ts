@@ -387,7 +387,8 @@
   function hlsAdapter(v: HTMLVideoElement): Adapter | null {
     let hls: HlsLike | null = null;
     for (const entry of win.__vtpQualityHls || []) {
-      if (!entry.video && entry.hls.media instanceof HTMLVideoElement) entry.video = entry.hls.media;
+      if (entry.hls.media instanceof HTMLVideoElement && entry.video !== entry.hls.media)
+        entry.video = entry.hls.media;
       if (entry.video === v) {
         hls = entry.hls;
         break;
