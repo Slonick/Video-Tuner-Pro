@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const h = vi.hoisted(() => ({ primary: null as unknown }));
+const h = vi.hoisted(() => ({
+  primary: null as unknown,
+  chapters: [
+    { start: 0, title: "" },
+    { start: 40, title: "Middle" },
+  ],
+}));
 
 vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => h.primary,
@@ -13,10 +19,7 @@ vi.mock("../src/content/markers.js", () => ({
   youTubeVideoId: () => "abc",
   hasNativeSponsorBlock: () => false,
   SPONSOR_COLORS: { sponsor: "#00d400" },
-  readYouTubeChapters: () => [
-    { start: 0, title: "" },
-    { start: 40, title: "Middle" },
-  ],
+  readYouTubeChapters: () => h.chapters,
   fetchSponsorSegments: vi.fn().mockResolvedValue([{ start: 10, end: 20, category: "sponsor" }]),
 }));
 
@@ -57,6 +60,10 @@ beforeEach(() => {
   exitViewer();
   document.body.innerHTML = "";
   h.primary = null;
+  h.chapters = [
+    { start: 0, title: "" },
+    { start: 40, title: "Middle" },
+  ];
   S.sponsorMarks = true;
 });
 

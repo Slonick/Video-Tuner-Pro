@@ -124,10 +124,13 @@ function positionFab(v: HTMLElement): void {
 function radialList(): HTMLButtonElement[] {
   if (!rItems) return [];
   if (isDrmVideo(primaryVideo())) return viewerFormat() ? [rItems.exit] : [];
-  const items = [rItems.theater, rItems.normal];
-  if (canUseNativePiP()) items.push(rItems.pip);
-  if (viewerFormat()) items.push(rItems.exit);
-  return items;
+  const f = viewerFormat();
+  const visual = [
+    f === "theater" ? rItems.exit : rItems.theater,
+    f === "normal" ? rItems.exit : rItems.normal,
+  ];
+  if (canUseNativePiP()) visual.push(rItems.pip);
+  return visual.reverse();
 }
 
 function nativePiPVideo(): HTMLVideoElement | null {
@@ -693,7 +696,7 @@ function mount(): void {
       act(exitViewer),
     ),
   };
-  shadow.append(rItems.normal, rItems.theater, rItems.pip, rItems.exit);
+  shadow.append(rItems.theater, rItems.normal, rItems.pip, rItems.exit);
   fab.addEventListener("mouseenter", openRadial);
   fab.addEventListener("mouseleave", scheduleRadialClose);
 }

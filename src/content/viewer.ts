@@ -183,7 +183,8 @@ export function viewerAnchorVideo(): HTMLElement | null {
   if (surfaceVideo?.isConnected) return surfaceVideo;
   const overlayEl = document.querySelector(`[${OVERLAY}]`);
   const fallback = Array.from(overlayEl?.children ?? []).find(
-    (el) => el instanceof HTMLElement && el.querySelector("video:not([data-vtp-viewer-backdrop-video])"),
+    (el) =>
+      el instanceof HTMLElement && el.querySelector("video:not([data-vtp-viewer-backdrop-video])"),
   );
   return fallback instanceof HTMLElement ? fallback : null;
 }
@@ -1010,7 +1011,9 @@ function mountBar(): void {
   seekEl.max = "1000";
   seekEl.step = "1";
   seekEl.setAttribute("aria-label", i18n("viewerSeekAria") || "Seek");
-  seekEl.addEventListener("pointerdown", () => (seeking = true));
+  seekEl.addEventListener("pointerdown", () => {
+    seeking = true;
+  });
   seekEl.addEventListener("pointerup", () => (seeking = false));
   seekEl.addEventListener("input", () => {
     if (!video) return;
@@ -1104,9 +1107,7 @@ function mountBar(): void {
 // Chapter ticks (captured pre-adoption) and opt-in SponsorBlock bands on the
 // seek bar. Waits for a real duration; bands render under the ticks.
 function segmentLabel(category: string): string {
-  return category
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (m) => m.toUpperCase());
+  return category.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 function chapterLabel(title: string, index: number): string {
@@ -1118,14 +1119,26 @@ function addMarkerRange(start: number, end: number, label: string, el: HTMLEleme
   markerRanges.push({ start, end, label, el });
 }
 
-function clearMarkerHover(): void {
+function clampMarkerFloatX(x: number, width: number): number {
+  const pad = width / 2 + 4;
+  return Math.min(
+    Math.max(x, pad),
+    Math.max(pad, (seekWrapEl?.getBoundingClientRect().width ?? 0) - pad),
+  );
+}
+
+function clearMarkerHighlight(): void {
   activeMarker?.el.classList.remove("active");
   activeMarker = null;
   markerTipEl?.classList.remove("show");
 }
 
+function clearMarkerHover(): void {
+  clearMarkerHighlight();
+}
+
 function showMarkerHover(e: PointerEvent): void {
-  if (!seekWrapEl || !markerTipEl || !video || !markerRanges.length) return;
+  if (!seekWrapEl || !markerTipEl || !video) return;
   const timeline = mediaTimeline(video);
   if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
   const r = seekWrapEl.getBoundingClientRect();
@@ -1137,7 +1150,7 @@ function showMarkerHover(e: PointerEvent): void {
       .filter((m) => t >= m.start && t <= m.end)
       .sort((a, b) => a.end - a.start - (b.end - b.start))[0] ?? null;
   if (!next) {
-    clearMarkerHover();
+    clearMarkerHighlight();
     return;
   }
   if (activeMarker !== next) {
@@ -1146,7 +1159,7 @@ function showMarkerHover(e: PointerEvent): void {
     next.el.classList.add("active");
     markerTipEl.textContent = next.label;
   }
-  markerTipEl.style.left = Math.round(x) + "px";
+  markerTipEl.style.left = Math.round(clampMarkerFloatX(x, 80)) + "px";
   markerTipEl.classList.add("show");
 }
 

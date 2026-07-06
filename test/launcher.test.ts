@@ -311,7 +311,7 @@ describe("launcher — open / close", () => {
 });
 
 describe("launcher — radial viewer menu", () => {
-  // The radial items follow the FAB in the shadow root: viewer, theater, PiP, exit.
+  // The radial items follow the FAB in the shadow root: theater, viewer, PiP, exit.
   const items = () =>
     Array.from(host()?.shadowRoot?.querySelectorAll("button") ?? []).slice(
       1,
@@ -328,7 +328,7 @@ describe("launcher — radial viewer menu", () => {
 
   it("hovering the FAB reveals both formats; exit stays hidden while closed", async () => {
     await openMenu();
-    const [normal, theater, pip, exit] = items();
+    const [theater, normal, pip, exit] = items();
     expect(shown(normal)).toBe(true);
     expect(shown(theater)).toBe(true);
     expect(shown(pip)).toBe(false);
@@ -338,7 +338,7 @@ describe("launcher — radial viewer menu", () => {
   it("hides viewer format actions on protected video", async () => {
     h.drm = true;
     await openMenu();
-    const [normal, theater, pip, exit] = items();
+    const [theater, normal, pip, exit] = items();
     expect(shown(normal)).toBe(false);
     expect(shown(theater)).toBe(false);
     expect(shown(pip)).toBe(false);
@@ -374,22 +374,23 @@ describe("launcher — radial viewer menu", () => {
     expect(normal.style.transform).toBe("scale(1)");
   });
 
-  it("while the viewer is open the menu offers exit and marks the active format", async () => {
+  it("while the viewer is open the exit action replaces the active format slot", async () => {
     v.format = "theater";
     await openMenu();
-    const [normal, theater, , exit] = items();
+    const [theater, normal, , exit] = items();
     expect(exit.style.display).toBe("flex");
     expect(shown(exit)).toBe(true);
-    expect(theater.getAttribute("aria-pressed")).toBe("true");
+    expect(shown(theater)).toBe(false);
     expect(normal.getAttribute("aria-pressed")).toBe("false");
+    expect(exit.style.top).toBe(theater.style.top);
+    expect(exit.style.left).toBe(theater.style.left);
   });
 
-  it("the items act on the viewer: formats toggle, exit closes", async () => {
+  it("the visible items act on the viewer: alternate format toggles, exit closes", async () => {
     v.format = "normal";
     await openMenu();
-    const [normal, theater, , exit] = items();
-    normal.click();
-    expect(v.toggleViewer).toHaveBeenCalledWith("normal");
+    const [theater, normal, , exit] = items();
+    expect(shown(normal)).toBe(false);
     theater.click();
     expect(v.toggleViewer).toHaveBeenCalledWith("theater");
     exit.click();
@@ -399,9 +400,9 @@ describe("launcher — radial viewer menu", () => {
   it("fans actions in theater, viewer, PiP order", async () => {
     Object.defineProperty(document, "pictureInPictureEnabled", { value: true, configurable: true });
     await openMenu(fakeNativeVideo());
-    const [viewer, theater, pip] = items();
-    expect(parseFloat(theater.style.top)).toBeGreaterThan(parseFloat(viewer.style.top));
-    expect(parseFloat(viewer.style.top)).toBeGreaterThan(parseFloat(pip.style.top));
+    const [theater, viewer, pip] = items();
+    expect(parseFloat(viewer.style.top)).toBeGreaterThan(parseFloat(theater.style.top));
+    expect(parseFloat(pip.style.top)).toBeGreaterThan(parseFloat(viewer.style.top));
     expect(parseFloat(viewer.style.left)).toBeLessThan(parseFloat(theater.style.left));
     expect(parseFloat(viewer.style.left)).toBeLessThan(parseFloat(pip.style.left));
   });
