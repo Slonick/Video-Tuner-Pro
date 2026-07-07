@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Listener = (msg: Record<string, unknown>, sender: Record<string, unknown>) => void;
+type TabRemovedListener = (tabId: number) => void;
 
 const h = vi.hoisted(() => ({
   listener: null as Listener | null,
+  tabRemoved: null as TabRemovedListener | null,
   badgeText: [] as unknown[],
   icons: [] as unknown[],
 }));
@@ -41,6 +43,7 @@ describe("background toolbar badge frame ownership", () => {
   beforeEach(async () => {
     vi.resetModules();
     h.listener = null;
+    h.tabRemoved = null;
     h.badgeText = [];
     h.icons = [];
     (globalThis as unknown as { browser?: unknown }).browser = undefined;
@@ -69,6 +72,11 @@ describe("background toolbar badge frame ownership", () => {
       },
       tabs: {
         onUpdated: { addListener() {} },
+        onRemoved: {
+          addListener(fn: TabRemovedListener) {
+            h.tabRemoved = fn;
+          },
+        },
       },
       alarms: {
         onAlarm: { addListener() {} },
@@ -109,5 +117,17 @@ describe("background toolbar badge frame ownership", () => {
 
     expect(h.badgeText).toEqual([{ text: "", tabId: 9 }]);
     expect(h.icons).toHaveLength(1);
+  });
+
+  it("forgets frame ownership when a tab is removed", () => {
+    h.listener!({ action: "icon", text: "1.25", live: false }, sender(10, 4));
+    h.tabRemoved!(10);
+    h.listener!({ action: "icon", text: "1.5", live: false }, sender(10, 0));
+
+    expect(h.badgeText).toEqual([
+      { text: "1.25", tabId: 10 },
+      { text: "", tabId: 10 },
+      { text: "1.5", tabId: 10 },
+    ]);
   });
 });

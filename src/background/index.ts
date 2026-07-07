@@ -114,6 +114,9 @@ if (api.tabs && api.tabs.onUpdated) {
     if (info.status === "loading") reset(tabId);
   });
 }
+if (api.tabs && api.tabs.onRemoved) {
+  api.tabs.onRemoved.addListener((tabId) => reset(tabId));
+}
 
 // On reload/update the content scripts already running in open tabs are orphaned
 // (their extension context is dead) and the browser won't re-inject until the page
