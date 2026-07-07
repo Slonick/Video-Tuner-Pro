@@ -17,12 +17,18 @@
   const BRIDGE_VERSION = "2026-07-07-local-roots";
   const win = window as typeof window & {
     __vtpQualityBridgeInstalled?: boolean | string;
+    __vtpQualityBridgeCleanup?: () => void;
     __vtpQualityPlayers?: CapturedPlayer[];
     __vtpQualityHls?: CapturedHls[];
     IVSPlayer?: unknown;
     Hls?: unknown;
   };
   if (win.__vtpQualityBridgeInstalled === BRIDGE_VERSION) return;
+  try {
+    win.__vtpQualityBridgeCleanup?.();
+  } catch (e) {
+    /* stale bridge cleanup must not block the new bridge */
+  }
   win.__vtpQualityBridgeInstalled = BRIDGE_VERSION;
   win.__vtpQualityPlayers ||= [];
   win.__vtpQualityHls ||= [];
@@ -1147,18 +1153,33 @@
     }
   }
 
-  document.addEventListener(REQ, (e) => {
+  const onQualityRequest = (e: Event) => {
     void handleRequest(e, detailOf(e), REQ);
-  });
-  document.addEventListener(SET, (e) => {
+  };
+  const onQualitySet = (e: Event) => {
     void handleRequest(e, detailOf(e), SET);
-  });
-  new MutationObserver(() => {
+  };
+  const requestObserver = new MutationObserver(() => {
     const d = detailOf(new Event(REQ));
     void handleRequest(
       new Event(REQ),
       d,
       document.documentElement.hasAttribute(ROOT_PICK_ATTR) ? SET : REQ,
     );
-  }).observe(document.documentElement, { attributes: true, attributeFilter: [ROOT_REQ_ATTR] });
+  });
+
+  document.addEventListener(REQ, onQualityRequest);
+  document.addEventListener(SET, onQualitySet);
+  requestObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: [ROOT_REQ_ATTR],
+  });
+  win.__vtpQualityBridgeCleanup = () => {
+    document.removeEventListener(REQ, onQualityRequest);
+    document.removeEventListener(SET, onQualitySet);
+    requestObserver.disconnect();
+    if (win.__vtpQualityBridgeInstalled === BRIDGE_VERSION) {
+      win.__vtpQualityBridgeInstalled = undefined;
+    }
+  };
 })();

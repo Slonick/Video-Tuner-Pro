@@ -13,8 +13,16 @@
 (function () {
   "use strict";
   const BRIDGE_VERSION = "2026-07-07-active-bridge";
-  const win = window as typeof window & { __vtpLatencyBridgeInstalled?: boolean | string };
+  const win = window as typeof window & {
+    __vtpLatencyBridgeInstalled?: boolean | string;
+    __vtpLatencyBridgeCleanup?: () => void;
+  };
   if (win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION) return;
+  try {
+    win.__vtpLatencyBridgeCleanup?.();
+  } catch (e) {
+    /* stale bridge cleanup must not block the new bridge */
+  }
   win.__vtpLatencyBridgeInstalled = BRIDGE_VERSION;
   const ATTR = "data-vtp-latency";
   const LIVE_ATTR = "data-vtp-live";
@@ -142,6 +150,10 @@
         typeof h.recoverMediaError === "function")
     );
   }
+  function activeHls(hls: HlsLike | null): hls is HlsLike {
+    if (!isHls(hls)) return false;
+    return hls.media instanceof HTMLMediaElement && hls.media.isConnected;
+  }
   function readProp(o: object, key: string): unknown {
     try {
       return (o as Record<string, unknown>)[key];
@@ -155,7 +167,7 @@
     depth: number,
     budget: { n: number },
   ): HlsLike | null {
-    if (isHls(value)) return value;
+    if (isHls(value) && activeHls(value)) return value;
     if (!value || typeof value !== "object" || depth <= 0 || budget.n <= 0) return null;
     if (value === window || value === document) return null;
     const obj = value as object;
@@ -221,11 +233,6 @@
   }
   let hlsInst: HlsLike | null = null;
   let nextHlsScanAt = 0;
-  function activeHls(hls: HlsLike | null): hls is HlsLike {
-    if (!isHls(hls)) return false;
-    const media = hls.media;
-    return !(media instanceof HTMLMediaElement) || media.isConnected;
-  }
   function ensureHls(): HlsLike | null {
     if (activeHls(hlsInst)) return hlsInst;
     hlsInst = null;
@@ -351,5 +358,14 @@
     }
   }
   timer = window.setInterval(tick, 1000);
+  win.__vtpLatencyBridgeCleanup = () => {
+    if (timer != null) {
+      clearInterval(timer);
+      timer = null;
+    }
+    if (win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION) {
+      win.__vtpLatencyBridgeInstalled = undefined;
+    }
+  };
   tick();
 })();

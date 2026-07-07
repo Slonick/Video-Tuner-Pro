@@ -452,8 +452,67 @@ describe("launcher — radial viewer menu", () => {
   it("animates radial items out from the FAB", async () => {
     await openMenu();
     const [normal] = items();
+    const fannedLeft = normal.style.left;
+    const fannedTop = normal.style.top;
     expect(normal.style.transform).toBe("scale(1)");
     fire(document.body, "pointerdown", 900, 900);
+    expect(normal.style.left).toBe(fannedLeft);
+    expect(normal.style.top).toBe(fannedTop);
+    await frame();
+    expect(normal.style.transform).toBe("scale(0.72)");
+    expect(normal.style.opacity).toBe("0");
+  });
+
+  it("keeps radial items visible until the close animation finishes", async () => {
+    await openMenu();
+    const [normal] = items();
+    vi.useFakeTimers();
+    try {
+      fire(document.body, "pointerdown", 900, 900);
+      expect(normal.style.opacity).toBe("1");
+      expect(normal.style.visibility).toBe("visible");
+      await vi.advanceTimersByTimeAsync(16);
+      expect(normal.style.opacity).toBe("0");
+      expect(normal.style.transform).toBe("scale(0.72)");
+      expect(normal.style.visibility).toBe("visible");
+      await vi.advanceTimersByTimeAsync(240);
+      expect(normal.style.visibility).toBe("hidden");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not hide radial items before the close animation frame starts", async () => {
+    await openMenu();
+    const [normal] = items();
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0);
+    vi.useFakeTimers();
+    try {
+      fire(document.body, "pointerdown", 900, 900);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(normal.style.opacity).toBe("1");
+      expect(normal.style.visibility).toBe("visible");
+    } finally {
+      vi.useRealTimers();
+      raf.mockRestore();
+    }
+  });
+
+  it("commits the fanned position before starting the close animation", async () => {
+    await openMenu();
+    const [normal] = items();
+    const readRect = vi.fn(
+      () => ({ left: 0, top: 0, width: 36, height: 36, right: 36, bottom: 36 }) as DOMRect,
+    );
+    normal.getBoundingClientRect = readRect;
+
+    fire(document.body, "pointerdown", 900, 900);
+
+    expect(readRect).toHaveBeenCalled();
+    expect(normal.style.opacity).toBe("1");
+    expect(normal.style.transform).toBe("scale(1)");
+    await frame();
+    expect(normal.style.opacity).toBe("0");
     expect(normal.style.transform).toBe("scale(0.72)");
   });
 
@@ -580,7 +639,10 @@ describe("launcher — radial viewer menu", () => {
 
   it("clicking outside closes the menu immediately", async () => {
     await openMenu();
+    const [normal] = items();
     fire(document.body, "pointerdown", 900, 900);
+    expect(normal.style.pointerEvents).toBe("none");
+    await frame();
     expect(items().some(shown)).toBe(false);
   });
 
@@ -589,6 +651,7 @@ describe("launcher — radial viewer menu", () => {
     fire(fabEl()!, "pointerdown", 580, 158);
     fire(fabEl()!, "pointerup", 580, 158);
     expect(frameEl()?.style.display).toBe("block");
+    await frame();
     expect(items().some(shown)).toBe(false);
   });
 

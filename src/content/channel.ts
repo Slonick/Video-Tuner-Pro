@@ -273,6 +273,12 @@ export function sameChannelIdentity(a: string[], b: string[]): boolean {
   return b.some((k) => previous.has(k));
 }
 
+export function sameChannelKeys(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const previous = new Set(a);
+  return b.every((k) => previous.has(k));
+}
+
 // The canonical channel key (for saving + change-tracking): the stable id when
 // present, else the handle / login. A value saved under the other form is still
 // matched at lookup, so it survives whichever link the page happens to expose.

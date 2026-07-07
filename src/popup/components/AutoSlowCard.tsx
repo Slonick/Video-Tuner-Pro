@@ -3,7 +3,6 @@
 // graph, an always-visible target-rate row, and an expanded body with Save (the
 // target is still saved per scope: channel > site > global) plus the global response
 // knobs (Slowest speed + Soft knee; Reaction / Hold / Ease-back stay options-only).
-// A "β" beta marker sits by the title.
 import { useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
 import { SliderRow } from "./SliderRow.js";
@@ -55,7 +54,6 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
             <span className="sec-text">
               <span className="sec-title-row">
                 <strong>{msg("autoSlowLabel") || "Auto-slow dense speech"}</strong>
-                <InfoTip beta tip={msg("betaNote")} />
                 <InfoTip tip={msg("autoSlowHint")} />
               </span>
               <span className="switch-sub">

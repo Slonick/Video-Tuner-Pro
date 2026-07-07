@@ -103,4 +103,11 @@ describe("background toolbar badge frame ownership", () => {
     ]);
     expect(h.icons).toHaveLength(2);
   });
+
+  it("accepts a clear when the service worker forgot the badge owner", () => {
+    h.listener!({ action: "icon", clear: true }, sender(9, 4));
+
+    expect(h.badgeText).toEqual([{ text: "", tabId: 9 }]);
+    expect(h.icons).toHaveLength(1);
+  });
 });

@@ -12,9 +12,17 @@ interface Props {
   pinned: boolean[];
   activePercent: number;
   onPick: (fraction: number) => void;
+  disabled?: boolean;
 }
 
-export function PresetGrid({ presets, presetKeys, pinned, activePercent, onPick }: Props) {
+export function PresetGrid({
+  presets,
+  presetKeys,
+  pinned,
+  activePercent,
+  onPick,
+  disabled = false,
+}: Props) {
   const quick = new Set(quickPresetIndices(pinned));
   return (
     <div className="buttons-grid presetgrid">
@@ -30,6 +38,7 @@ export function PresetGrid({ presets, presetKeys, pinned, activePercent, onPick 
             }
             data-percent={pct}
             data-key={key || undefined}
+            disabled={disabled}
             onClick={() => onPick(pct / 100)}
           >
             {pct + "%"}

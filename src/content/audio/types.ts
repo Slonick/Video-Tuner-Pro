@@ -13,8 +13,9 @@ export interface AudioLevels {
   // Set when the primary video's audio can't be captured (both audio features are dead
   // then). The reason drives a specific tooltip: "inuse" = another graph already owns
   // it (conflicting extension/player), "cors" = genuine cross-origin source, "noctx" =
-  // no Web Audio. Transient reasons (loading / suspended / VOT) are not surfaced.
-  blocked?: "inuse" | "cors" | "noctx";
+  // no Web Audio, "suspended" = the browser is waiting for a user gesture to unlock
+  // Web Audio. Loading / VOT are not surfaced.
+  blocked?: "inuse" | "cors" | "noctx" | "suspended";
   in?: number;
   out?: number;
   threshold?: number;

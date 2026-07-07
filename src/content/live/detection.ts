@@ -189,21 +189,17 @@ export function probeLive(v: HTMLVideoElement): void {
 // so tiny preview/ad players don't make detection flicker on/off.
 export function liveVideo(): HTMLVideoElement | null {
   const candidates: { video: HTMLVideoElement; area: number }[] = [];
-  let largestArea = 0;
   for (const v of collectVideos()) {
+    if (!isLive(v)) continue;
     const r = v.getBoundingClientRect();
     if (r.width < 40 || r.height < 40) continue;
     const area = r.width * r.height;
     candidates.push({ video: v, area });
-    if (area > largestArea) largestArea = area;
   }
 
   let best: HTMLVideoElement | null = null;
   let bestScore = -1;
-  const viableArea = largestArea * 0.25;
   for (const { video: v, area } of candidates) {
-    if (!isLive(v)) continue;
-    if (area < viableArea) continue;
     const score = (v.paused ? 0 : 1e9) + area;
     if (score > bestScore) {
       bestScore = score;

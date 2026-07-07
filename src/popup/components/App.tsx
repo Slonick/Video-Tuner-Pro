@@ -77,7 +77,9 @@ export function App() {
       ? msg("audioBlockCors")
       : audioBlk === "noctx"
         ? msg("audioBlockNoctx")
-        : msg("audioBlockInuse");
+        : audioBlk === "suspended"
+          ? msg("audioBlockSuspended")
+          : msg("audioBlockInuse");
 
   return (
     <>

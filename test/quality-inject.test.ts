@@ -8,6 +8,9 @@ interface QualityResponse {
 }
 
 beforeEach(() => {
+  (
+    window as typeof window & { __vtpQualityBridgeCleanup?: () => void }
+  ).__vtpQualityBridgeCleanup?.();
   vi.resetModules();
   document.body.innerHTML = "";
   document.documentElement.removeAttribute("data-vtp-quality-response");
@@ -17,6 +20,8 @@ beforeEach(() => {
   (
     window as typeof window & { __vtpQualityBridgeInstalled?: unknown }
   ).__vtpQualityBridgeInstalled = undefined;
+  delete (window as typeof window & { __vtpQualityBridgeCleanup?: () => void })
+    .__vtpQualityBridgeCleanup;
 });
 
 function waitForResponse(requestId: string): Promise<QualityResponse> {
@@ -40,6 +45,58 @@ function responseWithin(requestId: string, ms: number): Promise<QualityResponse 
 }
 
 describe("quality-inject request cost", () => {
+  it("calls the previous bridge cleanup before taking ownership", async () => {
+    const cleanup = vi.fn();
+    (
+      window as typeof window & {
+        __vtpQualityBridgeInstalled?: unknown;
+        __vtpQualityBridgeCleanup?: () => void;
+      }
+    ).__vtpQualityBridgeInstalled = "older-bridge";
+    (
+      window as typeof window & {
+        __vtpQualityBridgeCleanup?: () => void;
+      }
+    ).__vtpQualityBridgeCleanup = cleanup;
+
+    await import("../src/content/quality-inject.js");
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes request listeners when the bridge is cleaned up", async () => {
+    await import("../src/content/quality-inject.js");
+
+    (
+      window as typeof window & { __vtpQualityBridgeCleanup?: () => void }
+    ).__vtpQualityBridgeCleanup?.();
+
+    const response = responseWithin("after-cleanup", 20);
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "after-cleanup", videoId: "v1" },
+      }),
+    );
+
+    expect(await response).toBeNull();
+  });
+
+  it("does not clear a newer bridge owner from an old cleanup callback", async () => {
+    await import("../src/content/quality-inject.js");
+    const cleanup = (window as typeof window & { __vtpQualityBridgeCleanup?: () => void })
+      .__vtpQualityBridgeCleanup!;
+
+    (
+      window as typeof window & { __vtpQualityBridgeInstalled?: unknown }
+    ).__vtpQualityBridgeInstalled = "newer-bridge";
+    cleanup();
+
+    expect(
+      (window as typeof window & { __vtpQualityBridgeInstalled?: unknown })
+        .__vtpQualityBridgeInstalled,
+    ).toBe("newer-bridge");
+  });
+
   it("uses local player roots first and scans the document only as a fallback", async () => {
     await import("../src/content/quality-inject.js");
 

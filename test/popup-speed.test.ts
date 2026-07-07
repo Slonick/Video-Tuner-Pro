@@ -134,6 +134,36 @@ describe("live lock", () => {
     expect(lastCall("resetToSaved")).toBeUndefined();
   });
 
+  it("disables preset buttons while live-locked", async () => {
+    const { lastCall } = await mountApp({
+      tab: YT,
+      replies: { getSpeed: { speed: 1, channel: null, channelName: "", live: true } },
+    });
+    const preset = document.querySelector<HTMLButtonElement>('.btn-speed[data-percent="150"]')!;
+
+    expect(preset.disabled).toBe(true);
+    preset.click();
+    await flush();
+
+    expect(readout()).toBe("100%");
+    expect(lastCall("setSpeed")).toBeUndefined();
+  });
+
+  it("disables saving speed while live-locked", async () => {
+    const { lastCall } = await mountApp({
+      tab: YT,
+      replies: { getSpeed: { speed: 1, channel: null, channelName: "", live: true } },
+    });
+    const save = byId("setDefaultBtn") as HTMLButtonElement;
+
+    expect(save.disabled).toBe(true);
+    save.click();
+    await flush();
+
+    expect(document.querySelector(".scope-menu")).toBeNull();
+    expect(lastCall("remember")).toBeUndefined();
+  });
+
   it("stays unlocked on a non-live page", async () => {
     await mountApp({ tab: YT });
     expect(byId("liveWarn").style.display).toBe("none");
@@ -399,6 +429,16 @@ describe("viewer auto-open scope control", () => {
     click("viewerAutoSetBtn");
     await flush();
   };
+
+  it("carries a beta marker in the header", async () => {
+    await mountApp({
+      tab: YT,
+      replies: {
+        getViewerAuto: { mode: "off", scope: null, channel: "UCabc", channelName: "Ch" },
+      },
+    });
+    expect(document.querySelector(".viewer-auto-section .beta-glyph")?.textContent).toBe("β");
+  });
 
   it("saves the selected auto-open mode to a chosen scope", async () => {
     const { lastCall } = await mountApp({

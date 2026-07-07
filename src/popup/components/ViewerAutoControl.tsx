@@ -6,6 +6,7 @@ import { msg } from "../i18n.js";
 import { useStored } from "../hooks/useStored.js";
 import { STORE } from "../platform/storage.js";
 import { SaveScope } from "./SaveScope.js";
+import { InfoTip } from "./InfoTip.js";
 import { useCardOverlay } from "../hooks/useCardOverlay.js";
 import type { UseViewerAuto, ViewerAutoMode } from "../hooks/useViewerAuto.js";
 import type { UseViewerFit, ViewerFitMode } from "../hooks/useViewerFit.js";
@@ -64,7 +65,10 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
         <div className="sec-head">
           <Button className="sec-main" aria-expanded={open} onClick={toggle}>
             <span className="sec-text">
-              <strong>{label}</strong>
+              <span className="sec-title-row">
+                <strong>{label}</strong>
+                <InfoTip beta tip={msg("betaNote")} />
+              </span>
               <span className="switch-sub">
                 {va.enabled
                   ? `${msg(VIEWER_AUTO_LABEL[va.mode])} · ${

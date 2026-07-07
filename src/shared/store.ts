@@ -199,12 +199,7 @@ export const STORE = {
 
   remove(keys: string | string[], cb?: DoneCb): void {
     const list = typeof keys === "string" ? [keys] : keys;
-    const sync: string[] = [];
-    const local: string[] = [];
-    for (const key of list) {
-      local.push(key);
-      if (HAS_SYNC && key !== SYNC_META_KEY && key !== SYNC_MASTER_KEY) sync.push(key);
-    }
+    const { sync, local } = groupKeysByArea(list, cfg);
     const calls: Array<(done: ResultCb) => void> = [];
     if (sync.length) calls.push((d) => areaRemove(SYNC, sync, d));
     if (local.length) calls.push((d) => areaRemove(LOCAL, local, d));

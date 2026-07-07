@@ -43,6 +43,7 @@ interface Props {
   onPick: (target: Scope) => void;
   saveId?: string;
   resetId?: string;
+  disabled?: boolean;
 }
 
 interface Pos {
@@ -93,6 +94,7 @@ export function SaveScope({
   onPick,
   saveId,
   resetId,
+  disabled = false,
 }: Props) {
   const scopes = ORDER.filter((s) => s !== "channel" || hasChannel);
   const full = (s: Scope) => msg(FULL_KEY[s]);
@@ -168,6 +170,7 @@ export function SaveScope({
     flashTimer.current = setTimeout(() => setFlash(false), 1100);
   };
   const save = (target: Scope) => {
+    if (disabled) return;
     if (target !== scope) onPick(target);
     const done = (ok?: void | boolean) => {
       if (ok !== false) pulse();
@@ -181,6 +184,7 @@ export function SaveScope({
     }
   };
   const clear = (target: Scope) => {
+    if (disabled) return;
     onReset(target);
     close();
   };
@@ -235,6 +239,7 @@ export function SaveScope({
         className="btn-action btn-default scope-trigger"
         aria-haspopup="dialog"
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={(e) => {
           if (e.key === "Escape" && open) {
@@ -286,6 +291,7 @@ export function SaveScope({
               type="button"
               className="scope-primary"
               data-key={scope}
+              disabled={disabled}
               onClick={() => save(scope)}
             >
               {primaryLabel}
@@ -299,6 +305,7 @@ export function SaveScope({
                 <ConfirmButton
                   id={resetId}
                   className="scope-clear"
+                  disabled={disabled}
                   confirmChildren={confirmLabel}
                   title={removeLabel}
                   confirmTitle={confirmLabel}
@@ -324,6 +331,7 @@ export function SaveScope({
                     type="button"
                     className="scope-row"
                     aria-label={`${saveLabel} · ${full(s)}`}
+                    disabled={disabled}
                     onClick={() => save(s)}
                   >
                     <span className="scope-name">{full(s)}</span>
@@ -333,6 +341,7 @@ export function SaveScope({
                     <ConfirmButton
                       split
                       className="scope-del"
+                      disabled={disabled}
                       confirmHint={confirmLabel}
                       ariaLabel={`${removeLabel} · ${full(s)}`}
                       confirmTitle={removeLabel}

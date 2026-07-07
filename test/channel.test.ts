@@ -5,6 +5,7 @@ import {
   channelKeys,
   currentChannelName,
   sameChannelIdentity,
+  sameChannelKeys,
 } from "../src/content/channel.js";
 
 function at(hostname: string, pathname: string): void {
@@ -186,5 +187,18 @@ describe("sameChannelIdentity", () => {
   it("treats unrelated channels as different", () => {
     expect(sameChannelIdentity(["channel/UCone", "@one"], ["channel/UCtwo", "@two"])).toBe(false);
     expect(sameChannelIdentity([], ["@one"])).toBe(false);
+  });
+});
+
+describe("sameChannelKeys", () => {
+  it("detects a late-rendered alias so saved speeds can be re-resolved", () => {
+    expect(sameChannelKeys(["channel/UCabc_123"], ["channel/UCabc_123", "@WGC098"])).toBe(false);
+  });
+
+  it("ignores order but requires the same full key set", () => {
+    expect(
+      sameChannelKeys(["@WGC098", "channel/UCabc_123"], ["channel/UCabc_123", "@WGC098"]),
+    ).toBe(true);
+    expect(sameChannelKeys(["@one"], ["@two"])).toBe(false);
   });
 });

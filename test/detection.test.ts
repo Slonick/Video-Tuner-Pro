@@ -46,7 +46,7 @@ describe("liveVideo", () => {
     expect(liveVideo()).toBeNull();
   });
 
-  it("ignores small live previews next to a larger VOD", () => {
+  it("accepts a smaller live player next to a larger VOD preview", () => {
     const main = document.createElement("video");
     Object.defineProperty(main, "duration", { value: 600, configurable: true });
     Object.defineProperty(main, "paused", { value: false, configurable: true });
@@ -60,7 +60,32 @@ describe("liveVideo", () => {
       ({ width: 320, height: 180, left: 0, top: 0, right: 320, bottom: 180 }) as DOMRect;
 
     document.body.append(main, preview);
-    expect(liveVideo()).toBeNull();
+    expect(liveVideo()).toBe(preview);
+  });
+
+  it("does not measure obvious VODs while looking for a live player", () => {
+    const vod = document.createElement("video");
+    Object.defineProperty(vod, "duration", { value: 600, configurable: true });
+    Object.defineProperty(vod, "paused", { value: false, configurable: true });
+    const measure = vi.fn(() => ({
+      width: 1280,
+      height: 720,
+      left: 0,
+      top: 0,
+      right: 1280,
+      bottom: 720,
+    }));
+    vod.getBoundingClientRect = measure as typeof vod.getBoundingClientRect;
+
+    const live = document.createElement("video");
+    Object.defineProperty(live, "duration", { value: Infinity, configurable: true });
+    Object.defineProperty(live, "paused", { value: false, configurable: true });
+    live.getBoundingClientRect = () =>
+      ({ width: 320, height: 180, left: 0, top: 0, right: 320, bottom: 180 }) as DOMRect;
+
+    document.body.append(vod, live);
+    expect(liveVideo()).toBe(live);
+    expect(measure).not.toHaveBeenCalled();
   });
 
   it("still accepts a small live player when it is the main video", () => {

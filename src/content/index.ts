@@ -34,7 +34,7 @@ import { collectVideos, startTracking, stopTracking, reconcile, markDrmVideo } f
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
-import { channelKeys, sameChannelIdentity } from "./channel.js";
+import { channelKeys, sameChannelKeys } from "./channel.js";
 
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
@@ -105,8 +105,10 @@ function applyResolved(
   const keys = channelKeys();
   lastChannelKeys = keys;
   const r = resolveSpeed(keys, getDomain(), domains, channels, globalSpeed);
-  S.userSpeed = clamp(r.speed);
-  if (!onStreamPage() && !S.speedManual) S.currentSpeed = S.userSpeed;
+  if (!S.speedManual) {
+    S.userSpeed = clamp(r.speed);
+    if (!onStreamPage()) S.currentSpeed = S.userSpeed;
+  }
   S.speedScope = r.scope;
 }
 
@@ -260,7 +262,7 @@ function tick() {
   updateTimeBadge();
   updateLauncher();
   const keys = channelKeys();
-  if (keys.length && !sameChannelIdentity(lastChannelKeys, keys)) reresolve();
+  if (keys.length && !sameChannelKeys(lastChannelKeys, keys)) reresolve();
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
   // resets it via wake().
@@ -310,7 +312,7 @@ if (!document.hidden) startTimers();
 // Apply the speed the moment ANY video starts up — a second player added to the
 // page would otherwise wait for the next tick/mutation pass and could begin at
 // 1×. Media events don't bubble, but a capture-phase listener still sees them.
-for (const ev of ["play", "loadedmetadata"]) {
+for (const ev of ["play", "loadedmetadata", "durationchange"]) {
   document.addEventListener(
     ev,
     (e) => {
@@ -322,7 +324,7 @@ for (const ev of ["play", "loadedmetadata"]) {
       // Surface the badge whenever playback starts (covers autoplay pages where
       // the user never moves the pointer over the video). updateTimeBadge mounts
       // it if needed; flashBadge reveals it and resumes the usual auto-hide.
-      if (e.type === "play") {
+      if (e.type === "play" || !e.target.paused) {
         updateTimeBadge();
         flashBadge();
       }

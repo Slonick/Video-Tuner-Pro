@@ -46,8 +46,11 @@ function applyPitchMode(video: HTMLVideoElement): void {
 // so a disagreement costs one click per second instead of one per frame.
 let lastRateAssertAt = 0;
 function setLiveRate(video: HTMLVideoElement, rate: number, decisionChanged: boolean): void {
-  if (Math.abs(video.playbackRate - rate) <= 0.001) return;
   const now = Date.now();
+  if (Math.abs(video.playbackRate - rate) <= 0.001) {
+    if (decisionChanged) lastRateAssertAt = now;
+    return;
+  }
   if (!decisionChanged && now - lastRateAssertAt < 1000) return;
   lastRateAssertAt = now;
   try {
@@ -83,6 +86,7 @@ export function controlLive(): void {
   // intended non-live speed — otherwise a (mistaken) live detection would leave
   // playback stuck at 100%.
   if (onStreamPage()) return;
+  if (S.speedManual) return;
   if (Math.abs(S.currentSpeed - S.userSpeed) > 0.001) {
     S.currentSpeed = S.userSpeed;
     applyAll();

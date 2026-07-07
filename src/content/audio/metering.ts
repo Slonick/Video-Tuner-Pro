@@ -1,7 +1,7 @@
 import { ctxValid } from "../platform/browser.js";
 import { S } from "../state.js";
 import { primaryVideo } from "../videos.js";
-import { translationActive } from "./translation.js";
+import { compOn, translationActive } from "./translation.js";
 import { audioContext, graphForCurrentSource, lastSkip } from "./routing.js";
 import { rmsToDb, deriveOutDb } from "./levels.js";
 import type { AudioGraph, AudioLevels } from "./types.js";
@@ -11,10 +11,14 @@ export const audioLevelHist: { in: number; out: number }[] = [];
 export const A_HIST_MS = 150;
 const A_HIST_MAX = 48;
 
-// Only the persistent capture failures become a popup warning; loading/suspended/VOT
-// are transient and resolve on their own.
-function blockReason(skip: string | null): { blocked?: "inuse" | "cors" | "noctx" } {
-  return skip === "inuse" || skip === "cors" || skip === "noctx" ? { blocked: skip } : {};
+// Only capture failures that make audio features currently unusable become a popup
+// warning. Loading/VOT are transient; a suspended context needs a user gesture.
+function blockReason(skip: string | null): {
+  blocked?: "inuse" | "cors" | "noctx" | "suspended";
+} {
+  return skip === "inuse" || skip === "cors" || skip === "noctx" || skip === "suspended"
+    ? { blocked: skip }
+    : {};
 }
 
 function analyserDb(an: AnalyserNode): number {
@@ -25,7 +29,7 @@ function analyserDb(an: AnalyserNode): number {
 
 function audioOutDb(g: AudioGraph, inDb: number): number {
   const reduction = g.comp && typeof g.comp.reduction === "number" ? g.comp.reduction : 0;
-  return deriveOutDb(inDb, reduction, S.audioCompEnabled ? S.audioCompGain : 0);
+  return deriveOutDb(inDb, reduction, compOn() ? S.audioCompGain : 0);
 }
 
 export function audioLevels(): AudioLevels {
@@ -40,7 +44,7 @@ export function audioLevels(): AudioLevels {
       translation: translationActive(),
       // Surface a hard capture failure so the popup can warn + lock the audio cards
       // (monitor.ts runs applyAudioComp() right before this, so the skip is current).
-      // Transient reasons (loading/suspended/VOT) are left off.
+      // Transient reasons (loading/VOT) are left off.
       ...blockReason(lastSkip(v)),
     };
   }

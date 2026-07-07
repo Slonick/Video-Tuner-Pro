@@ -139,12 +139,13 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
 
   const setSpeed = useCallback(
     (fraction: number) => {
+      if (live) return;
       const clamped = clamp(fraction);
       touchUserSpeed();
       apply(clamped, true);
       sendSpeed(clamped);
     },
-    [apply, sendSpeed, touchUserSpeed],
+    [apply, live, sendSpeed, touchUserSpeed],
   );
 
   const nudge = useCallback(
@@ -153,6 +154,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   );
 
   const resetManual = useCallback(() => {
+    if (live) return;
     if (!hasTab) {
       fallbackFromStorage(true);
       return;
@@ -161,11 +163,12 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
       if (r == null) fallbackFromStorage(true);
       else pullAfter<SpeedResponse>(send, "getSpeed", applyResolved);
     });
-  }, [hasTab, fallbackFromStorage, send, applyResolved]);
+  }, [hasTab, live, fallbackFromStorage, send, applyResolved]);
 
   // `target` defaults to the active scope, or the scope chosen from the menu.
   const resetScope = useCallback(
     (target: Scope = scope) => {
+      if (live) return;
       // Channel has no off-page fallback (it needs the DOM) — revert to 1× instead.
       const fallback = () => {
         if (target === "channel") {
@@ -196,6 +199,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     },
     [
       scope,
+      live,
       hasTab,
       markSaved,
       resetFallback,
@@ -209,6 +213,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
 
   const save = useCallback(
     (target: Scope = scope) => {
+      if (live) return false;
       const v = clamp(speedRef.current);
       const fallback = () =>
         new Promise<boolean>((resolve) => {
@@ -240,27 +245,29 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
       }
       return fallback();
     },
-    [scope, hasTab, send, saveFallback, markSaved, refreshSaved],
+    [scope, live, hasTab, send, saveFallback, markSaved, refreshSaved],
   );
 
   const sliderInput = useCallback(
     (percent: number) => {
+      if (live) return;
       const clamped = clamp(percent / 100);
       touchUserSpeed();
       apply(clamped, false);
       clearTimeout(sliderTimer.current);
       sliderTimer.current = setTimeout(() => sendSpeed(clamped), 160);
     },
-    [apply, sendSpeed, touchUserSpeed],
+    [apply, live, sendSpeed, touchUserSpeed],
   );
 
   const sliderCommit = useCallback(
     (percent: number) => {
+      if (live) return;
       clearTimeout(sliderTimer.current);
       touchUserSpeed();
       sendSpeed(clamp(percent / 100));
     },
-    [sendSpeed, touchUserSpeed],
+    [live, sendSpeed, touchUserSpeed],
   );
 
   // Editable presets + slider bounds come from storage; stay subscribed so edits

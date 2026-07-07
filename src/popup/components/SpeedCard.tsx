@@ -132,6 +132,7 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
             pinned={s.pinned}
             activePercent={percent}
             onPick={s.setSpeed}
+            disabled={live}
           />
 
           <div className="quick-actions">
@@ -149,6 +150,7 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
               onPick={s.pickScope}
               saveId="setDefaultBtn"
               resetId="resetBtn"
+              disabled={live}
             />
           </div>
 

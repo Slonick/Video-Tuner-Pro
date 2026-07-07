@@ -91,7 +91,8 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (typeof tabId !== "number") return;
   const frameId = typeof sender.frameId === "number" ? sender.frameId : 0;
   if (msg.clear) {
-    if (badgeOwners.get(tabId) === frameId) reset(tabId);
+    const owner = badgeOwners.get(tabId);
+    if (owner == null || owner === frameId) reset(tabId);
     return;
   }
   const owner = badgeOwners.get(tabId);
@@ -153,6 +154,13 @@ function reinjectOpenTabs(): void {
           api.scripting.executeScript({
             target: { tabId, allFrames: true },
             files: ["audio-inject.js"],
+            world: "MAIN",
+          }),
+        );
+        call(() =>
+          api.scripting.executeScript({
+            target: { tabId, allFrames: true },
+            files: ["fullscreen-inject.js"],
             world: "MAIN",
           }),
         );

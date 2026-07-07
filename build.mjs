@@ -47,6 +47,7 @@ const jsEntries = {
   inject: join(SRC, "content/inject.ts"),   // MAIN-world Twitch/YouTube latency probe
   "quality-inject": join(SRC, "content/quality-inject.ts"), // MAIN-world player quality bridge
   "audio-inject": join(SRC, "content/audio-inject.ts"), // MAIN-world detached-<audio> rate bridge
+  "fullscreen-inject": join(SRC, "content/fullscreen-inject.ts"), // MAIN-world bare-video fullscreen wrapper
 };
 
 // HTML/CSS page bundles: each <dir>/<name>.html links a bundled <name>.js/.css.

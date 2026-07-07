@@ -19,12 +19,14 @@
 // inject.ts: a broken hook must never break the page's own audio.
 const RATE_ATTR = "data-vtp-audiorate";
 const BRIDGE_VERSION = "2026-07-07-active-bridge";
+type AudioBridgeWindow = typeof window & {
+  __vtpAudioBridgeInstalled?: boolean | string;
+  __vtpAudioBridgeCleanup?: () => void;
+  __vtpAudioNativePlay?: HTMLMediaElement["play"];
+};
 
 function isActiveBridge(): boolean {
-  return (
-    (window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string })
-      .__vtpAudioBridgeInstalled === BRIDGE_VERSION
-  );
+  return (window as AudioBridgeWindow).__vtpAudioBridgeInstalled === BRIDGE_VERSION;
 }
 
 // The desired rate published by the isolated script, or null when the toggle is
@@ -58,6 +60,7 @@ export function applyRate(media: HTMLMediaElement, rate: number): void {
 // a track is already playing can re-apply to them (refreshTracked, driven by the
 // attribute observer). Bounded by how many bare audio elements a page plays.
 const tracked = new Set<HTMLAudioElement>();
+const trackedCleanup = new WeakMap<HTMLAudioElement, () => void>();
 
 // Capture a detached <audio> as it starts playing and bring it to the current
 // rate. Connected media is left to the isolated script so neither world fights the
@@ -78,6 +81,12 @@ export function captureOnPlay(media: unknown): void {
     media.addEventListener("play", reapply);
     media.addEventListener("loadeddata", reapply);
     media.addEventListener("ratechange", reapply);
+    trackedCleanup.set(media, () => {
+      media.removeEventListener("play", reapply);
+      media.removeEventListener("loadeddata", reapply);
+      media.removeEventListener("ratechange", reapply);
+      trackedCleanup.delete(media);
+    });
   }
   const rate = desiredRate();
   if (rate != null) applyRate(media, rate);
@@ -92,6 +101,7 @@ export function refreshTracked(): void {
   for (const media of tracked) {
     if (media.isConnected) {
       applyRate(media, 1);
+      trackedCleanup.get(media)?.();
       tracked.delete(media);
       continue;
     }
@@ -105,13 +115,20 @@ export function refreshTracked(): void {
 // createElement). The capture runs before the native call and never affects its
 // result.
 export function install(): void {
-  const win = window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string };
+  const win = window as AudioBridgeWindow;
   if (win.__vtpAudioBridgeInstalled === BRIDGE_VERSION) return;
+  try {
+    win.__vtpAudioBridgeCleanup?.();
+  } catch (e) {
+    /* stale bridge cleanup must not block the new bridge */
+  }
   win.__vtpAudioBridgeInstalled = BRIDGE_VERSION;
+  const cleanup: Array<() => void> = [];
   try {
     const proto = HTMLMediaElement.prototype;
-    const nativePlay = proto.play;
-    proto.play = function (this: HTMLMediaElement, ...args: unknown[]): Promise<void> {
+    const nativePlay = win.__vtpAudioNativePlay || proto.play;
+    win.__vtpAudioNativePlay = nativePlay;
+    const hookedPlay = function (this: HTMLMediaElement, ...args: unknown[]): Promise<void> {
       try {
         captureOnPlay(this);
       } catch (e) {
@@ -119,6 +136,10 @@ export function install(): void {
       }
       return nativePlay.apply(this, args as []);
     };
+    proto.play = hookedPlay;
+    cleanup.push(() => {
+      if (proto.play === hookedPlay) proto.play = nativePlay;
+    });
   } catch (e) {
     /* prototype is frozen / unavailable — give up silently */
   }
@@ -127,16 +148,31 @@ export function install(): void {
     const observe = () => {
       const root = document.documentElement;
       if (!root) return;
-      new MutationObserver(refreshTracked).observe(root, {
+      const observer = new MutationObserver(refreshTracked);
+      observer.observe(root, {
         attributes: true,
         attributeFilter: [RATE_ATTR],
       });
+      cleanup.push(() => observer.disconnect());
     };
     if (document.documentElement) observe();
-    else document.addEventListener("DOMContentLoaded", observe);
+    else {
+      document.addEventListener("DOMContentLoaded", observe);
+      cleanup.push(() => document.removeEventListener("DOMContentLoaded", observe));
+    }
   } catch (e) {
     /* ignore */
   }
+  win.__vtpAudioBridgeCleanup = () => {
+    for (const fn of cleanup.splice(0)) fn();
+    for (const media of Array.from(tracked)) {
+      trackedCleanup.get(media)?.();
+      tracked.delete(media);
+    }
+    if (win.__vtpAudioBridgeInstalled === BRIDGE_VERSION) {
+      win.__vtpAudioBridgeInstalled = undefined;
+    }
+  };
 }
 
 install();

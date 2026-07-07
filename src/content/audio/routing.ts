@@ -34,7 +34,11 @@ function rememberUnroutable(video: HTMLVideoElement): void {
       : "";
   rememberSkip(
     video,
-    translationActive() ? "vot" : !resolvedSrc && !video.srcObject ? "loading" : "cors",
+    translationActive()
+      ? "vot"
+      : !sourceReady(video) || (!resolvedSrc && !video.srcObject)
+        ? "loading"
+        : "cors",
   );
   const sig = (currentSrc || rawSrc || "") + "|" + !!video.srcObject;
   if (sig !== lastNotRoutableLog) {
@@ -58,12 +62,17 @@ function canRouteAudio(video: HTMLVideoElement): boolean {
     if (rawSrc.startsWith("blob:") || rawSrc.startsWith("data:")) return true;
     return false;
   }
+  if (!sourceReady(video)) return false;
   try {
     if (new URL(src, location.href).origin === location.origin) return true;
   } catch (e) {
     return false;
   }
   return !!video.crossOrigin; // cross-origin only if the site set crossorigin=...
+}
+
+function sourceReady(video: HTMLVideoElement): boolean {
+  return typeof video.readyState !== "number" || video.readyState >= 1;
 }
 
 export function graphForCurrentSource(video: HTMLVideoElement): AudioGraph | null {

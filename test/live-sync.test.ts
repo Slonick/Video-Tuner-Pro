@@ -105,6 +105,17 @@ describe("controlLive dispatch", () => {
     expect(h.applyAll).toHaveBeenCalled();
   });
 
+  it("does not overwrite an active manual VOD speed", () => {
+    S.currentSpeed = 1.5;
+    S.userSpeed = 1.2;
+    S.speedManual = true;
+    h.liveVideo.mockReturnValue(null);
+    h.onStreamPage.mockReturnValue(false);
+    controlLive();
+    expect(S.currentSpeed).toBe(1.5);
+    expect(h.applyAll).not.toHaveBeenCalled();
+  });
+
   it("holds during the sticky stream window (onStreamPage) without restoring", () => {
     S.currentSpeed = 1.5;
     S.userSpeed = 1.2;
@@ -251,6 +262,26 @@ describe("sync ON (runLiveSync)", () => {
     vi.setSystemTime(T + 4000);
     controlLive();
     expect(second.playbackRate).toBeCloseTo(1.05, 5);
+  });
+
+  it("ignores dropped frames after the site already applied our new catch-up rate", () => {
+    const v = fakeVideo({ playbackRate: 1.05, droppedVideoFrames: 0 });
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+    h.liveVideo.mockReturnValue(v);
+    h.streamLatency.mockReturnValue(6.5); // desired 105%
+    h.forwardBuffer.mockReturnValue(10);
+
+    controlLive();
+    expect(S.currentSpeed).toBeCloseTo(1.05, 5);
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
+
+    v.droppedVideoFrames = 6; // burst caused by the external rate switch
+    vi.setSystemTime(T + 500);
+    controlLive();
+
+    expect(S.currentSpeed).toBeCloseTo(1.05, 5);
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
   });
 });
 

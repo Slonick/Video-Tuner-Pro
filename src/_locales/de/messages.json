@@ -40,6 +40,7 @@
   "audioBlockInuse": { "message": "Etwas anderes belegt bereits den Ton dieses Videos — meist eine andere Audio-Erweiterung, manchmal der Player der Seite. Nur eines kann ihn gleichzeitig nutzen, daher sind diese Funktionen hier pausiert. Schalte andere Audio-Erweiterungen in diesem Tab ab und lade die Seite neu." },
   "audioBlockCors": { "message": "Dieses Video stammt von einer anderen Website, die das Auslesen des Tons nicht erlaubt, daher kann er hier nicht verarbeitet werden. Das liegt an der Website — du kannst nichts ändern." },
   "audioBlockNoctx": { "message": "Dein Browser kann auf dieser Seite keinen Ton verarbeiten, daher sind diese Audiofunktionen nicht verfügbar." },
+  "audioBlockSuspended": { "message": "Dein Browser wartet auf einen Klick oder Tastendruck, bevor er diesen Ton verarbeiten kann. Klicke einmal auf die Seite und versuche es erneut." },
   "audioSubtitle": { "message": "Laute und leise Töne angleichen" },
   "audioHint": { "message": "Gleicht die Lautstärke aus — leise Stellen werden lauter, laute leiser —, damit du nicht ständig am Lautstärkeregler drehst. Manche Seiten blockieren das, deshalb funktioniert es nicht überall." },
   "audioVotNote": { "message": "Eine Voiceover-Übersetzung läuft — die Kompression ist pausiert, um nicht zu stören." },

@@ -100,6 +100,6 @@ describe("background reinjection", () => {
         .filter((x) => x.tabId === 1)
         .map((x) => x.files[0])
         .sort(),
-    ).toEqual(["audio-inject.js", "content.js", "quality-inject.js"]);
+    ).toEqual(["audio-inject.js", "content.js", "fullscreen-inject.js", "quality-inject.js"]);
   });
 });

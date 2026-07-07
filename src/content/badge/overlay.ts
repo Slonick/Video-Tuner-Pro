@@ -170,10 +170,12 @@ function hookPin(pin: HTMLElement): void {
 // (clamped inside the frame) for this site.
 function hookBadgeDrag(el: HTMLElement): void {
   let moved = false;
+  let pointerId: number | null = null;
   el.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     dragging = true;
     moved = false;
+    pointerId = e.pointerId;
     try {
       el.setPointerCapture(e.pointerId);
     } catch (x) {
@@ -192,23 +194,42 @@ function hookBadgeDrag(el: HTMLElement): void {
     el.style.top = Math.round(e.clientY - dragDY) + "px";
     flashBadge(); // stay lit while dragging
   });
-  const drop = () => {
+  const drop = (save = true) => {
     if (!dragging) return;
     dragging = false;
+    pointerId = null;
     el.style.cursor = "grab";
     // A click without a drag (e.g. the two clicks of a double-click) must not
     // re-save — its write would otherwise race the reset below and win.
-    if (!moved || !badgeVideo) return;
+    if (!save || !moved || !badgeVideo) return;
     const pos = badgeFraction(el.getBoundingClientRect(), badgeVideo.getBoundingClientRect());
     S.badgePos = pos;
     positionBadge(el, badgeVideo); // snap to the clamped spot
     saveBadgePos(pos.fx, pos.fy);
   };
-  el.addEventListener("pointerup", drop);
-  el.addEventListener("pointercancel", drop);
+  el.addEventListener("pointerup", () => drop());
+  el.addEventListener("pointercancel", () => drop(false));
+  document.addEventListener(
+    "pointerup",
+    (e) => {
+      if (pointerId == null || e.pointerId !== pointerId) return;
+      drop();
+    },
+    true,
+  );
+  document.addEventListener(
+    "pointercancel",
+    (e) => {
+      if (pointerId == null || e.pointerId !== pointerId) return;
+      drop(false);
+    },
+    true,
+  );
+  window.addEventListener("blur", () => drop(false), true);
   el.addEventListener("dblclick", (e) => {
     e.preventDefault();
     dragging = false;
+    pointerId = null;
     S.badgePos = null;
     if (badgeVideo) positionBadge(el, badgeVideo);
     resetBadgePos();

@@ -40,6 +40,7 @@
   "audioBlockInuse": { "message": "Algo más ya tiene el audio de este vídeo: normalmente otra extensión de audio, a veces el reproductor del sitio. Solo uno puede usarlo a la vez, así que estas funciones están en pausa aquí. Desactiva otras extensiones de audio en esta pestaña y recarga la página." },
   "audioBlockCors": { "message": "Este vídeo viene de otro sitio que no permite leer su audio, así que no se puede procesar aquí. Es la configuración del sitio: no hay nada que cambiar de tu parte." },
   "audioBlockNoctx": { "message": "Tu navegador no puede procesar audio en esta página, así que estas funciones de audio no están disponibles." },
+  "audioBlockSuspended": { "message": "Tu navegador espera un clic o una tecla antes de poder procesar este audio. Haz clic una vez en la página y vuelve a intentarlo." },
   "audioSubtitle": { "message": "Igualar sonidos fuertes y suaves" },
   "audioHint": { "message": "Empareja el volumen — sube las partes flojas y baja las fuertes — para que no tengas que tocar el volumen a cada rato. Algunos sitios lo bloquean, así que no funciona en todas partes." },
   "audioVotNote": { "message": "Hay una traducción de voz activa: la compresión está en pausa para no interferir." },

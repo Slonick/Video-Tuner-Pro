@@ -20,9 +20,19 @@ function makeYoutubePlayer(width: number, height: number, live: boolean): HTMLEl
 }
 
 async function loadInject(): Promise<void> {
+  (
+    window as typeof window & { __vtpLatencyBridgeCleanup?: () => void }
+  ).__vtpLatencyBridgeCleanup?.();
   vi.resetModules();
   delete (window as typeof window & { __vtpLatencyBridgeInstalled?: boolean | string })
     .__vtpLatencyBridgeInstalled;
+  delete (window as typeof window & { __vtpLatencyBridgeCleanup?: () => void })
+    .__vtpLatencyBridgeCleanup;
+  await import("../src/content/inject.js");
+}
+
+async function reloadInjectKeepingBridgeState(): Promise<void> {
+  vi.resetModules();
   await import("../src/content/inject.js");
 }
 
@@ -68,5 +78,74 @@ describe("MAIN-world live probe", () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(document.documentElement.getAttribute("data-vtp-live")).toBeNull();
+  });
+
+  it("cleans up a previous bridge before taking ownership", async () => {
+    const cleanup = vi.fn();
+    (
+      window as typeof window & {
+        __vtpLatencyBridgeInstalled?: string;
+        __vtpLatencyBridgeCleanup?: () => void;
+      }
+    ).__vtpLatencyBridgeInstalled = "older-bridge";
+    (
+      window as typeof window & {
+        __vtpLatencyBridgeCleanup?: () => void;
+      }
+    ).__vtpLatencyBridgeCleanup = cleanup;
+    makeYoutubePlayer(640, 360, true);
+
+    await reloadInjectKeepingBridgeState();
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("stops publishing after cleanup", async () => {
+    makeYoutubePlayer(640, 360, true);
+
+    await loadInject();
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+
+    (
+      window as typeof window & { __vtpLatencyBridgeCleanup?: () => void }
+    ).__vtpLatencyBridgeCleanup?.();
+    document.documentElement.removeAttribute("data-vtp-live");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBeNull();
+  });
+
+  it("does not clear a newer bridge owner from an old cleanup callback", async () => {
+    await loadInject();
+    const cleanup = (window as typeof window & { __vtpLatencyBridgeCleanup?: () => void })
+      .__vtpLatencyBridgeCleanup!;
+
+    (
+      window as typeof window & { __vtpLatencyBridgeInstalled?: unknown }
+    ).__vtpLatencyBridgeInstalled = "newer-bridge";
+    cleanup();
+
+    expect(
+      (window as typeof window & { __vtpLatencyBridgeInstalled?: unknown })
+        .__vtpLatencyBridgeInstalled,
+    ).toBe("newer-bridge");
+  });
+
+  it("skips detached HLS candidates and clears latency when the cached one detaches", async () => {
+    const staleVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    const liveVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    staleVideo.hls = { latency: 99, attachMedia() {} };
+    liveVideo.hls = { latency: 4, media: liveVideo };
+    document.body.append(staleVideo, liveVideo);
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.00");
+
+    liveVideo.remove();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
   });
 });

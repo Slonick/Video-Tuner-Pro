@@ -28,6 +28,7 @@ const R_ITEM = 36; // px — one radial-menu item's box
 const R_DIST = 62; // px — item centre's distance from the FAB centre
 const R_SPREAD = Math.PI / 3.6; // 50° between neighbouring radial items
 const R_HIDE_MS = 350; // grace period for the pointer to travel FAB → item
+const R_CLOSE_MS = 240; // wait for the fan-in transition before hiding items
 const RADIAL_TRANSITION =
   "left .22s cubic-bezier(.2,0,0,1), top .22s cubic-bezier(.2,0,0,1), opacity .18s ease, transform .22s cubic-bezier(.2,0,0,1)";
 const MARGIN = 16; // px — default inset from the video's right edge
@@ -50,6 +51,7 @@ let rItems: {
 let radialOpen = false;
 let radialTimer: Timer | undefined;
 let radialIdleTimer: Timer | undefined;
+let radialCloseTimer: Timer | undefined;
 let radialFrame = 0;
 let backdrop: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
@@ -250,7 +252,9 @@ function toggleNativePiP(): void {
 function openRadial(): void {
   if (!rItems || !fab) return;
   clearTimeout(radialTimer);
+  clearTimeout(radialCloseTimer);
   radialTimer = undefined;
+  radialCloseTimer = undefined;
   syncRadial();
   const items = radialList();
   for (const b of Object.values(rItems)) {
@@ -302,17 +306,30 @@ function closeRadial(resumeHide = false): void {
   radialOpen = false;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
+  clearTimeout(radialCloseTimer);
   radialTimer = undefined;
   radialIdleTimer = undefined;
+  radialCloseTimer = undefined;
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   if (rItems) {
-    for (const b of Object.values(rItems)) {
-      b.style.opacity = "0";
-      b.style.visibility = "hidden";
+    const closingItems = Object.values(rItems).filter((b) => b.style.visibility !== "hidden");
+    for (const b of closingItems) {
+      b.style.visibility = "visible";
       b.style.pointerEvents = "none";
     }
-    positionRadialAtFab();
+    for (const b of closingItems) b.getBoundingClientRect();
+    radialFrame = requestAnimationFrame(() => {
+      radialFrame = 0;
+      if (radialOpen || !rItems) return;
+      for (const b of closingItems) b.style.opacity = "0";
+      positionRadialAtFab(closingItems);
+      radialCloseTimer = setTimeout(() => {
+        radialCloseTimer = undefined;
+        if (radialOpen || !rItems) return;
+        for (const b of closingItems) b.style.visibility = "hidden";
+      }, R_CLOSE_MS);
+    });
   }
   if (resumeHide) flashFab();
 }
@@ -648,6 +665,7 @@ function mount(): void {
   radialOpen = false;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
+  clearTimeout(radialCloseTimer);
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   host = document.createElement("div");
@@ -901,6 +919,7 @@ function resetDetachedHost(): void {
   open = false;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
+  clearTimeout(radialCloseTimer);
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   host = null;

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   desiredRate,
   applyRate,
@@ -22,9 +22,11 @@ const activeBridgeVersion = (
 ).__vtpAudioBridgeInstalled;
 
 beforeEach(() => {
+  (window as typeof window & { __vtpAudioBridgeCleanup?: () => void }).__vtpAudioBridgeCleanup?.();
   (
     window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string }
-  ).__vtpAudioBridgeInstalled = activeBridgeVersion;
+  ).__vtpAudioBridgeInstalled = undefined;
+  install();
   publish(null);
 });
 
@@ -188,6 +190,64 @@ describe("install", () => {
       (window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string })
         .__vtpAudioBridgeInstalled,
     ).toBe(activeBridgeVersion);
+  });
+
+  it("runs the previous bridge cleanup when taking ownership", () => {
+    const cleanup = vi.fn();
+    (
+      window as typeof window & {
+        __vtpAudioBridgeInstalled?: boolean | string;
+        __vtpAudioBridgeCleanup?: () => void;
+      }
+    ).__vtpAudioBridgeInstalled = "older-bridge";
+    (
+      window as typeof window & {
+        __vtpAudioBridgeCleanup?: () => void;
+      }
+    ).__vtpAudioBridgeCleanup = cleanup;
+
+    install();
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(
+      (window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string })
+        .__vtpAudioBridgeInstalled,
+    ).toBe(activeBridgeVersion);
+  });
+
+  it("removes tracked media listeners during cleanup", () => {
+    publish("2");
+    const a = new Audio();
+    captureOnPlay(a);
+    expect(a.playbackRate).toBe(2);
+
+    (
+      window as typeof window & { __vtpAudioBridgeCleanup?: () => void }
+    ).__vtpAudioBridgeCleanup?.();
+    publish("3");
+    a.playbackRate = 1;
+    a.dispatchEvent(new Event("ratechange"));
+
+    expect(a.playbackRate).toBe(1);
+    install();
+    expect(
+      (window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string })
+        .__vtpAudioBridgeInstalled,
+    ).toBe(activeBridgeVersion);
+  });
+
+  it("does not clear a newer bridge owner from an old cleanup callback", () => {
+    install();
+    const cleanup = (window as typeof window & { __vtpAudioBridgeCleanup?: () => void })
+      .__vtpAudioBridgeCleanup!;
+
+    (window as typeof window & { __vtpAudioBridgeInstalled?: unknown }).__vtpAudioBridgeInstalled =
+      "newer-bridge";
+    cleanup();
+
+    expect(
+      (window as typeof window & { __vtpAudioBridgeInstalled?: unknown }).__vtpAudioBridgeInstalled,
+    ).toBe("newer-bridge");
   });
 });
 

@@ -190,14 +190,13 @@ describe("routed STORE", () => {
     expect(env.backing.sync.audioComp).toBe(true);
   });
 
-  it("removes normal keys from stale copies so deleted settings cannot reappear", async () => {
+  it("does not remove an opted-out key from sync", async () => {
     env.backing.local.syncCategories = { speeds: false };
     env.backing.local.globalSpeed = 2;
     env.backing.sync.globalSpeed = 1.5;
-    const { STORE, setCategorySync } = await freshStore(env.chrome);
+    const { STORE } = await freshStore(env.chrome);
 
     STORE.remove("globalSpeed");
-    setCategorySync("speeds", true);
 
     let got: Record<string, unknown> = {};
     STORE.get(["globalSpeed"], (r) => {
@@ -205,7 +204,7 @@ describe("routed STORE", () => {
     });
     expect(got.globalSpeed).toBeUndefined();
     expect(env.backing.local.globalSpeed).toBeUndefined();
-    expect(env.backing.sync.globalSpeed).toBeUndefined();
+    expect(env.backing.sync.globalSpeed).toBe(1.5);
   });
 
   it("drops a failed routed read from the merged result", async () => {
@@ -296,7 +295,7 @@ describe("master sync switch", () => {
     expect(got).toEqual({ globalSpeed: 2, audioComp: true });
   });
 
-  it("does not resurrect a removed synced key when the master switch turns back on", async () => {
+  it("does not delete a synced key while the master switch is off", async () => {
     const env = makeChrome();
     env.backing.local.syncMaster = false;
     env.backing.local.globalSpeed = 2;
@@ -310,9 +309,9 @@ describe("master sync switch", () => {
     STORE.get(["globalSpeed"], (r) => {
       got = r;
     });
-    expect(got.globalSpeed).toBeUndefined();
+    expect(got.globalSpeed).toBe(1.5);
     expect(env.backing.local.globalSpeed).toBeUndefined();
-    expect(env.backing.sync.globalSpeed).toBeUndefined();
+    expect(env.backing.sync.globalSpeed).toBe(1.5);
   });
 
   it("turning it back on restores synced categories to sync, leaving opted-out ones local", async () => {

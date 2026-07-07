@@ -40,6 +40,7 @@
   "audioBlockInuse": { "message": "Something else already has this video’s audio — usually another audio extension, sometimes the site’s own player. Only one can use it at a time, so these features are paused here. Try turning off other audio extensions on this tab, then reload the page." },
   "audioBlockCors": { "message": "This video comes from another site that doesn’t allow reading its audio, so it can’t be processed here. That’s the site’s setup — nothing to change on your side." },
   "audioBlockNoctx": { "message": "Your browser can’t process audio on this page, so these audio features aren’t available." },
+  "audioBlockSuspended": { "message": "Your browser is waiting for a click or key press before it can process this audio. Click the page once, then try again." },
   "audioSubtitle": { "message": "Even out loud and quiet sounds" },
   "audioGain": { "message": "Make-up gain" },
   "audioHint": { "message": "Evens out the volume — quiet parts come up, loud parts come down — so you're not always reaching for the volume knob. A few sites block it, so it won't work everywhere." },

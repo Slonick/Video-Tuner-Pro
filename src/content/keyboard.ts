@@ -125,6 +125,12 @@ function releaseHold(): void {
   setSpeed(S.holdPrev, false, true);
 }
 
+function releaseHoldOnWindowBlur(): void {
+  setTimeout(() => {
+    if (!document.hasFocus()) releaseHold();
+  }, 0);
+}
+
 // Releasing the hold key restores the speed it interrupted. Listens regardless
 // of the typing guard so a release over a focused field still cleans up.
 document.addEventListener(
@@ -136,7 +142,7 @@ document.addEventListener(
   true,
 );
 
-window.addEventListener("blur", releaseHold, true);
+window.addEventListener("blur", releaseHoldOnWindowBlur, true);
 document.addEventListener(
   "visibilitychange",
   () => {

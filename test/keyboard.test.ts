@@ -167,15 +167,38 @@ describe("keyboard shortcuts", () => {
     expect(m.setSpeed).not.toHaveBeenCalled();
   });
 
-  it("restores hold-to-speed on blur if keyup is lost", () => {
-    S.currentSpeed = 1.25;
-    S.holdSpeed = 2;
-    press("KeyX");
-    expect(S.holdActive).toBe(true);
-    expect(m.setSpeed).toHaveBeenCalledWith(2, false, true);
-    window.dispatchEvent(new Event("blur"));
-    expect(S.holdActive).toBe(false);
-    expect(m.setSpeed).toHaveBeenLastCalledWith(1.25, false, true);
+  it("restores hold-to-speed on window blur if keyup is lost", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      S.currentSpeed = 1.25;
+      S.holdSpeed = 2;
+      press("KeyX");
+      expect(S.holdActive).toBe(true);
+      expect(m.setSpeed).toHaveBeenCalledWith(2, false, true);
+      window.dispatchEvent(new Event("blur"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(S.holdActive).toBe(false);
+      expect(m.setSpeed).toHaveBeenLastCalledWith(1.25, false, true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not release hold-to-speed for focus changes inside the page", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      S.currentSpeed = 1.25;
+      S.holdSpeed = 2;
+      press("KeyX");
+      window.dispatchEvent(new Event("blur"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(S.holdActive).toBe(true);
+      expect(m.setSpeed).toHaveBeenLastCalledWith(2, false, true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("restores hold-to-speed on keyup", () => {

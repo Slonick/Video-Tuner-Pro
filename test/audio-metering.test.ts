@@ -14,7 +14,10 @@ const m = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => m.primary }));
-vi.mock("../src/content/audio/translation.js", () => ({ translationActive: () => m.translation }));
+vi.mock("../src/content/audio/translation.js", () => ({
+  translationActive: () => m.translation,
+  compOn: () => S.audioCompEnabled && !m.translation,
+}));
 vi.mock("../src/content/audio/routing.js", () => ({
   audioContext: () => m.ctx,
   audioGraphs: m.graphs,
@@ -70,13 +73,13 @@ describe("audioLevels", () => {
     expect(audioLevels().enabled).toBe(false);
   });
 
-  it("flags a hard capture failure (inuse / cors / noctx) as blocked", () => {
-    for (const r of ["inuse", "cors", "noctx"]) {
+  it("flags a capture failure (inuse / cors / noctx / suspended) as blocked", () => {
+    for (const r of ["inuse", "cors", "noctx", "suspended"]) {
       m.skip = r;
       expect(audioLevels().blocked).toBe(r);
     }
     // transient reasons resolve on their own → not surfaced as a hard block
-    for (const r of ["loading", "suspended", "vot", null]) {
+    for (const r of ["loading", "vot", null]) {
       m.skip = r;
       expect(audioLevels().blocked).toBeUndefined();
     }
@@ -116,6 +119,16 @@ describe("audioLevels", () => {
     m.graphs.set(v, makeGraph(0));
     m.translation = true;
     expect(audioLevels().translation).toBe(true);
+  });
+
+  it("does not add make-up gain while translation pauses compression", () => {
+    S.audioCompGain = 24;
+    const v = {} as HTMLVideoElement;
+    m.primary = v;
+    m.graphs.set(v, makeGraph(0));
+    m.translation = true;
+    const r = audioLevels();
+    expect(r.out).toBeCloseTo(r.in!, 6);
   });
 
   it("stays live even with compression disabled (transparent graph keeps metering)", () => {

@@ -40,6 +40,7 @@
   "audioBlockInuse": { "message": "Algo já está usando o áudio deste vídeo — geralmente outra extensão de áudio, às vezes o player do site. Só um pode usar por vez, então estes recursos estão pausados aqui. Desative outras extensões de áudio nesta aba e recarregue a página." },
   "audioBlockCors": { "message": "Este vídeo vem de outro site que não permite ler o áudio, então ele não pode ser processado aqui. É a configuração do site — nada a mudar do seu lado." },
   "audioBlockNoctx": { "message": "Seu navegador não consegue processar áudio nesta página, então estes recursos de áudio não estão disponíveis." },
+  "audioBlockSuspended": { "message": "Seu navegador está aguardando um clique ou tecla antes de processar este áudio. Clique uma vez na página e tente novamente." },
   "audioSubtitle": { "message": "Equilibrar sons altos e baixos" },
   "audioHint": { "message": "Equilibra o volume — as partes baixas sobem, as altas descem — para você não ficar toda hora mexendo no volume. Alguns sites bloqueiam, então não funciona em todo lugar." },
   "audioVotNote": { "message": "Uma tradução por voz está ativa — a compressão foi pausada para não interferir." },

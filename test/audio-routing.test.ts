@@ -12,6 +12,7 @@ class FakeParam {
   cancelScheduledValues() {}
 }
 let lastCtx: FakeAudioContext | null = null;
+let createSourceCalls = 0;
 class FakeAudioContext {
   state = "running";
   currentTime = 0;
@@ -25,6 +26,7 @@ class FakeAudioContext {
     return Promise.resolve();
   }
   createMediaElementSource() {
+    createSourceCalls++;
     if (this.throwOnSource) throw new Error("already captured");
     return { connect() {} };
   }
@@ -52,6 +54,7 @@ type VidProps = Partial<{
   currentSrc: string;
   src: string;
   crossOrigin: string;
+  readyState: number;
 }>;
 const vid = (p: VidProps = {}) =>
   ({
@@ -72,6 +75,7 @@ async function load() {
 
 beforeEach(() => {
   lastCtx = null;
+  createSourceCalls = 0;
   document.body.innerHTML = "";
 });
 afterEach(() => {
@@ -98,6 +102,30 @@ describe("setupGraph source gating (canRouteAudio)", () => {
     const { setupGraph, lastSkip } = await load();
     expect(setupGraph(vid({ src: location.origin + "/redirecting-video" }))).toBeNull();
     expect(lastSkip()).toBe("loading");
+  });
+
+  it("waits for metadata before routing a normal URL that may still redirect", async () => {
+    const { setupGraph, lastSkip } = await load();
+    const v = vid({
+      src: location.origin + "/redirecting-video",
+      currentSrc: location.origin + "/redirecting-video",
+      readyState: 0,
+    });
+
+    expect(setupGraph(v)).toBeNull();
+    expect(lastSkip(v)).toBe("loading");
+    expect(createSourceCalls).toBe(0);
+
+    Object.defineProperty(v, "readyState", { configurable: true, value: 1 });
+    Object.defineProperty(v, "currentSrc", {
+      configurable: true,
+      value: "https://cdn.example.com/v.mp4",
+    });
+
+    expect(setupGraph(v)).toBeNull();
+    expect(lastSkip(v)).toBe("cors");
+    expect(createSourceCalls).toBe(0);
+    expect(lastCtx).toBeNull();
   });
 
   it("skips when the resolved currentSrc redirects cross-origin without crossorigin", async () => {

@@ -26,7 +26,7 @@ vi.mock("../src/content/live/catchup.js", () => ({ catchupBufferLimited: () => h
 
 import { S } from "../src/content/state.js";
 import { STORE } from "../src/content/platform/storage.js";
-import { updateTimeBadge, ownsBadgeNode } from "../src/content/badge/overlay.js";
+import { updateTimeBadge, flashBadge, ownsBadgeNode } from "../src/content/badge/overlay.js";
 
 function fakeVideo(rect: Partial<DOMRect> = {}) {
   const r = {
@@ -279,15 +279,18 @@ describe("updateTimeBadge — positioning", () => {
     expect(el.style.top).toBe("180px");
   });
 
-  it("parents the badge inside a fullscreen bare video", () => {
+  it("parents the badge inside the fullscreen wrapper for a bare video", () => {
     const video = realVideo();
-    document.body.append(video);
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-vtp-fullscreen-wrapper", "");
+    wrapper.append(video);
+    document.body.append(wrapper);
     h.primary = video;
-    Object.defineProperty(document, "fullscreenElement", { value: video, configurable: true });
+    Object.defineProperty(document, "fullscreenElement", { value: wrapper, configurable: true });
 
     updateTimeBadge();
 
-    expect(document.querySelector("[data-vtp-badge]")?.parentNode).toBe(video);
+    expect(document.querySelector("[data-vtp-badge]")?.parentNode).toBe(wrapper);
   });
 });
 
@@ -305,8 +308,15 @@ describe("ownsBadgeNode", () => {
 // Dispatch a pointer/mouse event by type name (the handlers listen by type, so a
 // MouseEvent of type "pointermove" still fires the pointermove listener — and it
 // sidesteps jsdom's partial PointerEvent support).
-const fire = (el: EventTarget, type: string, init: MouseEventInit = {}) =>
-  el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, ...init }));
+const fire = (
+  el: EventTarget,
+  type: string,
+  init: MouseEventInit & { pointerId?: number } = {},
+) => {
+  const ev = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, ...init });
+  if (init.pointerId != null) Object.defineProperty(ev, "pointerId", { value: init.pointerId });
+  return el.dispatchEvent(ev);
+};
 
 describe("badge drag", () => {
   it("dropping after a drag saves the per-site position fraction", () => {
@@ -331,6 +341,51 @@ describe("badge drag", () => {
     expect(S.badgePos).not.toBeNull();
     expect(S.badgePos!.fx).toBeCloseTo(0.5, 1);
     expect(S.badgePos!.fy).toBeCloseTo(0.5, 1);
+  });
+
+  it("finishes a drag from a document-level pointerup when capture is lost", () => {
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    el.getBoundingClientRect = () => ({
+      left: 320,
+      top: 180,
+      width: 0,
+      height: 0,
+      right: 320,
+      bottom: 180,
+      x: 320,
+      y: 180,
+      toJSON() {},
+    });
+
+    fire(el, "pointerdown", { clientX: 10, clientY: 10, pointerId: 7 });
+    fire(el, "pointermove", { clientX: 330, clientY: 190, pointerId: 7 });
+    fire(document, "pointerup", { clientX: 330, clientY: 190, pointerId: 7 });
+
+    expect(S.badgePos).not.toBeNull();
+    expect(S.badgePos!.fx).toBeCloseTo(0.5, 1);
+    expect(S.badgePos!.fy).toBeCloseTo(0.5, 1);
+  });
+
+  it("cancels a drag on window blur so the badge can auto-hide again", () => {
+    vi.useFakeTimers();
+    try {
+      h.primary = fakeVideo();
+      updateTimeBadge();
+      const el = badgeEl() as HTMLElement;
+      fire(el, "pointerdown", { clientX: 10, clientY: 10, pointerId: 8 });
+      fire(el, "pointermove", { clientX: 20, clientY: 20, pointerId: 8 });
+      window.dispatchEvent(new Event("blur"));
+
+      flashBadge();
+      vi.advanceTimersByTime(2600);
+
+      expect(el.style.opacity).toBe("0");
+      expect(el.style.cursor).toBe("grab");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not mutate the previous saved-position map while saving", () => {

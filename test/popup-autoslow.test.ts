@@ -36,9 +36,9 @@ describe("auto-slow card", () => {
     expect(primary().textContent).toContain("for this site");
   });
 
-  it("carries a beta marker in the header", async () => {
+  it("does not carry the beta marker in the header", async () => {
     await mountApp({ tab: EX, replies: reply() });
-    expect(document.querySelector(".beta-glyph")?.textContent).toBe("β");
+    expect(document.querySelector(".autoslow-section .beta-glyph")).toBeNull();
     expect(byId("autoSlowToggle")).not.toBeNull();
   });
 
