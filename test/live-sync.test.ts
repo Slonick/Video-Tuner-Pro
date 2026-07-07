@@ -29,9 +29,22 @@ import { S } from "../src/content/state.js";
 import { controlLive } from "../src/content/live/sync.js";
 
 function fakeVideo(
-  props: Partial<{ playbackRate: number; paused: boolean; preservesPitch: boolean }> = {},
+  props: Partial<{
+    playbackRate: number;
+    paused: boolean;
+    preservesPitch: boolean;
+    droppedVideoFrames: number;
+  }> = {},
 ) {
-  return { playbackRate: 1.0, paused: false, preservesPitch: true, ...props } as HTMLVideoElement;
+  const v = {
+    playbackRate: 1.0,
+    paused: false,
+    preservesPitch: true,
+    ...props,
+  } as Partial<HTMLVideoElement> & { droppedVideoFrames?: number };
+  v.getVideoPlaybackQuality = () =>
+    ({ droppedVideoFrames: v.droppedVideoFrames ?? 0 }) as VideoPlaybackQuality;
+  return v as HTMLVideoElement;
 }
 
 // Advance the clock far past any previous test's module-level timestamps so the
@@ -159,10 +172,33 @@ describe("sync ON (runLiveSync)", () => {
     controlLive();
     expect(v.playbackRate).toBeCloseTo(1.1, 5);
 
-    h.streamLatency.mockReturnValue(5.5); // back within the allowed delay
+    h.streamLatency.mockReturnValue(4.9); // target reached
     vi.setSystemTime(T + 300);
     controlLive();
     expect(v.playbackRate).toBe(1.0); // not held back by the dwell
+    expect(S.currentSpeed).toBe(1.0);
+  });
+
+  it("keeps the minimum catch-up step above the target instead of flapping to 100%", () => {
+    const v = fakeVideo();
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+    h.liveVideo.mockReturnValue(v);
+    h.streamLatency.mockReturnValue(6.5); // excess 1.5s → 105%
+    h.forwardBuffer.mockReturnValue(10);
+    controlLive();
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
+
+    h.streamLatency.mockReturnValue(5.4); // inside deadband, still above target
+    vi.setSystemTime(T + 3000);
+    controlLive();
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
+    expect(S.currentSpeed).toBeCloseTo(1.05, 5);
+
+    h.streamLatency.mockReturnValue(4.9); // target reached
+    vi.setSystemTime(T + 6000);
+    controlLive();
+    expect(v.playbackRate).toBe(1.0);
     expect(S.currentSpeed).toBe(1.0);
   });
 
@@ -173,6 +209,48 @@ describe("sync ON (runLiveSync)", () => {
     controlLive();
     expect(h.applyAll).not.toHaveBeenCalled();
     expect(v.playbackRate).toBe(1.0);
+  });
+
+  it("does not inherit the dwell window when the live video element changes", () => {
+    const first = fakeVideo();
+    const second = fakeVideo();
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+
+    h.liveVideo.mockReturnValue(first);
+    h.streamLatency.mockReturnValue(13); // excess 8s → 110%
+    controlLive();
+    expect(first.playbackRate).toBeCloseTo(1.1, 5);
+
+    h.liveVideo.mockReturnValue(second);
+    h.streamLatency.mockReturnValue(11.9); // would be held at 110% if dwell leaked
+    vi.setSystemTime(T + 300);
+    controlLive();
+    expect(second.playbackRate).toBeCloseTo(1.05, 5);
+    expect(S.currentSpeed).toBeCloseTo(1.05, 5);
+  });
+
+  it("does not treat a new live video's first dropped-frame total as a burst", () => {
+    const first = fakeVideo({ droppedVideoFrames: 0 });
+    const second = fakeVideo({ droppedVideoFrames: 10 });
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+    h.streamLatency.mockReturnValue(null);
+    h.forwardBuffer.mockReturnValue(10);
+
+    h.liveVideo.mockReturnValue(first);
+    controlLive();
+    expect(first.playbackRate).toBeCloseTo(1.05, 5);
+
+    first.droppedVideoFrames = 5;
+    vi.setSystemTime(T + 2000);
+    controlLive();
+    expect(first.playbackRate).toBe(1.0);
+
+    h.liveVideo.mockReturnValue(second);
+    vi.setSystemTime(T + 4000);
+    controlLive();
+    expect(second.playbackRate).toBeCloseTo(1.05, 5);
   });
 });
 

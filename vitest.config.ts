@@ -28,8 +28,10 @@ export default defineConfig({
         "src/content/audio/types.ts", // type-only (interfaces)
         // Entry points / bootstrap glue — wired by the browser, not unit-tested.
         "src/background/**",
+        "src/content/main.ts",
         "src/content/index.ts",
         "src/content/inject.ts",
+        "src/content/quality-inject.ts",
         // Browser-wired sampler: reads the analyser/video and applies the rate.
         // The pure detector + controller live in pace.ts and are unit-tested.
         "src/content/audio/autoslow.ts",

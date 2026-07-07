@@ -10,30 +10,50 @@ import { STORE } from "../platform/storage.js";
 import { S } from "../state.js";
 import { controlLive } from "./sync.js";
 
-export function persistSiteTarget(target: number): void {
-  if (!ctxValid() || window.top !== window) return; // top frame only — see speed.ts
+type Done = (ok?: boolean) => void;
+
+export function persistSiteTarget(target: number, done?: Done): void {
+  if (!ctxValid() || window.top !== window) {
+    done?.(false);
+    return;
+  } // top frame only — see speed.ts
   STORE.get(["syncTargets"], (r) => {
-    const t = (r.syncTargets || {}) as Record<string, number>;
+    const t = { ...((r.syncTargets || {}) as Record<string, number>) };
     t[getDomain()] = target;
-    STORE.set({ syncTargets: t });
+    STORE.set({ syncTargets: t }, done);
   });
 }
 
-export function persistChannelTarget(target: number): void {
-  if (!ctxValid() || window.top !== window) return;
+export function persistChannelTarget(target: number, done?: Done): void {
+  if (!ctxValid() || window.top !== window) {
+    done?.(false);
+    return;
+  }
   const keys = channelKeys();
-  if (!keys.length) return;
+  if (!keys.length) {
+    done?.(false);
+    return;
+  }
   STORE.get(["syncTargetChannels"], (r) => {
-    const t = (r.syncTargetChannels || {}) as Record<string, number>;
+    const t = { ...((r.syncTargetChannels || {}) as Record<string, number>) };
     for (const k of keys) delete t[k];
     t[keys[0]] = target;
-    STORE.set({ syncTargetChannels: t });
+    STORE.set({ syncTargetChannels: t }, done);
   });
 }
 
-export function persistGlobalTarget(target: number): void {
-  if (!ctxValid() || window.top !== window) return;
-  STORE.set({ syncTargetGlobal: target });
+export function persistGlobalTarget(target: number, done?: Done): void {
+  if (!ctxValid() || window.top !== window) {
+    done?.(false);
+    return;
+  }
+  STORE.set({ syncTargetGlobal: target }, (ok) => {
+    if (ok === false) {
+      done?.(false);
+      return;
+    }
+    STORE.remove("liveSyncTarget", done);
+  });
 }
 
 // Re-resolve the chain from the given maps and apply it (no persist).
@@ -67,27 +87,43 @@ export function applyResolvedTargetFromStore(): void {
 }
 
 // Drop the saved target for one scope and re-resolve the remaining chain.
-export function resetTargetScope(scope: TargetScope): void {
-  if (!ctxValid()) return;
+export function resetTargetScope(scope: TargetScope, done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   STORE.get(["syncTargets", "syncTargetChannels", "syncTargetGlobal", "liveSyncTarget"], (r) => {
-    const site = (r.syncTargets || {}) as Record<string, number>;
-    const channels = (r.syncTargetChannels || {}) as Record<string, number>;
+    const site = { ...((r.syncTargets || {}) as Record<string, number>) };
+    const channels = { ...((r.syncTargetChannels || {}) as Record<string, number>) };
     let global = (r.syncTargetGlobal ?? r.liveSyncTarget) as number | undefined;
+    const finish = (ok?: boolean) => {
+      if (ok === false) {
+        done?.(false);
+        return;
+      }
+      applyResolvedTarget(site, channels, global);
+      done?.(true);
+    };
     if (scope === "channel") {
       const keys = channelKeys();
-      if (!keys.length) return;
+      if (!keys.length) {
+        done?.(false);
+        return;
+      }
       for (const k of keys) delete channels[k];
-      STORE.set({ syncTargetChannels: channels });
+      if (Object.keys(channels).length) STORE.set({ syncTargetChannels: channels }, finish);
+      else STORE.remove("syncTargetChannels", finish);
     } else if (scope === "site") {
       delete site[getDomain()];
-      STORE.set({ syncTargets: site });
+      if (Object.keys(site).length) STORE.set({ syncTargets: site }, finish);
+      else STORE.remove("syncTargets", finish);
     } else if (scope === "global") {
       global = undefined;
-      STORE.remove(["syncTargetGlobal", "liveSyncTarget"]); // clear the new + legacy global
+      STORE.remove(["syncTargetGlobal", "liveSyncTarget"], finish); // clear the new + legacy global
     } else {
+      done?.(false);
       return;
     }
-    applyResolvedTarget(site, channels, global);
   });
 }
 

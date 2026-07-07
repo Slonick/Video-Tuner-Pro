@@ -164,7 +164,7 @@ export const REGISTRY: Entry<unknown>[] = [
     set: (v) => (S.audioCompGain = v),
   }),
   // Auto-slow response dynamics (floor + hold/reaction/ease-back) — global scalars
-  // with no side-effect; the scoped enable/target bundle stays bespoke.
+  // with no side-effect; the scoped target stays bespoke.
   // Master on/off — global (like the compressor), not per-scope. The sampler resets
   // the slowdown itself when it sees the flag off, so no apply side-effect here.
   entry({

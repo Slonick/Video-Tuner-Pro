@@ -18,6 +18,7 @@ import {
   viewerFormat,
   viewerAnchorVideo,
   ownsViewerNode,
+  refreshViewerBackdrop,
   fmtTime,
 } from "../src/content/viewer.js";
 
@@ -65,7 +66,10 @@ function setSeekable(v: HTMLVideoElement, start: number, end: number): void {
   });
 }
 
-function installCapture(v: HTMLVideoElement): { stop: ReturnType<typeof vi.fn>; stream: MediaStream } {
+function installCapture(v: HTMLVideoElement): {
+  stop: ReturnType<typeof vi.fn>;
+  stream: MediaStream;
+} {
   const stop = vi.fn();
   const stream = {
     getVideoTracks: () => [{}],
@@ -95,6 +99,9 @@ const barButtons = () => Array.from(barEl()?.querySelectorAll("button") ?? []); 
 const barInputs = () => Array.from(barEl()?.querySelectorAll("input") ?? []) as HTMLInputElement[]; // seek, vol
 const barTime = () => barEl()?.querySelector(".time")?.textContent ?? null;
 const qwraps = () => Array.from(barEl()?.querySelectorAll(".qwrap") ?? []) as HTMLElement[];
+const viewerBackdrop = () => overlayEl()?.querySelector("div") as HTMLElement | null;
+const viewerBackdropVideo = () =>
+  overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLVideoElement | null;
 
 function setFullscreen(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
@@ -115,11 +122,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function installQualityBridge(options = [
-  { id: "auto", label: "Auto", current: true },
-  { id: "0", label: "360p" },
-  { id: "1", label: "720p" },
-]) {
+function installQualityBridge(
+  options = [
+    { id: "auto", label: "Auto", current: true },
+    { id: "0", label: "360p" },
+    { id: "1", label: "720p" },
+  ],
+) {
   const picks: string[] = [];
   document.addEventListener("vtp-quality-request", (e) => {
     const d = (e as CustomEvent).detail;
@@ -143,6 +152,16 @@ function installQualityBridge(options = [
     );
   });
   return picks;
+}
+
+function installBackdropMirror(v: HTMLVideoElement) {
+  const stop = vi.fn();
+  const stream = {
+    getVideoTracks: () => [{}],
+    getTracks: () => [{ stop }],
+  } as unknown as MediaStream;
+  Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
+  return { stop, stream };
 }
 
 describe("fmtTime", () => {
@@ -272,7 +291,8 @@ describe("toggleViewer — lifecycle", () => {
       const anim = { onfinish: null, oncancel: null } as unknown as Animation;
       setTimeout(() => {
         const done = anim.onfinish;
-        if (typeof done === "function") done.call(anim, new Event("finish") as AnimationPlaybackEvent);
+        if (typeof done === "function")
+          done.call(anim, new Event("finish") as AnimationPlaybackEvent);
       }, 100);
       return anim;
     });
@@ -295,6 +315,40 @@ describe("toggleViewer — lifecycle", () => {
     } else {
       delete (Element.prototype as { animate?: Element["animate"] }).animate;
     }
+  });
+
+  it("still closes if a Web Animation never reports finish or cancel", async () => {
+    vi.useFakeTimers();
+    const { wrap, v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+
+    const originalAnimate = Element.prototype.animate;
+    const animate = vi.fn(
+      () =>
+        ({
+          onfinish: null,
+          oncancel: null,
+        }) as unknown as Animation,
+    );
+    Object.defineProperty(Element.prototype, "animate", { value: animate, configurable: true });
+
+    exitViewer();
+    expect(overlayEl()).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(900);
+    await flush();
+    expect(overlayEl()).toBeNull();
+    expect(v.parentElement).toBe(wrap);
+
+    if (originalAnimate) {
+      Object.defineProperty(Element.prototype, "animate", {
+        value: originalAnimate,
+        configurable: true,
+      });
+    } else {
+      delete (Element.prototype as { animate?: Element["animate"] }).animate;
+    }
+    vi.useRealTimers();
   });
 
   it("Escape exits; a press on the dim exits; a press on the video does not", async () => {
@@ -425,32 +479,108 @@ describe("control bar", () => {
 
   it("can mirror the video under the normal viewer glass", async () => {
     const { v } = makeVideo();
-    const stop = vi.fn();
-    const stream = {
-      getVideoTracks: () => [{}],
-      getTracks: () => [{ stop }],
-    } as unknown as MediaStream;
+    const { stop, stream } = installBackdropMirror(v);
     const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
     const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
-    Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
     S.viewerBackdropVideo = true;
     h.primary = v;
 
     await openViewer("normal");
 
-    const bg = overlayEl()?.querySelector(
-      "[data-vtp-viewer-backdrop-video]",
-    ) as HTMLVideoElement | null;
+    const bg = viewerBackdropVideo();
     expect(bg).toBeTruthy();
     expect(bg?.srcObject).toBe(stream);
     expect(bg?.style.filter).toContain("blur");
-    const backdrop = overlayEl()?.querySelector("div") as HTMLElement | null;
+    const backdrop = viewerBackdrop();
     expect(backdrop?.style.backdropFilter).toBe("");
     toggleViewer("theater");
     await flush();
-    expect(overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]")).toBeNull();
+    expect(viewerBackdropVideo()).toBeNull();
     exitViewer();
     expect(stop).toHaveBeenCalled();
+    play.mockRestore();
+    pause.mockRestore();
+  });
+
+  it("keeps the glass blur when background video is disabled before opening", async () => {
+    const { v } = makeVideo();
+    installBackdropMirror(v);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    S.viewerBackdropVideo = false;
+    h.primary = v;
+
+    await openViewer("normal");
+
+    expect(viewerBackdropVideo()).toBeNull();
+    expect(viewerBackdrop()?.style.backdropFilter).toContain("blur(14px)");
+    exitViewer();
+    play.mockRestore();
+    pause.mockRestore();
+  });
+
+  it("falls back to the glass blur when background video is enabled but mirroring is unavailable", async () => {
+    const { v } = makeVideo();
+    S.viewerBackdropVideo = true;
+    h.primary = v;
+
+    await openViewer("normal");
+
+    expect(viewerBackdropVideo()).toBeNull();
+    expect(viewerBackdrop()?.style.backdropFilter).toContain("blur(14px)");
+    exitViewer();
+  });
+
+  it("switches background video on and off while the normal viewer is open", async () => {
+    const { v } = makeVideo();
+    const { stream } = installBackdropMirror(v);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    S.viewerBackdropVideo = false;
+    h.primary = v;
+
+    await openViewer("normal");
+    expect(viewerBackdropVideo()).toBeNull();
+    expect(viewerBackdrop()?.style.backdropFilter).toContain("blur(14px)");
+
+    S.viewerBackdropVideo = true;
+    refreshViewerBackdrop();
+
+    expect(viewerBackdropVideo()?.srcObject).toBe(stream);
+    expect(viewerBackdrop()?.style.backdropFilter).toBe("");
+
+    S.viewerBackdropVideo = false;
+    refreshViewerBackdrop();
+
+    expect(viewerBackdropVideo()).toBeNull();
+    expect(viewerBackdrop()?.style.backdropFilter).toContain("blur(14px)");
+    exitViewer();
+    play.mockRestore();
+    pause.mockRestore();
+  });
+
+  it("restores the configured background mode when switching between normal and theater", async () => {
+    const { v } = makeVideo();
+    const { stream } = installBackdropMirror(v);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    S.viewerBackdropVideo = true;
+    h.primary = v;
+
+    await openViewer("normal");
+    expect(viewerBackdropVideo()?.srcObject).toBe(stream);
+    expect(viewerBackdrop()?.style.backdropFilter).toBe("");
+
+    toggleViewer("theater");
+    await flush();
+    expect(viewerBackdropVideo()).toBeNull();
+    expect(viewerBackdrop()?.style.backdropFilter).toBe("");
+
+    toggleViewer("normal");
+    await flush();
+    expect(viewerBackdropVideo()?.srcObject).toBe(stream);
+    expect(viewerBackdrop()?.style.backdropFilter).toBe("");
+    exitViewer();
     play.mockRestore();
     pause.mockRestore();
   });
@@ -471,13 +601,14 @@ describe("control bar", () => {
     const originalAnimate = Element.prototype.animate;
     const animate = vi.fn(function (
       this: Element,
-      keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
-      options?: number | KeyframeAnimationOptions,
+      _keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+      _options?: number | KeyframeAnimationOptions,
     ) {
       const anim = { onfinish: null, oncancel: null } as unknown as Animation;
       setTimeout(() => {
         const done = anim.onfinish;
-        if (typeof done === "function") done.call(anim, new Event("finish") as AnimationPlaybackEvent);
+        if (typeof done === "function")
+          done.call(anim, new Event("finish") as AnimationPlaybackEvent);
       }, 0);
       return anim;
     });

@@ -3,12 +3,16 @@
 // write live on this single object (loadSpeed/onChanged set them, the speed/live/
 // audio/badge modules read — and a couple write — them).
 import { DEFAULT_PRESETS, DEFAULT_PRESET_KEYS } from "../shared/presets.js";
+import { DEFAULT_KEYMAP, type Keymap } from "../shared/keymap.js";
 
 export const S = {
   currentSpeed: 1.0,
   // The user's intended speed for NON-live playback (restored when a page turns
   // out not to be a live stream).
   userSpeed: 1.0,
+  // In-tab manual speed override. It wins over scoped saved values until the user
+  // explicitly resets to the saved speed or reloads the page.
+  speedManual: false,
   // Which saved scope the current resolved speed came from (channel/site/global),
   // or null when nothing is saved. The popup reads it to preselect the scope.
   speedScope: null as "channel" | "site" | "global" | null,
@@ -31,28 +35,8 @@ export const S = {
   // two stay sorted together so a key follows its speed.
   presets: DEFAULT_PRESETS.map((p) => p / 100) as number[],
   presetKeys: [...DEFAULT_PRESET_KEYS] as (string | null)[],
-  // Remappable shortcut keys (e.code values) for slower / faster / reset /
-  // toggle (last speed ⇄ 1×) / hold (temporary speed while pressed) / overlay
-  // (open the on-video popup).
-  keymap: {
-    slower: "KeyA",
-    faster: "KeyD",
-    reset: "KeyR",
-    toggle: "KeyS",
-    hold: "KeyF",
-    overlay: "KeyO",
-    viewer: "KeyV",
-    theater: "KeyT",
-  } as {
-    slower: string;
-    faster: string;
-    reset: string;
-    toggle: string;
-    hold: string;
-    overlay: string;
-    viewer: string;
-    theater: string;
-  },
+  // Remappable shortcut keys (e.code values) for speed, overlay and viewer actions.
+  keymap: { ...DEFAULT_KEYMAP } as Keymap,
   // How much one slower/faster press changes the speed (fraction; Shift doubles).
   speedStep: 0.05,
   // The speed the hold key applies while pressed (fraction).
@@ -103,13 +87,13 @@ export const S = {
   // popup's --glass-opacity token). Set in General; 0.3…1.4, default 1.
   glassOpacity: 1,
   // Auto-slow for dense speech: when the speaker tarators, temporarily lower the
-  // effective playback speed so it stays intelligible. Enabling resolves by scope
-  // (channel > site > global), like speed; `autoSlowEnabled`/`autoSlowScope` hold
-  // the resolved result. `autoSlowFactor` is the live multiplier the sampler
-  // drives (1 = no slowdown); `autoSlowFloor` is the lowest effective speed.
+  // effective playback speed so it stays intelligible. Enable is a global flag;
+  // the target resolves by scope (channel > site > global), like speed.
+  // `autoSlowFactor` is the live multiplier the sampler drives (1 = no slowdown);
+  // `autoSlowFloor` is the lowest effective speed.
   autoSlowEnabled: false,
   autoSlowScope: null as "channel" | "site" | "global" | null,
-  autoSlowFloor: 1.0, // min effective speed (fraction), 0.5…2 — scoped with the bundle
+  autoSlowFloor: 1.0, // min effective speed (fraction), 0.5…2
   autoSlowTarget: 6, // comfort ceiling (syllables/sec) — scoped; the graph's target line
   autoSlowKnee: 0.5, // soft-knee half-width (syll/s) around the target, global — 0…2
   autoSlowHold: 1.2, // s, global — how long it stays slowed after speech eases up

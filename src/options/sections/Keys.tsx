@@ -1,14 +1,15 @@
 // Keyboard-shortcut editor: click an action's key, then press the new one.
 // Stores KeyboardEvent.code values under "keymap"; the content listener picks it
 // up live. Mirrors the old keys.ts behaviour.
-import { useEffect, useRef, useState } from "react";
-import { STORE } from "../../shared/store.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { STORE, subscribe } from "../../shared/store.js";
 import {
   normalizeKeymap,
   DEFAULT_KEYMAP,
   isBindableCode,
   codeLabel,
   ACTIONS,
+  actionConflictsWithSpec,
   type Action,
   type Keymap,
 } from "../../shared/keymap.js";
@@ -36,6 +37,7 @@ export function Keys() {
   // Live refs so the global keydown handler (bound once) sees current state.
   const capRef = useRef<Action | null>(null);
   const mapRef = useRef<Keymap>(keymap);
+  const presetKeysRef = useRef<Array<string | null>>([]);
   const dupeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The key each action had before it was switched off, so flipping it back on
   // restores it (within the session) instead of jumping to the default.
@@ -43,13 +45,18 @@ export function Keys() {
   capRef.current = capturing;
   mapRef.current = keymap;
 
-  useEffect(() => {
-    STORE.get(["keymap"], (r) => {
+  const loadKeys = useCallback(() => {
+    STORE.get(["keymap", "presetKeys"], (r) => {
       const km = normalizeKeymap(r.keymap);
       for (const a of ACTIONS) if (km[a]) lastKey.current[a] = km[a];
       setKeymap(km);
+      presetKeysRef.current = Array.isArray(r.presetKeys) ? r.presetKeys : [];
     });
   }, []);
+
+  useEffect(loadKeys, [loadKeys]);
+
+  useEffect(() => subscribe(["keymap", "presetKeys"], loadKeys), [loadKeys]);
 
   useEffect(() => {
     const reject = (a: Action) => {
@@ -78,7 +85,10 @@ export function Keys() {
         reject(cap);
         return;
       }
-      if (ACTIONS.some((a) => a !== cap && mapRef.current[a] === e.code)) {
+      if (
+        ACTIONS.some((a) => a !== cap && mapRef.current[a] === e.code) ||
+        presetKeysRef.current.some((spec) => actionConflictsWithSpec(cap, e.code, spec))
+      ) {
         reject(cap);
         return;
       }
@@ -108,7 +118,11 @@ export function Keys() {
     if (on) {
       const want = lastKey.current[a] || DEFAULT_KEYMAP[a];
       // Don't resurrect a key another action now holds — fall back to unbound.
-      code = ACTIONS.some((o) => o !== a && keymap[o] === want) ? "" : want;
+      code =
+        ACTIONS.some((o) => o !== a && keymap[o] === want) ||
+        presetKeysRef.current.some((spec) => actionConflictsWithSpec(a, want, spec))
+          ? ""
+          : want;
     } else if (keymap[a]) {
       lastKey.current[a] = keymap[a];
     }

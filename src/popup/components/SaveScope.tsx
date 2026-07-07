@@ -38,7 +38,7 @@ interface Props {
   hasChannel: boolean;
   saveLabel: string;
   savedLabel: string; // brief confirm shown after a save
-  onSave: (target: Scope) => void;
+  onSave: (target: Scope) => void | boolean | Promise<void | boolean>;
   onReset: (target: Scope) => void;
   onPick: (target: Scope) => void;
   saveId?: string;
@@ -169,9 +169,16 @@ export function SaveScope({
   };
   const save = (target: Scope) => {
     if (target !== scope) onPick(target);
-    onSave(target);
-    pulse();
-    close();
+    const done = (ok?: void | boolean) => {
+      if (ok !== false) pulse();
+      close();
+    };
+    const result = onSave(target);
+    if (result && typeof (result as Promise<void | boolean>).then === "function") {
+      void (result as Promise<void | boolean>).then(done, () => done(false));
+    } else {
+      done(result as void | boolean);
+    }
   };
   const clear = (target: Scope) => {
     onReset(target);

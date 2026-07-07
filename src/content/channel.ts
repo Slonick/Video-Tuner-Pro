@@ -241,8 +241,8 @@ export function channelKeys(): string[] {
         if (m) id = m[1];
       }
       if (!handle) {
-        // Handles can be non-ASCII (e.g. a Cyrillic @Ігрович), which YouTube
-        // percent-encodes in the href (/@%D0%86…). Match any non-delimiter run after
+        // Handles can be non-ASCII, which YouTube percent-encodes in the href.
+        // Match any non-delimiter run after
         // "@" and decode it, so the key is the real handle — ASCII handles decode to
         // themselves, so existing keys are unchanged.
         const m = href.match(/\/@([^/?#]+)/);
@@ -265,6 +265,12 @@ export function channelKeys(): string[] {
     return login ? [site.ns + ":" + login] : [];
   }
   return [];
+}
+
+export function sameChannelIdentity(a: string[], b: string[]): boolean {
+  if (!a.length || !b.length) return false;
+  const previous = new Set(a);
+  return b.some((k) => previous.has(k));
 }
 
 // The canonical channel key (for saving + change-tracking): the stable id when

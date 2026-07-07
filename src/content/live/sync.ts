@@ -2,24 +2,27 @@
 // speed is never applied. Drives playback toward the live edge and back to 100%.
 import { ctxValid } from "../platform/browser.js";
 import { MIN_FORWARD_BUFFER, CATCHUP_DWELL_MS } from "../core/constants.js";
-import { decideCatchupSpeed, settleCatchupRate } from "./catchup.js";
+import { catchupBufferFloor, decideCatchupSpeed, settleCatchupRate } from "./catchup.js";
 import { S } from "../state.js";
 import { applyAll } from "../speed.js";
 import { teardown } from "../index.js";
 import { liveVideo, onStreamPage } from "./detection.js";
 import { forwardBuffer, streamLatency } from "./metrics.js";
 
-let lastDropped = 0; // dropped-frame counter from the previous tick
+const droppedFrames = new WeakMap<HTMLVideoElement, number>();
 let lastControlAt = 0;
 let lastStepAt = 0; // when the applied catch-up step last changed — the dwell anchor
+let activeLiveVideo: HTMLVideoElement | null = null;
 
 // Net video frames dropped since the previous call (decoder/network can't keep up).
 function droppedFramesDelta(video: HTMLVideoElement): number {
   try {
     const q = video.getVideoPlaybackQuality ? video.getVideoPlaybackQuality() : null;
     const total = q ? q.droppedVideoFrames : 0;
-    const delta = total - lastDropped;
-    lastDropped = total;
+    const previous = droppedFrames.get(video);
+    droppedFrames.set(video, total);
+    if (previous == null) return 0;
+    const delta = total - previous;
     return delta > 0 ? delta : 0;
   } catch (e) {
     return 0;
@@ -66,6 +69,11 @@ export function controlLive(): void {
   if (now - lastControlAt < 250) return;
   lastControlAt = now;
   const live = liveVideo();
+  if (live !== activeLiveVideo) {
+    activeLiveVideo = live;
+    lastStepAt = 0;
+    lastRateAssertAt = 0;
+  }
   if (live) {
     if (S.liveSyncEnabled) runLiveSync(live);
     else forceLiveNormal(live);
@@ -112,13 +120,24 @@ function runLiveSync(video: HTMLVideoElement): void {
   const dropped = Date.now() - lastRateAssertAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
   const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
 
-  const desired = decideCatchupSpeed({
+  const lag = lat != null ? lat : buffer;
+  const floor = catchupBufferFloor(lat, target, S.liveSyncBufferReserve);
+  let desired = decideCatchupSpeed({
     buffer,
     latency: lat,
     dropped,
     target,
     reserve: S.liveSyncBufferReserve,
   });
+  if (
+    desired <= 1 &&
+    S.currentSpeed > 1 &&
+    dropped === 0 &&
+    lag > target &&
+    buffer > floor + 0.05
+  ) {
+    desired = Math.min(S.currentSpeed, 1.05);
+  }
   const settled = settleCatchupRate(
     desired,
     S.currentSpeed,

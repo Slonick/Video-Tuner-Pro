@@ -47,16 +47,21 @@ export function useAudioCompressor(): UseAudioCompressor {
 
   const pending = useRef<Record<string, unknown>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const saveAudio = useCallback((obj: Record<string, unknown>) => {
-    Object.assign(pending.current, obj);
+  const flushAudio = useCallback(() => {
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      STORE.set(pending.current);
-      pending.current = {};
-    }, 350);
+    const next = pending.current;
+    pending.current = {};
+    if (Object.keys(next).length) STORE.set(next);
   }, []);
-  // Clear a pending debounced save on unmount so it can't fire afterwards.
-  useEffect(() => () => clearTimeout(saveTimer.current), []);
+  const saveAudio = useCallback(
+    (obj: Record<string, unknown>) => {
+      Object.assign(pending.current, obj);
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(flushAudio, 350);
+    },
+    [flushAudio],
+  );
+  useEffect(() => () => flushAudio(), [flushAudio]);
 
   const setEnabled = useCallback((on: boolean) => {
     setEnabledState(on);

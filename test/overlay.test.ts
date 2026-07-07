@@ -25,6 +25,7 @@ vi.mock("../src/content/live/metrics.js", () => ({
 vi.mock("../src/content/live/catchup.js", () => ({ catchupBufferLimited: () => h.limited }));
 
 import { S } from "../src/content/state.js";
+import { STORE } from "../src/content/platform/storage.js";
 import { updateTimeBadge, ownsBadgeNode } from "../src/content/badge/overlay.js";
 
 function fakeVideo(rect: Partial<DOMRect> = {}) {
@@ -44,6 +45,24 @@ function fakeVideo(rect: Partial<DOMRect> = {}) {
     getBoundingClientRect: () => r,
   } as unknown as HTMLVideoElement;
 }
+
+function realVideo(rect: Partial<DOMRect> = {}) {
+  const el = document.createElement("video");
+  Object.defineProperty(el, "duration", { value: 120, configurable: true });
+  Object.defineProperty(el, "currentTime", { value: 60, configurable: true });
+  Object.defineProperty(el, "playbackRate", { value: 1, configurable: true });
+  const r = {
+    left: 0,
+    top: 0,
+    width: 640,
+    height: 360,
+    right: 640,
+    bottom: 360,
+    ...rect,
+  } as DOMRect;
+  el.getBoundingClientRect = () => r;
+  return el;
+}
 // The badge now renders inside a shadow root on a marked host in the light DOM.
 const badgeEl = () =>
   (document
@@ -59,6 +78,7 @@ const badgeShown = () => {
 };
 
 beforeEach(() => {
+  document.querySelectorAll("[data-vtp-badge]").forEach((node) => node.remove());
   h.primary = null;
   h.anchor = null;
   h.onStream = false;
@@ -72,7 +92,17 @@ beforeEach(() => {
   S.currentSpeed = 1;
   S.liveSyncEnabled = false;
   S.liveSyncTarget = 5;
+  STORE.set({ badgePos: {}, badgePinned: {} });
+  Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
 });
+
+const get = (keys: string[]): Record<string, unknown> => {
+  let out: Record<string, unknown> = {};
+  STORE.get(keys, (r) => {
+    out = r;
+  });
+  return out;
+};
 
 describe("updateTimeBadge — visibility", () => {
   it("removes a stale badge host left by a previous content script", () => {
@@ -84,6 +114,23 @@ describe("updateTimeBadge — visibility", () => {
     const hosts = document.querySelectorAll("[data-vtp-badge]");
     expect(hosts.length).toBe(1);
     expect(hosts[0]).not.toBe(stale);
+  });
+
+  it("removes current-version stale hosts without a repeated document-wide sweep", () => {
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    document.querySelector("[data-vtp-badge]")?.remove();
+
+    const stale = document.createElement("div");
+    stale.id = "vtp-badge-host";
+    stale.setAttribute("data-vtp-badge", "");
+    document.body.append(stale);
+    const query = vi.spyOn(document, "querySelectorAll");
+
+    updateTimeBadge();
+
+    expect(document.querySelector("[data-vtp-badge]")).not.toBe(stale);
+    expect(query).not.toHaveBeenCalledWith("[data-vtp-badge]");
   });
 
   it("hides when the badge is disabled for this context", () => {
@@ -176,6 +223,18 @@ describe("updateTimeBadge — positioning", () => {
     expect(el.style.top).toBe("180px"); // 0 + 0.5 * 360
   });
 
+  it("clamps a saved position so the badge stays inside the video frame", () => {
+    S.badgePos = { fx: 1, fy: 1 };
+    h.primary = fakeVideo({ left: 20, top: 30, width: 640, height: 360, right: 660, bottom: 390 });
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    el.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 120, height: 40, right: 120, bottom: 40 }) as DOMRect;
+    updateTimeBadge();
+    expect(el.style.left).toBe("540px");
+    expect(el.style.top).toBe("350px");
+  });
+
   it("repositions on window resize outside the pop-out viewer", () => {
     S.badgePos = { fx: 0.5, fy: 0.5 };
     h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
@@ -185,6 +244,17 @@ describe("updateTimeBadge — positioning", () => {
     const el = badgeEl() as HTMLElement;
     expect(el.style.left).toBe("420px");
     expect(el.style.top).toBe("255px");
+  });
+
+  it("repositions on window scroll outside the pop-out viewer", () => {
+    S.badgePos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
+    updateTimeBadge();
+    h.primary = fakeVideo({ left: 0, top: -120, width: 640, height: 360, right: 640, bottom: 240 });
+    window.dispatchEvent(new Event("scroll"));
+    const el = badgeEl() as HTMLElement;
+    expect(el.style.left).toBe("320px");
+    expect(el.style.top).toBe("60px");
   });
 
   it("positions against the viewer anchor while the pop-out viewer is open", () => {
@@ -207,6 +277,17 @@ describe("updateTimeBadge — positioning", () => {
     const el = badgeEl() as HTMLElement;
     expect(el.style.left).toBe("320px");
     expect(el.style.top).toBe("180px");
+  });
+
+  it("parents the badge inside a fullscreen bare video", () => {
+    const video = realVideo();
+    document.body.append(video);
+    h.primary = video;
+    Object.defineProperty(document, "fullscreenElement", { value: video, configurable: true });
+
+    updateTimeBadge();
+
+    expect(document.querySelector("[data-vtp-badge]")?.parentNode).toBe(video);
   });
 });
 
@@ -252,18 +333,47 @@ describe("badge drag", () => {
     expect(S.badgePos!.fy).toBeCloseTo(0.5, 1);
   });
 
+  it("does not mutate the previous saved-position map while saving", () => {
+    const map = { other: { fx: 0.1, fy: 0.2 } };
+    STORE.set({ badgePos: map });
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const el = badgeEl() as HTMLElement;
+    el.getBoundingClientRect = () => ({
+      left: 320,
+      top: 180,
+      width: 0,
+      height: 0,
+      right: 320,
+      bottom: 180,
+      x: 320,
+      y: 180,
+      toJSON() {},
+    });
+
+    fire(el, "pointerdown", { clientX: 10, clientY: 10 });
+    fire(el, "pointermove", { clientX: 330, clientY: 190 });
+    fire(el, "pointerup", { clientX: 330, clientY: 190 });
+
+    expect(map).toEqual({ other: { fx: 0.1, fy: 0.2 } });
+    expect(get(["badgePos"]).badgePos).toMatchObject({ other: { fx: 0.1, fy: 0.2 } });
+  });
+
   it("a double-click resets to the default corner", () => {
     S.badgePos = { fx: 0.5, fy: 0.5 };
+    STORE.set({ badgePos: { localhost: { fx: 0.5, fy: 0.5 } } });
     h.primary = fakeVideo();
     updateTimeBadge();
     fire(badgeEl()!, "dblclick");
     expect(S.badgePos).toBeNull();
+    expect(get(["badgePos"]).badgePos).toBeUndefined();
   });
 });
 
 describe("badge pin", () => {
   it("clicking the pin toggles the pinned state", () => {
     S.badgePinned = false;
+    STORE.set({ badgePinned: { localhost: true } });
     h.primary = fakeVideo();
     updateTimeBadge();
     const pin = badgeEl()!.querySelectorAll("span")[1]; // [text, pin]
@@ -271,6 +381,20 @@ describe("badge pin", () => {
     expect(S.badgePinned).toBe(true);
     fire(pin, "click");
     expect(S.badgePinned).toBe(false);
+    expect(get(["badgePinned"]).badgePinned).toBeUndefined();
+  });
+
+  it("does not mutate the previous pin map while toggling", () => {
+    const map = { other: true };
+    STORE.set({ badgePinned: map });
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const pin = badgeEl()!.querySelectorAll("span")[1];
+
+    fire(pin, "click");
+
+    expect(map).toEqual({ other: true });
+    expect(get(["badgePinned"]).badgePinned).toMatchObject({ other: true, localhost: true });
   });
 });
 

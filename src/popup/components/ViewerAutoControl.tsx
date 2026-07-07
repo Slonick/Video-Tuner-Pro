@@ -137,8 +137,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
               <button
                 type="button"
                 className={
-                  "viewer-auto-state is-theater" +
-                  (va.pageMode === "theater" ? " is-active" : "")
+                  "viewer-auto-state is-theater" + (va.pageMode === "theater" ? " is-active" : "")
                 }
                 role="radio"
                 aria-checked={va.pageMode === "theater"}
@@ -148,9 +147,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 <span className="viewer-auto-window">
                   <span className="viewer-auto-video" />
                 </span>
-                <span className="viewer-auto-choice">
-                  {msg("viewerAutoTheater") || "Theater"}
-                </span>
+                <span className="viewer-auto-choice">{msg("viewerAutoTheater") || "Theater"}</span>
               </button>
             </div>
             <div className="viewer-auto-save">

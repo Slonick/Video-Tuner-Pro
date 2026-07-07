@@ -25,7 +25,7 @@ export interface UseViewerFit {
   saved: ScopeFlags;
   savedValues: ScopeValues;
   setMode: (mode: ViewerFitMode) => void;
-  save: (target?: Scope) => void;
+  save: (target?: Scope) => boolean | Promise<boolean>;
   resetScope: (target?: Scope) => void;
   pickScope: (scope: Scope) => void;
 }
@@ -45,62 +45,111 @@ export function useViewerFit(tab: ActiveTab | null, send: SendToTab): UseViewerF
     savedValues,
     channel,
     channelName,
+    channelKey,
     pickScope,
   } = useScopeSelection(domain, STORAGE);
 
   const [mode, setModeState] = useState<ViewerFitMode>("contain");
   const modeRef = useRef<ViewerFitMode>("contain");
+  const modeHoldUntil = useRef(0);
   const setMode = useCallback(
     (next: ViewerFitMode) => {
+      const previous = modeRef.current;
       modeRef.current = normalize(next);
       setModeState(modeRef.current);
-      if (hasTab) void send("setViewerFit", { mode: modeRef.current });
+      modeHoldUntil.current = Date.now() + 1200;
+      if (hasTab)
+        void send<ViewerFitResponse>("setViewerFit", { mode: modeRef.current }).then((resp) => {
+          if (!resp || resp.success === false) {
+            modeHoldUntil.current = 0;
+            modeRef.current = previous;
+            setModeState(previous);
+            return;
+          }
+          modeRef.current = normalize(resp.mode);
+          setModeState(modeRef.current);
+        });
     },
     [hasTab, send],
   );
 
-  const applyResolved = useCallback(
-    (resp: ViewerFitResponse) => {
-      modeRef.current = normalize(resp.mode);
-      setModeState(modeRef.current);
-    },
-    [],
-  );
+  const applyResolved = useCallback((resp: ViewerFitResponse) => {
+    if (Date.now() < modeHoldUntil.current) return;
+    modeRef.current = normalize(resp.mode);
+    setModeState(modeRef.current);
+  }, []);
 
   const fallbackFromStorage = useCallback(() => {
-    STORE.get(["viewerFitGlobal", STORAGE.siteMap], (r) => {
+    STORE.get(["viewerFitGlobal", STORAGE.siteMap, STORAGE.channelMap], (r) => {
       const sites = (r[STORAGE.siteMap] || {}) as Record<string, ViewerFitMode>;
-      modeRef.current = normalize(sites[domain] ?? r.viewerFitGlobal);
+      const channels = (r[STORAGE.channelMap] || {}) as Record<string, ViewerFitMode>;
+      modeRef.current = normalize(
+        (channelKey.current ? channels[channelKey.current] : undefined) ??
+          sites[domain] ??
+          r.viewerFitGlobal,
+      );
       setModeState(modeRef.current);
     });
-  }, [domain]);
+  }, [domain, channelKey]);
 
   const save = useCallback(
     (target: Scope = scope) => {
       const next = modeRef.current;
-      if (hasTab) {
-        void send("rememberViewerFit", { scope: target, mode: next }).then((r) => {
-          if (r == null) saveFallback(target, next);
+      const fallback = () =>
+        new Promise<boolean>((resolve) => {
+          if (target === "channel") {
+            refreshSaved();
+            resolve(false);
+            return;
+          }
+          saveFallback(target, next, (ok) => {
+            if (ok === false) {
+              refreshSaved();
+              resolve(false);
+              return;
+            }
+            markSaved(target, true, next);
+            resolve(true);
+          });
         });
-      } else {
-        saveFallback(target, next);
+      if (hasTab) {
+        return send<{ success?: boolean }>("rememberViewerFit", {
+          scope: target,
+          mode: next,
+        }).then((r) => {
+          if (r == null) return fallback();
+          if (r.success === false) {
+            refreshSaved();
+            return false;
+          }
+          markSaved(target, true, next);
+          return true;
+        });
       }
-      markSaved(target, true, next);
+      return fallback();
     },
-    [scope, hasTab, send, saveFallback, markSaved],
+    [scope, hasTab, send, saveFallback, markSaved, refreshSaved],
   );
 
   const resetScope = useCallback(
     (target: Scope = scope) => {
-      markSaved(target, false);
-      const fallback = () =>
-        target === "channel" ? setMode("contain") : resetFallback(target, fallbackFromStorage);
+      const fallback = () => {
+        if (target === "channel") {
+          refreshSaved();
+          return;
+        }
+        resetFallback(target, (ok) => {
+          if (ok !== false) markSaved(target, false);
+          fallbackFromStorage();
+        });
+      };
       if (!hasTab) {
         fallback();
         return;
       }
       void send("resetViewerFit", { scope: target }).then((r) => {
         if (r == null) fallback();
+        else if ((r as { success?: boolean }).success === false) refreshSaved();
         else
           pullAfter<ViewerFitResponse>(send, "getViewerFit", (resp) => {
             applyResolved(resp);
@@ -113,7 +162,6 @@ export function useViewerFit(tab: ActiveTab | null, send: SendToTab): UseViewerF
       scope,
       hasTab,
       markSaved,
-      setMode,
       resetFallback,
       fallbackFromStorage,
       send,
@@ -129,7 +177,7 @@ export function useViewerFit(tab: ActiveTab | null, send: SendToTab): UseViewerF
       void send<ViewerFitResponse>("getViewerFit").then((resp) => {
         if (resp) {
           applyResolved(resp);
-          applyChannel(resp.channel, resp.channelName);
+          applyChannel(resp.channel, resp.channelName, resp.channelKeys);
           defaultScope(resp.scope, !!resp.channel);
           refreshSaved();
         } else {

@@ -16,6 +16,7 @@ interface Props {
   value: number;
   tickStep?: number;
   animate?: boolean;
+  disabled?: boolean;
   ariaLabel: string;
   ariaValueText?: string;
   onChange?: (v: number) => void;
@@ -44,6 +45,7 @@ export function SliderRow(p: Props) {
         id={p.downId}
         aria-label={p.downLabel}
         title={p.downTitle}
+        disabled={p.disabled}
         onClick={p.onDown}
       >
         <MinusIcon />
@@ -57,6 +59,7 @@ export function SliderRow(p: Props) {
         value={p.value}
         tickStep={p.tickStep}
         animate={p.animate}
+        disabled={p.disabled}
         ariaLabel={p.ariaLabel}
         ariaValueText={p.ariaValueText}
         onChange={p.onChange}
@@ -67,6 +70,7 @@ export function SliderRow(p: Props) {
         id={p.upId}
         aria-label={p.upLabel}
         title={p.upTitle}
+        disabled={p.disabled}
         onClick={p.onUp}
       >
         <PlusIcon />
@@ -76,6 +80,7 @@ export function SliderRow(p: Props) {
         id={p.resetId}
         aria-label="Reset"
         title={p.resetTitle}
+        disabled={p.disabled}
         onClick={p.onReset}
       >
         <ResetIcon />

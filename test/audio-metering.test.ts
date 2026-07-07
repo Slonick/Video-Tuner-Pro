@@ -18,6 +18,7 @@ vi.mock("../src/content/audio/translation.js", () => ({ translationActive: () =>
 vi.mock("../src/content/audio/routing.js", () => ({
   audioContext: () => m.ctx,
   audioGraphs: m.graphs,
+  graphForCurrentSource: (v: unknown) => m.graphs.get(v) ?? null,
   lastSkip: () => m.skip,
 }));
 
@@ -51,6 +52,7 @@ beforeEach(() => {
   audioLevelHist.length = 0;
   S.audioCompEnabled = true;
   S.audioCompThreshold = -30;
+  S.audioCompGain = 0;
 });
 
 describe("audioLevels", () => {
@@ -97,6 +99,15 @@ describe("audioLevels", () => {
     m.graphs.set(v, makeGraph(0));
     const r = audioLevels();
     expect(r.out).toBeCloseTo(r.in!, 6);
+  });
+
+  it("includes make-up gain in the reported output level", () => {
+    S.audioCompGain = 12;
+    const v = {} as HTMLVideoElement;
+    m.primary = v;
+    m.graphs.set(v, makeGraph(-3));
+    const r = audioLevels();
+    expect(r.out).toBeCloseTo(2.98, 1);
   });
 
   it("flags an active translation (compression yields to VOT)", () => {

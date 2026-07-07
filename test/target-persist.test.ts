@@ -63,6 +63,21 @@ describe("persistChannelTarget", () => {
     expect(get(["syncTargetChannels"]).syncTargetChannels).toEqual({ UC1: 7 });
   });
 
+  it("does not mutate the previous target maps while preparing a write", () => {
+    const siteMap = { localhost: 8 };
+    const channelMap = { UC1: 6, "@h": 6 };
+    STORE.set({ syncTargets: siteMap, syncTargetChannels: channelMap });
+    h.keys = ["UC2", "@h"];
+
+    persistSiteTarget(9);
+    persistChannelTarget(7);
+
+    expect(siteMap).toEqual({ localhost: 8 });
+    expect(channelMap).toEqual({ UC1: 6, "@h": 6 });
+    expect(get(["syncTargets"]).syncTargets).toEqual({ localhost: 9 });
+    expect(get(["syncTargetChannels"]).syncTargetChannels).toEqual({ UC1: 6, UC2: 7 });
+  });
+
   it("no-ops without a channel", () => {
     persistChannelTarget(7);
     expect(get(["syncTargetChannels"]).syncTargetChannels).toEqual({});
@@ -71,8 +86,10 @@ describe("persistChannelTarget", () => {
 
 describe("persistGlobalTarget", () => {
   it("writes the global target", () => {
+    STORE.set({ liveSyncTarget: 20 });
     persistGlobalTarget(12);
     expect(get(["syncTargetGlobal"]).syncTargetGlobal).toBe(12);
+    expect(get(["liveSyncTarget"]).liveSyncTarget).toBeUndefined();
   });
 });
 
@@ -81,15 +98,28 @@ describe("resetTargetScope", () => {
     STORE.set({ syncTargetChannels: { UC1: 3, "@h": 3 }, syncTargets: { localhost: 8 } });
     h.keys = ["UC1", "@h"];
     resetTargetScope("channel");
-    expect(get(["syncTargetChannels"]).syncTargetChannels).toEqual({});
+    expect(get(["syncTargetChannels"]).syncTargetChannels).toBeUndefined();
     expect(S.liveSyncTarget).toBe(8);
     expect(S.targetScope).toBe("site");
+  });
+
+  it("does not mutate the previous maps while clearing a scope", () => {
+    const siteMap = { localhost: 8 };
+    const channelMap = { UC1: 3, "@h": 3 };
+    STORE.set({ syncTargets: siteMap, syncTargetChannels: channelMap });
+    h.keys = ["UC1", "@h"];
+
+    resetTargetScope("channel");
+
+    expect(siteMap).toEqual({ localhost: 8 });
+    expect(channelMap).toEqual({ UC1: 3, "@h": 3 });
+    expect(get(["syncTargetChannels"]).syncTargetChannels).toBeUndefined();
   });
 
   it("site: clears the domain target and falls back to global", () => {
     STORE.set({ syncTargets: { localhost: 8 }, syncTargetGlobal: 12 });
     resetTargetScope("site");
-    expect(get(["syncTargets"]).syncTargets).toEqual({});
+    expect(get(["syncTargets"]).syncTargets).toBeUndefined();
     expect(S.liveSyncTarget).toBe(12);
     expect(S.targetScope).toBe("global");
   });

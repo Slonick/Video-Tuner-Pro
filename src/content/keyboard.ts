@@ -2,7 +2,7 @@
 // Bare single keys by physical position (e.code, so they hold across layouts).
 // The action keys default to A (decrease), D (increase) by S.speedStep (Shift
 // doubles it), R (drop the manual change and re-take the saved speed by priority:
-// channel > site > global > 100%), S (toggle the last speed ⇄ 1×) and F (hold for
+// channel > site > global > 100%), S (toggle the last speed ⇄ 1×) and X (hold for
 // S.holdSpeed while pressed). All are remappable on the options page (S.keymap).
 // Each editable preset can carry its own hotkey chord (S.presetKeys, e.g. ⇧1 by
 // default); pressing it jumps to that preset speed. Preset chords may use
@@ -53,18 +53,20 @@ document.addEventListener(
     }
     // Action keys are bare position keys (Shift only, to double the step) — never
     // with Ctrl/Cmd/Alt, so browser/site chords are left alone.
-    const actionKey =
+    const speedStepKey =
+      !e.ctrlKey && !e.metaKey && !e.altKey && (e.code === slower || e.code === faster);
+    const plainActionKey =
       !e.ctrlKey &&
       !e.metaKey &&
       !e.altKey &&
-      (e.code === slower ||
-        e.code === faster ||
-        e.code === reset ||
+      !e.shiftKey &&
+      (e.code === reset ||
         e.code === toggle ||
         e.code === hold ||
         e.code === overlay ||
         e.code === viewer ||
         e.code === theater);
+    const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (speedStepKey || plainActionKey);
     if (preset === undefined && !actionKey) return;
     // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
     const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
@@ -73,6 +75,11 @@ document.addEventListener(
     if (!primaryVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
 
     e.preventDefault();
+    if (preset !== undefined) {
+      if (!e.repeat) setSpeed(preset, false, true);
+      return;
+    }
+    if (e.repeat && e.code !== slower && e.code !== faster && e.code !== hold) return;
     if (e.code === overlay) {
       toggleOverlayPopup();
       return;
@@ -83,10 +90,6 @@ document.addEventListener(
     }
     if (e.code === theater) {
       toggleViewer("theater");
-      return;
-    }
-    if (preset !== undefined) {
-      setSpeed(preset, false, true);
       return;
     }
     if (e.code === hold) {
@@ -116,14 +119,28 @@ document.addEventListener(
   true,
 );
 
+function releaseHold(): void {
+  if (!S.holdActive) return;
+  S.holdActive = false;
+  setSpeed(S.holdPrev, false, true);
+}
+
 // Releasing the hold key restores the speed it interrupted. Listens regardless
 // of the typing guard so a release over a focused field still cleans up.
 document.addEventListener(
   "keyup",
   (e) => {
     if (!S.holdActive || e.code !== S.keymap.hold) return;
-    S.holdActive = false;
-    setSpeed(S.holdPrev, false, true);
+    releaseHold();
+  },
+  true,
+);
+
+window.addEventListener("blur", releaseHold, true);
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (document.hidden) releaseHold();
   },
   true,
 );

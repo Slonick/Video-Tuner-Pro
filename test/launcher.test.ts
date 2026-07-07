@@ -34,6 +34,7 @@ vi.mock("../src/content/viewer.js", () => ({
 }));
 
 import { S } from "../src/content/state.js";
+import { STORE } from "../src/content/platform/storage.js";
 import { updateLauncher, ownsLauncherNode } from "../src/content/overlay/launcher.js";
 
 function fakeVideo(rect: Partial<DOMRect> = {}) {
@@ -84,6 +85,13 @@ function fire(el: EventTarget, type: string, x = 0, y = 0) {
 }
 
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+const get = (keys: string[]): Record<string, unknown> => {
+  let out: Record<string, unknown> = {};
+  STORE.get(keys, (r) => {
+    out = r;
+  });
+  return out;
+};
 
 beforeEach(() => {
   host()?.remove();
@@ -95,6 +103,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   S.overlayButton = "fullscreen";
   S.overlayBtnPos = null;
+  S.overlayPanelPos = null;
+  STORE.set({ overlayBtnPos: {}, overlayPanelPos: {} });
   Object.defineProperty(document, "pictureInPictureEnabled", { value: false, configurable: true });
   Object.defineProperty(document, "pictureInPictureElement", { value: null, configurable: true });
   Object.defineProperty(document, "exitPictureInPicture", {
@@ -149,6 +159,24 @@ describe("updateLauncher — eligibility", () => {
     expect(hosts.length).toBe(1);
     expect(hosts[0]).not.toBe(stale);
   });
+
+  it("removes current-version stale hosts without a repeated document-wide sweep", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    host()?.remove();
+
+    const stale = document.createElement("div");
+    stale.id = "vtp-launcher-host";
+    stale.setAttribute("data-vtp-launcher", "");
+    document.body.append(stale);
+    const query = vi.spyOn(document, "querySelectorAll");
+
+    updateLauncher();
+
+    expect(host()).not.toBe(stale);
+    expect(query).not.toHaveBeenCalledWith("[data-vtp-launcher]");
+  });
 });
 
 describe("updateLauncher — default position", () => {
@@ -170,6 +198,21 @@ describe("updateLauncher — default position", () => {
     const fab = fabEl()!;
     expect(fab.style.left).toBe("840px"); // anchor right(900) - size(44) - margin(16)
     expect(fab.style.top).toBe("253px"); // anchor top(50) + (450-44)/2
+  });
+
+  it("clamps a saved button position inside the video frame", () => {
+    S.overlayButton = "always";
+    S.overlayBtnPos = { fx: 1, fy: 1 };
+    h.primary = fakeVideo({ left: 20, top: 30, width: 640, height: 360, right: 660, bottom: 390 });
+    updateLauncher();
+    const fab = fabEl()!;
+    fab.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 44, height: 44, right: 44, bottom: 44 }) as DOMRect;
+
+    updateLauncher();
+
+    expect(fab.style.left).toBe("616px");
+    expect(fab.style.top).toBe("346px");
   });
 
   it("repositions on window resize outside the pop-out viewer", () => {
@@ -308,6 +351,57 @@ describe("launcher — open / close", () => {
     expect(frameEl()?.style.display ?? "none").not.toBe("block"); // dragged → not opened
     expect(S.overlayBtnPos).not.toBeNull();
   });
+
+  it("does not mutate the previous button-position map while saving a drag", () => {
+    const map = { other: { fx: 0.1, fy: 0.2 } };
+    STORE.set({ overlayBtnPos: map });
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    const fab = fabEl()!;
+
+    fire(fab, "pointerdown", 580, 158);
+    fire(fab, "pointermove", 100, 100);
+    fire(fab, "pointerup", 100, 100);
+
+    expect(map).toEqual({ other: { fx: 0.1, fy: 0.2 } });
+    expect(get(["overlayBtnPos"]).overlayBtnPos).toMatchObject({ other: { fx: 0.1, fy: 0.2 } });
+  });
+
+  it("a double-click clears the last saved button position", () => {
+    STORE.set({ overlayBtnPos: { localhost: { fx: 0.5, fy: 0.5 } } });
+    S.overlayButton = "always";
+    S.overlayBtnPos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo();
+    updateLauncher();
+
+    fire(fabEl()!, "dblclick", 320, 180);
+
+    expect(S.overlayBtnPos).toBeNull();
+    expect(get(["overlayBtnPos"]).overlayBtnPos).toBeUndefined();
+  });
+
+  it("a panel reset clears the last saved panel position", () => {
+    STORE.set({ overlayPanelPos: { localhost: { fx: 0.5, fy: 0.5 } } });
+    S.overlayButton = "always";
+    S.overlayPanelPos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo();
+    updateLauncher();
+    const fab = fabEl()!;
+    fire(fab, "pointerdown", 580, 158);
+    fire(fab, "pointerup", 580, 158);
+    const frame = frameEl()!;
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "vtp-overlay", drag: "reset" },
+        source: frame.contentWindow,
+      }),
+    );
+
+    expect(S.overlayPanelPos).toBeNull();
+    expect(get(["overlayPanelPos"]).overlayPanelPos).toBeUndefined();
+  });
 });
 
 describe("launcher — radial viewer menu", () => {
@@ -374,6 +468,43 @@ describe("launcher — radial viewer menu", () => {
     expect(normal.style.transform).toBe("scale(1)");
   });
 
+  it("closes an idle radial menu even while the pointer moves inside it", async () => {
+    vi.useFakeTimers();
+    try {
+      S.overlayButton = "always";
+      h.primary = fakeVideo();
+      updateLauncher();
+      fire(fabEl()!, "mouseenter");
+      await vi.advanceTimersByTimeAsync(16);
+      const [theater] = items();
+      for (let i = 0; i < 6; i++) {
+        fire(theater, "pointermove", 580, 158);
+        await vi.advanceTimersByTimeAsync(500);
+      }
+      await vi.advanceTimersByTimeAsync(200);
+      expect(items().some(shown)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not extend the radial idle timeout when launcher refreshes it", async () => {
+    vi.useFakeTimers();
+    try {
+      S.overlayButton = "always";
+      h.primary = fakeVideo();
+      updateLauncher();
+      fire(fabEl()!, "mouseenter");
+      await vi.advanceTimersByTimeAsync(16);
+      await vi.advanceTimersByTimeAsync(1600);
+      updateLauncher();
+      await vi.advanceTimersByTimeAsync(1200);
+      expect(items().some(shown)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("while the viewer is open the exit action replaces the active format slot", async () => {
     v.format = "theater";
     await openMenu();
@@ -436,6 +567,17 @@ describe("launcher — radial viewer menu", () => {
     vi.useRealTimers();
   });
 
+  it("outside movement does not keep postponing the radial close", async () => {
+    await openMenu();
+    vi.useFakeTimers();
+    fire(document, "pointermove", 900, 900);
+    vi.advanceTimersByTime(300);
+    fire(document, "pointermove", 901, 901);
+    vi.advanceTimersByTime(100);
+    expect(items().some(shown)).toBe(false);
+    vi.useRealTimers();
+  });
+
   it("clicking outside closes the menu immediately", async () => {
     await openMenu();
     fire(document.body, "pointerdown", 900, 900);
@@ -450,12 +592,13 @@ describe("launcher — radial viewer menu", () => {
     expect(items().some(shown)).toBe(false);
   });
 
-  it("in fullscreen mode the FAB surfaces while the viewer is open, even windowed", () => {
+  it("in fullscreen mode the FAB surfaces while the viewer is open, even windowed", async () => {
     v.format = "normal";
     h.primary = fakeVideo();
     updateLauncher(); // overlayButton stays "fullscreen", no fullscreen active
     expect(fabEl()).not.toBeNull();
     fire(document, "mousemove", 100, 100);
+    await frame();
     expect(fabShown()).toBe(true);
   });
 });

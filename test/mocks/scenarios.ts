@@ -2,6 +2,7 @@
 import type { MockData } from "./chrome.js";
 
 const THRESHOLD = -30;
+const GAIN = 10;
 
 // Latest in/out levels are returned alongside the history so the getMonitor
 // readout matches the last point of the getHistory graph.
@@ -13,7 +14,7 @@ function audioWaveform(n = 48, step = 150) {
     const env = 0.5 + 0.5 * Math.sin(i * 0.18) * Math.cos(i * 0.07);
     const inDb = -48 + 40 * Math.max(0, Math.min(1, env)); // ~-48…-8
     const over = Math.max(0, inDb - THRESHOLD);
-    const outDb = Math.min(0, inDb - over * 0.6); // compress only (graph excludes make-up)
+    const outDb = inDb - over * 0.6 + GAIN;
     lastIn = Math.round(inDb * 10) / 10;
     lastOut = Math.round(outDb * 10) / 10;
     audio.push([lastIn, lastOut]);
@@ -63,8 +64,8 @@ const SETTINGS = {
   audioCompRatio: 10,
   audioCompAttack: 0,
   audioCompRelease: 1,
-  audioCompGain: 10,
-  autoSlowGlobal: { on: true, target: 6 },
+  audioCompGain: GAIN,
+  autoSlowGlobal: { target: 6 },
 };
 
 export type ScenarioName = "audio" | "live" | "vot" | "idle" | "promo";

@@ -121,6 +121,26 @@ describe("toggle + slider", () => {
     expect(lastCall("setTarget")).toMatchObject({ action: "setTarget", target: 9 });
     expect((saved().syncTargets as Record<string, number>) ?? {}).not.toHaveProperty("example.com");
   });
+
+  it("keeps a local slider edit when the initial page target resolves late", async () => {
+    await mountApp({
+      tab: EX,
+      replies: {
+        getTarget: {
+          __delayMs: 80,
+          target: 12,
+          scope: "site",
+          channel: null,
+          channelName: "",
+          live: false,
+        },
+      },
+    });
+    setSlider("syncTarget", 9, { commit: false });
+    await wait(120);
+    expect(sliderValue("syncTarget")).toBe(9);
+    expect(byId("syncTargetVal").textContent).toBe("9");
+  });
 });
 
 describe("save / reset by scope", () => {
@@ -141,6 +161,34 @@ describe("save / reset by scope", () => {
     expect(val("site")).toBeTruthy();
   });
 
+  it("does not mark the target saved when the page rejects the save", async () => {
+    await mountApp({ tab: EX, replies: { rememberTarget: { success: false } } });
+    await openMenu();
+    primary().click();
+    await flush();
+
+    expect(byId("syncSetBtn").textContent).toContain("Save");
+    await openMenu();
+    expect(val("site")).toBeFalsy();
+  });
+
+  it("does not fake a channel target save when the page does not answer", async () => {
+    await mountApp({
+      tab: EX,
+      replies: {
+        getTarget: { target: 7, scope: null, channel: "twitch:x", channelName: "X", live: true },
+        rememberTarget: undefined,
+      },
+    });
+    await openMenu();
+    row("channel")!.click();
+    await flush();
+
+    expect(byId("syncSetBtn").textContent).toContain("Save");
+    await openMenu();
+    expect(val("channel")).toBeFalsy();
+  });
+
   it("Reset clears the slot, sends resetTarget, and pulls the new value back", async () => {
     const { replies, lastCall } = await mountApp({
       tab: EX,
@@ -156,6 +204,49 @@ describe("save / reset by scope", () => {
     expect(lastCall("resetTarget")).toMatchObject({ action: "resetTarget", scope: "site" });
     await wait(120); // deferred getTarget
     expect(sliderValue("syncTarget")).toBe(9);
+  });
+
+  it("keeps the saved target visible when the page rejects reset", async () => {
+    await mountApp({
+      tab: EX,
+      settings: { syncTargets: { "example.com": 8 } },
+      replies: { resetTarget: { success: false } },
+    });
+    await openMenu();
+    expect(val("site")).toBeTruthy();
+    click("syncResetBtn"); // arm
+    await flush();
+    click("syncResetBtn"); // rejected by page
+    await flush();
+
+    await openMenu();
+    expect(val("site")).toBeTruthy();
+  });
+
+  it("does not fake channel target removal when the page does not answer", async () => {
+    await mountApp({
+      tab: EX,
+      settings: { syncTargetChannels: { "twitch:x": 7 } },
+      replies: {
+        getTarget: {
+          target: 7,
+          scope: "channel",
+          channel: "twitch:x",
+          channelName: "X",
+          live: true,
+        },
+        resetTarget: undefined,
+      },
+    });
+    await openMenu();
+    expect(val("channel")).toBeTruthy();
+    click("syncResetBtn"); // arm
+    await flush();
+    click("syncResetBtn"); // no page reply
+    await flush();
+
+    await openMenu();
+    expect(val("channel")).toBeTruthy();
   });
 
   it("the per-target Reset sends resetTargetToSaved and pulls the saved value", async () => {
@@ -190,5 +281,21 @@ describe("no content script (storage fallback)", () => {
     expect(sliderValue("syncTarget")).toBe(9);
     await openMenu();
     expect(primary().textContent).toContain("for this site");
+  });
+
+  it("saving global delay through storage fallback replaces the legacy global key", async () => {
+    const { saved } = await mountApp({
+      tab: EX,
+      settings: { liveSyncTarget: 7 },
+      replies: { getTarget: undefined, rememberTarget: undefined },
+    });
+    setSlider("syncTarget", 11, { commit: false });
+    await flush();
+    await openMenu();
+    row("global")!.click();
+    await wait(120);
+
+    expect(saved().syncTargetGlobal).toBe(11);
+    expect(saved().liveSyncTarget).toBeUndefined();
   });
 });

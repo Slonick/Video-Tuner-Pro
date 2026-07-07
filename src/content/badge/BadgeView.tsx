@@ -10,6 +10,8 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../../shared/glass.js";
 
+export const BADGE_HOST_ID = "vtp-badge-host";
+
 const BADGE_STYLE: CSSProperties = {
   position: "fixed",
   zIndex: 2147483646,
@@ -93,6 +95,7 @@ export interface BadgeRefs {
 // nodes back so overlay.ts can drive them imperatively.
 export function mountBadge(): BadgeRefs {
   const host = document.createElement("div");
+  host.id = BADGE_HOST_ID;
   host.setAttribute("data-vtp-badge", ""); // marker (light DOM) so a re-injected instance removes a leftover
   // Render straight into the shadow root (no wrapper element) so the badge is its
   // only child — overlay.ts and the tests can find it as the shadow's lone div.

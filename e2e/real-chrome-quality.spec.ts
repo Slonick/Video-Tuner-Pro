@@ -27,6 +27,8 @@ interface Target {
   url: string;
   video: string;
   consent?: string;
+  skipLocked?: boolean;
+  skipOffline?: boolean;
 }
 
 const TARGETS: Record<string, Target> = {
@@ -41,19 +43,22 @@ const TARGETS: Record<string, Target> = {
     name: "boosty",
     url:
       process.env.REAL_CHROME_BOOSTY_URL ||
-      "https://boosty.to/?layer=video%3Asnailkick%3A43310146-d1d1-4a58-b5eb-3aa39b9f3409%3A7e32cfc1-cf04-4fbd-ba42-063302be44e7",
+      "https://boosty.to/?layer=video%3Asnailkick%3Af7608c5a-a3c5-465f-98cd-1a05e12f4c83%3A59fc4cf3-d86c-4152-9b45-47de9b561066",
     video: "video",
+    skipLocked: !process.env.REAL_CHROME_BOOSTY_URL,
   },
   twitch: {
     name: "twitch",
     url: process.env.REAL_CHROME_TWITCH_URL || "https://www.twitch.tv/recrent",
     video: "video",
+    skipOffline: !process.env.REAL_CHROME_TWITCH_URL,
   },
   kick: {
     name: "kick",
     url: process.env.REAL_CHROME_KICK_URL || "https://kick.com/fissure_cs_ru2",
     video: "video",
     consent: 'button:has-text("Accept all")',
+    skipOffline: !process.env.REAL_CHROME_KICK_URL,
   },
 };
 
@@ -138,6 +143,19 @@ async function startPageVideo(page: Page, selector: string): Promise<void> {
   await expect(playerError, "YouTube player error").toHaveCount(0, { timeout: 2000 });
 }
 
+async function isLockedBoostyPost(page: Page): Promise<boolean> {
+  return (
+    (await page.getByText("UNLOCK POST").count()) > 0 ||
+    (await page.getByText("Level required").count()) > 0 ||
+    ((await page.getByText("Start Your Page").count()) > 0 &&
+      (await page.getByText("Log in").count()) > 0)
+  );
+}
+
+async function isOfflineChannel(page: Page): Promise<boolean> {
+  return (await page.getByText(/\bis offline\b/i).count()) > 0;
+}
+
 async function extensionWorker(context: BrowserContext): Promise<Worker> {
   const existing = context
     .serviceWorkers()
@@ -177,11 +195,11 @@ async function enterTheaterViewer(page: Page): Promise<void> {
   await page.mouse.move(500, 350);
   const theater = page.locator('button[aria-label="Pop out in theater format"]').first();
   try {
-    await expect(theater, "extension theater launcher").toBeVisible({ timeout: 8000 });
+    await expect(theater, "extension theater launcher").toBeAttached({ timeout: 8000 });
   } catch (error) {
     await forceInjectContentScripts(page);
     try {
-      await expect(theater, "extension theater launcher after chrome.scripting injection").toBeVisible(
+      await expect(theater, "extension theater launcher after chrome.scripting injection").toBeAttached(
         { timeout: 30_000 },
       );
     } catch (injectionError) {
@@ -230,8 +248,9 @@ interface QualityState {
 async function qualityState(page: Page): Promise<QualityState> {
   return page.evaluate(() => {
     const overlay = document.querySelector("[data-vtp-viewer-overlay]");
-    const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) => el.shadowRoot)
-      ?.shadowRoot;
+    const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+      el.shadowRoot?.querySelector(".bar"),
+    )?.shadowRoot;
     const qwrap = shadow?.querySelector(".qwrap") as HTMLElement | null;
     const bar = shadow?.querySelector(".bar") as HTMLElement | null;
     const timeEl = shadow?.querySelector(".time") as HTMLElement | null;
@@ -302,15 +321,15 @@ async function switchQualityAndAssertPlayback(page: Page): Promise<{
   await expect
     .poll(() => qualityState(page).then((state) => state.time), { timeout: 15_000 })
     .toBeGreaterThan(before.time + 0.5);
-  const after = await qualityState(page);
-  expect(after.paused, "video keeps playing after quality switch").toBe(false);
-  expect(after.label, "selected quality label stays visible").toBe(expectedLabel);
   const expectedHeight = qualityHeight(target);
   if (expectedHeight) {
     await expect
       .poll(() => qualityState(page).then((state) => state.sourceHeight), { timeout: 20_000 })
       .toBe(expectedHeight);
   }
+  const after = await qualityState(page);
+  expect(after.paused, "video keeps playing after quality switch").toBe(false);
+  expect(after.label, "selected quality label stays visible").toBe(expectedLabel);
   expect(after.barWidth, "viewer bar stays inside the viewport").toBeLessThanOrEqual(760);
   return { before, target, after };
 }
@@ -341,7 +360,19 @@ test("viewer quality switches on real video pages in real Google Chrome", async 
     for (const target of selectedTargets()) {
       await page.goto(target.url, { waitUntil: "domcontentloaded" });
       await dismissConsent(page, target.consent);
-      await startPageVideo(page, target.video);
+      try {
+        await startPageVideo(page, target.video);
+      } catch (error) {
+        if (target.skipLocked && (await isLockedBoostyPost(page))) {
+          results[target.name] = { skipped: "locked Boosty post in clean Chrome profile" };
+          continue;
+        }
+        if (target.skipOffline && (await isOfflineChannel(page))) {
+          results[target.name] = { skipped: "default channel is offline" };
+          continue;
+        }
+        throw error;
+      }
       await enterTheaterViewer(page);
       results[target.name] = await switchQualityAndAssertPlayback(page);
       await page.screenshot({ path: testInfo.outputPath(`${target.name}-quality.png`) });

@@ -12,37 +12,60 @@ import { applyAudioComp } from "./audio/compressor.js";
 import { updateBadge } from "./badge/icon.js";
 import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
 
-export function persistDomainSpeed(speed: number): void {
-  if (!ctxValid()) return;
+type Done = (ok?: boolean) => void;
+
+export function persistDomainSpeed(speed: number, done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   // Only the top frame persists the per-site speed. The popup broadcasts
   // "rememberSite" to every frame, and each write is a read-modify-write of the
   // whole `domains` map — so a subframe (e.g. YouTube's accounts.youtube.com
   // login iframe) racing the main frame can clobber the real site's entry.
-  if (window.top !== window) return;
+  if (window.top !== window) {
+    done?.(false);
+    return;
+  }
   STORE.get(["domains"], (result) => {
-    const domains = (result.domains || {}) as Record<string, number>;
+    const domains = { ...((result.domains || {}) as Record<string, number>) };
     domains[getDomain()] = speed;
-    STORE.set({ domains });
+    STORE.set({ domains }, done);
   });
 }
 
-export function persistChannelSpeed(speed: number): void {
-  if (!ctxValid()) return;
-  if (window.top !== window) return; // top frame only — same multi-frame write race as persistDomainSpeed
+export function persistChannelSpeed(speed: number, done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
+  if (window.top !== window) {
+    done?.(false);
+    return;
+  } // top frame only — same multi-frame write race as persistDomainSpeed
   const keys = channelKeys();
-  if (!keys.length) return;
+  if (!keys.length) {
+    done?.(false);
+    return;
+  }
   STORE.get(["channels"], (result) => {
-    const channels = (result.channels || {}) as Record<string, number>;
+    const channels = { ...((result.channels || {}) as Record<string, number>) };
     for (const k of keys) delete channels[k];
     channels[keys[0]] = speed;
-    STORE.set({ channels });
+    STORE.set({ channels }, done);
   });
 }
 
-export function persistGlobalSpeed(speed: number): void {
-  if (!ctxValid()) return;
-  if (window.top !== window) return; // top frame only — keep parity with the other writers
-  STORE.set({ globalSpeed: speed });
+export function persistGlobalSpeed(speed: number, done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
+  if (window.top !== window) {
+    done?.(false);
+    return;
+  } // top frame only — keep parity with the other writers
+  STORE.set({ globalSpeed: speed }, done);
 }
 
 // Re-resolve the chain (channel > site > global > 100%) from the given maps and
@@ -53,8 +76,14 @@ function applyResolvedNow(
   globalSpeed: number | undefined,
 ): void {
   const r = resolveSpeed(channelKeys(), getDomain(), domains, channels, globalSpeed);
+  const speed = clamp(r.speed);
   S.speedScope = r.scope;
-  setSpeed(clamp(r.speed), false, true);
+  S.speedManual = false;
+  if (activePrimaryIsLive()) {
+    S.userSpeed = speed;
+    return;
+  }
+  setSpeed(speed, false, false);
 }
 
 // Reset just the manual change: re-take the saved speed by priority, deleting
@@ -72,27 +101,43 @@ export function resetToSaved(): void {
 
 // Drop the saved speed for one scope (channel/site/global) and re-resolve the
 // remaining chain, applying the new speed.
-export function resetScope(scope: SpeedScope): void {
-  if (!ctxValid()) return;
+export function resetScope(scope: SpeedScope, done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   STORE.get(["channels", "domains", "globalSpeed"], (result) => {
-    const channels = (result.channels || {}) as Record<string, number>;
-    const domains = (result.domains || {}) as Record<string, number>;
+    const channels = { ...((result.channels || {}) as Record<string, number>) };
+    const domains = { ...((result.domains || {}) as Record<string, number>) };
     let globalSpeed = result.globalSpeed as number | undefined;
+    const finish = (ok?: boolean) => {
+      if (ok === false) {
+        done?.(false);
+        return;
+      }
+      applyResolvedNow(channels, domains, globalSpeed);
+      done?.(true);
+    };
     if (scope === "channel") {
       const keys = channelKeys();
-      if (!keys.length) return;
+      if (!keys.length) {
+        done?.(false);
+        return;
+      }
       for (const k of keys) delete channels[k];
-      STORE.set({ channels });
+      if (Object.keys(channels).length) STORE.set({ channels }, finish);
+      else STORE.remove("channels", finish);
     } else if (scope === "site") {
       delete domains[getDomain()];
-      STORE.set({ domains });
+      if (Object.keys(domains).length) STORE.set({ domains }, finish);
+      else STORE.remove("domains", finish);
     } else if (scope === "global") {
       globalSpeed = undefined;
-      STORE.remove("globalSpeed");
+      STORE.remove("globalSpeed", finish);
     } else {
+      done?.(false);
       return;
     }
-    applyResolvedNow(channels, domains, globalSpeed);
   });
 }
 
@@ -101,26 +146,39 @@ export function resetScope(scope: SpeedScope): void {
 // flash before the reactive re-apply). Only writes playbackRate when it actually
 // differs — applyAll runs often (1s tick + every MutationObserver pass), and a
 // redundant write restarts the audio time-stretcher and glitches sound.
-function setMediaRate(media: HTMLMediaElement): void {
+function speedWithAutoSlow(base: number): number {
+  return S.autoSlowEnabled ? base * S.autoSlowFactor : base;
+}
+
+function setMediaRate(media: HTMLMediaElement, baseSpeed = S.currentSpeed): void {
   // The applied rate is the user's speed scaled by the auto-slow factor (1 when
   // the feature is off or no dense speech is detected). defaultPlaybackRate stays
   // at the *intended* speed so a freshly-loaded source isn't seeded at a
   // momentarily-slowed rate.
-  const eff = effectiveSpeed();
+  const eff = speedWithAutoSlow(baseSpeed);
   try {
     if (media.preservesPitch === false) media.preservesPitch = true;
-    if (Math.abs(media.defaultPlaybackRate - S.currentSpeed) > 0.001)
-      media.defaultPlaybackRate = S.currentSpeed;
+    if (Math.abs(media.defaultPlaybackRate - baseSpeed) > 0.001)
+      media.defaultPlaybackRate = baseSpeed;
     if (Math.abs(media.playbackRate - eff) > 0.001) media.playbackRate = eff;
   } catch (e) {
     /* some players reject rate before metadata is ready */
   }
 }
 
+function activePrimaryIsLive(): boolean {
+  const v = primaryVideo();
+  return v ? isLive(v) : onStreamPage();
+}
+
+function setNonLiveVideoRate(video: HTMLVideoElement): void {
+  setMediaRate(video, activePrimaryIsLive() ? S.userSpeed : S.currentSpeed);
+}
+
 // The speed actually written to playbackRate: the user's speed times the live
 // auto-slow factor. Ignored entirely when the feature is off.
 export function effectiveSpeed(): number {
-  return S.autoSlowEnabled ? S.currentSpeed * S.autoSlowFactor : S.currentSpeed;
+  return speedWithAutoSlow(S.currentSpeed);
 }
 
 // Re-assert the effective rate on the primary video right now — the autoslow
@@ -128,7 +186,7 @@ export function effectiveSpeed(): number {
 // waiting for the next 1s tick.
 export function reapplyPrimaryRate(): void {
   const v = primaryVideo();
-  if (v && !isLive(v)) setMediaRate(v);
+  if (v && !isLive(v)) setNonLiveVideoRate(v);
 }
 
 // Re-assert our rate on a single element. Backs the hard-capture handler
@@ -138,7 +196,7 @@ export function reapplyPrimaryRate(): void {
 export function reassertRate(media: HTMLMediaElement): void {
   if (media instanceof HTMLVideoElement) {
     if (isLive(media)) return;
-    setMediaRate(media);
+    setNonLiveVideoRate(media);
   } else if (S.audioSpeedEnabled) {
     setMediaRate(media);
   }
@@ -149,7 +207,7 @@ function applyToVideo(video: HTMLVideoElement): void {
   // per mutation pass (≈frame rate on chat-heavy pages), so countering the
   // player's own rate writes here flips the rate twice within a frame — every
   // flip restarts the audio time-stretcher with an audible click.
-  if (!isLive(video)) setMediaRate(video);
+  if (!isLive(video)) setNonLiveVideoRate(video);
 
   if (seenVideos.has(video)) return;
   seenVideos.add(video);
@@ -158,7 +216,7 @@ function applyToVideo(video: HTMLVideoElement): void {
     // On live streams the rate is governed by controlLive's tick; don't fight the
     // player's own latency control here, or the tug-of-war drops frames.
     if (isLive(video)) return;
-    setMediaRate(video);
+    setNonLiveVideoRate(video);
   };
   video.addEventListener("play", reapply);
   video.addEventListener("loadeddata", reapply);
@@ -231,9 +289,10 @@ export function applyAll(): void {
 
 export function setSpeed(speed: number, persist?: boolean, manual?: boolean): void {
   // Streams ignore manual speed entirely — they're governed by Live-sync.
-  if (manual && onStreamPage()) return;
+  if (manual && activePrimaryIsLive()) return;
   S.currentSpeed = clamp(speed);
   S.userSpeed = S.currentSpeed; // remember it as the intended non-live speed
+  if (manual) S.speedManual = true;
   applyAll();
   if (persist) persistDomainSpeed(S.currentSpeed);
   updateTimeBadge();

@@ -107,15 +107,17 @@ function chapterTitleFromElement(el: Element): string {
 }
 
 function descriptionText(root: ParentNode): string {
-  return [
-    "#description-inline-expander",
-    "#description",
-    "ytd-watch-metadata",
-    "ytd-video-secondary-info-renderer",
-    "ytd-expandable-video-description-body-renderer",
-  ]
-    .map((sel) => root.querySelector(sel)?.textContent ?? "")
-    .find((text) => parseTimestampList(text).length > 0) ?? "";
+  return (
+    [
+      "#description-inline-expander",
+      "#description",
+      "ytd-watch-metadata",
+      "ytd-video-secondary-info-renderer",
+      "ytd-expandable-video-description-body-renderer",
+    ]
+      .map((sel) => root.querySelector(sel)?.textContent ?? "")
+      .find((text) => parseTimestampList(text).length > 0) ?? ""
+  );
 }
 
 function titleForStart(titled: Chapter[], start: number): string {

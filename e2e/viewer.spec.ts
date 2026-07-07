@@ -12,7 +12,9 @@ const state = (page: import("@playwright/test").Page) =>
     const sourceVideo = sr?.querySelector("video") as HTMLVideoElement | null;
     const v = overlayVideo ?? sourceVideo;
     const r = v?.getBoundingClientRect();
-    const barHost = overlay?.children[1] as HTMLElement | undefined;
+    const barHost = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+      el.shadowRoot?.querySelector(".bar"),
+    );
     return {
       attr: document.documentElement.getAttribute("data-vtp-viewer"),
       overlay: !!overlay,
@@ -126,8 +128,8 @@ test("live viewer keeps a compact bar and compact quality label", async ({ page 
     .poll(() =>
       page.evaluate(() => {
         const overlay = document.querySelector("[data-vtp-viewer-overlay]");
-        const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find(
-          (el) => el.shadowRoot,
+        const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+          el.shadowRoot?.querySelector(".bar"),
         )?.shadowRoot;
         const bar = shadow?.querySelector(".bar") as HTMLElement | null;
         const qwrap = shadow?.querySelector(".qwrap") as HTMLElement | null;
@@ -148,8 +150,9 @@ test("live viewer keeps a compact bar and compact quality label", async ({ page 
     });
   const barWidth = await page.evaluate(() => {
     const overlay = document.querySelector("[data-vtp-viewer-overlay]");
-    const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) => el.shadowRoot)
-      ?.shadowRoot;
+    const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+      el.shadowRoot?.querySelector(".bar"),
+    )?.shadowRoot;
     return (shadow?.querySelector(".bar") as HTMLElement | null)?.getBoundingClientRect().width ?? 0;
   });
   expect(barWidth).toBeLessThanOrEqual(460);

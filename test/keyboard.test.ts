@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   resetToSaved: vi.fn(),
   toggleViewer: vi.fn(),
   hasVideo: true,
+  viewerFormat: null as string | null,
 }));
 
 vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed, resetToSaved: m.resetToSaved }));
@@ -19,7 +20,7 @@ vi.mock("../src/content/viewer.js", () => ({
   VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
   toggleViewer: m.toggleViewer,
   exitViewer: vi.fn(),
-  viewerFormat: () => null,
+  viewerFormat: () => m.viewerFormat,
   viewerAnchorVideo: () => null,
 }));
 
@@ -32,12 +33,21 @@ function press(code: string, init: KeyboardEventInit = {}): void {
   );
 }
 
+function release(code: string, init: KeyboardEventInit = {}): void {
+  document.dispatchEvent(
+    new KeyboardEvent("keyup", { code, bubbles: true, cancelable: true, ...init }),
+  );
+}
+
 describe("keyboard shortcuts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     S.keyboardEnabled = true;
     S.currentSpeed = 1.0;
+    S.holdActive = false;
+    S.holdPrev = 1.0;
     m.hasVideo = true;
+    m.viewerFormat = null;
     document.body.innerHTML = "";
   });
 
@@ -117,6 +127,14 @@ describe("keyboard shortcuts", () => {
     expect(m.toggleViewer).toHaveBeenCalledWith("theater");
   });
 
+  it("does not repeat one-shot viewer actions while the key is held", () => {
+    press("KeyV");
+    press("KeyV", { repeat: true });
+    press("KeyT", { repeat: true });
+    expect(m.toggleViewer).toHaveBeenCalledTimes(1);
+    expect(m.toggleViewer).toHaveBeenCalledWith("normal");
+  });
+
   it("viewer keys are ignored without a video", () => {
     m.hasVideo = false;
     press("KeyV");
@@ -133,11 +151,38 @@ describe("keyboard shortcuts", () => {
     expect(m.setSpeed).toHaveBeenCalledWith(1.25, false, true);
   });
 
+  it("lets a preset chord using a viewer key win over the viewer action", () => {
+    S.presets = [1.25];
+    S.presetKeys = ["S+KeyV"];
+    press("KeyV", { shiftKey: true });
+    expect(m.setSpeed).toHaveBeenCalledWith(1.25, false, true);
+    expect(m.toggleViewer).not.toHaveBeenCalled();
+  });
+
   it("ignores a preset chord whose modifiers don't match exactly", () => {
     S.presets = [1.25, 2.0];
     S.presetKeys = ["S+Digit1", "KeyG"];
     press("Digit1"); // no Shift — the spec needs it
     press("KeyG", { ctrlKey: true }); // extra Ctrl — spec is bare
     expect(m.setSpeed).not.toHaveBeenCalled();
+  });
+
+  it("restores hold-to-speed on blur if keyup is lost", () => {
+    S.currentSpeed = 1.25;
+    S.holdSpeed = 2;
+    press("KeyX");
+    expect(S.holdActive).toBe(true);
+    expect(m.setSpeed).toHaveBeenCalledWith(2, false, true);
+    window.dispatchEvent(new Event("blur"));
+    expect(S.holdActive).toBe(false);
+    expect(m.setSpeed).toHaveBeenLastCalledWith(1.25, false, true);
+  });
+
+  it("restores hold-to-speed on keyup", () => {
+    S.currentSpeed = 1.25;
+    press("KeyX");
+    release("KeyX");
+    expect(S.holdActive).toBe(false);
+    expect(m.setSpeed).toHaveBeenLastCalledWith(1.25, false, true);
   });
 });

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { STORE } from "../../shared/store.js";
 import { THEMES, type Theme, setTheme } from "../../shared/theme.js";
 import { LOCALES, LOCALE_NAMES, getLang, setLang, type Lang } from "../../shared/i18n-config.js";
-import { SYNC_META_KEY } from "../../shared/sync-config.js";
+import { SYNC_MASTER_KEY, SYNC_META_KEY } from "../../shared/sync-config.js";
 import { msg } from "../../popup/i18n.js";
 import { Group } from "../Group.js";
 import { Button } from "../../ui/Button.js";
@@ -196,6 +196,7 @@ export function Backup() {
     STORE.get(null, (all) => {
       const data: Record<string, unknown> = { ...all };
       delete data[SYNC_META_KEY];
+      delete data[SYNC_MASTER_KEY];
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -223,9 +224,32 @@ export function Backup() {
       }
       const data = { ...(parsed as Record<string, unknown>) };
       delete data[SYNC_META_KEY]; // never import another device's sync choices
-      STORE.set(data, () => {
-        flash(setImp, "optImportDone", true);
-        setTimeout(() => location.reload(), 1000);
+      delete data[SYNC_MASTER_KEY];
+      STORE.get(null, (current) => {
+        const stale = Object.keys(current).filter(
+          (key) => key !== SYNC_META_KEY && key !== SYNC_MASTER_KEY && !(key in data),
+        );
+        const write = () => {
+          STORE.set(data, (ok) => {
+            if (ok === false) {
+              flash(setImp, "optImportError", false);
+              return;
+            }
+            flash(setImp, "optImportDone", true);
+            setTimeout(() => location.reload(), 1000);
+          });
+        };
+        if (!stale.length) {
+          write();
+          return;
+        }
+        STORE.remove(stale, (ok) => {
+          if (ok === false) {
+            flash(setImp, "optImportError", false);
+            return;
+          }
+          write();
+        });
       });
     };
     reader.readAsText(file);

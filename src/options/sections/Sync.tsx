@@ -37,12 +37,16 @@ export function Sync() {
   const [master, setMaster] = useState(() => getSyncMaster());
 
   const toggleCat = (cat: Category, on: boolean) => {
-    setCfg({ ...cfg, [cat]: on });
-    setCategorySync(cat, on);
+    setCfg((current) => ({ ...current, [cat]: on }));
+    setCategorySync(cat, on, (ok) => {
+      if (ok === false) setCfg(getSyncConfig());
+    });
   };
   const toggleMaster = (on: boolean) => {
     setMaster(on);
-    setMasterSync(on);
+    setMasterSync(on, (ok) => {
+      if (ok === false) setMaster(getSyncMaster());
+    });
   };
 
   return (

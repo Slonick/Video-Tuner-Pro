@@ -78,6 +78,11 @@ describe("area routing", () => {
     expect(areaForKey("domains", cfg)).toBe("local");
     expect(areaForKey("audioComp", cfg)).toBe("sync");
   });
+  it("keeps sync routing metadata local even when general settings sync", () => {
+    const cfg = normalizeConfig({ general: true });
+    expect(areaForKey("syncCategories", cfg)).toBe("local");
+    expect(areaForKey("syncMaster", cfg)).toBe("local");
+  });
   it("groups a mixed key list by area", () => {
     const cfg = normalizeConfig({ speeds: false });
     const { sync, local } = groupKeysByArea(["domains", "audioComp", "globalSpeed"], cfg);

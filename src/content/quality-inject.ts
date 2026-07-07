@@ -14,7 +14,7 @@
     video: HTMLVideoElement | null;
   }
 
-  const BRIDGE_VERSION = "2026-07-04-vidstack";
+  const BRIDGE_VERSION = "2026-07-07-local-roots";
   const win = window as typeof window & {
     __vtpQualityBridgeInstalled?: boolean | string;
     __vtpQualityPlayers?: CapturedPlayer[];
@@ -26,6 +26,10 @@
   win.__vtpQualityBridgeInstalled = BRIDGE_VERSION;
   win.__vtpQualityPlayers ||= [];
   win.__vtpQualityHls ||= [];
+
+  function isActiveBridge(): boolean {
+    return win.__vtpQualityBridgeInstalled === BRIDGE_VERSION;
+  }
 
   const REQ = "vtp-quality-request";
   const RESP = "vtp-quality-response";
@@ -66,9 +70,9 @@
     const rec = player as Record<string, unknown>;
     const attach = rec.attachHTMLVideoElement;
     if (typeof attach === "function" && !(attach as { __vtpWrapped?: boolean }).__vtpWrapped) {
-      const wrapped = function (this: unknown, videoEl: HTMLVideoElement) {
+      const wrapped = function (this: unknown, videoEl: HTMLVideoElement, ...args: unknown[]) {
         if (videoEl instanceof HTMLVideoElement) entry.video = videoEl;
-        return attach.apply(this, arguments as unknown as [HTMLVideoElement]);
+        return attach.apply(this, [videoEl, ...args] as unknown as [HTMLVideoElement]);
       };
       (wrapped as { __vtpWrapped?: boolean }).__vtpWrapped = true;
       try {
@@ -93,9 +97,10 @@
     if (!lib || typeof lib !== "object") return lib;
     const rec = lib as Record<string, unknown>;
     const create = rec.create;
-    if (typeof create !== "function" || (create as { __vtpWrapped?: boolean }).__vtpWrapped) return lib;
-    const wrapped = function (this: unknown) {
-      const player = create.apply(this, arguments as unknown as []);
+    if (typeof create !== "function" || (create as { __vtpWrapped?: boolean }).__vtpWrapped)
+      return lib;
+    const wrapped = function (this: unknown, ...args: unknown[]) {
+      const player = create.apply(this, args as []);
       capturePlayer(player);
       return player;
     };
@@ -155,25 +160,40 @@
     const proto = (value as HlsCtor).prototype;
     const attach = proto?.attachMedia;
     if (!proto || typeof attach !== "function" || proto.__vtpWrapped) return !!proto?.__vtpWrapped;
-    proto.attachMedia = function (this: HlsLike, media: HTMLMediaElement) {
+    proto.attachMedia = function (this: HlsLike, media: HTMLMediaElement, ...args: unknown[]) {
       if (media instanceof HTMLVideoElement) captureHls(this, media);
-      return attach.apply(this, arguments as unknown as [HTMLMediaElement]);
+      return attach.apply(this, [media, ...args] as unknown as [HTMLMediaElement]);
     };
     proto.__vtpWrapped = true;
     return true;
   }
 
   function installHlsHook(): void {
-    if (hookHlsConstructor(win.Hls)) return;
-    let attempts = 0;
-    const timer = window.setInterval(() => {
-      attempts++;
-      if (hookHlsConstructor(win.Hls) || attempts >= 40) window.clearInterval(timer);
-    }, 250);
+    let current: unknown;
+    const descriptor = Object.getOwnPropertyDescriptor(window, "Hls");
+    if (descriptor && !descriptor.configurable) {
+      hookHlsConstructor(win.Hls);
+      return;
+    }
+    if (descriptor && "value" in descriptor) current = descriptor.value;
+    if (current !== undefined) hookHlsConstructor(current);
+    try {
+      Object.defineProperty(window, "Hls", {
+        configurable: true,
+        get() {
+          return current;
+        },
+        set(value) {
+          current = value;
+          hookHlsConstructor(value);
+        },
+      });
+    } catch (e) {
+      hookHlsConstructor(win.Hls);
+    }
   }
 
   installHlsHook();
-
 
   function detailOf(e: Event): Detail {
     const detail = (e as CustomEvent).detail || {};
@@ -194,9 +214,17 @@
     } catch (e) {
       return null;
     }
-    const queue: ParentNode[] = [document];
+    const queue: ParentNode[] = [];
     const seen = new WeakSet<object>();
     let budget = 250;
+    try {
+      for (const el of document.querySelectorAll("*")) {
+        const sr = el.shadowRoot;
+        if (sr) queue.push(sr);
+      }
+    } catch (e) {
+      return null;
+    }
     while (queue.length && budget-- > 0) {
       const root = queue.shift()!;
       if (seen.has(root)) continue;
@@ -219,10 +247,7 @@
     if (typeof id !== "string" || !id) return null;
     const path = typeof e.composedPath === "function" ? e.composedPath() : [];
     for (const item of path) {
-      if (
-        item instanceof HTMLVideoElement &&
-        item.getAttribute(VIDEO_ATTR) === id
-      ) {
+      if (item instanceof HTMLVideoElement && item.getAttribute(VIDEO_ATTR) === id) {
         return item;
       }
     }
@@ -322,9 +347,20 @@
   function pushElementRoots(out: unknown[], el: Element | null): void {
     if (!el) return;
     out.push(el);
+    for (const key of Object.keys(el)) {
+      if (/^__react(?:Fiber|Props)\$/i.test(key))
+        out.push((el as unknown as Record<string, unknown>)[key]);
+    }
   }
 
+  let rootsCache = new WeakMap<HTMLVideoElement, { local?: unknown[]; full?: unknown[] }>();
+  let rootSearchMode: "local" | "full" = "full";
+
   function rootsFor(v: HTMLVideoElement): unknown[] {
+    const cached = rootsCache.get(v) || {};
+    const mode = rootSearchMode;
+    const hit = mode === "local" ? cached.local : cached.full;
+    if (hit) return hit;
     const out: unknown[] = [v];
     let el: Element | null = v;
     for (let i = 0; i < 16 && el; i++) {
@@ -336,24 +372,54 @@
       const root = el.getRootNode();
       el = root instanceof ShadowRoot ? root.host : null;
     }
+    cached.local ||= out;
+    if (mode === "full") {
+      let budget = 2400;
+      for (const node of document.querySelectorAll("*")) {
+        if (budget-- <= 0) break;
+        if (Object.keys(node).some((key) => /^__react(?:Fiber|Props)\$/i.test(key))) {
+          pushElementRoots(out, node);
+        }
+      }
+    }
+    cached[mode] = out;
+    rootsCache.set(v, cached);
     return out;
   }
 
   function findValue<T>(
     roots: unknown[],
     accept: (value: Record<string, unknown>) => T | null,
+    maxBudget = 10000,
   ): T | null {
     const seen = new WeakSet<object>();
     const queue = roots.filter(isObj).map((value) => ({ value, depth: 0 }));
-    let budget = 160;
+    let budget = maxBudget;
     while (queue.length && budget-- > 0) {
-      const { value, depth } = queue.shift()!;
+      const { value, depth } = queue.pop()!;
       if (seen.has(value)) continue;
       seen.add(value);
       const accepted = accept(value);
       if (accepted) return accepted;
-      if (depth >= 3) continue;
+      if (depth >= 8) continue;
+      if (Array.isArray(value)) {
+        for (const child of value.slice(0, 20)) {
+          if (isObj(child)) queue.push({ value: child, depth: depth + 1 });
+        }
+      }
       const preferred = [
+        "children",
+        "props",
+        "pendingProps",
+        "memoizedProps",
+        "memoizedState",
+        "stateNode",
+        "child",
+        "sibling",
+        "return",
+        "dependencies",
+        "firstContext",
+        "memoizedValue",
         "hls",
         "hlsjs",
         "hlsInstance",
@@ -368,20 +434,47 @@
         "vhs",
         "api",
         "value",
+        "state",
+        "store",
+        "core",
       ];
-      for (const key of preferred) {
+      const dynamic = Object.keys(value).filter((key) =>
+        /props|state|store|node|child|return|memoized|pending|queue|dependencies|player|media|video|quality|hls|instance|context/i.test(
+          key,
+        ),
+      );
+      const keys = [...new Set([...preferred, ...dynamic])];
+      for (let i = keys.length - 1; i >= 0; i--) {
+        const key = keys[i];
         const child = read(value, key);
-        if (isObj(child)) queue.push({ value: child, depth: depth + 1 });
+        if (!isObj(child)) continue;
+        const acceptedChild = accept(child);
+        if (acceptedChild) return acceptedChild;
+        queue.push({ value: child, depth: depth + 1 });
       }
+    }
+    return null;
+  }
+
+  function findValueInRoots<T>(
+    roots: unknown[],
+    accept: (value: Record<string, unknown>) => T | null,
+  ): T | null {
+    for (const root of roots) {
+      if (!isObj(root)) continue;
+      const found = findValue([root], accept, 300);
+      if (found) return found;
     }
     return null;
   }
 
   interface HlsLike {
     levels?: Array<{ height?: number; bitrate?: number; name?: string }>;
+    autoLevelEnabled?: boolean;
     currentLevel?: number;
     nextLevel?: number;
     loadLevel?: number;
+    manualLevel?: number;
     media?: unknown;
   }
   function hlsAdapter(v: HTMLVideoElement): Adapter | null {
@@ -416,6 +509,13 @@
         ];
       },
       current() {
+        if (
+          hls.autoLevelEnabled === true ||
+          hls.manualLevel === -1 ||
+          hls.nextLevel === -1 ||
+          hls.loadLevel === -1
+        )
+          return "auto";
         const n =
           typeof hls.currentLevel === "number"
             ? hls.currentLevel
@@ -554,9 +654,10 @@
     };
     if (!host || qualities().length < 2) return null;
     const qualityId = (quality: VidstackQuality, index: number): string => {
-      const height = typeof quality.height === "number" && isFinite(quality.height)
-        ? Math.round(quality.height)
-        : 0;
+      const height =
+        typeof quality.height === "number" && isFinite(quality.height)
+          ? Math.round(quality.height)
+          : 0;
       return height > 0 ? `h${height}` : `index:${index}`;
     };
     const label = (quality: VidstackQuality, index: number): string =>
@@ -810,8 +911,15 @@
         break;
       }
     }
+    const acceptIvs = (o: Record<string, unknown>): IvsLike | null =>
+      typeof read(o, "getQualities") === "function" && typeof read(o, "setQuality") === "function"
+        ? (o as unknown as IvsLike)
+        : null;
+    const roots = rootsFor(v);
+    player ||= findValue(roots, acceptIvs) || findValueInRoots(roots, acceptIvs);
     const qualities = player?.getQualities?.() || [];
     if (!player || qualities.length < 2) return null;
+    let manualCurrent: string | null = null;
     const idForQuality = (quality: IvsQuality | null | undefined): string => {
       if (!quality) return "auto";
       const index = qualities.indexOf(quality);
@@ -831,23 +939,29 @@
         ];
       },
       current() {
+        if (manualCurrent) return manualCurrent;
         const auto = player.isAutoQualityMode?.();
         if (auto) return "auto";
         return idForQuality(player.getQuality?.());
       },
       set(id: string) {
         if (id === "auto") {
+          manualCurrent = "auto";
           player.setAutoQualityMode?.(true);
           return;
         }
         const quality = qualities.find((q, i) => ivsId(q, i) === id);
-        if (quality) player.setQuality?.(quality, true);
+        if (quality) {
+          manualCurrent = id;
+          player.setAutoQualityMode?.(false);
+          player.setQuality?.(quality, false);
+        }
       },
     };
   }
 
   function adapterFor(v: HTMLVideoElement): Adapter | null {
-    return (
+    const find = (): Adapter | null =>
       youtubeAdapter(v) ||
       ivsAdapter(v) ||
       vkVideoPlayerAdapter(v) ||
@@ -855,15 +969,25 @@
       hlsAdapter(v) ||
       dashAdapter(v) ||
       shakaAdapter(v) ||
-      videoJsAdapter(v)
-    );
+      videoJsAdapter(v);
+    try {
+      rootSearchMode = "local";
+      const local = find();
+      if (local) return local;
+      rootSearchMode = "full";
+      return find();
+    } finally {
+      rootSearchMode = "full";
+    }
   }
 
   function debugFor(v: HTMLVideoElement, adapter: Adapter | null): string {
     const now = (): number => window.performance?.now?.() ?? Date.now();
     const started = now();
     const seen = new WeakSet<object>();
-    const queue = rootsFor(v).filter(isObj).map((value) => ({ value, depth: 0, path: "video" }));
+    const queue = rootsFor(v)
+      .filter(isObj)
+      .map((value) => ({ value, depth: 0, path: "video" }));
     const hits: Array<Record<string, unknown>> = [];
     const preferred = [
       "hls",
@@ -907,7 +1031,10 @@
         hit.dash = true;
         matched = true;
       }
-      if (typeof read(value, "getQualities") === "function" || typeof read(value, "setQuality") === "function") {
+      if (
+        typeof read(value, "getQualities") === "function" ||
+        typeof read(value, "setQuality") === "function"
+      ) {
         hit.qualityMethods = {
           get: typeof read(value, "getQualities") === "function",
           set: typeof read(value, "setQuality") === "function",
@@ -950,17 +1077,20 @@
     presetOptions?: QualityOption[],
     presetCurrent?: string,
   ): Promise<void> {
+    if (!isActiveBridge()) return;
     const options = presetOptions || (adapter ? await adapter.options() : []);
     let current = presetCurrent || (adapter ? await adapter.current() : "auto");
+    if (!isActiveBridge()) return;
     const selected = options.find((opt) => opt.current);
-    if (selected && !options.some((opt) => opt.id === current && opt.current)) current = selected.id;
+    if (selected && !options.some((opt) => opt.id === current && opt.current))
+      current = selected.id;
     const payload: QualityResponse = {
       requestId,
       options,
       current,
     };
     document.documentElement.setAttribute(ROOT_RESP_ATTR, JSON.stringify(payload));
-    if (!adapter) {
+    if (!adapter || options.length < 2) {
       try {
         const video = videoById(document.documentElement.getAttribute(ROOT_VIDEO_ATTR));
         if (video) {
@@ -968,7 +1098,10 @@
           document.documentElement.setAttribute(ROOT_DEBUG_ATTR, debug);
         }
       } catch (e) {
-        document.documentElement.setAttribute(ROOT_DEBUG_ATTR, JSON.stringify({ error: String(e) }));
+        document.documentElement.setAttribute(
+          ROOT_DEBUG_ATTR,
+          JSON.stringify({ error: String(e) }),
+        );
       }
     } else {
       document.documentElement.removeAttribute(ROOT_DEBUG_ATTR);
@@ -979,24 +1112,31 @@
   let handledRequest = "";
 
   async function handleRequest(e: Event, d: Detail, type: typeof REQ | typeof SET): Promise<void> {
+    if (!isActiveBridge()) return;
     if (typeof d.requestId !== "string") return;
     if (d.requestId === handledRequest) return;
     handledRequest = d.requestId;
-    const v = videoFromEvent(e, d.videoId);
-    const adapter = v ? adapterFor(v) : null;
-    if (type === SET && adapter && typeof d.qualityId === "string") {
-      const before = await adapter.options();
-      try {
-        await adapter.set(d.qualityId);
-      } catch (error) {
-        /* keep the viewer responsive even if a player rejects a level switch */
+    try {
+      const v = videoFromEvent(e, d.videoId);
+      const adapter = v ? adapterFor(v) : null;
+      if (type === SET && adapter && typeof d.qualityId === "string") {
+        const before = await adapter.options();
+        if (!isActiveBridge()) return;
+        try {
+          await adapter.set(d.qualityId);
+        } catch (error) {
+          /* keep the viewer responsive even if a player rejects a level switch */
+        }
+        if (!isActiveBridge()) return;
+        const current = d.qualityId;
+        const selected = before.map((opt) => ({ ...opt, current: opt.id === current }));
+        await respond(d.requestId, adapter, selected.length ? selected : undefined, current);
+        return;
       }
-      const current = d.qualityId;
-      const selected = before.map((opt) => ({ ...opt, current: opt.id === current }));
-      await respond(d.requestId, adapter, selected.length ? selected : undefined, current);
-      return;
+      await respond(d.requestId, adapter);
+    } finally {
+      rootsCache = new WeakMap();
     }
-    await respond(d.requestId, adapter);
   }
 
   document.addEventListener(REQ, (e) => {
@@ -1007,6 +1147,10 @@
   });
   new MutationObserver(() => {
     const d = detailOf(new Event(REQ));
-    void handleRequest(new Event(REQ), d, document.documentElement.hasAttribute(ROOT_PICK_ATTR) ? SET : REQ);
+    void handleRequest(
+      new Event(REQ),
+      d,
+      document.documentElement.hasAttribute(ROOT_PICK_ATTR) ? SET : REQ,
+    );
   }).observe(document.documentElement, { attributes: true, attributeFilter: [ROOT_REQ_ATTR] });
 })();

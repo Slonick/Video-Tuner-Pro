@@ -58,9 +58,26 @@ describe("viewer auto persistence", () => {
     expect(channels()).toEqual({ UC1: "theater" });
   });
 
+  it("does not mutate the previous maps while preparing a write", () => {
+    const siteMap = { localhost: "normal" };
+    const channelMap = { UC1: "normal", "@h": "normal" };
+    STORE.set({ viewerAutoSites: siteMap, viewerAutoChannels: channelMap });
+    h.keys = ["UC2", "@h"];
+
+    persistSiteViewerAuto("theater");
+    persistChannelViewerAuto("off");
+
+    expect(siteMap).toEqual({ localhost: "normal" });
+    expect(channelMap).toEqual({ UC1: "normal", "@h": "normal" });
+    expect(sites()).toEqual({ localhost: "theater" });
+    expect(channels()).toEqual({ UC1: "normal", UC2: "off" });
+  });
+
   it("writes the global mode", () => {
+    STORE.set({ viewerAuto: "theater" });
     persistGlobalViewerAuto("normal");
     expect(get(["viewerAutoGlobal"]).viewerAutoGlobal).toBe("normal");
+    expect(get(["viewerAuto"]).viewerAuto).toBeUndefined();
   });
 });
 
@@ -95,7 +112,7 @@ describe("resetViewerAutoScope", () => {
   it("clears the site entry and re-resolves", () => {
     STORE.set({ viewerAutoGlobal: "theater", viewerAutoSites: { localhost: "normal" } });
     resetViewerAutoScope("site");
-    expect(sites()).toEqual({});
+    expect(sites()).toBeUndefined();
     expect(S.viewerAuto).toBe("theater");
     expect(S.viewerAutoScope).toBe("global");
   });

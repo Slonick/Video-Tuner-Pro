@@ -365,8 +365,8 @@ html.vtp-embedded .group-label::after {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--track));
   background:
     linear-gradient(var(--track), var(--track)) 0 18% / 100% 1px no-repeat,
-    linear-gradient(rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.34)) 0 calc(18% + 1px) /
-      100% calc(82% - 1px) no-repeat,
+    linear-gradient(rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.34)) 0 calc(18% + 1px) / 100%
+      calc(82% - 1px) no-repeat,
     var(--glass-l2);
 }
 

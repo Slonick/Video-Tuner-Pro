@@ -39,27 +39,24 @@ export function resolveSyncTarget(
   return { target: 5, scope: null };
 }
 
-// Auto-slow is saved per scope as a bundle (enable + sensitivity + floor),
-// resolved by the same priority: the highest-priority scope that has an entry
-// supplies all three. A scope with no entry inherits the broader one. Default off.
+// Auto-slow's target is saved per scope, resolved by the same priority. The
+// feature enable is a separate global flag in the settings registry.
 export type AutoSlowScope = "channel" | "site" | "global" | null;
 
 export interface AutoSlowSettings {
-  on: boolean;
   target: number; // comfort ceiling — syllables/sec (matches the graph's target line)
+  on?: boolean; // legacy field from the old scoped-enable model; ignored.
 }
 export interface ResolvedAutoSlow {
-  enabled: boolean;
   target: number;
   scope: AutoSlowScope;
 }
 
-export const AUTO_SLOW_DEFAULTS: AutoSlowSettings = { on: false, target: 6 };
+export const AUTO_SLOW_DEFAULTS: AutoSlowSettings = { target: 6 };
 
 function bundle(s: AutoSlowSettings, scope: AutoSlowScope): ResolvedAutoSlow {
   const target = Number(s.target);
   return {
-    enabled: !!s.on,
     target: Number.isNaN(target) ? 6 : Math.min(12, Math.max(3, target)),
     scope,
   };
@@ -76,7 +73,7 @@ export function resolveAutoSlow(
   if (chKey != null) return bundle(channels[chKey], "channel");
   if (sites[domain] != null) return bundle(sites[domain], "site");
   if (global != null) return bundle(global, "global");
-  return { enabled: false, target: 6, scope: null };
+  return { target: 6, scope: null };
 }
 
 export type ViewerAutoMode = "off" | "normal" | "theater";

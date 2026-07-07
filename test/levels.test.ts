@@ -20,8 +20,11 @@ describe("deriveOutDb", () => {
   it("silence stays silent", () => {
     expect(deriveOutDb(-100, -6)).toBe(-100);
   });
-  it("output = input + reduction (compression only, no make-up)", () => {
+  it("output = input + reduction by default", () => {
     expect(deriveOutDb(-30, -6)).toBe(-36);
+  });
+  it("includes make-up gain in the actual output level", () => {
+    expect(deriveOutDb(-10, -3, 18)).toBe(5);
   });
   it("transparent (no reduction) → output == input", () => {
     expect(deriveOutDb(-30, 0)).toBe(-30);

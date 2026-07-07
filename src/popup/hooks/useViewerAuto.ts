@@ -31,7 +31,7 @@ export interface UseViewerAuto {
   setEnabled: (enabled: boolean) => void;
   setMode: (mode: ViewerAutoMode) => void;
   setPageMode: (mode: ViewerAutoMode) => void;
-  save: (target?: Scope) => void;
+  save: (target?: Scope) => boolean | Promise<boolean>;
   resetScope: (target?: Scope) => void;
   pickScope: (scope: Scope) => void;
 }
@@ -58,7 +58,9 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
   const [pageMode, setPageModeState] = useState<ViewerAutoMode>("off");
   const [enabled, setEnabledState] = useState(true);
   const modeRef = useRef<ViewerAutoMode>("off");
+  const pageModeRef = useRef<ViewerAutoMode>("off");
   const modeHoldUntil = useRef(0);
+  const pageModeHoldUntil = useRef(0);
   const setMode = useCallback((next: ViewerAutoMode) => {
     modeRef.current = normalize(next);
     setModeState(modeRef.current);
@@ -77,9 +79,14 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
     [setMode],
   );
 
-  const applyPageState = useCallback((resp: ViewerStateResponse | null | undefined) => {
-    setPageModeState(normalize(resp?.mode));
-  }, []);
+  const applyPageState = useCallback(
+    (resp: ViewerStateResponse | null | undefined, force = false) => {
+      if (!force && Date.now() < pageModeHoldUntil.current) return;
+      pageModeRef.current = normalize(resp?.mode);
+      setPageModeState(pageModeRef.current);
+    },
+    [],
+  );
 
   const refreshPageState = useCallback(() => {
     if (!hasTab) {
@@ -92,12 +99,24 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
   const setPageMode = useCallback(
     (next: ViewerAutoMode) => {
       const mode = normalize(next);
+      const previousMode = modeRef.current;
+      const previousPageMode = pageModeRef.current;
       modeHoldUntil.current = Date.now() + 1200;
+      pageModeHoldUntil.current = Date.now() + 1200;
       setMode(mode);
+      pageModeRef.current = mode;
       setPageModeState(mode);
       if (!hasTab) return;
       void send<ViewerStateResponse>("setViewerState", { mode }).then((resp) => {
-        if (resp) applyPageState(resp);
+        if (!resp || resp.success === false) {
+          modeHoldUntil.current = 0;
+          pageModeHoldUntil.current = 0;
+          setMode(previousMode);
+          pageModeRef.current = previousPageMode;
+          setPageModeState(previousPageMode);
+          return;
+        }
+        applyPageState(resp, true);
       });
     },
     [hasTab, send, setMode, applyPageState],
@@ -113,29 +132,61 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
   const save = useCallback(
     (target: Scope = scope) => {
       const next = modeRef.current;
-      if (hasTab) {
-        void send("rememberViewerAuto", { scope: target, mode: next }).then((r) => {
-          if (r == null) saveFallback(target, next);
+      const fallback = () =>
+        new Promise<boolean>((resolve) => {
+          if (target === "channel") {
+            refreshSaved();
+            resolve(false);
+            return;
+          }
+          saveFallback(target, next, (ok) => {
+            if (ok === false) {
+              refreshSaved();
+              resolve(false);
+              return;
+            }
+            markSaved(target, true, next);
+            resolve(true);
+          });
         });
-      } else {
-        saveFallback(target, next);
+      if (hasTab) {
+        return send<{ success?: boolean }>("rememberViewerAuto", {
+          scope: target,
+          mode: next,
+        }).then((r) => {
+          if (r == null) return fallback();
+          if (r.success === false) {
+            refreshSaved();
+            return false;
+          }
+          markSaved(target, true, next);
+          return true;
+        });
       }
-      markSaved(target, true, next);
+      return fallback();
     },
-    [scope, hasTab, send, saveFallback, markSaved],
+    [scope, hasTab, send, saveFallback, markSaved, refreshSaved],
   );
 
   const resetScope = useCallback(
     (target: Scope = scope) => {
-      markSaved(target, false);
-      const fallback = () =>
-        target === "channel" ? setMode("off") : resetFallback(target, fallbackFromStorage);
+      const fallback = () => {
+        if (target === "channel") {
+          refreshSaved();
+          return;
+        }
+        resetFallback(target, (ok) => {
+          if (ok !== false) markSaved(target, false);
+          fallbackFromStorage();
+        });
+      };
       if (!hasTab) {
         fallback();
         return;
       }
       void send("resetViewerAuto", { scope: target }).then((r) => {
         if (r == null) fallback();
+        else if ((r as { success?: boolean }).success === false) refreshSaved();
         else
           pullAfter<ViewerAutoResponse>(send, "getViewerAuto", (resp) => {
             applyResolved(resp);
@@ -148,7 +199,6 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
       scope,
       hasTab,
       markSaved,
-      setMode,
       resetFallback,
       fallbackFromStorage,
       send,
@@ -164,7 +214,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
       void send<ViewerAutoResponse>("getViewerAuto").then((resp) => {
         if (resp) {
           applyResolved(resp);
-          applyChannel(resp.channel, resp.channelName);
+          applyChannel(resp.channel, resp.channelName, resp.channelKeys);
           defaultScope(resp.scope, !!resp.channel);
           refreshSaved();
         } else {
@@ -199,7 +249,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
     ) => {
       if (msg?.action !== "viewerStateChanged") return;
       if (sender?.tab?.id != null && sender.tab.id !== tab.tabId) return;
-      applyPageState({ mode: normalize(msg.mode) });
+      applyPageState({ mode: normalize(msg.mode) }, true);
     };
     api.runtime.onMessage.addListener(onMessage);
     return () => api.runtime.onMessage.removeListener?.(onMessage);

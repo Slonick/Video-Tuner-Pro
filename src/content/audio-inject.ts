@@ -18,6 +18,14 @@
 // Everything is wrapped defensively (try/catch, no-op on failure), matching
 // inject.ts: a broken hook must never break the page's own audio.
 const RATE_ATTR = "data-vtp-audiorate";
+const BRIDGE_VERSION = "2026-07-07-active-bridge";
+
+function isActiveBridge(): boolean {
+  return (
+    (window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string })
+      .__vtpAudioBridgeInstalled === BRIDGE_VERSION
+  );
+}
 
 // The desired rate published by the isolated script, or null when the toggle is
 // off (attribute absent / unparseable).
@@ -56,11 +64,14 @@ const tracked = new Set<HTMLAudioElement>();
 // other over the same element. Listeners re-assert across the source's own
 // lifecycle (same events as applyToAudio in speed.ts).
 export function captureOnPlay(media: unknown): void {
+  if (!isActiveBridge()) return;
   if (!(media instanceof HTMLAudioElement)) return;
   if (media.isConnected) return; // the isolated script owns connected media
   if (!tracked.has(media)) {
     tracked.add(media);
     const reapply = () => {
+      if (!isActiveBridge()) return;
+      if (media.isConnected) return;
       const r = desiredRate();
       if (r != null) applyRate(media, r);
     };
@@ -76,9 +87,14 @@ export function captureOnPlay(media: unknown): void {
 // re-apply to every tracked element, resetting to 1× when the toggle goes off
 // (attribute removed → desiredRate() null). Detached-only, mirroring capture.
 export function refreshTracked(): void {
+  if (!isActiveBridge()) return;
   const rate = desiredRate();
   for (const media of tracked) {
-    if (media.isConnected) continue;
+    if (media.isConnected) {
+      applyRate(media, 1);
+      tracked.delete(media);
+      continue;
+    }
     applyRate(media, rate == null ? 1 : rate);
   }
 }
@@ -89,9 +105,9 @@ export function refreshTracked(): void {
 // createElement). The capture runs before the native call and never affects its
 // result.
 export function install(): void {
-  const win = window as typeof window & { __vtpAudioBridgeInstalled?: boolean };
-  if (win.__vtpAudioBridgeInstalled) return;
-  win.__vtpAudioBridgeInstalled = true;
+  const win = window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string };
+  if (win.__vtpAudioBridgeInstalled === BRIDGE_VERSION) return;
+  win.__vtpAudioBridgeInstalled = BRIDGE_VERSION;
   try {
     const proto = HTMLMediaElement.prototype;
     const nativePlay = proto.play;

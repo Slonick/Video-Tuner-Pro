@@ -95,11 +95,30 @@ describe("saved values manager", () => {
     await flush();
     const rows = document.querySelectorAll("#savedLists .saved-row");
     expect(rows.length).toBeGreaterThanOrEqual(3); // global + site + channel
-    // The site row has two chips (speed + delay); delete the speed.
-    const siteRow = Array.from(rows).find((r) => r.textContent?.includes("example.com"))!;
+    const speedsCat = document.querySelectorAll(".saved-cat")[0];
+    const siteRow = Array.from(speedsCat.querySelectorAll(".saved-row")).find((r) =>
+      r.textContent?.includes("example.com"),
+    )!;
     const firstDel = siteRow.querySelector<HTMLButtonElement>(".saved-del")!;
     firstDel.click();
-    expect((get(["domains"]).domains as Record<string, number>)["example.com"]).toBeUndefined();
+    expect(get(["domains"]).domains).toBeUndefined();
+  });
+
+  it("deletes a saved viewer fill mode", async () => {
+    const get = await mount({
+      viewerFitSites: { "example.com": "cover" },
+    });
+    await flush();
+    await flush();
+    await flush();
+    const fitCat = Array.from(document.querySelectorAll(".saved-cat")).find((cat) =>
+      cat.textContent?.includes("Fill mode"),
+    )!;
+    const siteRow = Array.from(fitCat.querySelectorAll(".saved-row")).find((r) =>
+      r.textContent?.includes("example.com"),
+    )!;
+    siteRow.querySelector<HTMLButtonElement>(".saved-del")!.click();
+    expect(get(["viewerFitSites"]).viewerFitSites).toBeUndefined();
   });
 });
 

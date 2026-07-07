@@ -52,9 +52,11 @@ async function flush() {
 
 const overlayEl = () => document.querySelector("[data-vtp-viewer-overlay]") as HTMLElement | null;
 const shadowRoot = () =>
-  (Array.from(overlayEl()?.children ?? []).find((c) => (c as HTMLElement).shadowRoot) as
-    | HTMLElement
-    | undefined)?.shadowRoot ?? null;
+  (
+    Array.from(overlayEl()?.children ?? []).find((c) => (c as HTMLElement).shadowRoot) as
+      | HTMLElement
+      | undefined
+  )?.shadowRoot ?? null;
 
 beforeEach(() => {
   exitViewer();

@@ -15,6 +15,7 @@ import {
   DEFAULT_MASTER,
   normalizeConfig,
   effectiveConfig,
+  areaForKey,
   groupKeysByArea,
   type Category,
   type SyncConfig,
@@ -30,9 +31,22 @@ const HAS_SYNC = SYNC !== LOCAL;
 
 type Items = Record<string, unknown>;
 type GetCb = (items: Items) => void;
-type DoneCb = () => void;
+type DoneCb = (ok?: boolean) => void;
+type ResultCb = (ok: boolean) => void;
 
 const areaObj = (name: "sync" | "local") => (name === "sync" ? SYNC : LOCAL);
+
+function storageOk(): boolean {
+  return !api.runtime?.lastError;
+}
+
+function areaSet(area: Area, obj: Items, done: ResultCb): void {
+  area.set(obj, () => done(storageOk()));
+}
+
+function areaRemove(area: Area, keys: string | string[], done: ResultCb): void {
+  area.remove(keys, () => done(storageOk()));
+}
 
 // --- Cached config -----------------------------------------------------------
 // `prefs` is the user's per-category intent; `master` is the global switch. The
@@ -100,6 +114,21 @@ export function subscribe(keys: string[], cb: DoneCb): () => void {
 }
 
 // --- Multi-area fan-out, collapsed to a single callback ----------------------
+function routedMerge(syncItems: Items, localItems: Items): Items {
+  const out: Items = { ...syncItems, ...localItems };
+  const keys = new Set([...Object.keys(syncItems), ...Object.keys(localItems)]);
+  for (const k of keys) {
+    if (k === SYNC_META_KEY || k === SYNC_MASTER_KEY) {
+      if (k in localItems) out[k] = localItems[k];
+      continue;
+    }
+    const area = areaForKey(k, cfg);
+    if (area === "sync" && k in syncItems) out[k] = syncItems[k];
+    if (area === "local" && k in localItems) out[k] = localItems[k];
+  }
+  return out;
+}
+
 function fanGet(plan: Array<["sync" | "local", string[] | null]>, cb: GetCb): void {
   const out: Items = {};
   if (!plan.length) {
@@ -109,20 +138,22 @@ function fanGet(plan: Array<["sync" | "local", string[] | null]>, cb: GetCb): vo
   let pending = plan.length;
   for (const [name, keys] of plan) {
     areaObj(name).get(keys as string[], (items) => {
-      Object.assign(out, items);
+      if (storageOk()) Object.assign(out, items);
       if (--pending === 0) cb(out);
     });
   }
 }
 
-function fanDone(calls: Array<(done: DoneCb) => void>, cb?: DoneCb): void {
+function fanDone(calls: Array<(done: ResultCb) => void>, cb?: DoneCb): void {
   if (!calls.length) {
-    cb?.();
+    cb?.(true);
     return;
   }
   let pending = calls.length;
-  const one = () => {
-    if (--pending === 0) cb?.();
+  let ok = true;
+  const one = (result: boolean) => {
+    ok = ok && result;
+    if (--pending === 0) cb?.(ok);
   };
   for (const run of calls) run(one);
 }
@@ -131,13 +162,19 @@ function fanDone(calls: Array<(done: DoneCb) => void>, cb?: DoneCb): void {
 export const STORE = {
   get(keys: string | string[] | null | undefined, cb: GetCb): void {
     if (keys == null) {
-      fanGet(
-        [
-          ["sync", null],
-          ["local", null],
-        ],
-        cb,
-      );
+      let syncItems: Items | null = null;
+      let localItems: Items | null = null;
+      const finish = () => {
+        if (syncItems && localItems) cb(routedMerge(syncItems, localItems));
+      };
+      SYNC.get(null, (items) => {
+        syncItems = storageOk() ? items : {};
+        finish();
+      });
+      LOCAL.get(null, (items) => {
+        localItems = storageOk() ? items : {};
+        finish();
+      });
       return;
     }
     const list = typeof keys === "string" ? [keys] : keys;
@@ -154,18 +191,23 @@ export const STORE = {
     const grouped = groupKeysByArea(Object.keys(obj), cfg);
     for (const k of grouped.sync) bySync[k] = obj[k];
     for (const k of grouped.local) byLocal[k] = obj[k];
-    const calls: Array<(done: DoneCb) => void> = [];
-    if (Object.keys(bySync).length) calls.push((d) => SYNC.set(bySync, d));
-    if (Object.keys(byLocal).length) calls.push((d) => LOCAL.set(byLocal, d));
+    const calls: Array<(done: ResultCb) => void> = [];
+    if (Object.keys(bySync).length) calls.push((d) => areaSet(SYNC, bySync, d));
+    if (Object.keys(byLocal).length) calls.push((d) => areaSet(LOCAL, byLocal, d));
     fanDone(calls, cb);
   },
 
   remove(keys: string | string[], cb?: DoneCb): void {
     const list = typeof keys === "string" ? [keys] : keys;
-    const { sync, local } = groupKeysByArea(list, cfg);
-    const calls: Array<(done: DoneCb) => void> = [];
-    if (sync.length) calls.push((d) => SYNC.remove(sync, d));
-    if (local.length) calls.push((d) => LOCAL.remove(local, d));
+    const sync: string[] = [];
+    const local: string[] = [];
+    for (const key of list) {
+      local.push(key);
+      if (HAS_SYNC && key !== SYNC_META_KEY && key !== SYNC_MASTER_KEY) sync.push(key);
+    }
+    const calls: Array<(done: ResultCb) => void> = [];
+    if (sync.length) calls.push((d) => areaRemove(SYNC, sync, d));
+    if (local.length) calls.push((d) => areaRemove(LOCAL, local, d));
     fanDone(calls, cb);
   },
 };
@@ -173,40 +215,66 @@ export const STORE = {
 // --- Migrating keys between the two areas as preferences change --------------
 type Area = typeof SYNC | typeof LOCAL;
 
-function persistPrefs(done?: DoneCb): void {
-  LOCAL.set({ [SYNC_META_KEY]: prefs }, () => done?.());
-}
-function persistMaster(done?: DoneCb): void {
-  LOCAL.set({ [SYNC_MASTER_KEY]: master }, () => done?.());
+function commitPrefs(next: SyncConfig): void {
+  prefs = next;
+  recompute();
 }
 
-// Move one category's stored keys from one area to the other (a no-op when none
-// are present). Persisting the new preference is the caller's job.
-function migrateCategory(cat: Category, from: Area, to: Area, done: DoneCb): void {
+function commitMaster(next: boolean): void {
+  master = next;
+  recompute();
+}
+
+function persistPrefs(next: SyncConfig, done?: DoneCb): void {
+  areaSet(LOCAL, { [SYNC_META_KEY]: next }, (ok) => done?.(ok));
+}
+function persistMaster(next: boolean, done?: DoneCb): void {
+  areaSet(LOCAL, { [SYNC_MASTER_KEY]: next }, (ok) => done?.(ok));
+}
+
+// Copy one category's stored keys to the newly-routed area. We deliberately keep
+// the source copy: storage.onChanged remove events look identical to a user reset
+// for live content scripts, while the router ignores the stale area anyway.
+function migrateCategory(cat: Category, from: Area, to: Area, done: ResultCb): void {
   const keys = KEYS_BY_CATEGORY[cat];
   from.get(keys, (items) => {
-    const present = Object.keys(items);
-    if (!present.length) {
-      done();
+    if (!storageOk()) {
+      done(false);
       return;
     }
-    to.set(items, () => from.remove(present, done));
+    const present = Object.keys(items);
+    if (!present.length) {
+      done(true);
+      return;
+    }
+    areaSet(to, items, done);
   });
 }
 
 export function setCategorySync(cat: Category, synced: boolean, done?: DoneCb): void {
   const was = prefs[cat];
-  prefs = { ...prefs, [cat]: synced };
-  recompute();
+  const nextPrefs = { ...prefs, [cat]: synced };
   // Nothing to migrate when there's no sync area, the master switch already keeps
   // everything local, or the preference didn't actually change — just record it.
   if (!HAS_SYNC || !master || was === synced) {
-    persistPrefs(done);
+    persistPrefs(nextPrefs, (ok) => {
+      if (ok) commitPrefs(nextPrefs);
+      done?.(ok);
+    });
     return;
   }
   const from = synced ? LOCAL : SYNC; // where the keys currently live
   const to = synced ? SYNC : LOCAL; // where they should move to
-  migrateCategory(cat, from, to, () => persistPrefs(done));
+  migrateCategory(cat, from, to, (ok) => {
+    if (ok) {
+      persistPrefs(nextPrefs, (saved) => {
+        if (saved) commitPrefs(nextPrefs);
+        done?.(saved);
+      });
+      return;
+    }
+    done?.(false);
+  });
 }
 
 // Flip the master switch: categories the user wants synced migrate between local
@@ -214,21 +282,35 @@ export function setCategorySync(cat: Category, synced: boolean, done?: DoneCb): 
 // so turning the switch back on restores exactly what was synced before.
 export function setMasterSync(on: boolean, done?: DoneCb): void {
   if (master === on) {
-    persistMaster(done);
+    persistMaster(on, (ok) => {
+      if (ok) commitMaster(on);
+      done?.(ok);
+    });
     return;
   }
-  master = on;
-  recompute();
   const cats = (Object.keys(prefs) as Category[]).filter((c) => prefs[c]);
   if (!HAS_SYNC || !cats.length) {
-    persistMaster(done);
+    persistMaster(on, (ok) => {
+      if (ok) commitMaster(on);
+      done?.(ok);
+    });
     return;
   }
   const from = on ? LOCAL : SYNC; // on: pull synced categories up; off: push them down
   const to = on ? SYNC : LOCAL;
   let pending = cats.length;
-  const one = () => {
-    if (--pending === 0) persistMaster(done);
+  let ok = true;
+  const one = (moved: boolean) => {
+    ok = ok && moved;
+    if (--pending !== 0) return;
+    if (ok) {
+      persistMaster(on, (saved) => {
+        if (saved) commitMaster(on);
+        done?.(saved);
+      });
+      return;
+    }
+    done?.(false);
   };
   for (const c of cats) migrateCategory(c, from, to, one);
 }

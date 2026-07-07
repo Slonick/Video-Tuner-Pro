@@ -2,7 +2,7 @@
 // the frame holding the video replies, with the top frame as a deferred fallback.
 import { api } from "./platform/browser.js";
 import { getDomain } from "./core/domain.js";
-import { currentChannel, currentChannelName } from "./channel.js";
+import { channelKeys, currentChannel, currentChannelName } from "./channel.js";
 import { clamp, clampTarget } from "./core/clamp.js";
 import { S } from "./state.js";
 import { collectVideos, isDrmVideo, primaryVideo } from "./videos.js";
@@ -52,11 +52,10 @@ import { audioLevelHist, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowHist, AUTO_SLOW_HIST_MS } from "./audio/autoslow-state.js";
 import { bufferLevelHist } from "./bitrate.js";
 
-// Build a settings bundle from a popup message, clamped to valid ranges.
-function autoSlowFromRequest(req: { enabled?: unknown; target?: unknown }): AutoSlowSettings {
+// Build the scoped target from a popup message, clamped to valid ranges.
+function autoSlowFromRequest(req: { target?: unknown }): AutoSlowSettings {
   const target = Number(req.target);
   return {
-    on: req.enabled === true,
     target: Number.isNaN(target) ? AUTO_SLOW_DEFAULTS.target : Math.min(12, Math.max(3, target)),
   };
 }
@@ -90,12 +89,49 @@ function replyFromVideoFrame(
   return false; // subframe without a video stays silent
 }
 
+function actInVideoFrame(
+  sendResponse: (response?: unknown) => void,
+  act: () => unknown,
+  build: (result: unknown) => unknown,
+): boolean {
+  if (collectVideos().length <= 0) return false;
+  let result: unknown;
+  try {
+    result = act();
+    sendResponse(build(result));
+  } catch (e) {
+    sendResponse({ success: false });
+  }
+  return true;
+}
+
 function currentDrmProtected(): boolean {
   try {
     return isDrmVideo(primaryVideo());
   } catch (e) {
     return false;
   }
+}
+
+function channelInfo(): { channel: string | null; channelKeys: string[]; channelName: string } {
+  const keys = channelKeys();
+  return {
+    channel: keys[0] ?? currentChannel(),
+    channelKeys: keys,
+    channelName: currentChannelName(),
+  };
+}
+
+function topFrame(): boolean {
+  try {
+    return window.top === window;
+  } catch {
+    return false;
+  }
+}
+
+function replySaved(sendResponse: (response?: unknown) => void, extra?: Record<string, unknown>) {
+  return (ok?: boolean) => sendResponse({ success: ok !== false, ...extra });
 }
 
 api.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -109,16 +145,20 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }));
   }
   if (request.action === "remember") {
+    if (!topFrame()) return false;
     const speed = typeof request.speed === "number" ? clamp(request.speed) : S.currentSpeed;
-    if (request.scope === "channel") persistChannelSpeed(speed);
-    else if (request.scope === "global") persistGlobalSpeed(speed);
-    else persistDomainSpeed(speed);
-    sendResponse({ success: true, speed });
+    const done = replySaved(sendResponse, { speed });
+    if (request.scope === "channel") persistChannelSpeed(speed, done);
+    else if (request.scope === "global") persistGlobalSpeed(speed, done);
+    else persistDomainSpeed(speed, done);
     return true;
   }
   if (request.action === "reset") {
-    resetScope(request.scope === "channel" || request.scope === "global" ? request.scope : "site");
-    sendResponse({ success: true });
+    if (!topFrame()) return false;
+    resetScope(
+      request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+      replySaved(sendResponse),
+    );
     return true;
   }
   if (request.action === "resetToSaved") {
@@ -130,8 +170,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse, () => ({
       speed: S.currentSpeed,
       domain: getDomain(),
-      channel: currentChannel(),
-      channelName: currentChannelName(),
+      ...channelInfo(),
       scope: S.speedScope,
       live: onStreamPage(),
       ...(currentDrmProtected() ? { drm: true } : {}),
@@ -143,18 +182,20 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse, () => ({ success: true, target: S.liveSyncTarget }));
   }
   if (request.action === "rememberTarget") {
+    if (!topFrame()) return false;
     const target = clampTarget(request.target);
-    if (request.scope === "channel") persistChannelTarget(target);
-    else if (request.scope === "global") persistGlobalTarget(target);
-    else persistSiteTarget(target);
-    sendResponse({ success: true, target });
+    const done = replySaved(sendResponse, { target });
+    if (request.scope === "channel") persistChannelTarget(target, done);
+    else if (request.scope === "global") persistGlobalTarget(target, done);
+    else persistSiteTarget(target, done);
     return true;
   }
   if (request.action === "resetTarget") {
+    if (!topFrame()) return false;
     resetTargetScope(
       request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+      replySaved(sendResponse),
     );
-    sendResponse({ success: true });
     return true;
   }
   if (request.action === "resetTargetToSaved") {
@@ -166,34 +207,34 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse, () => ({
       target: S.liveSyncTarget,
       scope: S.targetScope,
-      channel: currentChannel(),
-      channelName: currentChannelName(),
+      ...channelInfo(),
       live: onStreamPage(),
     }));
   }
-  // --- Auto-slow settings bundle (enable + target), per scope — mirrors the
-  // live-sync target above.
+  // --- Auto-slow target, per scope — mirrors the live-sync target above.
   if (request.action === "setAutoSlow") {
     setAutoSlowPreview(autoSlowFromRequest(request)); // live preview, no persist
     return replyFromVideoFrame(sendResponse, () => ({ success: true }));
   }
   if (request.action === "rememberAutoSlow") {
+    if (!topFrame()) return false;
     const s = autoSlowFromRequest(request);
-    if (request.scope === "channel") persistChannelAutoSlow(s);
-    else if (request.scope === "global") persistGlobalAutoSlow(s);
-    else persistSiteAutoSlow(s);
-    sendResponse({ success: true });
+    const done = replySaved(sendResponse);
+    if (request.scope === "channel") persistChannelAutoSlow(s, done);
+    else if (request.scope === "global") persistGlobalAutoSlow(s, done);
+    else persistSiteAutoSlow(s, done);
     return true;
   }
   if (request.action === "resetAutoSlow") {
+    if (!topFrame()) return false;
     resetAutoSlowScope(
       request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+      replySaved(sendResponse),
     );
-    sendResponse({ success: true });
     return true;
   }
   if (request.action === "resetAutoSlowToSaved") {
-    applyResolvedAutoSlowFromStore(); // discard the live preview, re-apply the saved bundle
+    applyResolvedAutoSlowFromStore(); // discard the live preview, re-apply the saved target
     sendResponse({ success: true });
     return true;
   }
@@ -202,23 +243,24 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       enabled: S.autoSlowEnabled,
       target: S.autoSlowTarget,
       scope: S.autoSlowScope,
-      channel: currentChannel(),
-      channelName: currentChannelName(),
+      ...channelInfo(),
     }));
   }
   if (request.action === "rememberViewerAuto") {
+    if (!topFrame()) return false;
     const mode = viewerAutoFromRequest(request);
-    if (request.scope === "channel") persistChannelViewerAuto(mode);
-    else if (request.scope === "global") persistGlobalViewerAuto(mode);
-    else persistSiteViewerAuto(mode);
-    sendResponse({ success: true, mode });
+    const done = replySaved(sendResponse, { mode });
+    if (request.scope === "channel") persistChannelViewerAuto(mode, done);
+    else if (request.scope === "global") persistGlobalViewerAuto(mode, done);
+    else persistSiteViewerAuto(mode, done);
     return true;
   }
   if (request.action === "resetViewerAuto") {
+    if (!topFrame()) return false;
     resetViewerAutoScope(
       request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+      replySaved(sendResponse),
     );
-    sendResponse({ success: true });
     return true;
   }
   if (request.action === "resetViewerAutoToSaved") {
@@ -230,38 +272,48 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse, () => ({
       mode: S.viewerAuto,
       scope: S.viewerAutoScope,
-      channel: currentChannel(),
-      channelName: currentChannelName(),
+      ...channelInfo(),
     }));
   }
   if (request.action === "setViewerState") {
     const mode = viewerAutoFromRequest(request);
-    setViewerState(mode);
-    return replyFromVideoFrame(sendResponse, () => ({
-      success: true,
-      mode: viewerFormat() ?? "off",
-    }));
+    return actInVideoFrame(
+      sendResponse,
+      () => setViewerState(mode),
+      () => ({
+        success: true,
+        mode: viewerFormat() ?? "off",
+      }),
+    );
   }
   if (request.action === "getViewerState") {
     return replyFromVideoFrame(sendResponse, () => ({ mode: viewerFormat() ?? "off" }));
   }
   if (request.action === "setViewerFit") {
-    const mode = setViewerFitMode(request.mode);
-    return replyFromVideoFrame(sendResponse, () => ({ success: true, mode }));
+    return actInVideoFrame(
+      sendResponse,
+      () => setViewerFitMode(request.mode),
+      (mode) => ({
+        success: true,
+        mode,
+      }),
+    );
   }
   if (request.action === "rememberViewerFit") {
+    if (!topFrame()) return false;
     const mode = viewerFitFromRequest(request);
-    if (request.scope === "channel") persistChannelViewerFit(mode);
-    else if (request.scope === "global") persistGlobalViewerFit(mode);
-    else persistSiteViewerFit(mode);
-    sendResponse({ success: true, mode });
+    const done = replySaved(sendResponse, { mode });
+    if (request.scope === "channel") persistChannelViewerFit(mode, done);
+    else if (request.scope === "global") persistGlobalViewerFit(mode, done);
+    else persistSiteViewerFit(mode, done);
     return true;
   }
   if (request.action === "resetViewerFit") {
+    if (!topFrame()) return false;
     resetViewerFitScope(
       request.scope === "channel" || request.scope === "global" ? request.scope : "site",
+      replySaved(sendResponse),
     );
-    sendResponse({ success: true });
     return true;
   }
   if (request.action === "resetViewerFitToSaved") {
@@ -273,8 +325,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return replyFromVideoFrame(sendResponse, () => ({
       mode: S.viewerFit,
       scope: S.viewerFitScope,
-      channel: currentChannel(),
-      channelName: currentChannelName(),
+      ...channelInfo(),
     }));
   }
   if (request.action === "getMonitor") {

@@ -13,8 +13,20 @@ function isYouTube(): boolean {
 // pause, exactly like a VOD. So we track whether the user has scrubbed away from
 // the live edge (see trackDvr) and treat the page as a recording until they're
 // back at the live head.
-let dvrMode = false;
-let lastMediaTime = 0;
+interface DvrState {
+  generation: number;
+  active: boolean;
+  lastMediaTime: number;
+}
+
+let dvrGeneration = 0;
+let dvrSeenAt = 0;
+const dvrState = new WeakMap<HTMLVideoElement, DvrState>();
+
+function dvrActive(video: HTMLVideoElement): boolean {
+  const state = dvrState.get(video);
+  return !!state && state.generation === dvrGeneration && state.active;
+}
 
 // Drive DVR detection from a live <video>'s timeupdate/seeking events. A backward
 // jump in playback position is the user scrubbing into the recording — Live-sync
@@ -22,22 +34,37 @@ let lastMediaTime = 0;
 // Returning to the live head clears it, detected via YouTube's own LIVE badge
 // (it carries `ytp-live-badge-is-livehead` only when playback sits at the edge).
 export function trackDvr(video: HTMLVideoElement): void {
-  if (!isYouTube() || document.documentElement.getAttribute("data-vtp-live") !== "1") {
-    dvrMode = false;
-    lastMediaTime = 0;
+  if (!isYouTube()) {
+    dvrGeneration++;
+    dvrSeenAt = 0;
     return;
   }
+  if (document.documentElement.getAttribute("data-vtp-live") !== "1") return;
+  let state = dvrState.get(video);
+  if (!state || state.generation !== dvrGeneration) {
+    state = { generation: dvrGeneration, active: false, lastMediaTime: 0 };
+    dvrState.set(video, state);
+  }
   const t = video.currentTime;
-  const badge = document.querySelector<HTMLElement>(".ytp-live-badge");
-  if (badge && badge.classList.contains("ytp-live-badge-is-livehead")) dvrMode = false;
-  else if (lastMediaTime && t < lastMediaTime - 3) dvrMode = true;
-  lastMediaTime = t;
+  const player =
+    (video.closest && video.closest(".html5-video-player")) ||
+    document.querySelector(".html5-video-player") ||
+    document;
+  const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
+  if (badge && badge.classList.contains("ytp-live-badge-is-livehead")) {
+    state.active = false;
+    dvrSeenAt = 0;
+  } else if (state.lastMediaTime && t < state.lastMediaTime - 3) {
+    state.active = true;
+    dvrSeenAt = Date.now();
+  }
+  state.lastMediaTime = t;
 }
 
 // New content (SPA navigation, quality reload) starts at the live edge.
 export function resetDvr(): void {
-  dvrMode = false;
-  lastMediaTime = 0;
+  dvrGeneration++;
+  dvrSeenAt = 0;
 }
 
 // A live edge has no real length. Chromium signals that with duration === Infinity;
@@ -60,7 +87,7 @@ export function isLive(video: HTMLVideoElement): boolean {
   const flag = document.documentElement.getAttribute("data-vtp-live");
   // YouTube DVR: a live broadcast you've scrubbed back from is a recording, not a
   // stream, until you return to the live edge (see trackDvr/dvrMode).
-  if (isYouTube() && flag === "1") return !dvrMode;
+  if (isYouTube() && flag === "1") return !dvrActive(video);
   if (flag === "1") return true;
   if (flag === "0") return false;
 
@@ -161,12 +188,23 @@ export function probeLive(v: HTMLVideoElement): void {
 // Pick the main live <video>: prefer the one that's actually playing and largest,
 // so tiny preview/ad players don't make detection flicker on/off.
 export function liveVideo(): HTMLVideoElement | null {
+  const candidates: { video: HTMLVideoElement; area: number }[] = [];
+  let largestArea = 0;
+  for (const v of collectVideos()) {
+    const r = v.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40) continue;
+    const area = r.width * r.height;
+    candidates.push({ video: v, area });
+    if (area > largestArea) largestArea = area;
+  }
+
   let best: HTMLVideoElement | null = null;
   let bestScore = -1;
-  for (const v of collectVideos()) {
+  const viableArea = largestArea * 0.25;
+  for (const { video: v, area } of candidates) {
     if (!isLive(v)) continue;
-    const r = v.getBoundingClientRect();
-    const score = (v.paused ? 0 : 1e9) + r.width * r.height;
+    if (area < viableArea) continue;
+    const score = (v.paused ? 0 : 1e9) + area;
     if (score > bestScore) {
       bestScore = score;
       best = v;
@@ -179,6 +217,7 @@ export function liveVideo(): HTMLVideoElement | null {
 // True if this page is a live stream, staying sticky through brief detection
 // flickers (quality switches momentarily report a finite duration on Twitch).
 export function onStreamPage(): boolean {
-  if (dvrMode) return false; // scrubbed back into the DVR buffer — treat as a recording
-  return !!liveVideo() || Date.now() - liveSeenAt < 6000;
+  if (liveVideo()) return true;
+  if (Date.now() - dvrSeenAt < 6000) return false; // scrubbed back into the DVR buffer
+  return Date.now() - liveSeenAt < 6000;
 }

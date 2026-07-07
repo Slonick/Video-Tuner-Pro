@@ -23,12 +23,13 @@ export interface MountedOptions {
 
 export async function mountOptions(
   settings: Record<string, unknown> = {},
+  opts: { failSetKeys?: string[] } = {},
 ): Promise<MountedOptions> {
   document.body.innerHTML = read("../../src/options/options.html")
     .replace(/[\s\S]*<body>/, "")
     .replace(/<\/body>[\s\S]*/, "")
     .replace(/<script[\s\S]*?<\/script>/g, "");
-  const chrome = createMockChrome({ messages, settings });
+  const chrome = createMockChrome({ messages, settings, failSetKeys: opts.failSetKeys });
   (globalThis as unknown as { chrome: typeof chrome; browser?: unknown }).chrome = chrome;
   (globalThis as unknown as { browser?: unknown }).browser = undefined;
   vi.resetModules();

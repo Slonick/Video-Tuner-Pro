@@ -12,11 +12,16 @@
 // internals, so we describe narrow shapes for exactly the fields we read.
 (function () {
   "use strict";
-  const win = window as typeof window & { __vtpLatencyBridgeInstalled?: boolean };
-  if (win.__vtpLatencyBridgeInstalled) return;
-  win.__vtpLatencyBridgeInstalled = true;
+  const BRIDGE_VERSION = "2026-07-07-active-bridge";
+  const win = window as typeof window & { __vtpLatencyBridgeInstalled?: boolean | string };
+  if (win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION) return;
+  win.__vtpLatencyBridgeInstalled = BRIDGE_VERSION;
   const ATTR = "data-vtp-latency";
   const LIVE_ATTR = "data-vtp-live";
+
+  function isActiveBridge(): boolean {
+    return win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION;
+  }
 
   // --- Narrow shapes of the private internals we touch -----------------------
   interface TwitchStats {
@@ -131,7 +136,7 @@
     if (!o || typeof o !== "object") return false;
     const h = o as HlsLike;
     return (
-      (typeof h.latency === "number" || Array.isArray(h.levels)) &&
+      typeof h.latency === "number" &&
       (h.media instanceof HTMLMediaElement ||
         typeof h.attachMedia === "function" ||
         typeof h.recoverMediaError === "function")
@@ -247,12 +252,10 @@
     // video's getVideoData().isLive. Read only a VISIBLE player so a stale live
     // watch player can't make Shorts (or an inline preview) look like a stream.
     const players = document.querySelectorAll<HTMLElement>(".html5-video-player");
-    let fallback: YouTubePlayer | null = null;
     for (const p of players) {
-      if (!fallback) fallback = p as YouTubePlayer;
       if (p.clientWidth > 0 && p.clientHeight > 0) return p as YouTubePlayer;
     }
-    return fallback;
+    return null;
   }
 
   // The player's own live flag (getVideoData().isLive) — authoritative when
@@ -324,7 +327,15 @@
     return null;
   }
 
+  let timer: number | null = null;
   function tick() {
+    if (!isActiveBridge()) {
+      if (timer != null) {
+        clearInterval(timer);
+        timer = null;
+      }
+      return;
+    }
     try {
       const tw = twitchLatency();
       const lat = tw != null ? tw : (youtubeLatency() ?? hlsLatency());
@@ -339,6 +350,6 @@
       /* ignore */
     }
   }
-  setInterval(tick, 1000);
+  timer = window.setInterval(tick, 1000);
   tick();
 })();

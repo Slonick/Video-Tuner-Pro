@@ -9,7 +9,7 @@ import { VIEWER_LAYOUT_EVENT, viewerAnchorVideo } from "../viewer.js";
 import { onStreamPage } from "../live/detection.js";
 import { catchupBufferLimited } from "../live/catchup.js";
 import { forwardBuffer, streamLatency } from "../live/metrics.js";
-import { mountBadge } from "./BadgeView.js";
+import { BADGE_HOST_ID, mountBadge } from "./BadgeView.js";
 
 type Timer = ReturnType<typeof setTimeout>;
 
@@ -66,29 +66,42 @@ export function ownsBadgeNode(node: Node | null): boolean {
   return !!(badgeHost && (badgeHost === node || badgeHost.contains(node)));
 }
 
+function removeCurrentStaleBadgeHost(): void {
+  const stale = document.getElementById(BADGE_HOST_ID);
+  if (stale && stale !== badgeHost) stale.remove();
+}
+
 function removeStaleBadgeHosts(): void {
-  document.querySelectorAll("[data-vtp-badge]").forEach((node) => {
-    if (node !== badgeHost) node.remove();
-  });
+  removeCurrentStaleBadgeHost();
+  let legacy = document.querySelector("[data-vtp-badge]:not(#" + BADGE_HOST_ID + ")");
+  while (legacy && legacy !== badgeHost) {
+    legacy.remove();
+    legacy = document.querySelector("[data-vtp-badge]:not(#" + BADGE_HOST_ID + ")");
+  }
 }
 
 // Place the badge at its saved per-site fraction of the video, or the default
 // top-left corner when it's never been moved.
 function positionBadge(el: HTMLElement, v: HTMLElement): void {
   const r = v.getBoundingClientRect();
+  const b = el.getBoundingClientRect();
+  const maxLeft = r.left + Math.max(0, r.width - b.width);
+  const maxTop = r.top + Math.max(0, r.height - b.height);
+  const place = (left: number, top: number) => {
+    el.style.left = Math.round(Math.min(Math.max(left, r.left), maxLeft)) + "px";
+    el.style.top = Math.round(Math.min(Math.max(top, r.top), maxTop)) + "px";
+  };
   if (S.badgePos) {
-    el.style.left = Math.round(r.left + S.badgePos.fx * r.width) + "px";
-    el.style.top = Math.round(r.top + S.badgePos.fy * r.height) + "px";
+    place(r.left + S.badgePos.fx * r.width, r.top + S.badgePos.fy * r.height);
   } else {
-    el.style.left = Math.round(r.left + Math.max(10, r.width * 0.012)) + "px";
-    el.style.top = Math.round(r.top + Math.max(10, r.height * 0.04)) + "px";
+    place(r.left + Math.max(10, r.width * 0.012), r.top + Math.max(10, r.height * 0.04));
   }
 }
 
 function saveBadgePos(fx: number, fy: number): void {
   if (!ctxValid()) return;
   STORE.get(["badgePos"], (r) => {
-    const map = (r.badgePos || {}) as Record<string, { fx: number; fy: number }>;
+    const map = { ...((r.badgePos || {}) as Record<string, { fx: number; fy: number }>) };
     map[getDomain()] = { fx, fy };
     STORE.set({ badgePos: map });
   });
@@ -98,19 +111,21 @@ function saveBadgePos(fx: number, fy: number): void {
 function resetBadgePos(): void {
   if (!ctxValid()) return;
   STORE.get(["badgePos"], (r) => {
-    const map = (r.badgePos || {}) as Record<string, { fx: number; fy: number }>;
+    const map = { ...((r.badgePos || {}) as Record<string, { fx: number; fy: number }>) };
     delete map[getDomain()];
-    STORE.set({ badgePos: map });
+    if (Object.keys(map).length) STORE.set({ badgePos: map });
+    else STORE.remove("badgePos");
   });
 }
 
 function saveBadgePinned(on: boolean): void {
   if (!ctxValid()) return;
   STORE.get(["badgePinned"], (r) => {
-    const map = (r.badgePinned || {}) as Record<string, boolean>;
+    const map = { ...((r.badgePinned || {}) as Record<string, boolean>) };
     if (on) map[getDomain()] = true;
     else delete map[getDomain()];
-    STORE.set({ badgePinned: map });
+    if (Object.keys(map).length) STORE.set({ badgePinned: map });
+    else STORE.remove("badgePinned");
   });
 }
 
@@ -278,7 +293,7 @@ export function applyBadgeGlass(): void {
 
 // video and auto-hides after a moment.
 export function updateTimeBadge(): void {
-  removeStaleBadgeHosts();
+  removeCurrentStaleBadgeHost();
   const v = primaryVideo();
   const anchor = viewerAnchorVideo() ?? v;
   const stream = onStreamPage();
@@ -295,6 +310,7 @@ export function updateTimeBadge(): void {
   hookBadgeMouse();
   let el = timeBadgeEl;
   if (!el) {
+    removeStaleBadgeHosts();
     const refs = mountBadge(); // React renders the badge into a shadow root
     badgeHost = refs.host;
     badgeHost.style.setProperty("--glass-opacity", String(S.glassOpacity)); // scales the glass
@@ -310,7 +326,7 @@ export function updateTimeBadge(): void {
   // Position is fixed (viewport-relative), but in fullscreen only descendants of
   // the fullscreen element paint — so re-parent the shadow host into it.
   const fsEl = document.fullscreenElement;
-  const host: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
+  const host: Element = fsEl || document.body;
   if (badgeHost && badgeHost.parentNode !== host) host.appendChild(badgeHost);
   el.style.display = "flex";
   renderBadge(v, anchor);
@@ -325,3 +341,4 @@ export function updateTimeBadge(): void {
 
 document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateTimeBadge());
 window.addEventListener("resize", () => updateTimeBadge(), { passive: true });
+window.addEventListener("scroll", () => updateTimeBadge(), { passive: true });

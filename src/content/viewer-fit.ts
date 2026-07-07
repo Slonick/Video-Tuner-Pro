@@ -12,6 +12,7 @@ import { S } from "./state.js";
 import { setViewerFitMode } from "./viewer.js";
 
 type Map = Record<string, ViewerFitMode>;
+type Done = (ok?: boolean) => void;
 
 function applyResolvedViewerFit(sites: Map, channels: Map, global: unknown): void {
   const r = resolveViewerFit(channelKeys(), getDomain(), sites, channels, global);
@@ -30,52 +31,80 @@ export function applyResolvedViewerFitFromStore(): void {
   });
 }
 
-export function persistSiteViewerFit(mode: ViewerFitMode): void {
-  if (!ctxValid() || window.top !== window) return;
+export function persistSiteViewerFit(mode: ViewerFitMode, done?: Done): void {
+  if (!ctxValid() || window.top !== window) {
+    done?.(false);
+    return;
+  }
   STORE.get(["viewerFitSites"], (r) => {
-    const map = (r.viewerFitSites || {}) as Map;
+    const map = { ...((r.viewerFitSites || {}) as Map) };
     map[getDomain()] = normalizeViewerFit(mode);
-    STORE.set({ viewerFitSites: map });
+    STORE.set({ viewerFitSites: map }, done);
   });
 }
 
-export function persistChannelViewerFit(mode: ViewerFitMode): void {
-  if (!ctxValid() || window.top !== window) return;
+export function persistChannelViewerFit(mode: ViewerFitMode, done?: Done): void {
+  if (!ctxValid() || window.top !== window) {
+    done?.(false);
+    return;
+  }
   const keys = channelKeys();
-  if (!keys.length) return;
+  if (!keys.length) {
+    done?.(false);
+    return;
+  }
   STORE.get(["viewerFitChannels"], (r) => {
-    const map = (r.viewerFitChannels || {}) as Map;
+    const map = { ...((r.viewerFitChannels || {}) as Map) };
     for (const key of keys) delete map[key];
     map[keys[0]] = normalizeViewerFit(mode);
-    STORE.set({ viewerFitChannels: map });
+    STORE.set({ viewerFitChannels: map }, done);
   });
 }
 
-export function persistGlobalViewerFit(mode: ViewerFitMode): void {
-  if (!ctxValid() || window.top !== window) return;
-  STORE.set({ viewerFitGlobal: normalizeViewerFit(mode) });
+export function persistGlobalViewerFit(mode: ViewerFitMode, done?: Done): void {
+  if (!ctxValid() || window.top !== window) {
+    done?.(false);
+    return;
+  }
+  STORE.set({ viewerFitGlobal: normalizeViewerFit(mode) }, done);
 }
 
-export function resetViewerFitScope(scope: ViewerFitScope): void {
-  if (!ctxValid()) return;
+export function resetViewerFitScope(scope: ViewerFitScope, done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   STORE.get(["viewerFitGlobal", "viewerFitSites", "viewerFitChannels"], (r) => {
-    const sites = (r.viewerFitSites || {}) as Map;
-    const channels = (r.viewerFitChannels || {}) as Map;
+    const sites = { ...((r.viewerFitSites || {}) as Map) };
+    const channels = { ...((r.viewerFitChannels || {}) as Map) };
     let global = r.viewerFitGlobal;
+    const finish = (ok?: boolean) => {
+      if (ok === false) {
+        done?.(false);
+        return;
+      }
+      applyResolvedViewerFit(sites, channels, global);
+      done?.(true);
+    };
     if (scope === "channel") {
       const keys = channelKeys();
-      if (!keys.length) return;
+      if (!keys.length) {
+        done?.(false);
+        return;
+      }
       for (const key of keys) delete channels[key];
-      STORE.set({ viewerFitChannels: channels });
+      if (Object.keys(channels).length) STORE.set({ viewerFitChannels: channels }, finish);
+      else STORE.remove("viewerFitChannels", finish);
     } else if (scope === "site") {
       delete sites[getDomain()];
-      STORE.set({ viewerFitSites: sites });
+      if (Object.keys(sites).length) STORE.set({ viewerFitSites: sites }, finish);
+      else STORE.remove("viewerFitSites", finish);
     } else if (scope === "global") {
       global = undefined;
-      STORE.remove(["viewerFitGlobal"]);
+      STORE.remove(["viewerFitGlobal"], finish);
     } else {
+      done?.(false);
       return;
     }
-    applyResolvedViewerFit(sites, channels, global);
   });
 }

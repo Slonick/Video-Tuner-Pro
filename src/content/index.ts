@@ -16,12 +16,13 @@ import { normalizePresetSet } from "../shared/presets.js";
 import { S } from "./state.js";
 import { applyAll, reassertRate } from "./speed.js";
 import { controlLive } from "./live/sync.js";
+import { onStreamPage } from "./live/detection.js";
 import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
-import { ownsViewerNode, syncViewerBackdropVideo } from "./viewer.js";
+import { ownsViewerNode, refreshViewerBackdrop } from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
 import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
@@ -33,14 +34,14 @@ import { collectVideos, startTracking, stopTracking, reconcile, markDrmVideo } f
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
-import { currentChannel, channelKeys } from "./channel.js";
+import { channelKeys, sameChannelIdentity } from "./channel.js";
 
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;
 let autoSlowSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
-let lastChannel: string | null = null; // re-resolve speed when the YouTube channel changes
+let lastChannelKeys: string[] = []; // re-resolve speed when the channel identity changes
 
 // Background-tick cadence: 1s while the page has a video, backing off toward 5s on
 // pages with none so idle tabs stop walking the DOM every second. Media events and
@@ -102,10 +103,10 @@ function applyResolved(
   globalSpeed: number | undefined,
 ): void {
   const keys = channelKeys();
-  lastChannel = keys[0] ?? null;
+  lastChannelKeys = keys;
   const r = resolveSpeed(keys, getDomain(), domains, channels, globalSpeed);
   S.userSpeed = clamp(r.speed);
-  S.currentSpeed = S.userSpeed;
+  if (!onStreamPage() && !S.speedManual) S.currentSpeed = S.userSpeed;
   S.speedScope = r.scope;
 }
 
@@ -232,7 +233,7 @@ function reresolve() {
     updateLauncher();
   });
   applyResolvedTargetFromStore(); // the channel changed — its allowed-delay may differ
-  applyResolvedAutoSlowFromStore(); // ...and its auto-slow enable may differ too
+  applyResolvedAutoSlowFromStore(); // ...and its auto-slow target may differ too
   applyResolvedViewerAutoFromStore(); // ...and its viewer auto-open mode may differ too
   applyResolvedViewerFitFromStore(); // ...and its viewer fit mode may differ too
 }
@@ -258,7 +259,8 @@ function tick() {
   controlLive();
   updateTimeBadge();
   updateLauncher();
-  if (currentChannel() !== lastChannel) reresolve();
+  const keys = channelKeys();
+  if (keys.length && !sameChannelIdentity(lastChannelKeys, keys)) reresolve();
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
   // resets it via wake().
@@ -414,6 +416,9 @@ api.storage.onChanged.addListener((changes, area) => {
   // audio-speed re-applies/resets, the overlay button re-evaluates) come from the
   // registry in one pass.
   applyRegistryChanges(changes);
+  if (changes.domains || changes.channels || changes.globalSpeed) {
+    reresolve();
+  }
   // Audio compressor values are in the registry too; only its engage/re-apply stays
   // here — the toggle re-engages (retrying while the context warms up), a param tweak
   // just re-applies once.
@@ -455,7 +460,7 @@ api.storage.onChanged.addListener((changes, area) => {
     S.overlayPanelPos = map[getDomain()] || null;
   }
   if (changes.autoSlowSites || changes.autoSlowChannels || changes.autoSlowGlobal) {
-    applyResolvedAutoSlowFromStore(); // re-resolve the scoped bundle (enable + target)
+    applyResolvedAutoSlowFromStore(); // re-resolve the scoped target
   }
   if (
     changes.viewerAutoGlobal ||
@@ -469,7 +474,7 @@ api.storage.onChanged.addListener((changes, area) => {
     applyResolvedViewerFitFromStore();
   }
   if (changes.viewerBackdropVideo) {
-    syncViewerBackdropVideo();
+    refreshViewerBackdrop();
   }
   if (changes.speedPresets || changes.presetKeys) {
     // Both arrays sort together, so re-read both and recompute the pair set.

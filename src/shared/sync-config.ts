@@ -151,6 +151,7 @@ export function areaForCategory(cat: Category, cfg: SyncConfig): "sync" | "local
   return cfg[cat] ? "sync" : "local";
 }
 export function areaForKey(key: string, cfg: SyncConfig): "sync" | "local" {
+  if (key === SYNC_META_KEY || key === SYNC_MASTER_KEY) return "local";
   return areaForCategory(categoryOf(key), cfg);
 }
 

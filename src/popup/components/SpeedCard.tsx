@@ -106,8 +106,9 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
             tickStep={50}
             value={target}
             animate={s.speed.animate}
+            disabled={live}
             ariaLabel={msg("meterSpeed") || "Speed"}
-            ariaValueText={Math.round(target * 100) + "%"}
+            ariaValueText={Math.round(target) + "%"}
             onChange={s.sliderInput}
             onCommit={s.sliderCommit}
             onDown={() => s.nudge(-s.speedStep)}

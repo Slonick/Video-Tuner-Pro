@@ -40,7 +40,7 @@ function manifestFor(target) {
 // Entry name → output path (relative to the target dir). content scripts and the
 // popup script become single bundled IIFE files; the manifest references these.
 const jsEntries = {
-  content: join(SRC, "content/index.ts"),
+  content: join(SRC, "content/main.ts"), // boot-guard wrapper around content/index.ts
   background: join(SRC, "background/index.ts"),
   "popup/popup": join(SRC, "popup/index.tsx"),
   "options/options": join(SRC, "options/index.tsx"),

@@ -18,6 +18,7 @@ import {
   parseChord,
   eventChord,
   eventMatchesSpec,
+  actionConflictsWithSpec,
   chordLabel,
   IS_MAC,
   DEFAULT_KEYMAP,
@@ -195,6 +196,12 @@ describe("key chords", () => {
     expect(eventMatchesSpec("M+KeyG", ev("KeyG", { [SECONDARY]: true }))).toBe(false);
     expect(eventMatchesSpec("KeyG", ev("KeyG", { [SECONDARY]: true }))).toBe(false);
     expect(eventMatchesSpec(null, ev("KeyG"))).toBe(false);
+  });
+  it("detects preset/action conflicts including shifted speed-step chords", () => {
+    expect(actionConflictsWithSpec("slower", "KeyA", "S+KeyA")).toBe(true);
+    expect(actionConflictsWithSpec("slower", "KeyA", "M+KeyA")).toBe(false);
+    expect(actionConflictsWithSpec("reset", "KeyR", "S+KeyR")).toBe(false);
+    expect(actionConflictsWithSpec("reset", "KeyR", "KeyR")).toBe(true);
   });
   it("chordLabel renders per the requested platform", () => {
     expect(chordLabel("S+Digit1", true)).toBe("⇧1");

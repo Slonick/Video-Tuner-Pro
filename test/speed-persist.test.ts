@@ -8,14 +8,16 @@ const h = vi.hoisted(() => ({
   keys: [] as string[],
   videos: [] as HTMLVideoElement[],
   live: false,
+  liveVideos: new WeakSet<HTMLVideoElement>(),
 }));
 vi.mock("../src/content/channel.js", () => ({ channelKeys: () => h.keys }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => h.videos,
+  primaryVideo: () => h.videos[0] ?? null,
   seenVideos: new WeakSet(),
 }));
 vi.mock("../src/content/live/detection.js", () => ({
-  isLive: () => h.live,
+  isLive: (v: HTMLVideoElement) => h.live || h.liveVideos.has(v),
   probeLive: vi.fn(),
   onStreamPage: () => h_onStream(),
   trackDvr: vi.fn(),
@@ -39,6 +41,7 @@ import {
   persistChannelSpeed,
   persistGlobalSpeed,
   resetScope,
+  resetToSaved,
   setSpeed,
   applyAll,
   effectiveSpeed,
@@ -59,9 +62,11 @@ beforeEach(() => {
   h.keys = [];
   h.videos = [];
   h.live = false;
+  h.liveVideos = new WeakSet<HTMLVideoElement>();
   onStream = false;
   S.currentSpeed = 1.0;
   S.userSpeed = 1.0;
+  S.speedManual = false;
   // jsdom: window is its own top frame by default.
 });
 
@@ -130,7 +135,7 @@ describe("resetScope", () => {
     STORE.set({ channels: { UC123: 2.0, "@handle": 2.0 }, domains: { localhost: 1.5 } });
     h.keys = ["UC123", "@handle"];
     resetScope("channel");
-    expect(get(["channels"]).channels).toEqual({});
+    expect(get(["channels"]).channels).toBeUndefined();
     expect(S.currentSpeed).toBe(1.5); // fell back to the domain default
   });
 
@@ -145,7 +150,7 @@ describe("resetScope", () => {
     STORE.set({ channels: {}, domains: { localhost: 1.5 }, globalSpeed: 1.2 });
     h.keys = [];
     resetScope("site");
-    expect(get(["domains"]).domains).toEqual({});
+    expect(get(["domains"]).domains).toBeUndefined();
     expect(S.currentSpeed).toBeCloseTo(1.2, 5);
   });
 
@@ -155,6 +160,46 @@ describe("resetScope", () => {
     resetScope("global");
     expect(get(["globalSpeed"]).globalSpeed).toBeUndefined();
     expect(S.currentSpeed).toBe(1.0);
+  });
+
+  it("on a live page updates the saved non-live speed without clobbering live-sync", () => {
+    STORE.set({ channels: { UC123: 2.0 }, domains: { localhost: 1.5 }, globalSpeed: 1.25 });
+    h.keys = ["UC123"];
+    onStream = true;
+    S.currentSpeed = 1.05;
+    S.userSpeed = 2.0;
+    resetScope("channel");
+    expect(get(["channels"]).channels).toBeUndefined();
+    expect(S.userSpeed).toBe(1.5);
+    expect(S.currentSpeed).toBe(1.05);
+    expect(S.speedScope).toBe("site");
+  });
+
+  it("resetToSaved on a live page refreshes only the intended non-live speed", () => {
+    STORE.set({ channels: {}, domains: { localhost: 1.5 } });
+    onStream = true;
+    S.currentSpeed = 1.1;
+    S.userSpeed = 2.0;
+    S.speedManual = true;
+    resetToSaved();
+    expect(S.userSpeed).toBe(1.5);
+    expect(S.currentSpeed).toBe(1.1);
+    expect(S.speedScope).toBe("site");
+    expect(S.speedManual).toBe(false);
+  });
+
+  it("resetToSaved clears the manual override and applies the saved speed on VOD", () => {
+    STORE.set({ channels: {}, domains: { localhost: 1.5 } });
+    S.currentSpeed = 1.9;
+    S.userSpeed = 1.9;
+    S.speedManual = true;
+
+    resetToSaved();
+
+    expect(S.currentSpeed).toBe(1.5);
+    expect(S.userSpeed).toBe(1.5);
+    expect(S.speedScope).toBe("site");
+    expect(S.speedManual).toBe(false);
   });
 });
 
@@ -166,21 +211,65 @@ describe("setSpeed", () => {
     expect(S.currentSpeed).toBeGreaterThan(1);
   });
 
+  it("marks an in-tab manual speed override", () => {
+    setSpeed(1.4, false, true);
+    expect(S.currentSpeed).toBeCloseTo(1.4, 5);
+    expect(S.userSpeed).toBeCloseTo(1.4, 5);
+    expect(S.speedManual).toBe(true);
+  });
+
   it("persists to the domain only when asked", () => {
     setSpeed(1.4, true);
     expect((get(["domains"]).domains as Record<string, number>).localhost).toBe(1.4);
   });
 
   it("ignores a MANUAL change on a live stream page (governed by live-sync)", () => {
+    const live = fakeVideo(1);
+    h.videos = [live];
+    h.liveVideos.add(live);
     onStream = true;
     setSpeed(1.4, false, true);
     expect(S.currentSpeed).toBe(1.0); // unchanged
+  });
+
+  it("allows a manual change on the main VOD even when another video is live", () => {
+    const main = fakeVideo(1);
+    const livePreview = fakeVideo(1);
+    h.videos = [main, livePreview];
+    h.liveVideos.add(livePreview);
+    onStream = true;
+
+    setSpeed(1.4, false, true);
+
+    expect(S.currentSpeed).toBeCloseTo(1.4, 5);
+    expect(S.userSpeed).toBeCloseTo(1.4, 5);
+    expect(S.speedManual).toBe(true);
+    expect(main.playbackRate).toBeCloseTo(1.4, 5);
+    expect(livePreview.playbackRate).toBe(1);
   });
 
   it("still applies a non-manual change on a stream page (live-sync's own write)", () => {
     onStream = true;
     setSpeed(1.1, false, false);
     expect(S.currentSpeed).toBeCloseTo(1.1, 5);
+  });
+});
+
+describe("applyAll", () => {
+  it("does not leak the live catch-up rate onto non-live preview videos", () => {
+    const live = document.createElement("video");
+    const preview = document.createElement("video");
+    h.liveVideos.add(live);
+    h.videos = [live, preview];
+    onStream = true;
+    S.currentSpeed = 1.05; // live-sync catch-up rate
+    S.userSpeed = 1.75; // intended non-live rate
+
+    applyAll();
+
+    expect(live.playbackRate).toBe(1);
+    expect(preview.playbackRate).toBeCloseTo(1.75, 5);
+    expect(preview.defaultPlaybackRate).toBeCloseTo(1.75, 5);
   });
 });
 

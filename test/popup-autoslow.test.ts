@@ -21,6 +21,11 @@ const openMenu = async () => {
   await flush();
 };
 const primary = () => document.querySelector<HTMLElement>(".scope-menu .scope-primary")!;
+const row = (scope: string) =>
+  document.querySelector<HTMLElement>(
+    `.scope-menu .scope-row-wrap[data-key="${scope}"] .scope-row`,
+  );
+const val = (scope: string) => row(scope)?.querySelector(".scope-val");
 
 describe("auto-slow card", () => {
   it("reflects the global enable flag + per-scope target + scope", async () => {
@@ -58,6 +63,23 @@ describe("auto-slow card", () => {
     expect(lastCall("setAutoSlow")).toMatchObject({ action: "setAutoSlow", target: 9 });
   });
 
+  it("keeps a local target edit when the initial page bundle resolves late", async () => {
+    await mountApp({
+      tab: EX,
+      replies: {
+        ...reply({
+          __delayMs: 80,
+          target: 4,
+          scope: "site",
+          channel: null,
+        }),
+      },
+    });
+    setSlider("autoSlowTarget", 9);
+    await wait(120);
+    expect(sliderValue("autoSlowTarget")).toBe(9);
+  });
+
   it("Save sends rememberAutoSlow for the selected scope", async () => {
     const { lastCall } = await mountApp({ tab: EX, replies: reply({ target: 7 }) });
     await openMenu();
@@ -70,11 +92,42 @@ describe("auto-slow card", () => {
     });
   });
 
+  it("does not mark auto-slow saved when the page rejects the save", async () => {
+    await mountApp({
+      tab: EX,
+      replies: { ...reply({ target: 7 }), rememberAutoSlow: { success: false } },
+    });
+    await openMenu();
+    primary().click();
+    await flush();
+
+    expect(byId("autoSlowSetBtn").textContent).toContain("Save");
+    await openMenu();
+    expect(val("site")).toBeFalsy();
+  });
+
+  it("does not fake a channel auto-slow save when the page does not answer", async () => {
+    await mountApp({
+      tab: EX,
+      replies: {
+        ...reply({ scope: null, channel: "twitch:x", target: 7 }),
+        rememberAutoSlow: undefined,
+      },
+    });
+    await openMenu();
+    row("channel")!.click();
+    await flush();
+
+    expect(byId("autoSlowSetBtn").textContent).toContain("Save");
+    await openMenu();
+    expect(val("channel")).toBeFalsy();
+  });
+
   it("Reset sends resetAutoSlow and pulls the re-resolved value back", async () => {
     const { replies, lastCall } = await mountApp({
       tab: EX,
       replies: reply({ target: 8 }),
-      settings: { autoSlowSites: { "example.com": { on: true, target: 8 } } }, // Site saved → Reset enabled
+      settings: { autoSlowSites: { "example.com": { target: 8 } } }, // Site saved → Reset enabled
     });
     await flush();
     replies.resetAutoSlow = { success: true };
@@ -85,6 +138,43 @@ describe("auto-slow card", () => {
     click("autoSlowResetBtn"); // confirm
     await wait(120);
     expect(lastCall("resetAutoSlow")).toMatchObject({ action: "resetAutoSlow", scope: "site" });
+  });
+
+  it("keeps the saved auto-slow target visible when the page rejects reset", async () => {
+    await mountApp({
+      tab: EX,
+      replies: { ...reply({ target: 8 }), resetAutoSlow: { success: false } },
+      settings: { autoSlowSites: { "example.com": { target: 8 } } },
+    });
+    await openMenu();
+    expect(val("site")).toBeTruthy();
+    click("autoSlowResetBtn"); // arm
+    await flush();
+    click("autoSlowResetBtn"); // rejected by page
+    await flush();
+
+    await openMenu();
+    expect(val("site")).toBeTruthy();
+  });
+
+  it("does not fake channel auto-slow removal when the page does not answer", async () => {
+    await mountApp({
+      tab: EX,
+      replies: {
+        ...reply({ scope: "channel", channel: "twitch:x", target: 8 }),
+        resetAutoSlow: undefined,
+      },
+      settings: { autoSlowChannels: { "twitch:x": { target: 8 } } },
+    });
+    await openMenu();
+    expect(val("channel")).toBeTruthy();
+    click("autoSlowResetBtn"); // arm
+    await flush();
+    click("autoSlowResetBtn"); // no page reply
+    await flush();
+
+    await openMenu();
+    expect(val("channel")).toBeTruthy();
   });
 
   it("the per-target Reset sends resetAutoSlowToSaved and pulls the saved value", async () => {

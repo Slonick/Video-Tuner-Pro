@@ -6,7 +6,7 @@ import { onStreamPage, isLive } from "../live/detection.js";
 import { compOn } from "./translation.js";
 import {
   audioContext,
-  audioGraphs,
+  graphForCurrentSource,
   setupGraph,
   hookAudioGesture,
   resumeAudioCtx,
@@ -60,7 +60,7 @@ export function applyAudioComp(videos?: HTMLVideoElement[]): {
     skipped = 0,
     reason: string | null = null;
   for (const v of list) {
-    let g: AudioGraph | null | undefined = audioGraphs.get(v);
+    let g: AudioGraph | null | undefined = graphForCurrentSource(v);
     if (!g) {
       // Capture only what a live feature actually needs: compression routes every
       // video; auto-slow needs just the primary's analyser — and never on a live
@@ -74,7 +74,7 @@ export function applyAudioComp(videos?: HTMLVideoElement[]): {
       g = setupGraph(v);
       if (!g) {
         skipped++;
-        const skip = lastSkip();
+        const skip = lastSkip(v);
         if (skip === "inuse") reason = "inuse";
         else if (!reason) reason = skip;
         continue;

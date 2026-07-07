@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isLive, probeLive } from "../src/content/live/detection.js";
+import { isLive, liveVideo, probeLive } from "../src/content/live/detection.js";
 
 function vid(over: Partial<HTMLVideoElement> = {}): HTMLVideoElement {
   return {
@@ -28,6 +28,50 @@ describe("isLive", () => {
   });
   it("NaN duration (VOD before metadata) → not live", () => {
     expect(isLive(vid({ duration: NaN }))).toBe(false);
+  });
+});
+
+describe("liveVideo", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("ignores tiny live previews", () => {
+    const preview = document.createElement("video");
+    Object.defineProperty(preview, "duration", { value: Infinity, configurable: true });
+    Object.defineProperty(preview, "paused", { value: false, configurable: true });
+    preview.getBoundingClientRect = () =>
+      ({ width: 24, height: 24, left: 0, top: 0, right: 24, bottom: 24 }) as DOMRect;
+    document.body.appendChild(preview);
+    expect(liveVideo()).toBeNull();
+  });
+
+  it("ignores small live previews next to a larger VOD", () => {
+    const main = document.createElement("video");
+    Object.defineProperty(main, "duration", { value: 600, configurable: true });
+    Object.defineProperty(main, "paused", { value: false, configurable: true });
+    main.getBoundingClientRect = () =>
+      ({ width: 1280, height: 720, left: 0, top: 0, right: 1280, bottom: 720 }) as DOMRect;
+
+    const preview = document.createElement("video");
+    Object.defineProperty(preview, "duration", { value: Infinity, configurable: true });
+    Object.defineProperty(preview, "paused", { value: false, configurable: true });
+    preview.getBoundingClientRect = () =>
+      ({ width: 320, height: 180, left: 0, top: 0, right: 320, bottom: 180 }) as DOMRect;
+
+    document.body.append(main, preview);
+    expect(liveVideo()).toBeNull();
+  });
+
+  it("still accepts a small live player when it is the main video", () => {
+    const player = document.createElement("video");
+    Object.defineProperty(player, "duration", { value: Infinity, configurable: true });
+    Object.defineProperty(player, "paused", { value: false, configurable: true });
+    player.getBoundingClientRect = () =>
+      ({ width: 320, height: 180, left: 0, top: 0, right: 320, bottom: 180 }) as DOMRect;
+
+    document.body.appendChild(player);
+    expect(liveVideo()).toBe(player);
   });
 });
 

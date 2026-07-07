@@ -145,6 +145,13 @@ describe("slider + toggle persistence", () => {
     expect(s.audioCompThreshold).toBe(-30);
   });
 
+  it("flushes a pending debounced save when the popup unmounts", async () => {
+    const first = await mountApp({});
+    setSlider("acRatio", 12);
+    await mountApp({});
+    expect(first.saved().audioCompRatio).toBe(12);
+  });
+
   it("the toggle persists the audioComp flag", async () => {
     const { saved } = await mountApp({});
     byId("audioCompToggle").click(); // on → off

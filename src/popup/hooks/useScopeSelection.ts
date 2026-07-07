@@ -17,16 +17,21 @@ export interface ScopeSelection {
   channel: string | null;
   channelName: string;
   channelKey: MutableRefObject<string | null>;
+  channelKeys: MutableRefObject<string[]>;
   refreshSaved: () => void;
-  applyChannel: (ch: string | null | undefined, name?: string | null) => void;
+  applyChannel: (
+    ch: string | null | undefined,
+    name?: string | null,
+    aliases?: string[] | null,
+  ) => void;
   defaultScope: (scope: Scope | null | undefined, hasChannel: boolean) => void;
   pickScope: (scope: Scope) => void;
   markSaved: (scope: Scope, on: boolean, value?: unknown) => void;
   // Write/clear the selected scope straight to storage (global/site only — channel
   // needs the page). `value` is a number for speed/target, or a settings bundle for
   // auto-slow. `resetFallback` runs `done` once the store has been updated.
-  saveFallback: (scope: Scope, value: unknown) => void;
-  resetFallback: (scope: Scope, done: () => void) => void;
+  saveFallback: (scope: Scope, value: unknown, done?: (ok?: boolean) => void) => void;
+  resetFallback: (scope: Scope, done: (ok?: boolean) => void) => void;
 }
 
 // `storage` must be a stable reference (define it as a module constant).
@@ -41,6 +46,7 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
   const [channel, setChannel] = useState<string | null>(null);
   const [channelName, setChannelName] = useState("");
   const channelKey = useRef<string | null>(null);
+  const channelKeys = useRef<string[]>([]);
 
   const refreshSaved = useCallback(() => {
     STORE.get([...storage.global, storage.siteMap, storage.channelMap], (r) => {
@@ -48,7 +54,8 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
       const channels = (r[storage.channelMap] || {}) as Record<string, unknown>;
       const globalKey = storage.global.find((k) => r[k] != null);
       const siteV = domain ? sites[domain] : undefined;
-      const channelV = channelKey.current ? channels[channelKey.current] : undefined;
+      const savedChannelKey = channelKeys.current.find((k) => channels[k] != null);
+      const channelV = savedChannelKey ? channels[savedChannelKey] : undefined;
       setSaved({
         global: globalKey != null,
         site: siteV != null,
@@ -63,12 +70,22 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
   }, [domain, storage]);
 
   const applyChannel = useCallback(
-    (ch: string | null | undefined, name?: string | null) => {
-      setChannel(ch ?? null);
-      if (name !== undefined) setChannelName(name || ch || "");
+    (ch: string | null | undefined, name?: string | null, aliases?: string[] | null) => {
+      const nextChannel = ch ?? null;
+      const keys = Array.isArray(aliases)
+        ? aliases.filter((k): k is string => typeof k === "string" && !!k)
+        : [];
+      if (nextChannel && !keys.includes(nextChannel)) keys.unshift(nextChannel);
+      setChannel(nextChannel);
+      if (name !== undefined) setChannelName(name || nextChannel || "");
       setScope((s) => (!ch && s === "channel" ? "site" : s));
-      if ((ch ?? null) !== channelKey.current) {
-        channelKey.current = ch ?? null;
+      const changed =
+        nextChannel !== channelKey.current ||
+        keys.length !== channelKeys.current.length ||
+        keys.some((k, i) => k !== channelKeys.current[i]);
+      if (changed) {
+        channelKey.current = nextChannel;
+        channelKeys.current = keys;
         refreshSaved();
       }
     },
@@ -93,37 +110,46 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
   }, []);
 
   const saveFallback = useCallback(
-    (s: Scope, value: unknown) => {
+    (s: Scope, value: unknown, done?: (ok?: boolean) => void) => {
       if (s === "global") {
-        STORE.set({ [storage.global[0]]: value });
+        STORE.set({ [storage.global[0]]: value }, (ok) => {
+          if (ok === false || storage.global.length === 1) {
+            done?.(ok);
+            return;
+          }
+          STORE.remove(storage.global.slice(1), done);
+        });
         return;
       }
       if (s === "site" && domain) {
         STORE.get([storage.siteMap], (r) => {
           const map = { ...((r[storage.siteMap] || {}) as Record<string, unknown>) };
           map[domain] = value;
-          STORE.set({ [storage.siteMap]: map });
+          STORE.set({ [storage.siteMap]: map }, done);
         });
+        return;
       }
+      done?.(false);
     },
     [domain, storage],
   );
 
   const resetFallback = useCallback(
-    (s: Scope, done: () => void) => {
+    (s: Scope, done: (ok?: boolean) => void) => {
       if (s === "global") {
         STORE.remove(storage.global, done);
         return;
       }
       if (s === "site" && domain) {
         STORE.get([storage.siteMap], (r) => {
-          const map = { ...((r[storage.siteMap] || {}) as Record<string, number>) };
+          const map = { ...((r[storage.siteMap] || {}) as Record<string, unknown>) };
           delete map[domain];
-          STORE.set({ [storage.siteMap]: map }, done);
+          if (Object.keys(map).length) STORE.set({ [storage.siteMap]: map }, done);
+          else STORE.remove(storage.siteMap, done);
         });
         return;
       }
-      done();
+      done(true);
     },
     [domain, storage],
   );
@@ -135,6 +161,7 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
     channel,
     channelName,
     channelKey,
+    channelKeys,
     refreshSaved,
     applyChannel,
     defaultScope,

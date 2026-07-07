@@ -4,7 +4,7 @@
 // in jsdom and asserting the chrome.storage the popup + content script read back.
 // These were previously only smoke-tested; this exercises the handler branches
 // (clamps, dedup rejection, add/remove limits, pin limits, reset, gain override).
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   mountOptions,
   flush,
@@ -99,8 +99,8 @@ describe("Options · General", () => {
     expect(get(["overlayButton"]).overlayButton).toBe("fullscreen");
   });
 
-  it("import of a valid JSON writes the settings; invalid is ignored", async () => {
-    const { get } = await mountOptions({});
+  it("import of a valid JSON restores settings; invalid is ignored", async () => {
+    const { get } = await mountOptions({ domains: { "old.example": 1.25 } });
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
     const drop = (text: string) => {
       const file = new File([text], "s.json", { type: "application/json" });
@@ -110,9 +110,39 @@ describe("Options · General", () => {
     drop("not json {");
     await settle();
     expect(get(["globalSpeed"]).globalSpeed).toBeUndefined();
-    drop(JSON.stringify({ globalSpeed: 1.9 }));
+    drop(
+      JSON.stringify({ globalSpeed: 1.9, syncCategories: { speeds: false }, syncMaster: false }),
+    );
     await settle();
     expect(get(["globalSpeed"]).globalSpeed).toBeCloseTo(1.9, 2);
+    const restored = get(["domains", "syncCategories", "syncMaster"]);
+    expect(restored.domains).toBeUndefined();
+    expect(restored.syncCategories).toBeUndefined();
+    expect(restored.syncMaster).toBeUndefined();
+  });
+
+  it("export omits sync routing metadata", async () => {
+    const blobs: Blob[] = [];
+    const create = vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      blobs.push(blob as Blob);
+      return "blob:settings";
+    });
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    await mountOptions({
+      globalSpeed: 1.9,
+      syncCategories: { speeds: false },
+      syncMaster: false,
+    });
+
+    byId("exportBtn").click();
+    await flush();
+
+    const exported = JSON.parse(await blobs[0].text()) as Record<string, unknown>;
+    expect(exported.globalSpeed).toBe(1.9);
+    expect(exported.syncCategories).toBeUndefined();
+    expect(exported.syncMaster).toBeUndefined();
+    create.mockRestore();
+    revoke.mockRestore();
   });
 });
 
@@ -135,6 +165,24 @@ describe("Options · Keys", () => {
     pressDoc({ code: "Enter" }); // not a bindable code
     await flush();
     expect((get(["keymap"]).keymap as Record<string, string> | undefined)?.reset).not.toBe("KeyA");
+  });
+
+  it("rejects an action key that is already used by a preset", async () => {
+    const { get } = await mountOptions({ presetKeys: ["KeyG"] });
+    byId("keyReset").click();
+    await flush();
+    pressDoc({ code: "KeyG" });
+    await flush();
+    expect((get(["keymap"]).keymap as Record<string, string> | undefined)?.reset).not.toBe("KeyG");
+  });
+
+  it("rejects a speed-step action key already used by a shifted preset", async () => {
+    const { get } = await mountOptions({ presetKeys: ["S+KeyG"] });
+    byId("keySlower").click();
+    await flush();
+    pressDoc({ code: "KeyG" });
+    await flush();
+    expect((get(["keymap"]).keymap as Record<string, string> | undefined)?.slower).not.toBe("KeyG");
   });
 
   it("Escape cancels capture without changing the binding", async () => {
@@ -164,6 +212,23 @@ describe("Options · Keys", () => {
     sw.click();
     await flush();
     expect((get(["keymap"]).keymap as Record<string, string>).slower).toBe("KeyA");
+  });
+
+  it("tracks external keymap changes before saving another action", async () => {
+    const { get } = await mountOptions({});
+
+    chrome.storage.local.set({ keymap: { slower: "KeyJ", faster: "KeyD" } });
+    await flush();
+    expect(byId("keySlower").textContent).toBe("J");
+
+    byId("keyReset").click();
+    await flush();
+    pressDoc({ code: "KeyK" });
+    await flush();
+
+    const km = get(["keymap"]).keymap as Record<string, string>;
+    expect(km.slower).toBe("KeyJ");
+    expect(km.reset).toBe("KeyK");
   });
 
   it("reset-to-defaults restores the keymap", async () => {
@@ -229,6 +294,35 @@ describe("Options · Speed presets", () => {
     await flush();
     expect((get(["presetKeys"]).presetKeys as (string | null)[])[0]).toBe("KeyG");
     expect(keyBtn().textContent).toBe("G");
+  });
+
+  it("rejects a shifted preset hotkey that shadows a speed-step action", async () => {
+    const { get } = await mountOptions({});
+    const keyBtn = () => sp().querySelector<HTMLElement>(".preset-row .preset-key")!;
+    keyBtn().click();
+    await flush();
+    pressDoc({ code: "KeyA", shiftKey: true });
+    await flush();
+    expect(get(["presetKeys"]).presetKeys).toBeUndefined();
+  });
+
+  it("uses the current action keymap when rejecting preset hotkeys", async () => {
+    const { get } = await mountOptions({});
+    byId("keySlower").click();
+    await flush();
+    pressDoc({ code: "KeyJ" });
+    await flush();
+    expect((get(["keymap"]).keymap as Record<string, string>).slower).toBe("KeyJ");
+
+    const keyBtn = () => sp().querySelector<HTMLElement>(".preset-row .preset-key")!;
+    keyBtn().click();
+    await flush();
+    pressDoc({ code: "KeyJ" });
+    await flush();
+    expect(get(["presetKeys"]).presetKeys).toBeUndefined();
+    pressDoc({ code: "KeyG" });
+    await flush();
+    expect((get(["presetKeys"]).presetKeys as (string | null)[])[0]).toBe("KeyG");
   });
 
   it("reset restores the default preset set", async () => {
@@ -361,6 +455,15 @@ describe("Options · Sync", () => {
     expect(byId("syncRows").className).toMatch(/is-off/);
     expect(firstCat.hasAttribute("disabled")).toBe(true);
   });
+
+  it("rolls back the master switch when storage rejects the change", async () => {
+    await mountOptions({}, { failSetKeys: ["syncMaster"] });
+    const master = byId("syncMaster").querySelector<HTMLElement>("[role=switch]")!;
+    master.click();
+    await flush();
+    expect(byId("syncRows").className).not.toMatch(/is-off/);
+    expect(master.getAttribute("aria-checked")).toBe("true");
+  });
 });
 
 describe("Options · Saved", () => {
@@ -402,9 +505,44 @@ describe("Options · Saved", () => {
     )!;
     aRow.querySelector<HTMLElement>(".saved-del")!.click();
     await flush();
-    expect((get(["syncTargets"]).syncTargets as Record<string, number>)["a.com"]).toBeUndefined();
+    expect(get(["syncTargets"]).syncTargets).toBeUndefined();
     await confirmText(delaysCat.querySelector(".card-actions .confirm-btn") as HTMLElement);
     expect(get(["syncTargetGlobal"]).syncTargetGlobal).toBeUndefined();
     expect(get(["syncTargetChannels"]).syncTargetChannels).toBeUndefined();
+  });
+
+  it("renders and deletes scoped viewer and auto-slow settings", async () => {
+    const { get } = await mountOptions({
+      autoSlowGlobal: { target: 7 },
+      autoSlowSites: { "a.com": { target: 5 } },
+      viewerAutoChannels: { "twitch:foo": "theater" },
+      viewerFitGlobal: "fill",
+      viewerFitSites: { "a.com": "cover" },
+      viewerFitChannels: { "twitch:foo": "contain" },
+    });
+    await settle();
+
+    const cats = [...document.querySelectorAll(".saved-cat")] as HTMLElement[];
+    const autoCat = cats.find((c) => c.textContent?.includes("Auto-slow dense speech"))!;
+    const viewerAutoCat = cats.find((c) => c.textContent?.includes("Auto pop-out on play"))!;
+    const fitCat = cats.find((c) => c.textContent?.includes("Fill mode"))!;
+
+    expect(autoCat.textContent).toContain("a.com");
+    expect(viewerAutoCat.textContent).toContain("foo (Twitch)");
+    expect(fitCat.textContent).toContain("Crop");
+
+    const fitSite = [...fitCat.querySelectorAll(".saved-row")].find((r) =>
+      r.textContent?.includes("a.com"),
+    )!;
+    fitSite.querySelector<HTMLElement>(".saved-del")!.click();
+    await flush();
+    expect(get(["viewerFitSites"]).viewerFitSites).toBeUndefined();
+
+    await confirmText(viewerAutoCat.querySelector(".card-actions .confirm-btn") as HTMLElement);
+    expect(get(["viewerAutoChannels"]).viewerAutoChannels).toBeUndefined();
+
+    await confirmText(autoCat.querySelector(".card-actions .confirm-btn") as HTMLElement);
+    expect(get(["autoSlowGlobal"]).autoSlowGlobal).toBeUndefined();
+    expect(get(["autoSlowSites"]).autoSlowSites).toBeUndefined();
   });
 });

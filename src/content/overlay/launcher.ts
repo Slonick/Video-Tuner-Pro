@@ -34,6 +34,7 @@ const MARGIN = 16; // px — default inset from the video's right edge
 const POPUP_W = 684; // px — the popup's fixed width (popup base.css)
 const FIT_MARGIN = 24; // px — keep the overlay this far from the viewport edges
 const FALLBACK_H = 520; // px — height before the popup reports its real one
+const HOST_ID = "vtp-launcher-host";
 
 let host: HTMLDivElement | null = null; // shadow host (light DOM) we re-parent + mark
 let shadow: ShadowRoot | null = null;
@@ -90,9 +91,13 @@ export function ownsLauncherNode(node: Node | null): boolean {
 }
 
 function removeStaleHosts(): void {
-  document.querySelectorAll("[data-vtp-launcher]").forEach((node) => {
-    if (node !== host) node.remove();
-  });
+  const stale = document.getElementById(HOST_ID);
+  if (stale && stale !== host) stale.remove();
+  let legacy = document.querySelector("[data-vtp-launcher]:not(#" + HOST_ID + ")");
+  while (legacy && legacy !== host) {
+    legacy.remove();
+    legacy = document.querySelector("[data-vtp-launcher]:not(#" + HOST_ID + ")");
+  }
 }
 
 function eligible(): boolean {
@@ -109,12 +114,19 @@ function eligible(): boolean {
 function positionFab(v: HTMLElement): void {
   if (!fab) return;
   const r = v.getBoundingClientRect();
+  const b = fab.getBoundingClientRect();
+  const bw = b.width || FAB_SIZE;
+  const bh = b.height || FAB_SIZE;
+  const maxLeft = r.left + Math.max(0, r.width - bw);
+  const maxTop = r.top + Math.max(0, r.height - bh);
+  const place = (left: number, top: number) => {
+    fab!.style.left = Math.round(Math.min(Math.max(left, r.left), maxLeft)) + "px";
+    fab!.style.top = Math.round(Math.min(Math.max(top, r.top), maxTop)) + "px";
+  };
   if (S.overlayBtnPos) {
-    fab.style.left = Math.round(r.left + S.overlayBtnPos.fx * r.width) + "px";
-    fab.style.top = Math.round(r.top + S.overlayBtnPos.fy * r.height) + "px";
+    place(r.left + S.overlayBtnPos.fx * r.width, r.top + S.overlayBtnPos.fy * r.height);
   } else {
-    fab.style.left = Math.round(r.right - FAB_SIZE - MARGIN) + "px";
-    fab.style.top = Math.round(r.top + (r.height - FAB_SIZE) / 2) + "px";
+    place(r.right - FAB_SIZE - MARGIN, r.top + (r.height - FAB_SIZE) / 2);
   }
   if (radialOpen) layoutRadial();
 }
@@ -199,6 +211,13 @@ function layoutRadial(): void {
     b.style.top = Math.round(fy + Math.sin(a) * R_DIST - R_ITEM / 2) + "px";
     b.style.transform = "scale(1)";
   });
+  const f = viewerFormat();
+  if (rItems && f) {
+    const active = f === "theater" ? rItems.theater : rItems.normal;
+    active.style.left = rItems.exit.style.left;
+    active.style.top = rItems.exit.style.top;
+    active.style.transform = rItems.exit.style.transform;
+  }
 }
 
 // Reflect the viewer's state on the items: the active format reads as pressed,
@@ -231,7 +250,7 @@ function toggleNativePiP(): void {
 function openRadial(): void {
   if (!rItems || !fab) return;
   clearTimeout(radialTimer);
-  clearTimeout(radialIdleTimer);
+  radialTimer = undefined;
   syncRadial();
   const items = radialList();
   for (const b of Object.values(rItems)) {
@@ -242,6 +261,7 @@ function openRadial(): void {
   }
   if (!items.length) {
     radialOpen = false;
+    clearTimeout(radialIdleTimer);
     snapRadialAtFab();
     return;
   }
@@ -252,11 +272,11 @@ function openRadial(): void {
       b.style.pointerEvents = "auto";
     }
     layoutRadial();
-    radialIdleTimer = setTimeout(() => closeRadial(true), 2600);
     flashFab();
     return;
   }
   radialOpen = true;
+  clearTimeout(radialIdleTimer);
   snapRadialAtFab(items);
   radialFrame = requestAnimationFrame(() => {
     radialFrame = 0;
@@ -282,6 +302,8 @@ function closeRadial(resumeHide = false): void {
   radialOpen = false;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
+  radialTimer = undefined;
+  radialIdleTimer = undefined;
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   if (rItems) {
@@ -298,8 +320,16 @@ function closeRadial(resumeHide = false): void {
 // Leaving the FAB or an item starts a short countdown, so the pointer can hop
 // between them without the menu collapsing mid-travel.
 function scheduleRadialClose(): void {
+  if (radialTimer) return;
+  radialTimer = setTimeout(() => {
+    radialTimer = undefined;
+    closeRadial(true);
+  }, R_HIDE_MS);
+}
+
+function keepRadialOpen(): void {
   clearTimeout(radialTimer);
-  radialTimer = setTimeout(() => closeRadial(true), R_HIDE_MS);
+  radialTimer = undefined;
 }
 
 function ownsRadialEvent(e: Event): boolean {
@@ -310,7 +340,7 @@ function ownsRadialEvent(e: Event): boolean {
 function saveFabPos(fx: number, fy: number): void {
   if (!ctxValid()) return;
   STORE.get(["overlayBtnPos"], (r) => {
-    const map = (r.overlayBtnPos || {}) as Record<string, { fx: number; fy: number }>;
+    const map = { ...((r.overlayBtnPos || {}) as Record<string, { fx: number; fy: number }>) };
     map[getDomain()] = { fx, fy };
     STORE.set({ overlayBtnPos: map });
   });
@@ -319,9 +349,10 @@ function saveFabPos(fx: number, fy: number): void {
 function resetFabPos(): void {
   if (!ctxValid()) return;
   STORE.get(["overlayBtnPos"], (r) => {
-    const map = (r.overlayBtnPos || {}) as Record<string, { fx: number; fy: number }>;
+    const map = { ...((r.overlayBtnPos || {}) as Record<string, { fx: number; fy: number }>) };
     delete map[getDomain()];
-    STORE.set({ overlayBtnPos: map });
+    if (Object.keys(map).length) STORE.set({ overlayBtnPos: map });
+    else STORE.remove("overlayBtnPos");
   });
 }
 
@@ -366,7 +397,7 @@ function positionPanel(): void {
 function savePanelPos(fx: number, fy: number): void {
   if (!ctxValid()) return;
   STORE.get(["overlayPanelPos"], (r) => {
-    const map = (r.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>;
+    const map = { ...((r.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>) };
     map[getDomain()] = { fx, fy };
     STORE.set({ overlayPanelPos: map });
   });
@@ -377,9 +408,10 @@ function resetPanelPos(): void {
   positionPanel();
   if (!ctxValid()) return;
   STORE.get(["overlayPanelPos"], (r) => {
-    const map = (r.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>;
+    const map = { ...((r.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>) };
     delete map[getDomain()];
-    STORE.set({ overlayPanelPos: map });
+    if (Object.keys(map).length) STORE.set({ overlayPanelPos: map });
+    else STORE.remove("overlayPanelPos");
   });
 }
 
@@ -613,7 +645,13 @@ function hookFabDrag(el: HTMLElement): void {
 
 function mount(): void {
   removeStaleHosts();
+  radialOpen = false;
+  clearTimeout(radialTimer);
+  clearTimeout(radialIdleTimer);
+  cancelAnimationFrame(radialFrame);
+  radialFrame = 0;
   host = document.createElement("div");
+  host.id = HOST_ID;
   host.setAttribute("data-vtp-launcher", "");
   host.style.setProperty("--glass-opacity", String(S.glassOpacity)); // scales the FAB glass
   shadow = host.attachShadow({ mode: "open" });
@@ -830,7 +868,7 @@ function hookMouse(): void {
     "pointermove",
     (e) => {
       if (!radialOpen) return;
-      if (ownsRadialEvent(e)) openRadial();
+      if (ownsRadialEvent(e)) keepRadialOpen();
       else scheduleRadialClose();
     },
     { passive: true, capture: true },
@@ -857,13 +895,29 @@ function hideFab(): void {
   closeRadial();
 }
 
+function resetDetachedHost(): void {
+  if (!host || host.isConnected) return;
+  radialOpen = false;
+  open = false;
+  clearTimeout(radialTimer);
+  clearTimeout(radialIdleTimer);
+  cancelAnimationFrame(radialFrame);
+  radialFrame = 0;
+  host = null;
+  shadow = null;
+  fab = null;
+  rItems = null;
+  backdrop = null;
+  frame = null;
+}
+
 // Re-apply the glass-opacity multiplier (General setting) to the launcher glass.
 export function applyLauncherGlass(): void {
   host?.style.setProperty("--glass-opacity", String(S.glassOpacity));
 }
 
 export function updateLauncher(): void {
-  removeStaleHosts();
+  resetDetachedHost();
   const paused = viewerLayoutPaused();
   const viewerAnchor = viewerAnchorVideo();
   if (viewerAnchor) {

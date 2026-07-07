@@ -1,11 +1,18 @@
 // Popup entry. Apply the theme, then — once the selective-sync config has loaded
 // and the saved language is applied — render the React app (so msg() returns text
 // in the chosen language during the first render).
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { whenReady } from "./platform/storage.js";
 import { loadLang } from "./i18n.js";
 import { initTheme } from "../shared/theme.js";
 import { App } from "./components/App.js";
+
+let root: Root | null = null;
+
+export function unmountPopupForTest(): void {
+  root?.unmount();
+  root = null;
+}
 
 // When the popup is embedded as an in-page overlay (the on-video launcher loads
 // popup.html in an iframe), report its content height to the host so the iframe
@@ -87,7 +94,8 @@ function wireEmbeddedOverlay(): void {
 initTheme();
 whenReady(() => {
   loadLang(() => {
-    createRoot(document.getElementById("root")!).render(<App />);
+    root = createRoot(document.getElementById("root")!);
+    root.render(<App />);
     wireEmbeddedOverlay();
   });
 });

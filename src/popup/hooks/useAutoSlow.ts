@@ -30,7 +30,7 @@ export interface UseAutoSlow {
   savedValues: ScopeValues;
   setTarget: (v: number) => void;
   nudge: (delta: number) => void;
-  save: (target?: Scope) => void;
+  save: (target?: Scope) => boolean | Promise<boolean>;
   resetManual: () => void;
   resetScope: (target?: Scope) => void;
   pickScope: (scope: Scope) => void;
@@ -53,6 +53,7 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
   const [target, setTargetState] = useState(DEF.target);
   // Synchronous mirror so a Save right after a slider drag reads the latest value.
   const ref = useRef<Bundle>({ ...DEF });
+  const userRevision = useRef(0);
 
   const apply = useCallback((b: Bundle) => {
     ref.current = { ...b };
@@ -70,21 +71,34 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
   }, [pushPreview]);
 
   // No content script (no tab): resolve site > global from storage directly.
-  const fromStorage = useCallback(() => {
-    STORE.get(["autoSlowGlobal", "autoSlowSites"], (r) => {
-      const sites = (r.autoSlowSites || {}) as Record<string, Bundle>;
-      const b = (domain && sites[domain]) || (r.autoSlowGlobal as Bundle) || DEF;
-      apply({ target: b.target ?? DEF.target });
-      defaultScope(null, false);
-      refreshSaved();
-    });
-  }, [domain, apply, defaultScope, refreshSaved]);
+  const fromStorage = useCallback(
+    (expectedRevision?: number) => {
+      STORE.get(["autoSlowGlobal", "autoSlowSites"], (r) => {
+        const sites = (r.autoSlowSites || {}) as Record<string, Bundle>;
+        const b = (domain && sites[domain]) || (r.autoSlowGlobal as Bundle) || DEF;
+        if (expectedRevision == null || userRevision.current === expectedRevision) {
+          apply({ target: b.target ?? DEF.target });
+        }
+        defaultScope(null, false);
+        refreshSaved();
+      });
+    },
+    [domain, apply, defaultScope, refreshSaved],
+  );
 
-  const setTarget = useCallback((v: number) => {
-    ref.current.target = v;
-    setTargetState(v);
-    debounced.current();
+  const touchUserTarget = useCallback(() => {
+    userRevision.current++;
   }, []);
+
+  const setTarget = useCallback(
+    (v: number) => {
+      touchUserTarget();
+      ref.current.target = v;
+      setTargetState(v);
+      debounced.current();
+    },
+    [touchUserTarget],
+  );
   // Step the target, clamped to the slider's range; reads the ref so back-to-back
   // taps don't race a pending re-render.
   const nudge = useCallback(
@@ -95,31 +109,65 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
   const save = useCallback(
     (target: Scope = scope) => {
       const b = { ...ref.current };
-      markSaved(target, true, b);
-      if (hasTab) {
-        void send("rememberAutoSlow", { scope: target, target: b.target }).then((r) => {
-          if (r == null) saveFallback(target, b);
+      const fallback = () =>
+        new Promise<boolean>((resolve) => {
+          if (target === "channel") {
+            refreshSaved();
+            resolve(false);
+            return;
+          }
+          saveFallback(target, b, (ok) => {
+            if (ok === false) {
+              refreshSaved();
+              resolve(false);
+              return;
+            }
+            markSaved(target, true, b);
+            resolve(true);
+          });
         });
-      } else {
-        saveFallback(target, b);
+      if (hasTab) {
+        return send<{ success?: boolean }>("rememberAutoSlow", {
+          scope: target,
+          target: b.target,
+        }).then((r) => {
+          if (r == null) return fallback();
+          if (r.success === false) {
+            refreshSaved();
+            return false;
+          }
+          markSaved(target, true, b);
+          return true;
+        });
       }
+      return fallback();
     },
-    [scope, hasTab, send, saveFallback, markSaved],
+    [scope, hasTab, send, saveFallback, markSaved, refreshSaved],
   );
 
   const resetScope = useCallback(
     (target: Scope = scope) => {
-      markSaved(target, false);
-      const fallback = () => resetFallback(target, fromStorage);
+      const fallback = () => {
+        if (target === "channel") {
+          refreshSaved();
+          return;
+        }
+        resetFallback(target, (ok) => {
+          if (ok !== false) markSaved(target, false);
+          fromStorage();
+        });
+      };
       if (!hasTab) {
         fallback();
         return;
       }
-      void send("resetAutoSlow", { scope: target }).then((r) => {
+      void send<{ success?: boolean }>("resetAutoSlow", { scope: target }).then((r) => {
         if (r == null) fallback();
+        else if (r.success === false) refreshSaved();
         // Re-resolve so the value drops to the next scope and Save retargets to it.
         else
           pullAfter<AutoSlowResponse>(send, "getAutoSlow", (resp) => {
+            markSaved(target, false);
             applyResolved(resp);
             defaultScope(resp.scope, !!resp.channel);
             refreshSaved();
@@ -152,20 +200,26 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
 
   useEffect(() => {
     if (!tab) return;
+    const initialRevision = userRevision.current;
+    let canceled = false;
     if (hasTab) {
       void send<AutoSlowResponse>("getAutoSlow").then((resp) => {
+        if (canceled) return;
         if (!resp) {
-          fromStorage();
+          fromStorage(initialRevision);
           return;
         }
-        applyResolved(resp);
-        applyChannel(resp.channel);
+        if (userRevision.current === initialRevision) applyResolved(resp);
+        applyChannel(resp.channel, resp.channelName, resp.channelKeys);
         defaultScope(resp.scope, !!resp.channel);
         refreshSaved();
       });
     } else {
-      fromStorage();
+      fromStorage(initialRevision);
     }
+    return () => {
+      canceled = true;
+    };
   }, [
     tab,
     hasTab,

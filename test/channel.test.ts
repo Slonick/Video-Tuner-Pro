@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { currentChannel, channelKeys, currentChannelName } from "../src/content/channel.js";
+import {
+  currentChannel,
+  channelKeys,
+  currentChannelName,
+  sameChannelIdentity,
+} from "../src/content/channel.js";
 
 function at(hostname: string, pathname: string): void {
   vi.stubGlobal("location", { hostname, pathname });
@@ -26,9 +31,9 @@ describe("currentChannel (stable per-channel key)", () => {
 
   it("reads a non-ASCII @handle that YouTube percent-encodes in the href", () => {
     at("www.youtube.com", "/watch");
-    // /@Ігрович (Cyrillic) → the href is percent-encoded; the key is the decoded handle.
-    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@%D0%86%D0%B3%D1%80%D0%BE%D0%B2%D0%B8%D1%87">Ігрович</a></ytd-video-owner-renderer>`;
-    expect(currentChannel()).toBe("@Ігрович");
+    // The href is percent-encoded; the key is the decoded handle.
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@caf%C3%A9">Cafe</a></ytd-video-owner-renderer>`;
+    expect(currentChannel()).toBe("@café");
   });
 
   it("reads the /channel/UC… id when there's no handle", () => {
@@ -170,5 +175,16 @@ describe("currentChannelName (display name for the header)", () => {
   it("falls back to the login for sites without a matched name node (TikTok)", () => {
     at("www.tiktok.com", "/@charli/live");
     expect(currentChannelName()).toBe("charli");
+  });
+});
+
+describe("sameChannelIdentity", () => {
+  it("treats a late-rendered canonical id as the same YouTube channel", () => {
+    expect(sameChannelIdentity(["@WGC098"], ["channel/UCabc_123", "@WGC098"])).toBe(true);
+  });
+
+  it("treats unrelated channels as different", () => {
+    expect(sameChannelIdentity(["channel/UCone", "@one"], ["channel/UCtwo", "@two"])).toBe(false);
+    expect(sameChannelIdentity([], ["@one"])).toBe(false);
   });
 });

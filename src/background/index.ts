@@ -30,6 +30,7 @@ const RED_ICON = {
   48: "icons/icon-red-48.png",
   128: "icons/icon-red-128.png",
 };
+const badgeOwners = new Map<number, number>();
 
 // On Chrome MV3 these action APIs return a Promise that rejects asynchronously
 // when the tab is already gone ("No tab with id …"); a plain try/catch only
@@ -44,6 +45,7 @@ function call(fn: () => unknown): void {
 }
 
 function reset(tabId?: number): void {
+  if (typeof tabId === "number") badgeOwners.delete(tabId);
   call(() => api.action.setBadgeText({ text: "", tabId }));
   call(() => api.action.setIcon({ path: DEFAULT_ICON, tabId }));
 }
@@ -86,10 +88,15 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (!msg || msg.action !== "icon" || !sender.tab) return;
   const tabId = sender.tab.id;
+  if (typeof tabId !== "number") return;
+  const frameId = typeof sender.frameId === "number" ? sender.frameId : 0;
   if (msg.clear) {
-    reset(tabId);
+    if (badgeOwners.get(tabId) === frameId) reset(tabId);
     return;
   }
+  const owner = badgeOwners.get(tabId);
+  if (frameId !== 0 && owner != null && owner !== frameId) return;
+  badgeOwners.set(tabId, frameId);
   call(() => api.action.setBadgeText({ text: msg.text || "", tabId }));
   call(() => api.action.setBadgeBackgroundColor({ color: "#0a84ff", tabId }));
   if (api.action.setBadgeTextColor) {
@@ -126,13 +133,15 @@ function reinjectOpenTabs(): void {
             files: ["content.js"],
           }),
         );
-        call(() =>
-          api.scripting.executeScript({
-            target: { tabId, allFrames: true },
-            files: ["inject.js"],
-            world: "MAIN",
-          }),
-        );
+        if (shouldInjectLatencyBridge(tab.url)) {
+          call(() =>
+            api.scripting.executeScript({
+              target: { tabId, allFrames: true },
+              files: ["inject.js"],
+              world: "MAIN",
+            }),
+          );
+        }
         call(() =>
           api.scripting.executeScript({
             target: { tabId, allFrames: true },
@@ -150,6 +159,25 @@ function reinjectOpenTabs(): void {
       }
     }),
   );
+}
+
+function shouldInjectLatencyBridge(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "twitch.tv" ||
+      host.endsWith(".twitch.tv") ||
+      host === "youtube.com" ||
+      host.endsWith(".youtube.com") ||
+      host === "kick.com" ||
+      host.endsWith(".kick.com") ||
+      host === "w.tv" ||
+      host.endsWith(".w.tv")
+    );
+  } catch (e) {
+    return false;
+  }
 }
 
 if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
@@ -176,18 +204,27 @@ if (api.runtime && api.runtime.onInstalled) {
   });
 }
 
-// One-time migration: copy any pre-existing device-local settings into synced
-// storage (only if sync has none yet), so upgrading users keep their settings.
+// One-time migration: copy pre-router device-local settings into the routed store
+// only where the current routed area has no value yet.
 if (api.runtime && api.runtime.onInstalled && api.storage && api.storage.sync) {
   api.runtime.onInstalled.addListener(() => {
-    api.storage.sync.get(["domains", "liveSync"], (s) => {
-      if (s && (s.domains || s.liveSync != null)) return; // already synced
-      api.storage.local.get(["domains", "liveSync", "liveSyncTarget", "liveSyncMax"], (l) => {
-        const copy: Record<string, unknown> = {};
-        for (const k of ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"]) {
-          if (l[k] !== undefined) copy[k] = l[k];
-        }
-        if (Object.keys(copy).length) api.storage.sync.set(copy);
+    const keys = ["domains", "liveSync", "liveSyncTarget", "liveSyncMax"];
+    const doneKey = "legacyLocalSyncMigrationDone";
+    whenReady(() => {
+      api.storage.local.get([doneKey, ...keys], (local) => {
+        if (local[doneKey]) return;
+        STORE.get(keys, (current) => {
+          const copy: Record<string, unknown> = {};
+          for (const k of keys) {
+            if (current[k] === undefined && local[k] !== undefined) copy[k] = local[k];
+          }
+          const markDone = () => api.storage.local.set({ [doneKey]: true });
+          if (Object.keys(copy).length) {
+            STORE.set(copy, (ok) => {
+              if (ok !== false) markDone();
+            });
+          } else markDone();
+        });
       });
     });
   });

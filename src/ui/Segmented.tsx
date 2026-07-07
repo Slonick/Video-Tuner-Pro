@@ -3,7 +3,7 @@
 // Used for the theme / language / on-video pickers (and mirrors the popup's scope
 // picker). role=radiogroup with arrow-key roving focus. `cols` lays the cells out
 // in a grid (the language picker); omit for a single row.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { prefersReducedMotion } from "./anim.js";
 
 interface Item<T extends string> {
@@ -48,7 +48,7 @@ export function Segmented<T extends string>({
   const firstSlide = useRef(true);
   const slideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const measure = () => {
+  const measure = useCallback(() => {
     const b = btns.current[value];
     if (!b) {
       setPill(null);
@@ -61,13 +61,13 @@ export function Segmented<T extends string>({
       return;
     }
     setPill({ left: b.offsetLeft, top: b.offsetTop, width, height });
-  };
+  }, [value]);
 
   useLayoutEffect(() => {
     measure();
     const raf = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(raf);
-  }, [value, items.length]);
+  }, [measure, items.length]);
 
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
@@ -78,7 +78,7 @@ export function Segmented<T extends string>({
     ro.observe(root);
     ro.observe(active);
     return () => ro.disconnect();
-  }, [value, items.length]);
+  }, [measure, value, items.length]);
 
   useEffect(() => {
     if (firstSlide.current) {

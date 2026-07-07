@@ -48,38 +48,53 @@ afterEach(() => {
 
 describe("persist", () => {
   it("writes the site bundle under the normalized domain (top frame)", () => {
-    persistSiteAutoSlow({ on: true, target: 8 });
-    expect(sites().localhost).toEqual({ on: true, target: 8 });
+    persistSiteAutoSlow({ target: 8 });
+    expect(sites().localhost).toEqual({ target: 8 });
   });
 
   it("does NOT write the site bundle from a subframe", () => {
     Object.defineProperty(window, "top", { value: {}, configurable: true });
-    persistSiteAutoSlow({ on: true, target: 8 });
+    persistSiteAutoSlow({ target: 8 });
     expect(sites()).toEqual({});
   });
 
   it("stores the channel bundle under the canonical key, dropping the other form", () => {
-    STORE.set({ autoSlowChannels: { "@h": { on: true, target: 5 } } });
+    STORE.set({ autoSlowChannels: { "@h": { target: 5 } } });
     h.keys = ["UC1", "@h"];
-    persistChannelAutoSlow({ on: false, target: 7 });
-    expect(channels()).toEqual({ UC1: { on: false, target: 7 } });
+    persistChannelAutoSlow({ target: 7 });
+    expect(channels()).toEqual({ UC1: { target: 7 } });
+  });
+
+  it("does not mutate the previous maps while preparing a write", () => {
+    const siteMap = { localhost: { target: 8 } };
+    const channelMap = { UC1: { target: 6 }, "@h": { target: 6 } };
+    STORE.set({ autoSlowSites: siteMap, autoSlowChannels: channelMap });
+    h.keys = ["UC2", "@h"];
+
+    persistSiteAutoSlow({ target: 9 });
+    persistChannelAutoSlow({ target: 7 });
+
+    expect(siteMap).toEqual({ localhost: { target: 8 } });
+    expect(channelMap).toEqual({ UC1: { target: 6 }, "@h": { target: 6 } });
+    expect(sites()).toEqual({ localhost: { target: 9 } });
+    expect(channels()).toEqual({ UC1: { target: 6 }, UC2: { target: 7 } });
   });
 
   it("channel persist no-ops without a channel", () => {
-    persistChannelAutoSlow({ on: true, target: 6 });
+    persistChannelAutoSlow({ target: 6 });
     expect(channels()).toEqual({});
   });
 
   it("writes the global bundle", () => {
-    persistGlobalAutoSlow({ on: true, target: 9 });
-    expect(get(["autoSlowGlobal"]).autoSlowGlobal).toEqual({ on: true, target: 9 });
+    persistGlobalAutoSlow({ target: 9 });
+    expect(get(["autoSlowGlobal"]).autoSlowGlobal).toEqual({ target: 9 });
   });
 });
 
 // Only the TARGET resolves per scope now; the enable is a separate global flag.
 describe("applyResolvedAutoSlowFromStore", () => {
   it("resolves the site bundle's target into S", () => {
-    STORE.set({ autoSlowSites: { localhost: { on: true, target: 5 } } });
+    STORE.set({ autoSlowSites: { localhost: { target: 5 } } });
     applyResolvedAutoSlowFromStore();
     expect(S.autoSlowTarget).toBe(5);
     expect(S.autoSlowScope).toBe("site");
@@ -87,8 +102,8 @@ describe("applyResolvedAutoSlowFromStore", () => {
 
   it("a channel bundle wins over site", () => {
     STORE.set({
-      autoSlowSites: { localhost: { on: false, target: 4 } },
-      autoSlowChannels: { UC1: { on: true, target: 9 } },
+      autoSlowSites: { localhost: { target: 4 } },
+      autoSlowChannels: { UC1: { target: 9 } },
     });
     h.keys = ["UC1"];
     applyResolvedAutoSlowFromStore();
@@ -105,31 +120,44 @@ describe("applyResolvedAutoSlowFromStore", () => {
 
 describe("resetAutoSlowScope", () => {
   it("clears the site entry and re-resolves to no scope", () => {
-    STORE.set({ autoSlowSites: { localhost: { on: true, target: 8 } } });
+    STORE.set({ autoSlowSites: { localhost: { target: 8 } } });
     resetAutoSlowScope("site");
-    expect(sites()).toEqual({});
+    expect(sites()).toBeUndefined();
     expect(S.autoSlowScope).toBe(null);
   });
 
   it("clears the global entry", () => {
-    STORE.set({ autoSlowGlobal: { on: true, target: 7 } });
+    STORE.set({ autoSlowGlobal: { target: 7 } });
     resetAutoSlowScope("global");
     expect(get(["autoSlowGlobal"]).autoSlowGlobal).toBeUndefined();
   });
 
   it("clears the channel entry under every key form", () => {
     STORE.set({
-      autoSlowChannels: { UC1: { on: true, target: 6 }, "@h": { on: true, target: 6 } },
+      autoSlowChannels: { UC1: { target: 6 }, "@h": { target: 6 } },
     });
     h.keys = ["UC1", "@h"];
     resetAutoSlowScope("channel");
-    expect(channels()).toEqual({});
+    expect(channels()).toBeUndefined();
+  });
+
+  it("does not mutate the previous maps while clearing a scope", () => {
+    const siteMap = { localhost: { target: 8 } };
+    const channelMap = { UC1: { target: 6 }, "@h": { target: 6 } };
+    STORE.set({ autoSlowSites: siteMap, autoSlowChannels: channelMap });
+    h.keys = ["UC1", "@h"];
+
+    resetAutoSlowScope("channel");
+
+    expect(siteMap).toEqual({ localhost: { target: 8 } });
+    expect(channelMap).toEqual({ UC1: { target: 6 }, "@h": { target: 6 } });
+    expect(channels()).toBeUndefined();
   });
 });
 
 describe("setAutoSlowPreview", () => {
   it("applies the target live without persisting", () => {
-    setAutoSlowPreview({ on: true, target: 10 });
+    setAutoSlowPreview({ target: 10 });
     expect(S.autoSlowTarget).toBe(10);
     expect(get(["autoSlowGlobal"]).autoSlowGlobal).toBeUndefined();
   });

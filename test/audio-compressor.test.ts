@@ -12,6 +12,7 @@ const m = vi.hoisted(() => {
     graphs: new Map<unknown, unknown>(),
     setupGraph: vi.fn(),
     lastSkipVal: null as string | null,
+    lastSkipByVideo: new Map<unknown, string | null>(),
     stream: false,
     makeParam,
   };
@@ -29,10 +30,11 @@ vi.mock("../src/content/videos.js", () => ({
 vi.mock("../src/content/audio/routing.js", () => ({
   audioContext: () => ({ currentTime: 0 }),
   audioGraphs: m.graphs,
+  graphForCurrentSource: (v: unknown) => m.graphs.get(v) ?? null,
   setupGraph: m.setupGraph,
   hookAudioGesture: vi.fn(),
   resumeAudioCtx: vi.fn(),
-  lastSkip: () => m.lastSkipVal,
+  lastSkip: (v?: unknown) => (v ? (m.lastSkipByVideo.get(v) ?? m.lastSkipVal) : m.lastSkipVal),
 }));
 
 import { S } from "../src/content/state.js";
@@ -61,6 +63,7 @@ describe("applyAudioComp param mapping", () => {
     m.graphs.clear();
     m.compOn = true;
     m.lastSkipVal = null;
+    m.lastSkipByVideo.clear();
     S.audioCompEnabled = true;
     S.audioCompThreshold = -40;
     S.audioCompKnee = 25;
@@ -156,6 +159,7 @@ describe("applyAudioComp routing decisions", () => {
     m.graphs.clear();
     m.compOn = true;
     m.lastSkipVal = null;
+    m.lastSkipByVideo.clear();
     m.setupGraph.mockReset();
     m.stream = false;
     S.autoSlowEnabled = false;
@@ -243,6 +247,22 @@ describe("applyAudioComp routing decisions", () => {
       return null;
     });
     const res = applyAudioComp();
+    expect(res.reason).toBe("inuse");
+  });
+
+  it("reads the skip reason from the video that failed, not the global latest skip", () => {
+    S.audioCompEnabled = true;
+    const a = { id: "a" } as unknown as HTMLVideoElement;
+    const b = { id: "b" } as unknown as HTMLVideoElement;
+    m.primary = a;
+    m.list = [a, b];
+    m.setupGraph.mockReturnValue(null);
+    m.lastSkipVal = "loading";
+    m.lastSkipByVideo.set(a, "inuse");
+    m.lastSkipByVideo.set(b, "cors");
+
+    const res = applyAudioComp();
+
     expect(res.reason).toBe("inuse");
   });
 });

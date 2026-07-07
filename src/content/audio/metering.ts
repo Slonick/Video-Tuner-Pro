@@ -2,7 +2,7 @@ import { ctxValid } from "../platform/browser.js";
 import { S } from "../state.js";
 import { primaryVideo } from "../videos.js";
 import { translationActive } from "./translation.js";
-import { audioContext, audioGraphs, lastSkip } from "./routing.js";
+import { audioContext, graphForCurrentSource, lastSkip } from "./routing.js";
 import { rmsToDb, deriveOutDb } from "./levels.js";
 import type { AudioGraph, AudioLevels } from "./types.js";
 
@@ -25,12 +25,12 @@ function analyserDb(an: AnalyserNode): number {
 
 function audioOutDb(g: AudioGraph, inDb: number): number {
   const reduction = g.comp && typeof g.comp.reduction === "number" ? g.comp.reduction : 0;
-  return deriveOutDb(inDb, reduction);
+  return deriveOutDb(inDb, reduction, S.audioCompEnabled ? S.audioCompGain : 0);
 }
 
 export function audioLevels(): AudioLevels {
   const v = primaryVideo();
-  const g = v ? audioGraphs.get(v) : null;
+  const g = v ? graphForCurrentSource(v) : null;
   // Report levels whenever the graph exists — even with compression off (it runs
   // transparent), so the meter and threshold preview stay live.
   if (!g || !g.analyserIn) {
@@ -41,7 +41,7 @@ export function audioLevels(): AudioLevels {
       // Surface a hard capture failure so the popup can warn + lock the audio cards
       // (monitor.ts runs applyAudioComp() right before this, so the skip is current).
       // Transient reasons (loading/suspended/VOT) are left off.
-      ...blockReason(lastSkip()),
+      ...blockReason(lastSkip(v)),
     };
   }
   const inDb = analyserDb(g.analyserIn);
@@ -67,7 +67,7 @@ export function recordAudioSample(): void {
   const ctx = audioContext();
   if (!ctx || ctx.state !== "running") return;
   const v = primaryVideo();
-  const g = v ? audioGraphs.get(v) : null;
+  const g = v ? graphForCurrentSource(v) : null;
   if (!g || !g.analyserIn) return;
   const inDb = analyserDb(g.analyserIn);
   audioLevelHist.push({ in: inDb, out: audioOutDb(g, inDb) });

@@ -91,19 +91,38 @@ describe("setupGraph source gating (canRouteAudio)", () => {
 
   it("routes a same-origin source", async () => {
     const { setupGraph } = await load();
-    expect(setupGraph(vid({ src: location.origin + "/clip.mp4" }))).not.toBeNull();
+    expect(setupGraph(vid({ currentSrc: location.origin + "/clip.mp4" }))).not.toBeNull();
+  });
+
+  it("waits for currentSrc before routing a normal URL", async () => {
+    const { setupGraph, lastSkip } = await load();
+    expect(setupGraph(vid({ src: location.origin + "/redirecting-video" }))).toBeNull();
+    expect(lastSkip()).toBe("loading");
+  });
+
+  it("skips when the resolved currentSrc redirects cross-origin without crossorigin", async () => {
+    const { setupGraph, lastSkip } = await load();
+    expect(
+      setupGraph(
+        vid({
+          src: location.origin + "/redirecting-video",
+          currentSrc: "https://cdn.example.com/v.mp4",
+        }),
+      ),
+    ).toBeNull();
+    expect(lastSkip()).toBe("cors");
   });
 
   it("skips a cross-origin source with no crossorigin attr (CORS would silence it)", async () => {
     const { setupGraph, lastSkip } = await load();
-    expect(setupGraph(vid({ src: "https://cdn.example.com/v.mp4" }))).toBeNull();
+    expect(setupGraph(vid({ currentSrc: "https://cdn.example.com/v.mp4" }))).toBeNull();
     expect(lastSkip()).toBe("cors");
   });
 
   it("routes a cross-origin source that opted in via crossorigin", async () => {
     const { setupGraph } = await load();
     expect(
-      setupGraph(vid({ src: "https://cdn.example.com/v.mp4", crossOrigin: "anonymous" })),
+      setupGraph(vid({ currentSrc: "https://cdn.example.com/v.mp4", crossOrigin: "anonymous" })),
     ).not.toBeNull();
   });
 
@@ -111,6 +130,19 @@ describe("setupGraph source gating (canRouteAudio)", () => {
     const { setupGraph, lastSkip } = await load();
     expect(setupGraph(vid())).toBeNull();
     expect(lastSkip()).toBe("loading"); // transient — not a hard "cors" block
+  });
+
+  it("keeps skip reasons tied to the video that failed", async () => {
+    const { setupGraph, lastSkip } = await load();
+    const cors = vid({ currentSrc: "https://cdn.example.com/v.mp4" });
+    const loading = vid();
+
+    expect(setupGraph(cors)).toBeNull();
+    expect(setupGraph(loading)).toBeNull();
+
+    expect(lastSkip(cors)).toBe("cors");
+    expect(lastSkip(loading)).toBe("loading");
+    expect(lastSkip()).toBe("loading");
   });
 
   it("yields (skips) while a VOT translation is actively playing", async () => {
@@ -163,5 +195,26 @@ describe("setupGraph context & exclusivity", () => {
     expect(g.comp).toBeDefined();
     expect(g.gain).toBeDefined();
     expect(g.analyserIn).toBeDefined();
+  });
+
+  it("treats an existing graph as inactive after the element switches to unsafe CORS", async () => {
+    const { setupGraph, graphForCurrentSource, lastSkip } = await load();
+    const v = vid({ currentSrc: location.origin + "/clip.mp4" });
+    const g = setupGraph(v);
+
+    Object.defineProperty(v, "currentSrc", {
+      configurable: true,
+      value: "https://cdn.example.com/next.mp4",
+    });
+
+    expect(graphForCurrentSource(v)).toBeNull();
+    expect(lastSkip(v)).toBe("cors");
+
+    Object.defineProperty(v, "currentSrc", {
+      configurable: true,
+      value: "blob:https://example.test/safe",
+    });
+
+    expect(graphForCurrentSource(v)).toBe(g);
   });
 });

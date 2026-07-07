@@ -64,6 +64,7 @@ describe("loadRegistry — defaults", () => {
     expect(S.audioSpeedEnabled).toBe(false); // opt-in
     expect(S.forceRate).toBe(false);
     expect(S.keyboardEnabled).toBe(true);
+    expect(S.keymap.hold).toBe("KeyX");
     expect(S.holdSpeed).toBe(2.0);
     expect(S.overlayButton).toBe("fullscreen");
     expect(S.audioCompEnabled).toBe(true);

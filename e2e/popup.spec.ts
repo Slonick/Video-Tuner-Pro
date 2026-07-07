@@ -1,9 +1,8 @@
 // The popup, driven the way a user actually reaches it on a page: the on-video
 // launcher opens popup.html as an in-page iframe, and the popup targets the host
 // tab's video. Playwright clicks the controls inside that frame and asserts the
-// real <video> responds. (The standalone popup tab can't resolve a video tab, and
-// the Claude-in-Chrome MCP can't touch another extension's page at all — this is
-// the faithful path.)
+// real <video> responds. A standalone popup tab can't resolve a video tab; this
+// is the faithful path.
 import { test, expect, setStorage, clearAll } from "./fixtures/extension.js";
 import type { Frame, Page } from "@playwright/test";
 

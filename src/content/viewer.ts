@@ -204,6 +204,7 @@ function notifyViewerLayout(): void {
 
 function applyOverlayBackdrop(): void {
   if (!backdropEl || !fmt) return;
+  if (fmt !== "normal" || !S.viewerBackdropVideo || !mirrorStream) removeBackdropVideo();
   backdropEl.style.setProperty("--glass-opacity", String(S.glassOpacity));
   if (fmt === "theater") {
     backdropEl.style.background = "rgba(0, 0, 0, 0.92)";
@@ -224,6 +225,10 @@ function applyOverlayBackdrop(): void {
     }
   }
   syncViewerBackdropVideo();
+}
+
+export function refreshViewerBackdrop(): void {
+  applyOverlayBackdrop();
 }
 
 function removeBackdropVideo(): void {
@@ -491,13 +496,21 @@ function waitAnimation(anim: Animation | null): Promise<void> {
   const finish = anim.onfinish;
   const cancel = anim.oncancel;
   return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(complete, VIEWER_ANIM_MS + 180);
+    function complete() {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve();
+    }
     anim.onfinish = (e) => {
       if (typeof finish === "function") finish.call(anim, e);
-      resolve();
+      complete();
     };
     anim.oncancel = (e) => {
       if (typeof cancel === "function") cancel.call(anim, e);
-      resolve();
+      complete();
     };
   });
 }
@@ -781,7 +794,9 @@ function qualityRequest(
   if (!videoId) return Promise.resolve({ options: [], current: "auto" });
   const requestId = `q${++qualityReq}`;
   return new Promise((resolve) => {
+    let obs: MutationObserver | null = null;
     const done = (state: QualityState) => {
+      obs?.disconnect();
       document.removeEventListener("vtp-quality-response", onResponse);
       clearTimeout(timer);
       resolve(state);
@@ -805,6 +820,8 @@ function qualityRequest(
     const timer = setTimeout(() => done({ options: [], current: "auto" }), 4000);
     document.addEventListener("vtp-quality-response", onResponse);
     const root = document.documentElement;
+    obs = new MutationObserver(() => onResponse(new Event("vtp-quality-response")));
+    obs.observe(root, { attributes: true, attributeFilter: [QUALITY_RESP_ATTR] });
     root.setAttribute(QUALITY_REQ_ATTR, requestId);
     root.setAttribute(QUALITY_VIDEO_ATTR, videoId);
     if (qualityId) root.setAttribute(QUALITY_PICK_ATTR, qualityId);

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createMockChrome } from "./mocks/chrome.js";
@@ -10,6 +10,7 @@ const byId = (id: string) => document.getElementById(id)!;
 // Toggles are Radix Switches (role="switch" buttons), not checkboxes.
 const isOn = (id: string) => byId(id).getAttribute("aria-checked") === "true";
 const tick = () => new Promise((r) => setTimeout(r, 50));
+let unmountPopup: (() => void) | undefined;
 
 beforeAll(async () => {
   const html = read("../src/popup/popup.html");
@@ -25,8 +26,13 @@ beforeAll(async () => {
   });
 
   // Import the popup entry AFTER the DOM + chrome exist → runs the whole popup.
-  await import("../src/popup/index.js");
+  const popup = await import("../src/popup/index.js");
+  unmountPopup = popup.unmountPopupForTest;
   await tick();
+});
+
+afterAll(() => {
+  unmountPopup?.();
 });
 
 describe("popup integration", () => {

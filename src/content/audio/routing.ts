@@ -8,6 +8,7 @@ import type { AudioGraph } from "./types.js";
 let audioCtx: AudioContext | null = null;
 export const audioGraphs = new WeakMap<HTMLVideoElement, AudioGraph>();
 const audioSkipped = new WeakSet<HTMLVideoElement>(); // videos we must not route (CORS-risk / already wired)
+const audioSkipReasons = new WeakMap<HTMLVideoElement, string>();
 let audioGestureHooked = false;
 let lastAudioSkip: string | null = null; // why the most recent setupGraph() bailed
 let lastNotRoutableLog: string | null = null; // throttles the "not routable yet" diagnostic log
@@ -15,8 +16,34 @@ let lastNotRoutableLog: string | null = null; // throttles the "not routable yet
 export function audioContext(): AudioContext | null {
   return audioCtx;
 }
-export function lastSkip(): string | null {
-  return lastAudioSkip;
+export function lastSkip(video?: HTMLVideoElement | null): string | null {
+  return video ? (audioSkipReasons.get(video) ?? null) : lastAudioSkip;
+}
+
+function rememberSkip(video: HTMLVideoElement, reason: string): void {
+  audioSkipReasons.set(video, reason);
+  lastAudioSkip = reason;
+}
+
+function rememberUnroutable(video: HTMLVideoElement): void {
+  const currentSrc = video.currentSrc || "";
+  const rawSrc = video.src || "";
+  const resolvedSrc =
+    currentSrc || rawSrc.startsWith("blob:") || rawSrc.startsWith("data:")
+      ? currentSrc || rawSrc
+      : "";
+  rememberSkip(
+    video,
+    translationActive() ? "vot" : !resolvedSrc && !video.srcObject ? "loading" : "cors",
+  );
+  const sig = (currentSrc || rawSrc || "") + "|" + !!video.srcObject;
+  if (sig !== lastNotRoutableLog) {
+    lastNotRoutableLog = sig;
+    alog("audio: not routable yet —", {
+      currentSrc: video.currentSrc || video.src || "",
+      hasSrcObject: !!video.srcObject,
+    });
+  }
 }
 
 // Web Audio SILENCES cross-origin-without-CORS media, so only route safe sources:
@@ -24,15 +51,31 @@ export function lastSkip(): string | null {
 function canRouteAudio(video: HTMLVideoElement): boolean {
   if (translationActive()) return false; // don't grab a new source mid-translation
   if (video.srcObject) return true;
-  const src = video.currentSrc || video.src || "";
-  if (!src) return false;
+  const src = video.currentSrc || "";
+  const rawSrc = video.src || "";
   if (src.startsWith("blob:") || src.startsWith("data:")) return true;
+  if (!src) {
+    if (rawSrc.startsWith("blob:") || rawSrc.startsWith("data:")) return true;
+    return false;
+  }
   try {
     if (new URL(src, location.href).origin === location.origin) return true;
   } catch (e) {
     return false;
   }
   return !!video.crossOrigin; // cross-origin only if the site set crossorigin=...
+}
+
+export function graphForCurrentSource(video: HTMLVideoElement): AudioGraph | null {
+  const g = audioGraphs.get(video) ?? null;
+  if (!g) return null;
+  if (canRouteAudio(video)) {
+    audioSkipReasons.delete(video);
+    lastAudioSkip = null;
+    return g;
+  }
+  rememberUnroutable(video);
+  return null;
 }
 
 export function resumeAudioCtx(): void {
@@ -72,9 +115,9 @@ function ensureAudioCtx(): AudioContext | null {
 }
 
 export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
-  if (audioGraphs.has(video)) return audioGraphs.get(video) ?? null;
+  if (audioGraphs.has(video)) return graphForCurrentSource(video);
   if (audioSkipped.has(video)) {
-    lastAudioSkip = "inuse";
+    rememberSkip(video, "inuse");
     return null;
   }
   // NOT routable yet: do NOT ban the element. Its src may still be loading or the
@@ -82,26 +125,17 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   if (!canRouteAudio(video)) {
     // Split the "not routable" cases: VOT and a still-loading src are transient (the
     // popup shouldn't warn), but a genuine cross-origin source is a hard block.
-    const src = video.currentSrc || video.src || "";
-    lastAudioSkip = translationActive() ? "vot" : !src && !video.srcObject ? "loading" : "cors";
-    const sig = (video.currentSrc || video.src || "") + "|" + !!video.srcObject;
-    if (sig !== lastNotRoutableLog) {
-      lastNotRoutableLog = sig;
-      alog("audio: not routable yet —", {
-        currentSrc: video.currentSrc || video.src || "",
-        hasSrcObject: !!video.srcObject,
-      });
-    }
+    rememberUnroutable(video);
     return null;
   }
   const ctx = ensureAudioCtx();
   if (!ctx) {
-    lastAudioSkip = "noctx";
+    rememberSkip(video, "noctx");
     return null;
   }
   // Capturing into a suspended context silences the element until it resumes.
   if (ctx.state !== "running") {
-    lastAudioSkip = "suspended";
+    rememberSkip(video, "suspended");
     resumeAudioCtx();
     return null;
   }
@@ -110,7 +144,7 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
     source = ctx.createMediaElementSource(video);
   } catch (e) {
     // Element already feeds another Web Audio graph — only one capture allowed.
-    lastAudioSkip = "inuse";
+    rememberSkip(video, "inuse");
     audioSkipped.add(video);
     alog("audio: skipped (element already captured by another extension/player)");
     return null;
@@ -129,6 +163,8 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   source.connect(analyserIn);
   const g: AudioGraph = { source, comp, gain, analyserIn };
   audioGraphs.set(video, g);
+  audioSkipReasons.delete(video);
+  lastAudioSkip = null;
   // Routed audio goes silent if the context is suspended, so resume on play.
   video.addEventListener("playing", resumeAudioCtx, { passive: true });
   alog("audio: compression graph engaged on a video");

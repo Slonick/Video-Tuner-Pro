@@ -72,7 +72,10 @@ test("configure in options → use via popup → persist across reload", async (
       return !!popup;
     })
     .toBe(true);
+  await popup!.locator("#speedUp").waitFor();
+  await expect(popup!.locator("#currentSpeedPct")).toContainText("150%");
   await popup!.locator('.btn-speed[data-percent="175"]').click(); // a default-pinned preset
+  await expect(popup!.locator("#currentSpeedPct")).toContainText("175%");
   await expect.poll(() => rate(page)).toBeCloseTo(1.75, 2);
 
   // 5. Remember it for this site (the popup's Save contract), then reload.

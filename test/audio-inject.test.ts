@@ -5,6 +5,7 @@ import {
   applyRate,
   captureOnPlay,
   refreshTracked,
+  install,
 } from "../src/content/audio-inject.js";
 
 // The MAIN-world bridge that drives DETACHED <audio> (e.g. SoundCloud's
@@ -16,8 +17,16 @@ const publish = (v: string | null) =>
   v == null
     ? document.documentElement.removeAttribute(ATTR)
     : document.documentElement.setAttribute(ATTR, v);
+const activeBridgeVersion = (
+  window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string }
+).__vtpAudioBridgeInstalled;
 
-beforeEach(() => publish(null));
+beforeEach(() => {
+  (
+    window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string }
+  ).__vtpAudioBridgeInstalled = activeBridgeVersion;
+  publish(null);
+});
 
 describe("desiredRate (reads data-vtp-audiorate)", () => {
   it("is null when the attribute is absent (toggle off)", () => {
@@ -90,6 +99,17 @@ describe("captureOnPlay", () => {
     captureOnPlay(a);
     expect(a.playbackRate).toBe(1);
   });
+
+  it("stops capturing after a newer bridge version takes ownership", () => {
+    publish("2");
+    (window as typeof window & { __vtpAudioBridgeInstalled?: string }).__vtpAudioBridgeInstalled =
+      "newer-bridge";
+
+    const a = new Audio();
+    captureOnPlay(a);
+
+    expect(a.playbackRate).toBe(1);
+  });
 });
 
 describe("refreshTracked (mid-playback bridge changes)", () => {
@@ -113,6 +133,61 @@ describe("refreshTracked (mid-playback bridge changes)", () => {
     publish(null); // toggle off → attribute removed
     refreshTracked();
     expect(a.playbackRate).toBe(1);
+  });
+
+  it("stops driving a tracked audio element after it is connected to the page", () => {
+    publish("2");
+    const a = document.createElement("audio");
+    captureOnPlay(a);
+    expect(a.playbackRate).toBe(2);
+
+    document.body.appendChild(a);
+    publish("3");
+    refreshTracked();
+    expect(a.playbackRate).toBe(1);
+  });
+
+  it("stops refreshing tracked audio after a newer bridge version takes ownership", () => {
+    publish("2");
+    const a = new Audio();
+    captureOnPlay(a);
+    expect(a.playbackRate).toBe(2);
+
+    (window as typeof window & { __vtpAudioBridgeInstalled?: string }).__vtpAudioBridgeInstalled =
+      "newer-bridge";
+    publish("3");
+    refreshTracked();
+
+    expect(a.playbackRate).toBe(2);
+  });
+
+  it("stops reapplying from tracked media events after a newer bridge takes ownership", () => {
+    publish("2");
+    const a = new Audio();
+    captureOnPlay(a);
+    expect(a.playbackRate).toBe(2);
+
+    (window as typeof window & { __vtpAudioBridgeInstalled?: string }).__vtpAudioBridgeInstalled =
+      "newer-bridge";
+    publish("3");
+    a.dispatchEvent(new Event("ratechange"));
+
+    expect(a.playbackRate).toBe(2);
+  });
+});
+
+describe("install", () => {
+  it("takes ownership from the old boolean install guard", () => {
+    (
+      window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string }
+    ).__vtpAudioBridgeInstalled = true;
+
+    install();
+
+    expect(
+      (window as typeof window & { __vtpAudioBridgeInstalled?: boolean | string })
+        .__vtpAudioBridgeInstalled,
+    ).toBe(activeBridgeVersion);
   });
 });
 

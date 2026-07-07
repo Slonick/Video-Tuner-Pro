@@ -35,7 +35,7 @@ export function updateBadge(): void {
   let payload: IconPayload;
   if (hasVideo) {
     payload = { action: "icon", text: speedLabel(S.currentSpeed), live: onStreamPage() };
-  } else if (badgeHadVideo || urlChanged) {
+  } else if (badgeHadVideo) {
     payload = { action: "icon", clear: true };
   } else {
     return;

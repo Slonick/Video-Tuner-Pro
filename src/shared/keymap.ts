@@ -143,6 +143,24 @@ export function eventMatchesSpec(spec: string | null, e: KeyboardEvent): boolean
   );
 }
 
+export function actionConflictsWithChord(
+  action: Action,
+  actionCode: string,
+  chord: KeyChord | null,
+): boolean {
+  if (!actionCode || !chord || chord.code !== actionCode) return false;
+  if (action === "slower" || action === "faster") return !chord.mod && !chord.alt;
+  return !chord.shift && !chord.mod && !chord.alt;
+}
+
+export function actionConflictsWithSpec(
+  action: Action,
+  actionCode: string,
+  spec: string | null,
+): boolean {
+  return actionConflictsWithChord(action, actionCode, parseChord(spec));
+}
+
 // Human-readable chord label, rendered for the given platform. Shift is ⇧
 // everywhere; the primary modifier is ⌘ on Mac / "Ctrl+" elsewhere, Alt is ⌥ on
 // Mac / "Alt+" elsewhere. e.g. "S+Digit1" → "⇧1"; "M+KeyM" → "⌘M" (mac) / "Ctrl+M".
