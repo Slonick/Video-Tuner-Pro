@@ -9,7 +9,11 @@ import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
 import { STORE } from "../platform/storage.js";
 import { api, ctxValid } from "../platform/browser.js";
-import { currentFullscreenElement, fullscreenOverlayHost } from "../platform/fullscreen.js";
+import {
+  addFullscreenChangeListener,
+  currentFullscreenElement,
+  fullscreenOverlayHost,
+} from "../platform/fullscreen.js";
 import { i18n } from "../platform/i18n.js";
 import { isDrmVideo, primaryVideo } from "../videos.js";
 import {
@@ -877,7 +881,7 @@ function hookMouse(): void {
     },
     { passive: true },
   );
-  document.addEventListener("fullscreenchange", () => {
+  addFullscreenChangeListener(() => {
     closeRadial();
     updateLauncher();
     if (eligible()) flashFab(); // surface it the moment fullscreen begins

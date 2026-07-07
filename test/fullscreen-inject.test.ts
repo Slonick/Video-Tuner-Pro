@@ -13,6 +13,10 @@ function setFullscreenElement(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
 }
 
+function setWebkitFullscreenElement(el: Element | null): void {
+  Object.defineProperty(document, "webkitFullscreenElement", { value: el, configurable: true });
+}
+
 async function loadBridge(): Promise<void> {
   vi.resetModules();
   delete win.__vtpFullscreenBridgeInstalled;
@@ -29,6 +33,7 @@ async function reloadBridgeKeepingState(): Promise<void> {
 beforeEach(() => {
   document.body.innerHTML = "";
   setFullscreenElement(null);
+  setWebkitFullscreenElement(null);
   Object.defineProperty(Element.prototype, "requestFullscreen", {
     configurable: true,
     value: vi.fn(function (this: Element) {
@@ -48,6 +53,7 @@ afterEach(() => {
     value: originalRequest,
   });
   setFullscreenElement(null);
+  setWebkitFullscreenElement(null);
 });
 
 describe("fullscreen-inject", () => {
@@ -105,6 +111,26 @@ describe("fullscreen-inject", () => {
     expect(video.nextSibling).toBe(marker);
     expect(wrapper.isConnected).toBe(false);
     expect(video.style.objectFit).toBe("cover");
+  });
+
+  it("cleans up the wrapper on prefixed fullscreen changes too", async () => {
+    await loadBridge();
+    const parent = document.createElement("section");
+    const video = document.createElement("video");
+    parent.append(video);
+    document.body.append(parent);
+
+    video.dispatchEvent(new Event(REQUEST_EVENT, { bubbles: true, cancelable: true }));
+
+    const wrapper = parent.querySelector("[data-vtp-fullscreen-wrapper]") as HTMLElement;
+    expect(wrapper).toBeTruthy();
+
+    setFullscreenElement(null);
+    setWebkitFullscreenElement(null);
+    document.dispatchEvent(new Event("webkitfullscreenchange"));
+
+    expect(parent.firstChild).toBe(video);
+    expect(wrapper.isConnected).toBe(false);
   });
 
   it("also leaves Element.requestFullscreen calls with a video receiver alone", async () => {

@@ -14,7 +14,7 @@ import {
   SPONSOR_COLORS,
 } from "./markers.js";
 import { api } from "./platform/browser.js";
-import { currentFullscreenElement } from "./platform/fullscreen.js";
+import { addFullscreenChangeListener, currentFullscreenElement } from "./platform/fullscreen.js";
 import { i18n } from "./platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
 import { isLive } from "./live/detection.js";
@@ -1246,7 +1246,7 @@ function hookGlobal(): void {
     { passive: true },
   );
   // Real fullscreen supersedes the viewer — the two fight over the same video.
-  document.addEventListener("fullscreenchange", () => {
+  addFullscreenChangeListener(() => {
     if (currentFullscreenElement()) exitViewer();
   });
 }

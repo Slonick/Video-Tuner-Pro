@@ -391,7 +391,7 @@ describe("toggleViewer — lifecycle", () => {
     h.primary = v;
     await openViewer("theater");
     setWebkitFullscreen(document.body);
-    document.dispatchEvent(new Event("fullscreenchange"));
+    document.dispatchEvent(new Event("webkitfullscreenchange"));
     expect(viewerFormat()).toBeNull();
   });
 

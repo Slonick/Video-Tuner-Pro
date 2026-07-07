@@ -1,6 +1,8 @@
 // MAIN-world helper for extension-owned fullscreen requests. Sites keep their
 // native fullscreen behavior; only our explicit event wraps a bare video so
 // overlays can render inside the fullscreen element.
+import { addFullscreenChangeListener, currentFullscreenElement } from "./platform/fullscreen.js";
+
 (function () {
   "use strict";
 
@@ -82,7 +84,7 @@
     const cleanup = () => {
       if (done) return;
       done = true;
-      document.removeEventListener("fullscreenchange", onFullscreenChange, true);
+      removeFullscreenListener();
       if (activeCleanup === cleanup) activeCleanup = null;
       restore(video, prevStyle);
       if (wrapper.parentNode) {
@@ -91,12 +93,14 @@
       }
     };
     const onFullscreenChange = () => {
-      if (document.fullscreenElement !== wrapper) cleanup();
+      if (currentFullscreenElement() !== wrapper) cleanup();
     };
+    const removeFullscreenListener = addFullscreenChangeListener(onFullscreenChange, {
+      capture: true,
+    });
 
     parent.insertBefore(wrapper, video);
     wrapper.appendChild(video);
-    document.addEventListener("fullscreenchange", onFullscreenChange, true);
     activeCleanup = cleanup;
 
     try {
