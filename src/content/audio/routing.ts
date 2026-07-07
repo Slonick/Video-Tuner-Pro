@@ -50,8 +50,9 @@ function rememberUnroutable(video: HTMLVideoElement): void {
   }
 }
 
-// Web Audio SILENCES cross-origin-without-CORS media, so only route safe sources:
-// MediaStream (srcObject), MSE/blob, data:, same-origin, or crossorigin-opted-in.
+// Web Audio SILENCES cross-origin-without-CORS media and createMediaElementSource()
+// cannot be undone for the element. Only route sources that stay safe across
+// redirects/source swaps: MediaStream, MSE/blob, data:, or explicit CORS opt-in.
 function canRouteAudio(video: HTMLVideoElement): boolean {
   if (translationActive()) return false; // don't grab a new source mid-translation
   if (video.srcObject) return true;
@@ -63,11 +64,6 @@ function canRouteAudio(video: HTMLVideoElement): boolean {
     return false;
   }
   if (!sourceReady(video)) return false;
-  try {
-    if (new URL(src, location.href).origin === location.origin) return true;
-  } catch (e) {
-    return false;
-  }
   return !!video.crossOrigin; // cross-origin only if the site set crossorigin=...
 }
 

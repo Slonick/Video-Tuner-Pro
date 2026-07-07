@@ -7,13 +7,22 @@ test.beforeEach(async ({ serviceWorker }) => {
 });
 
 // The real proof the Web Audio compressor works (which jsdom can't give): with
-// compression enabled, a graph actually routes the same-origin video's audio.
+// compression enabled, a graph actually routes a safe blob video's audio.
 test("enabling compression engages a real Web Audio graph on the video", async ({
   page,
   serviceWorker,
 }) => {
   await setStorage(serviceWorker, { audioComp: true });
   await page.goto("/");
+  await page.evaluate(async () => {
+    const video = document.getElementById("v") as HTMLVideoElement;
+    const blob = await fetch("sample.webm").then((r) => r.blob());
+    video.src = URL.createObjectURL(blob);
+    await new Promise<void>((resolve) => {
+      if (video.readyState >= 1) resolve();
+      else video.addEventListener("loadedmetadata", () => resolve(), { once: true });
+    });
+  });
   await page.locator("#v").click(); // user gesture → AudioContext resumes
   await page.evaluate(() =>
     (document.getElementById("v") as HTMLVideoElement).play().catch(() => {}),

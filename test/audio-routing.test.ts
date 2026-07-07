@@ -93,9 +93,10 @@ describe("setupGraph source gating (canRouteAudio)", () => {
     expect(setupGraph(vid({ src: "blob:https://x/abc" }))).not.toBeNull();
   });
 
-  it("routes a same-origin source", async () => {
-    const { setupGraph } = await load();
-    expect(setupGraph(vid({ currentSrc: location.origin + "/clip.mp4" }))).not.toBeNull();
+  it("skips ordinary network URLs without explicit CORS opt-in", async () => {
+    const { setupGraph, lastSkip } = await load();
+    expect(setupGraph(vid({ currentSrc: location.origin + "/clip.mp4" }))).toBeNull();
+    expect(lastSkip()).toBe("cors");
   });
 
   it("waits for currentSrc before routing a normal URL", async () => {
@@ -119,7 +120,7 @@ describe("setupGraph source gating (canRouteAudio)", () => {
     Object.defineProperty(v, "readyState", { configurable: true, value: 1 });
     Object.defineProperty(v, "currentSrc", {
       configurable: true,
-      value: "https://cdn.example.com/v.mp4",
+      value: location.origin + "/ok.mp4",
     });
 
     expect(setupGraph(v)).toBeNull();
@@ -225,14 +226,14 @@ describe("setupGraph context & exclusivity", () => {
     expect(g.analyserIn).toBeDefined();
   });
 
-  it("treats an existing graph as inactive after the element switches to unsafe CORS", async () => {
+  it("treats an existing graph as inactive after the element switches to an unsafe URL", async () => {
     const { setupGraph, graphForCurrentSource, lastSkip } = await load();
-    const v = vid({ currentSrc: location.origin + "/clip.mp4" });
+    const v = vid({ currentSrc: "blob:https://example.test/safe" });
     const g = setupGraph(v);
 
     Object.defineProperty(v, "currentSrc", {
       configurable: true,
-      value: "https://cdn.example.com/next.mp4",
+      value: location.origin + "/next.mp4",
     });
 
     expect(graphForCurrentSource(v)).toBeNull();

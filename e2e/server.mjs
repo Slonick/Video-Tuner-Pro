@@ -1,5 +1,5 @@
-// Minimal static server for the E2E fixtures (a same-origin page + video), so the
-// content script injects normally and same-origin audio routing works. No deps.
+// Minimal static server for the E2E fixtures, so the content script injects
+// normally on a real http(s)-style page. No deps.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

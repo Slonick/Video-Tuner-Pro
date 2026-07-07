@@ -17,8 +17,8 @@
     </style>
   </head>
   <body>
-    <!-- A same-origin VOD: finite duration (so it's treated as non-live and honours
-       playbackRate) and same-origin (so the audio compressor graph may route it). -->
+    <!-- A finite VOD: non-live, so it honours playbackRate. Audio compression tests
+       replace this with a blob URL before asking Web Audio to capture it. -->
     <video id="v" src="sample.webm" playsinline preload="auto"></video>
   </body>
 </html>
