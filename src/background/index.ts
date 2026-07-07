@@ -157,13 +157,6 @@ function reinjectOpenTabs(): void {
             world: "MAIN",
           }),
         );
-        call(() =>
-          api.scripting.executeScript({
-            target: { tabId, allFrames: true },
-            files: ["fullscreen-inject.js"],
-            world: "MAIN",
-          }),
-        );
       }
     }),
   );

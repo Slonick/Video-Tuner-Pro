@@ -280,10 +280,9 @@ describe("updateTimeBadge — positioning", () => {
     expect(el.style.top).toBe("180px");
   });
 
-  it("parents the badge inside the fullscreen wrapper for a bare video", () => {
+  it("parents the badge inside a fullscreen container", () => {
     const video = realVideo();
     const wrapper = document.createElement("div");
-    wrapper.setAttribute("data-vtp-fullscreen-wrapper", "");
     wrapper.append(video);
     document.body.append(wrapper);
     h.primary = video;
