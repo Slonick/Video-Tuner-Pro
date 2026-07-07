@@ -288,6 +288,8 @@
     return map[id] || id;
   }
 
+  const youtubePending = new WeakMap<HTMLVideoElement, { id: string; until: number }>();
+
   function youtubeAdapter(v: HTMLVideoElement): Adapter | null {
     const root =
       (v.closest && v.closest(".html5-video-player")) ||
@@ -310,12 +312,18 @@
       },
       current() {
         try {
+          const pending = youtubePending.get(v);
+          if (pending) {
+            if (Date.now() < pending.until) return pending.id;
+            youtubePending.delete(v);
+          }
           return p.getPlaybackQuality?.() || "auto";
         } catch (e) {
           return "auto";
         }
       },
       set(id: string) {
+        youtubePending.set(v, { id, until: Date.now() + 12_000 });
         if (id === "auto") {
           p.setPlaybackQualityRange?.("auto");
           p.setPlaybackQuality?.("auto");

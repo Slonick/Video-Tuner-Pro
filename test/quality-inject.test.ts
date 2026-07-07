@@ -96,6 +96,51 @@ describe("quality-inject request cost", () => {
   });
 });
 
+describe("quality-inject YouTube adapter", () => {
+  it("keeps the selected quality current while YouTube reports the old level", async () => {
+    await import("../src/content/quality-inject.js");
+
+    const root = document.createElement("div") as HTMLDivElement & {
+      getAvailableQualityLevels?: () => string[];
+      getPlaybackQuality?: () => string;
+      setPlaybackQualityRange?: (min: string, max?: string) => void;
+      setPlaybackQuality?: (q: string) => void;
+    };
+    root.className = "html5-video-player";
+    root.getAvailableQualityLevels = () => ["hd1080", "hd720", "large"];
+    root.getPlaybackQuality = () => "hd1080";
+    root.setPlaybackQualityRange = vi.fn();
+    root.setPlaybackQuality = vi.fn();
+
+    const video = document.createElement("video");
+    video.setAttribute("data-vtp-quality-id", "yt1");
+    root.append(video);
+    document.body.append(root);
+
+    const setResponse = waitForResponse("yt-set");
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-set", {
+        detail: { requestId: "yt-set", videoId: "yt1", qualityId: "hd720" },
+      }),
+    );
+
+    const setDetail = await setResponse;
+    expect(setDetail.current).toBe("hd720");
+    expect(setDetail.options.find((opt) => opt.id === "hd720")?.current).toBe(true);
+
+    const refreshResponse = waitForResponse("yt-refresh");
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "yt-refresh", videoId: "yt1" },
+      }),
+    );
+
+    const refreshDetail = await refreshResponse;
+    expect(refreshDetail.current).toBe("hd720");
+    expect(refreshDetail.options.find((opt) => opt.id === "hd720")?.current).toBe(true);
+  });
+});
+
 describe("quality-inject HLS adapter", () => {
   it("stops answering after a newer bridge version takes ownership", async () => {
     class FakeHls {
