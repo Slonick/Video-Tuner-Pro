@@ -45,14 +45,19 @@ function applyPitchMode(video: HTMLVideoElement): void {
 // own latency manager nudging the rate — is re-asserted at most once a second,
 // so a disagreement costs one click per second instead of one per frame.
 let lastRateAssertAt = 0;
+let lastRateDecisionAt = 0;
 function setLiveRate(video: HTMLVideoElement, rate: number, decisionChanged: boolean): void {
   const now = Date.now();
   if (Math.abs(video.playbackRate - rate) <= 0.001) {
-    if (decisionChanged) lastRateAssertAt = now;
+    if (decisionChanged) {
+      lastRateAssertAt = now;
+      lastRateDecisionAt = now;
+    }
     return;
   }
   if (!decisionChanged && now - lastRateAssertAt < 1000) return;
   lastRateAssertAt = now;
+  if (decisionChanged) lastRateDecisionAt = now;
   try {
     video.playbackRate = rate;
   } catch (e) {
@@ -76,6 +81,7 @@ export function controlLive(): void {
     activeLiveVideo = live;
     lastStepAt = 0;
     lastRateAssertAt = 0;
+    lastRateDecisionAt = 0;
   }
   if (live) {
     if (S.liveSyncEnabled) runLiveSync(live);
@@ -119,9 +125,9 @@ function runLiveSync(video: HTMLVideoElement): void {
   const lat = streamLatency();
   // A rate switch itself drops a frame or two, and a bail here causes another
   // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
-  // Ignore drops briefly after our own rate writes and below a real burst.
+  // Ignore drops briefly after the catch-up decision changes and below a real burst.
   const rawDropped = droppedFramesDelta(video);
-  const dropped = Date.now() - lastRateAssertAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
+  const dropped = Date.now() - lastRateDecisionAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
   const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
 
   const lag = lat != null ? lat : buffer;

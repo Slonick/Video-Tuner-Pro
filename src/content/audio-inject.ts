@@ -100,7 +100,6 @@ export function refreshTracked(): void {
   const rate = desiredRate();
   for (const media of tracked) {
     if (media.isConnected) {
-      applyRate(media, 1);
       trackedCleanup.get(media)?.();
       tracked.delete(media);
       continue;

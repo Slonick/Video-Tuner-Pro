@@ -106,8 +106,6 @@ export function isLive(video: HTMLVideoElement): boolean {
     if (player) {
       if (player.classList.contains("ytp-live")) return true;
       if (player.querySelector(".ytp-time-display.ytp-live")) return true;
-      const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
-      if (badge && badge.offsetParent !== null) return true; // visible = live
     }
   }
 

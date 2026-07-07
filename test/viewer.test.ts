@@ -107,6 +107,10 @@ function setFullscreen(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
 }
 
+function setWebkitFullscreen(el: Element | null): void {
+  Object.defineProperty(document, "webkitFullscreenElement", { value: el, configurable: true });
+}
+
 beforeEach(() => {
   exitViewer();
   document.body.innerHTML = "";
@@ -116,6 +120,7 @@ beforeEach(() => {
   S.viewerAuto = "off";
   S.viewerBackdropVideo = false;
   setFullscreen(null);
+  setWebkitFullscreen(null);
 });
 
 afterEach(() => {
@@ -194,6 +199,14 @@ describe("toggleViewer — lifecycle", () => {
     const { v } = makeVideo();
     h.primary = v;
     setFullscreen(document.body);
+    await openViewer("normal");
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("does nothing while the page is in prefixed fullscreen", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    setWebkitFullscreen(document.body);
     await openViewer("normal");
     expect(viewerFormat()).toBeNull();
   });
@@ -369,6 +382,15 @@ describe("toggleViewer — lifecycle", () => {
     h.primary = v;
     await openViewer("theater");
     setFullscreen(document.body);
+    document.dispatchEvent(new Event("fullscreenchange"));
+    expect(viewerFormat()).toBeNull();
+  });
+
+  it("entering prefixed fullscreen exits the viewer", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    setWebkitFullscreen(document.body);
     document.dispatchEvent(new Event("fullscreenchange"));
     expect(viewerFormat()).toBeNull();
   });

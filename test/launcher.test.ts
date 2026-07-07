@@ -113,10 +113,15 @@ beforeEach(() => {
   });
   // jsdom has no fullscreen — force the property the launcher reads.
   Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
+  Object.defineProperty(document, "webkitFullscreenElement", { value: null, configurable: true });
 });
 
 function enterFullscreen(el: Element | null = document.body) {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
+}
+
+function enterWebkitFullscreen(el: Element | null = document.body) {
+  Object.defineProperty(document, "webkitFullscreenElement", { value: el, configurable: true });
 }
 
 describe("updateLauncher — eligibility", () => {
@@ -137,6 +142,13 @@ describe("updateLauncher — eligibility", () => {
   it("mounts and positions in fullscreen mode once fullscreen", () => {
     h.primary = fakeVideo();
     enterFullscreen();
+    updateLauncher();
+    expect(fabEl()).not.toBeNull();
+  });
+
+  it("mounts and positions in fullscreen mode once prefixed fullscreen", () => {
+    h.primary = fakeVideo();
+    enterWebkitFullscreen();
     updateLauncher();
     expect(fabEl()).not.toBeNull();
   });

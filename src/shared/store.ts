@@ -115,7 +115,7 @@ export function subscribe(keys: string[], cb: DoneCb): () => void {
 
 // --- Multi-area fan-out, collapsed to a single callback ----------------------
 function routedMerge(syncItems: Items, localItems: Items): Items {
-  const out: Items = { ...syncItems, ...localItems };
+  const out: Items = {};
   const keys = new Set([...Object.keys(syncItems), ...Object.keys(localItems)]);
   for (const k of keys) {
     if (k === SYNC_META_KEY || k === SYNC_MASTER_KEY) {

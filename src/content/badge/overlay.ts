@@ -4,6 +4,7 @@ import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
 import { STORE } from "../platform/storage.js";
 import { ctxValid } from "../platform/browser.js";
+import { fullscreenOverlayHost } from "../platform/fullscreen.js";
 import { primaryVideo } from "../videos.js";
 import { VIEWER_LAYOUT_EVENT, viewerAnchorVideo } from "../viewer.js";
 import { onStreamPage } from "../live/detection.js";
@@ -345,9 +346,9 @@ export function updateTimeBadge(): void {
     hookPin(badgePinEl);
   }
   // Position is fixed (viewport-relative), but in fullscreen only descendants of
-  // the fullscreen element paint — so re-parent the shadow host into it.
-  const fsEl = document.fullscreenElement;
-  const host: Element = fsEl || document.body;
+  // the fullscreen element paint. A bare <video> cannot render child overlays, so
+  // keep the host on the page unless fullscreen targets a wrapper/container.
+  const host = fullscreenOverlayHost();
   if (badgeHost && badgeHost.parentNode !== host) host.appendChild(badgeHost);
   el.style.display = "flex";
   renderBadge(v, anchor);

@@ -1,11 +1,11 @@
-// MAIN-world fullscreen bridge. A bare <video> in fullscreen cannot render
-// extension overlays as children, so request fullscreen on a temporary wrapper
-// instead. The isolated badge/launcher code then appends into that fullscreen
-// wrapper like it does for normal player containers.
+// MAIN-world helper for extension-owned fullscreen requests. Sites keep their
+// native fullscreen behavior; only our explicit event wraps a bare video so
+// overlays can render inside the fullscreen element.
 (function () {
   "use strict";
 
   const BRIDGE_VERSION = "2026-07-07-fullscreen-wrapper";
+  const REQUEST_EVENT = "vtp-request-wrapped-fullscreen";
   type FullscreenBridgeWindow = typeof window & {
     __vtpFullscreenBridgeInstalled?: boolean | string;
     __vtpFullscreenBridgeCleanup?: () => void;
@@ -23,12 +23,12 @@
   } catch (e) {
     /* stale bridge cleanup must not block the new bridge */
   }
-  const videoProto = HTMLVideoElement.prototype;
-  const elementProto = Element.prototype;
   const nativeRequest = win.__vtpFullscreenNativeRequest || Element.prototype.requestFullscreen;
   if (typeof nativeRequest !== "function") return;
   win.__vtpFullscreenNativeRequest = nativeRequest;
   win.__vtpFullscreenBridgeInstalled = BRIDGE_VERSION;
+
+  let activeCleanup: (() => void) | null = null;
 
   function snapshot(video: HTMLVideoElement): StyleSnapshot {
     return {
@@ -50,13 +50,10 @@
     video.style.objectFit = style.objectFit;
   }
 
-  function requestWrappedFullscreen(
-    video: HTMLVideoElement,
-    options?: FullscreenOptions,
-  ): Promise<void> {
+  function requestWrappedFullscreen(video: HTMLVideoElement): Promise<void> {
     const parent = video.parentNode;
     if (!parent || !video.isConnected || document.fullscreenElement) {
-      return nativeRequest.call(video, options);
+      return nativeRequest.call(video);
     }
 
     const next = video.nextSibling;
@@ -86,6 +83,7 @@
       if (done) return;
       done = true;
       document.removeEventListener("fullscreenchange", onFullscreenChange, true);
+      if (activeCleanup === cleanup) activeCleanup = null;
       restore(video, prevStyle);
       if (wrapper.parentNode) {
         parent.insertBefore(video, next && next.parentNode === parent ? next : null);
@@ -99,74 +97,33 @@
     parent.insertBefore(wrapper, video);
     wrapper.appendChild(video);
     document.addEventListener("fullscreenchange", onFullscreenChange, true);
+    activeCleanup = cleanup;
 
     try {
-      return nativeRequest.call(wrapper, options).catch((e) => {
+      return nativeRequest.call(wrapper).catch((e) => {
         cleanup();
-        return nativeRequest.call(video, options).catch(() => {
+        return nativeRequest.call(video).catch(() => {
           throw e;
         });
       });
     } catch (e) {
       cleanup();
-      return nativeRequest.call(video, options);
+      return nativeRequest.call(video);
     }
   }
 
-  const hookedRequest = function (
-    this: HTMLVideoElement,
-    options?: FullscreenOptions,
-  ): Promise<void> {
-    return requestWrappedFullscreen(this, options);
-  };
-  const hookedElementRequest = function (
-    this: Element,
-    options?: FullscreenOptions,
-  ): Promise<void> {
-    if (this instanceof HTMLVideoElement) return requestWrappedFullscreen(this, options);
-    return nativeRequest.call(this, options);
+  const onRequest = (e: Event) => {
+    const target = e.target;
+    if (!(target instanceof HTMLVideoElement)) return;
+    e.preventDefault();
+    void requestWrappedFullscreen(target);
   };
 
-  let elementPatched = false;
-  try {
-    Object.defineProperty(elementProto, "requestFullscreen", {
-      configurable: true,
-      writable: true,
-      value: hookedElementRequest,
-    });
-    elementPatched = true;
-    Object.defineProperty(videoProto, "requestFullscreen", {
-      configurable: true,
-      writable: true,
-      value: hookedRequest,
-    });
-  } catch (e) {
-    if (elementPatched && elementProto.requestFullscreen === hookedElementRequest) {
-      Object.defineProperty(elementProto, "requestFullscreen", {
-        configurable: true,
-        writable: true,
-        value: nativeRequest,
-      });
-    }
-    if (win.__vtpFullscreenBridgeInstalled === BRIDGE_VERSION) {
-      delete win.__vtpFullscreenBridgeInstalled;
-    }
-    return;
-  }
+  document.addEventListener(REQUEST_EVENT, onRequest, true);
+
   win.__vtpFullscreenBridgeCleanup = () => {
-    if (elementProto.requestFullscreen === hookedElementRequest) {
-      Object.defineProperty(elementProto, "requestFullscreen", {
-        configurable: true,
-        writable: true,
-        value: nativeRequest,
-      });
-    }
-    if (videoProto.requestFullscreen !== hookedRequest) return;
-    Object.defineProperty(videoProto, "requestFullscreen", {
-      configurable: true,
-      writable: true,
-      value: nativeRequest,
-    });
+    document.removeEventListener(REQUEST_EVENT, onRequest, true);
+    activeCleanup?.();
     if (win.__vtpFullscreenBridgeInstalled === BRIDGE_VERSION) {
       delete win.__vtpFullscreenBridgeInstalled;
     }

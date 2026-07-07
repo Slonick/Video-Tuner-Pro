@@ -136,6 +136,21 @@ describe("isLive (live signals are scoped to the video's own player)", () => {
     Object.defineProperty(video, "duration", { value: 30, configurable: true });
     expect(isLive(video)).toBe(false);
   });
+
+  it("does not force layout by reading the YouTube live badge visibility", () => {
+    document.body.innerHTML = `<div class="html5-video-player"><button class="ytp-live-badge"></button><video></video></div>`;
+    const video = document.querySelector("video") as HTMLVideoElement;
+    const badge = document.querySelector(".ytp-live-badge") as HTMLElement;
+    Object.defineProperty(video, "duration", { value: 30, configurable: true });
+    Object.defineProperty(badge, "offsetParent", {
+      configurable: true,
+      get: () => {
+        throw new Error("offsetParent should not be read");
+      },
+    });
+
+    expect(isLive(video)).toBe(false);
+  });
 });
 
 describe("probeLive (generic real-time-edge detection)", () => {

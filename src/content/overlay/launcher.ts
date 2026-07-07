@@ -9,6 +9,7 @@ import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
 import { STORE } from "../platform/storage.js";
 import { api, ctxValid } from "../platform/browser.js";
+import { currentFullscreenElement, fullscreenOverlayHost } from "../platform/fullscreen.js";
 import { i18n } from "../platform/i18n.js";
 import { isDrmVideo, primaryVideo } from "../videos.js";
 import {
@@ -107,7 +108,7 @@ function eligible(): boolean {
   if (S.overlayButton === "always") return true;
   // In fullscreen mode the FAB also surfaces while the pop-out viewer is open,
   // so its radial menu (switch format / exit) stays reachable by mouse.
-  if (S.overlayButton === "fullscreen") return !!document.fullscreenElement || !!viewerFormat();
+  if (S.overlayButton === "fullscreen") return !!currentFullscreenElement() || !!viewerFormat();
   return false;
 }
 
@@ -578,8 +579,7 @@ export function toggleOverlayPopup(): void {
   if (!fabVideo) return; // nothing to overlay
   if (!host) mount();
   hookMouse();
-  const fsEl = document.fullscreenElement;
-  const parent: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
+  const parent = fullscreenOverlayHost();
   if (host && host.parentNode !== parent) parent.appendChild(host);
   if (!dragging) positionFab(fabVideo);
   togglePopup();
@@ -956,16 +956,14 @@ export function updateLauncher(): void {
     // the right parent (e.g. on entering fullscreen) and only hide the button.
     hideFab();
     if (open && host) {
-      const fsEl = document.fullscreenElement;
-      const parent: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
+      const parent = fullscreenOverlayHost();
       if (host.parentNode !== parent) parent.appendChild(host);
     }
     return;
   }
   if (!host) mount();
   hookMouse();
-  const fsEl = document.fullscreenElement;
-  const parent: Element = fsEl && fsEl.tagName !== "VIDEO" ? fsEl : document.body;
+  const parent = fullscreenOverlayHost();
   if (host && host.parentNode !== parent) parent.appendChild(host);
   if (fabVideo && !dragging && (!paused || viewerAnchor)) positionFab(fabVideo);
   // The viewer can close behind our back (Esc, backdrop click) — refresh an

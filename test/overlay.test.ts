@@ -94,6 +94,7 @@ beforeEach(() => {
   S.liveSyncTarget = 5;
   STORE.set({ badgePos: {}, badgePinned: {} });
   Object.defineProperty(document, "fullscreenElement", { value: null, configurable: true });
+  Object.defineProperty(document, "webkitFullscreenElement", { value: null, configurable: true });
 });
 
 const get = (keys: string[]): Record<string, unknown> => {
@@ -291,6 +292,51 @@ describe("updateTimeBadge — positioning", () => {
     updateTimeBadge();
 
     expect(document.querySelector("[data-vtp-badge]")?.parentNode).toBe(wrapper);
+  });
+
+  it("does not parent the badge inside a bare fullscreen video", () => {
+    const video = realVideo();
+    document.body.append(video);
+    h.primary = video;
+    Object.defineProperty(document, "fullscreenElement", { value: video, configurable: true });
+
+    updateTimeBadge();
+
+    const host = document.querySelector("[data-vtp-badge]");
+    expect(host?.parentNode).toBe(document.body);
+    expect(video.querySelector("[data-vtp-badge]")).toBeNull();
+  });
+
+  it("uses a prefixed fullscreen container when the browser exposes one", () => {
+    const video = realVideo();
+    const wrapper = document.createElement("div");
+    wrapper.append(video);
+    document.body.append(wrapper);
+    h.primary = video;
+    Object.defineProperty(document, "webkitFullscreenElement", {
+      value: wrapper,
+      configurable: true,
+    });
+
+    updateTimeBadge();
+
+    expect(document.querySelector("[data-vtp-badge]")?.parentNode).toBe(wrapper);
+  });
+
+  it("does not parent the badge inside a bare prefixed fullscreen video", () => {
+    const video = realVideo();
+    document.body.append(video);
+    h.primary = video;
+    Object.defineProperty(document, "webkitFullscreenElement", {
+      value: video,
+      configurable: true,
+    });
+
+    updateTimeBadge();
+
+    const host = document.querySelector("[data-vtp-badge]");
+    expect(host?.parentNode).toBe(document.body);
+    expect(video.querySelector("[data-vtp-badge]")).toBeNull();
   });
 });
 

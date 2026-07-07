@@ -7,6 +7,7 @@ const win = window as typeof window & {
   __vtpFullscreenBridgeCleanup?: () => void;
   __vtpFullscreenNativeRequest?: Element["requestFullscreen"];
 };
+const REQUEST_EVENT = "vtp-request-wrapped-fullscreen";
 
 function setFullscreenElement(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
@@ -61,7 +62,23 @@ describe("fullscreen-inject", () => {
     expect(win.__vtpFullscreenBridgeInstalled).toBeUndefined();
   });
 
-  it("fullscreen-wraps a bare video so overlays can render in fullscreen", async () => {
+  it("leaves site video fullscreen requests alone", async () => {
+    await loadBridge();
+    const parent = document.createElement("section");
+    const video = document.createElement("video");
+    parent.append(video);
+    document.body.append(parent);
+
+    await video.requestFullscreen();
+
+    expect(parent.querySelector("[data-vtp-fullscreen-wrapper]")).toBeNull();
+    expect(document.fullscreenElement).toBe(video);
+    expect(
+      (Element.prototype.requestFullscreen as ReturnType<typeof vi.fn>).mock.instances[0],
+    ).toBe(video);
+  });
+
+  it("wraps a bare video only for the extension fullscreen event", async () => {
     await loadBridge();
     const parent = document.createElement("section");
     const video = document.createElement("video");
@@ -70,7 +87,7 @@ describe("fullscreen-inject", () => {
     parent.append(video, marker);
     document.body.append(parent);
 
-    await video.requestFullscreen();
+    video.dispatchEvent(new Event(REQUEST_EVENT, { bubbles: true, cancelable: true }));
 
     const nativeRequest = win.__vtpFullscreenNativeRequest as ReturnType<typeof vi.fn>;
     const wrapper = parent.querySelector("[data-vtp-fullscreen-wrapper]") as HTMLElement;
@@ -90,7 +107,7 @@ describe("fullscreen-inject", () => {
     expect(video.style.objectFit).toBe("cover");
   });
 
-  it("also wraps when a site calls Element.requestFullscreen with a video receiver", async () => {
+  it("also leaves Element.requestFullscreen calls with a video receiver alone", async () => {
     await loadBridge();
     const parent = document.createElement("section");
     const video = document.createElement("video");
@@ -99,12 +116,8 @@ describe("fullscreen-inject", () => {
 
     await Element.prototype.requestFullscreen.call(video);
 
-    const nativeRequest = win.__vtpFullscreenNativeRequest as ReturnType<typeof vi.fn>;
-    const wrapper = parent.querySelector("[data-vtp-fullscreen-wrapper]") as HTMLElement;
-    expect(wrapper).toBeTruthy();
-    expect(wrapper.contains(video)).toBe(true);
-    expect(document.fullscreenElement).toBe(wrapper);
-    expect(nativeRequest.mock.instances[0]).toBe(wrapper);
+    expect(parent.querySelector("[data-vtp-fullscreen-wrapper]")).toBeNull();
+    expect(document.fullscreenElement).toBe(video);
   });
 
   it("cleans up the current install flag so the bridge can be reinstalled", async () => {
@@ -117,7 +130,7 @@ describe("fullscreen-inject", () => {
     const video = document.createElement("video");
     document.body.append(video);
 
-    await video.requestFullscreen();
+    video.dispatchEvent(new Event(REQUEST_EVENT, { bubbles: true, cancelable: true }));
 
     expect(document.querySelector("[data-vtp-fullscreen-wrapper]")).toBeTruthy();
   });
@@ -139,7 +152,7 @@ describe("fullscreen-inject", () => {
     document.body.append(video, alreadyFullscreen);
     setFullscreenElement(alreadyFullscreen);
 
-    await video.requestFullscreen();
+    video.dispatchEvent(new Event(REQUEST_EVENT, { bubbles: true, cancelable: true }));
 
     expect(document.querySelector("[data-vtp-fullscreen-wrapper]")).toBeNull();
     expect((win.__vtpFullscreenNativeRequest as ReturnType<typeof vi.fn>).mock.instances[0]).toBe(

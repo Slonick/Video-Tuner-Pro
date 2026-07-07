@@ -34,7 +34,7 @@ import { collectVideos, startTracking, stopTracking, reconcile, markDrmVideo } f
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
-import { channelKeys, sameChannelKeys } from "./channel.js";
+import { channelKeys, sameChannelIdentity, sameChannelKeys } from "./channel.js";
 
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
@@ -101,8 +101,8 @@ function applyResolved(
   domains: Record<string, number>,
   channels: Record<string, number>,
   globalSpeed: number | undefined,
+  keys = channelKeys(),
 ): void {
-  const keys = channelKeys();
   lastChannelKeys = keys;
   const r = resolveSpeed(keys, getDomain(), domains, channels, globalSpeed);
   if (!S.speedManual) {
@@ -221,13 +221,14 @@ function loadSpeed() {
 // YouTube is an SPA — navigating to another channel's video keeps this script
 // alive, so re-resolve when the detected channel changes (the 1s tick drives the
 // check; the owner link may render a beat after navigation).
-function reresolve() {
+function reresolve(keys?: string[]) {
   if (!ctxValid()) return;
   STORE.get(["domains", "channels", "globalSpeed"], (r) => {
     applyResolved(
       (r.domains || {}) as Record<string, number>,
       (r.channels || {}) as Record<string, number>,
       r.globalSpeed as number | undefined,
+      keys,
     );
     applyAll();
     controlLive();
@@ -238,6 +239,14 @@ function reresolve() {
   applyResolvedAutoSlowFromStore(); // ...and its auto-slow target may differ too
   applyResolvedViewerAutoFromStore(); // ...and its viewer auto-open mode may differ too
   applyResolvedViewerFitFromStore(); // ...and its viewer fit mode may differ too
+}
+
+function preferKnownChannelKeys(keys: string[]): string[] {
+  if (!sameChannelIdentity(lastChannelKeys, keys)) return keys;
+  const current = new Set(keys);
+  const ordered = lastChannelKeys.filter((key) => current.has(key));
+  for (const key of keys) if (!ordered.includes(key)) ordered.push(key);
+  return ordered;
 }
 
 // Wait for the selective-sync config so the first resolve reads each setting from
@@ -262,7 +271,8 @@ function tick() {
   updateTimeBadge();
   updateLauncher();
   const keys = channelKeys();
-  if (keys.length && !sameChannelKeys(lastChannelKeys, keys)) reresolve();
+  if (keys.length && !sameChannelKeys(lastChannelKeys, keys))
+    reresolve(preferKnownChannelKeys(keys));
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
   // resets it via wake().
@@ -324,7 +334,7 @@ for (const ev of ["play", "loadedmetadata", "durationchange"]) {
       // Surface the badge whenever playback starts (covers autoplay pages where
       // the user never moves the pointer over the video). updateTimeBadge mounts
       // it if needed; flashBadge reveals it and resumes the usual auto-hide.
-      if (e.type === "play" || !e.target.paused) {
+      if (e.type === "play" || (!e.target.paused && !onStreamPage())) {
         updateTimeBadge();
         flashBadge();
       }

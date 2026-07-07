@@ -283,6 +283,30 @@ describe("sync ON (runLiveSync)", () => {
     expect(S.currentSpeed).toBeCloseTo(1.05, 5);
     expect(v.playbackRate).toBeCloseTo(1.05, 5);
   });
+
+  it("still bails on dropped frames after an external rate reassert", () => {
+    const v = fakeVideo({ playbackRate: 1.0, droppedVideoFrames: 0 });
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+    h.liveVideo.mockReturnValue(v);
+    h.streamLatency.mockReturnValue(6.5); // desired 105%
+    h.forwardBuffer.mockReturnValue(10);
+
+    controlLive();
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
+
+    v.playbackRate = 1.0; // site/player nudges the rate back
+    vi.setSystemTime(T + 1300);
+    controlLive(); // extension reasserts, but this should not reset the drop-bail window
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
+
+    v.droppedVideoFrames = 5;
+    vi.setSystemTime(T + 2000);
+    controlLive();
+
+    expect(S.currentSpeed).toBe(1.0);
+    expect(v.playbackRate).toBe(1.0);
+  });
 });
 
 describe("setLiveRate anti-click re-assert", () => {

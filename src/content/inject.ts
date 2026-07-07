@@ -16,6 +16,7 @@
   const win = window as typeof window & {
     __vtpLatencyBridgeInstalled?: boolean | string;
     __vtpLatencyBridgeCleanup?: () => void;
+    __vtpQualityHls?: Array<{ hls: HlsLike; video?: HTMLVideoElement | null }>;
   };
   if (win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION) return;
   try {
@@ -154,6 +155,15 @@
     if (!isHls(hls)) return false;
     return hls.media instanceof HTMLMediaElement && hls.media.isConnected;
   }
+  function sharedHls(): HlsLike | null {
+    for (const entry of win.__vtpQualityHls || []) {
+      if (entry.hls.media instanceof HTMLVideoElement && entry.video !== entry.hls.media) {
+        entry.video = entry.hls.media;
+      }
+      if (activeHls(entry.hls)) return entry.hls;
+    }
+    return null;
+  }
   function readProp(o: object, key: string): unknown {
     try {
       return (o as Record<string, unknown>)[key];
@@ -236,6 +246,12 @@
   function ensureHls(): HlsLike | null {
     if (activeHls(hlsInst)) return hlsInst;
     hlsInst = null;
+    const captured = sharedHls();
+    if (captured) {
+      nextHlsScanAt = 0;
+      hlsInst = captured;
+      return hlsInst;
+    }
     const now = Date.now();
     if (now < nextHlsScanAt) return null;
     hlsInst = findHls();

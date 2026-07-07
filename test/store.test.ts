@@ -430,6 +430,22 @@ describe("setCategorySync migration", () => {
     expect(all.globalSpeed).toBe(2.5);
   });
 
+  it("get(null) omits stale copies from non-routed areas", async () => {
+    const env = makeChrome();
+    env.backing.local.globalSpeed = 2;
+    env.backing.sync.audioComp = true;
+    env.backing.local.audioComp = false;
+    const { STORE } = await freshStore(env.chrome);
+
+    let all: Record<string, unknown> = {};
+    STORE.get(null, (r) => {
+      all = r;
+    });
+
+    expect(all.globalSpeed).toBeUndefined();
+    expect(all.audioComp).toBe(true);
+  });
+
   it("keeps the source data and preference when the target write fails", async () => {
     const env = makeChrome();
     env.backing.sync.globalSpeed = 1.75;

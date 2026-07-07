@@ -182,6 +182,13 @@
       return;
     }
     if (descriptor && "value" in descriptor) current = descriptor.value;
+    else if (descriptor) {
+      try {
+        current = win.Hls;
+      } catch (e) {
+        current = undefined;
+      }
+    }
     if (current !== undefined) hookHlsConstructor(current);
     try {
       Object.defineProperty(window, "Hls", {

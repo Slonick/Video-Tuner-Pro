@@ -97,6 +97,28 @@ describe("quality-inject request cost", () => {
     ).toBe("newer-bridge");
   });
 
+  it("preserves window.Hls across bridge cleanup and reinstall", async () => {
+    class FakeHls {
+      static isSupported() {
+        return true;
+      }
+
+      attachMedia() {}
+    }
+
+    (window as typeof window & { Hls?: unknown }).Hls = FakeHls;
+    await import("../src/content/quality-inject.js");
+
+    (
+      window as typeof window & { __vtpQualityBridgeCleanup?: () => void }
+    ).__vtpQualityBridgeCleanup?.();
+    vi.resetModules();
+
+    await import("../src/content/quality-inject.js");
+
+    expect((window as typeof window & { Hls?: unknown }).Hls).toBe(FakeHls);
+  });
+
   it("uses local player roots first and scans the document only as a fallback", async () => {
     await import("../src/content/quality-inject.js");
 

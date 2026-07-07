@@ -148,4 +148,29 @@ describe("MAIN-world live probe", () => {
 
     expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
   });
+
+  it("uses the quality bridge HLS registry while full HLS scans are backed off", async () => {
+    const liveVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    liveVideo.hls = { latency: 4, media: liveVideo };
+    document.body.append(liveVideo);
+
+    await loadInject();
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.00");
+
+    liveVideo.remove();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
+
+    const nextVideo = document.createElement("video");
+    const nextHls = { latency: 7, media: nextVideo };
+    (
+      window as typeof window & {
+        __vtpQualityHls?: Array<{ hls: unknown; video?: HTMLVideoElement | null }>;
+      }
+    ).__vtpQualityHls = [{ hls: nextHls, video: nextVideo }];
+    document.body.append(nextVideo);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("7.00");
+  });
 });

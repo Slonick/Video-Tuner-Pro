@@ -11,6 +11,9 @@ const fx = vi.hoisted(() => ({
   reconcile: vi.fn(),
   markDrmVideo: vi.fn(),
   addStorageListener: vi.fn(),
+  keys: [] as string[],
+  resolveSpeed: vi.fn(),
+  onStream: false,
 }));
 
 vi.mock("../src/content/platform/browser.js", () => ({
@@ -32,7 +35,7 @@ vi.mock("../src/content/core/clamp.js", () => ({
 }));
 vi.mock("../src/content/core/domain.js", () => ({ getDomain: () => "example.com" }));
 vi.mock("../src/content/core/resolve.js", () => ({
-  resolveSpeed: () => ({ speed: 1, scope: "site" }),
+  resolveSpeed: fx.resolveSpeed,
   resolveSyncTarget: () => ({ target: 5, scope: "site" }),
   resolveAutoSlow: () => ({ target: 6, scope: "site" }),
   resolveViewerAuto: () => ({ mode: "off", scope: "site" }),
@@ -45,7 +48,7 @@ vi.mock("../src/shared/presets.js", () => ({
 }));
 vi.mock("../src/content/speed.js", () => ({ applyAll: fx.applyAll, reassertRate: vi.fn() }));
 vi.mock("../src/content/live/sync.js", () => ({ controlLive: fx.controlLive }));
-vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => false }));
+vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => fx.onStream }));
 vi.mock("../src/content/live/target.js", () => ({ applyResolvedTargetFromStore: vi.fn() }));
 vi.mock("../src/content/audio/compressor.js", () => ({ applyAudioComp: vi.fn() }));
 vi.mock("../src/content/audio/status.js", () => ({ engageAudio: vi.fn() }));
@@ -89,9 +92,13 @@ vi.mock("../src/content/messaging.js", () => ({}));
 vi.mock("../src/content/keyboard.js", () => ({}));
 vi.mock("../src/content/theater.js", () => ({}));
 vi.mock("../src/content/channel.js", () => ({
-  channelKeys: () => [],
-  sameChannelKeys: () => true,
+  channelKeys: () => fx.keys,
+  sameChannelIdentity: (a: string[], b: string[]) => a.some((key) => b.includes(key)),
+  sameChannelKeys: (a: string[], b: string[]) =>
+    a.length === b.length && a.every((key) => b.includes(key)),
 }));
+
+import { STORE } from "../src/content/platform/storage.js";
 
 async function loadIndex(): Promise<void> {
   vi.resetModules();
@@ -108,6 +115,19 @@ function media(paused: boolean): HTMLVideoElement {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  fx.onStream = false;
+  fx.keys = [];
+  fx.resolveSpeed.mockImplementation(
+    (
+      keys: string[],
+      _domain: string,
+      _domains: Record<string, number>,
+      channels: Record<string, number>,
+    ) => {
+      const key = keys.find((k) => channels[k] != null);
+      return key ? { speed: channels[key], scope: "channel" } : { speed: 1, scope: null };
+    },
+  );
   document.body.textContent = "";
   Object.defineProperty(document, "hidden", { value: false, configurable: true });
 });
@@ -135,5 +155,43 @@ describe("content media events", () => {
 
     expect(fx.updateTimeBadge).not.toHaveBeenCalled();
     expect(fx.flashBadge).not.toHaveBeenCalled();
+  });
+
+  it("does not keep a live badge awake on repeated duration changes", async () => {
+    fx.onStream = true;
+    await loadIndex();
+
+    media(false).dispatchEvent(new Event("durationchange"));
+
+    expect(fx.applyAll).toHaveBeenCalled();
+    expect(fx.controlLive).toHaveBeenCalled();
+    expect(fx.updateTimeBadge).not.toHaveBeenCalled();
+    expect(fx.flashBadge).not.toHaveBeenCalled();
+  });
+});
+
+describe("content channel alias changes", () => {
+  it("keeps the existing alias ahead of a late-rendered YouTube canonical id", async () => {
+    vi.mocked(STORE.get).mockImplementation((_keys, cb) => {
+      cb({ domains: {}, channels: { "channel/UCabc": 2, "@h": 1.5 } });
+    });
+    fx.keys = ["@h"];
+    await loadIndex();
+    const { S } = await import("../src/content/state.js");
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(S.currentSpeed).toBe(1.5);
+
+    fx.keys = ["channel/UCabc", "@h"];
+    await vi.advanceTimersByTimeAsync(2001);
+
+    expect(S.currentSpeed).toBe(1.5);
+    expect(fx.resolveSpeed).toHaveBeenLastCalledWith(
+      ["@h", "channel/UCabc"],
+      "example.com",
+      {},
+      { "channel/UCabc": 2, "@h": 1.5 },
+      undefined,
+    );
   });
 });

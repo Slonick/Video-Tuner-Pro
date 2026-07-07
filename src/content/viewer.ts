@@ -14,6 +14,7 @@ import {
   SPONSOR_COLORS,
 } from "./markers.js";
 import { api } from "./platform/browser.js";
+import { currentFullscreenElement } from "./platform/fullscreen.js";
 import { i18n } from "./platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
 import { isLive } from "./live/detection.js";
@@ -1246,7 +1247,7 @@ function hookGlobal(): void {
   );
   // Real fullscreen supersedes the viewer — the two fight over the same video.
   document.addEventListener("fullscreenchange", () => {
-    if (document.fullscreenElement) exitViewer();
+    if (currentFullscreenElement()) exitViewer();
   });
 }
 
@@ -1372,7 +1373,7 @@ async function enter(
 ): Promise<void> {
   if (window.top !== window) return;
   const v = target ?? primaryVideo();
-  if (!v || document.fullscreenElement || fmt || exiting || overlay || isDrmVideo(v)) return;
+  if (!v || currentFullscreenElement() || fmt || exiting || overlay || isDrmVideo(v)) return;
   const firstRect = v.getBoundingClientRect();
   const mirror = createMirror(v);
   if (!mirror && opts.mirrorOnly) return;

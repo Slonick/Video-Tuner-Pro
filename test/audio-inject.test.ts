@@ -146,7 +146,7 @@ describe("refreshTracked (mid-playback bridge changes)", () => {
     document.body.appendChild(a);
     publish("3");
     refreshTracked();
-    expect(a.playbackRate).toBe(1);
+    expect(a.playbackRate).toBe(2);
   });
 
   it("stops refreshing tracked audio after a newer bridge version takes ownership", () => {
