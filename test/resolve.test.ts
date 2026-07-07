@@ -26,6 +26,15 @@ describe("resolveSpeed", () => {
     });
   });
 
+  it("uses the latest saved alias when both channel key forms exist", () => {
+    expect(
+      resolveSpeed(["UC1", "@handle"], D, {}, { UC1: 2.0, "@handle": 1.75 }, undefined),
+    ).toEqual({
+      speed: 1.75,
+      scope: "channel",
+    });
+  });
+
   it("falls to the site speed when no channel speed", () => {
     expect(resolveSpeed(["UC1"], D, { [D]: 1.5 }, {}, 1.25)).toEqual({ speed: 1.5, scope: "site" });
   });
@@ -58,6 +67,15 @@ describe("resolveSyncTarget", () => {
 
   it("matches a channel target saved under either key form", () => {
     expect(resolveSyncTarget(["UC1", "@h"], "youtube.com", {}, { "@h": 6 }, undefined)).toEqual({
+      target: 6,
+      scope: "channel",
+    });
+  });
+
+  it("uses the latest saved alias when both channel target key forms exist", () => {
+    expect(
+      resolveSyncTarget(["UC1", "@h"], "youtube.com", {}, { UC1: 9, "@h": 6 }, undefined),
+    ).toEqual({
       target: 6,
       scope: "channel",
     });
@@ -96,6 +114,13 @@ describe("resolveAutoSlow", () => {
     expect(
       resolveAutoSlow(["UC1"], D, { [D]: B(9, true) }, { UC1: B(5, false) }, B(8, true)),
     ).toEqual({
+      target: 5,
+      scope: "channel",
+    });
+  });
+
+  it("uses the latest saved alias when both auto-slow channel key forms exist", () => {
+    expect(resolveAutoSlow(["UC1", "@h"], D, {}, { UC1: B(8), "@h": B(5) }, undefined)).toEqual({
       target: 5,
       scope: "channel",
     });
@@ -154,6 +179,15 @@ describe("resolveViewerAuto", () => {
     });
   });
 
+  it("uses the latest saved alias when both viewer-auto channel key forms exist", () => {
+    expect(
+      resolveViewerAuto(["UC1", "@h"], D, {}, { UC1: "theater", "@h": "normal" }, "off"),
+    ).toEqual({
+      mode: "normal",
+      scope: "channel",
+    });
+  });
+
   it("falls to the site mode when no channel entry", () => {
     expect(resolveViewerAuto(["UC1"], D, { [D]: "normal" }, {}, "theater")).toEqual({
       mode: "normal",
@@ -178,6 +212,15 @@ describe("resolveViewerFit", () => {
 
   it("a channel mode wins over site + global", () => {
     expect(resolveViewerFit(["UC1"], D, { [D]: "cover" }, { UC1: "fill" }, "contain")).toEqual({
+      mode: "fill",
+      scope: "channel",
+    });
+  });
+
+  it("uses the latest saved alias when both viewer-fit channel key forms exist", () => {
+    expect(
+      resolveViewerFit(["UC1", "@h"], D, {}, { UC1: "cover", "@h": "fill" }, "contain"),
+    ).toEqual({
       mode: "fill",
       scope: "channel",
     });

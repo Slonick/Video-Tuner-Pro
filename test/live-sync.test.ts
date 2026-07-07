@@ -154,7 +154,7 @@ describe("sync ON (runLiveSync)", () => {
     expect(v.playbackRate).toBeCloseTo(1.05, 5);
   });
 
-  it("holds a catch-up step through the dwell window instead of dithering", () => {
+  it("keeps a catch-up step above the target instead of dithering downward", () => {
     const v = fakeVideo();
     S.liveSyncEnabled = true;
     S.liveSyncTarget = 5;
@@ -169,9 +169,14 @@ describe("sync ON (runLiveSync)", () => {
     expect(v.playbackRate).toBeCloseTo(1.1, 5); // held — dwell not elapsed
     expect(S.currentSpeed).toBeCloseTo(1.1, 5);
 
-    vi.setSystemTime(T + 3000); // dwell elapsed → the pending step lands
+    vi.setSystemTime(T + 3000); // dwell elapsed, but still above target
     controlLive();
-    expect(v.playbackRate).toBeCloseTo(1.05, 5);
+    expect(v.playbackRate).toBeCloseTo(1.1, 5);
+
+    h.streamLatency.mockReturnValue(4.9); // target reached
+    vi.setSystemTime(T + 3300);
+    controlLive();
+    expect(v.playbackRate).toBe(1.0);
   });
 
   it("bails to 100% immediately even inside the dwell window", () => {

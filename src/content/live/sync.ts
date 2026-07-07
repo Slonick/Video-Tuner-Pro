@@ -147,6 +147,15 @@ function runLiveSync(video: HTMLVideoElement): void {
     buffer > floor + 0.05
   ) {
     desired = Math.min(S.currentSpeed, 1.05);
+  } else if (
+    lastStepAt > 0 &&
+    desired > 1 &&
+    desired < S.currentSpeed &&
+    dropped === 0 &&
+    lag > target &&
+    buffer > floor + 0.05
+  ) {
+    desired = S.currentSpeed;
   }
   const settled = settleCatchupRate(
     desired,

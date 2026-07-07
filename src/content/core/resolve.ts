@@ -5,6 +5,16 @@
 // reset, and unit-testable in isolation. The caller clamps the returned speed.
 export type SpeedScope = "channel" | "site" | "global" | null;
 
+function latestChannelKey<T>(channelKeys: string[], entries: Record<string, T>): string | null {
+  if (!channelKeys.length) return null;
+  const available = new Set(channelKeys);
+  let latest: string | null = null;
+  for (const key of Object.keys(entries)) {
+    if (available.has(key) && entries[key] != null) latest = key;
+  }
+  return latest;
+}
+
 export function resolveSpeed(
   channelKeys: string[],
   domain: string,
@@ -13,8 +23,9 @@ export function resolveSpeed(
   globalSpeed: number | undefined,
 ): { speed: number; scope: SpeedScope } {
   // A per-channel speed may be saved under EITHER the channel-id or the @handle
-  // form (YouTube exposes both) — the first match wins over the site speed.
-  const chKey = channelKeys.find((k) => channels[k] != null);
+  // form (YouTube exposes both). If both forms exist, the most recently written
+  // storage entry wins, so an older alias cannot shadow a fresh save.
+  const chKey = latestChannelKey(channelKeys, channels);
   if (chKey != null) return { speed: channels[chKey], scope: "channel" };
   if (domains[domain] != null) return { speed: domains[domain], scope: "site" };
   if (globalSpeed != null) return { speed: globalSpeed, scope: "global" };
@@ -32,7 +43,7 @@ export function resolveSyncTarget(
   channelTargets: Record<string, number>,
   globalTarget: number | undefined,
 ): { target: number; scope: TargetScope } {
-  const chKey = channelKeys.find((k) => channelTargets[k] != null);
+  const chKey = latestChannelKey(channelKeys, channelTargets);
   if (chKey != null) return { target: channelTargets[chKey], scope: "channel" };
   if (siteTargets[domain] != null) return { target: siteTargets[domain], scope: "site" };
   if (globalTarget != null) return { target: globalTarget, scope: "global" };
@@ -69,7 +80,7 @@ export function resolveAutoSlow(
   channels: Record<string, AutoSlowSettings>,
   global: AutoSlowSettings | undefined,
 ): ResolvedAutoSlow {
-  const chKey = channelKeys.find((k) => channels[k] != null);
+  const chKey = latestChannelKey(channelKeys, channels);
   if (chKey != null) return bundle(channels[chKey], "channel");
   if (sites[domain] != null) return bundle(sites[domain], "site");
   if (global != null) return bundle(global, "global");
@@ -90,7 +101,7 @@ export function resolveViewerAuto(
   channels: Record<string, ViewerAutoMode>,
   global: unknown,
 ): { mode: ViewerAutoMode; scope: ViewerAutoScope } {
-  const chKey = channelKeys.find((k) => channels[k] != null);
+  const chKey = latestChannelKey(channelKeys, channels);
   if (chKey != null) return { mode: normalizeViewerAuto(channels[chKey]), scope: "channel" };
   if (sites[domain] != null) return { mode: normalizeViewerAuto(sites[domain]), scope: "site" };
   if (global != null) return { mode: normalizeViewerAuto(global), scope: "global" };
@@ -111,7 +122,7 @@ export function resolveViewerFit(
   channels: Record<string, ViewerFitMode>,
   global: unknown,
 ): { mode: ViewerFitMode; scope: ViewerFitScope } {
-  const chKey = channelKeys.find((k) => channels[k] != null);
+  const chKey = latestChannelKey(channelKeys, channels);
   if (chKey != null) return { mode: normalizeViewerFit(channels[chKey]), scope: "channel" };
   if (sites[domain] != null) return { mode: normalizeViewerFit(sites[domain]), scope: "site" };
   if (global != null) return { mode: normalizeViewerFit(global), scope: "global" };
