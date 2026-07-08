@@ -76,6 +76,20 @@ describe("MAIN-world live probe", () => {
     expect(document.documentElement.getAttribute("data-vtp-live")).toBeNull();
   });
 
+  it("does not scan generic HLS internals on a confirmed YouTube VOD", async () => {
+    makeYoutubePlayer(640, 360, false);
+    const video = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    const hlsReads = vi.fn(() => null);
+    Object.defineProperty(video, "hls", { get: hlsReads, configurable: true, enumerable: true });
+    document.body.append(video);
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("0");
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
+    expect(hlsReads).not.toHaveBeenCalled();
+  });
+
   it("does not scan Twitch fiber players outside Twitch hosts", async () => {
     vi.stubGlobal("location", { hostname: "example.com" });
     const getLiveLatency = vi.fn(() => 2.5);

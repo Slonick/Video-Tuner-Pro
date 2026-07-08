@@ -386,11 +386,12 @@
     }
     try {
       const tw = twitchLatency();
-      const lat = tw != null ? tw : (youtubeLatency() ?? hlsLatency());
+      const yt = tw == null ? youtubeLatency() : null;
+      const live = youtubeIsLive();
+      const lat = tw != null ? tw : (yt ?? (IS_YOUTUBE && live === false ? null : hlsLatency()));
       const root = document.documentElement;
       if (!root) return;
       setAttrIfChanged(root, ATTR, lat != null ? (Math.round(lat * 10) / 10).toFixed(1) : null);
-      const live = youtubeIsLive();
       setAttrIfChanged(root, LIVE_ATTR, live == null ? null : live ? "1" : "0");
     } catch (e) {
       /* ignore */
