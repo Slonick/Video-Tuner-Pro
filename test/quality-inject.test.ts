@@ -194,6 +194,34 @@ describe("quality-inject request cost", () => {
     expect(document.documentElement.getAttribute("data-vtp-quality-debug")).toBeNull();
   });
 
+  it("does not rescan React roots repeatedly for the same unsupported video", async () => {
+    await import("../src/content/quality-inject.js");
+
+    const video = document.createElement("video");
+    video.setAttribute("data-vtp-quality-id", "v1");
+    document.body.append(video);
+    const queryAll = vi.spyOn(document, "querySelectorAll");
+
+    const first = waitForResponse("miss-1");
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "miss-1", videoId: "v1" },
+      }),
+    );
+    await first;
+
+    queryAll.mockClear();
+    const second = waitForResponse("miss-2");
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "miss-2", videoId: "v1" },
+      }),
+    );
+    await second;
+
+    expect(queryAll.mock.calls.filter(([selector]) => selector === "*")).toHaveLength(0);
+  });
+
   it("answers a reused request id after the previous request has finished", async () => {
     await import("../src/content/quality-inject.js");
 

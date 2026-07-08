@@ -410,6 +410,15 @@
 
   let rootsCache = new WeakMap<HTMLVideoElement, { local?: unknown[]; full?: unknown[] }>();
   let rootSearchMode: "local" | "full" = "full";
+  const adapterCache = new WeakMap<
+    HTMLVideoElement,
+    { key: string; adapter: Adapter | null; until: number }
+  >();
+  const ADAPTER_MISS_TTL_MS = 2000;
+
+  function adapterCacheKey(v: HTMLVideoElement): string {
+    return `${v.getAttribute(VIDEO_ATTR) || ""}|${v.currentSrc || v.src || ""}|${v.duration || 0}`;
+  }
 
   function rootsFor(v: HTMLVideoElement): unknown[] {
     const cached = rootsCache.get(v) || {};
@@ -1019,6 +1028,10 @@
 
   function adapterFor(v: HTMLVideoElement): Adapter | null {
     pruneCapturedState();
+    const cacheKey = adapterCacheKey(v);
+    const cached = adapterCache.get(v);
+    if (cached?.key === cacheKey && (cached.adapter || Date.now() < cached.until))
+      return cached.adapter;
     const find = (): Adapter | null =>
       youtubeAdapter(v) ||
       ivsAdapter(v) ||
@@ -1031,9 +1044,18 @@
     try {
       rootSearchMode = "local";
       const local = find();
-      if (local) return local;
+      if (local) {
+        adapterCache.set(v, { key: cacheKey, adapter: local, until: Infinity });
+        return local;
+      }
       rootSearchMode = "full";
-      return find();
+      const full = find();
+      adapterCache.set(v, {
+        key: cacheKey,
+        adapter: full,
+        until: full ? Infinity : Date.now() + ADAPTER_MISS_TTL_MS,
+      });
+      return full;
     } finally {
       rootSearchMode = "full";
     }
@@ -1205,7 +1227,6 @@
       await respond(d.requestId, adapter, undefined, undefined, d.videoId);
     } finally {
       inflightRequests.delete(requestKey);
-      rootsCache = new WeakMap();
     }
   }
 
