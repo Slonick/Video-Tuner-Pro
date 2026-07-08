@@ -245,6 +245,9 @@ function syncRadial(): void {
   rItems.exit.style.display = f ? "flex" : "none";
 }
 
+document.addEventListener("enterpictureinpicture", syncRadial, true);
+document.addEventListener("leavepictureinpicture", syncRadial, true);
+
 function toggleNativePiP(): void {
   const v = nativePiPVideo();
   if (!canUseNativePiP(v)) return;

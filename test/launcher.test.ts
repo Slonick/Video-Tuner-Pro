@@ -525,6 +525,24 @@ describe("launcher — radial viewer menu", () => {
     expect(video.requestPictureInPicture).toHaveBeenCalled();
   });
 
+  it("keeps the PiP pressed state in sync with native PiP events", async () => {
+    Object.defineProperty(document, "pictureInPictureEnabled", { value: true, configurable: true });
+    const video = fakeNativeVideo();
+    await openMenu(video);
+    const [, , pip] = items();
+
+    Object.defineProperty(document, "pictureInPictureElement", {
+      value: video,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event("enterpictureinpicture"));
+    expect(pip.getAttribute("aria-pressed")).toBe("true");
+
+    Object.defineProperty(document, "pictureInPictureElement", { value: null, configurable: true });
+    document.dispatchEvent(new Event("leavepictureinpicture"));
+    expect(pip.getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("animates radial items out from the FAB", async () => {
     await openMenu();
     const [normal] = items();
