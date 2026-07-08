@@ -114,75 +114,79 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
             <div
               id="viewerAutoVisual"
               className="viewer-auto-visual"
-              role="radiogroup"
+              role="group"
               aria-label={label}
             >
-              <button
-                type="button"
-                className={
-                  "viewer-auto-state is-page" + (va.pageMode === "off" ? " is-active" : "")
-                }
-                role="radio"
-                aria-checked={va.pageMode === "off"}
-                disabled={blocked || !va.enabled}
-                onClick={() => setPageMode("off")}
-              >
-                <span className="viewer-auto-window">
-                  <span className="viewer-auto-video" />
-                  <span className="viewer-auto-lines">
-                    <i />
-                    <i />
-                    <i />
+              <div className="viewer-mode-grid" role="radiogroup" aria-label={label}>
+                <button
+                  type="button"
+                  className={
+                    "viewer-auto-state is-page" + (va.pageMode === "off" ? " is-active" : "")
+                  }
+                  role="radio"
+                  aria-checked={va.pageMode === "off"}
+                  disabled={blocked || !va.enabled}
+                  onClick={() => setPageMode("off")}
+                >
+                  <span className="viewer-auto-window">
+                    <span className="viewer-auto-video" />
+                    <span className="viewer-auto-lines">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
                   </span>
+                  <span className="viewer-auto-choice">{msg("overlayBtnOff") || "Off"}</span>
+                </button>
+                <button
+                  type="button"
+                  className={
+                    "viewer-auto-state is-viewer" + (va.pageMode === "normal" ? " is-active" : "")
+                  }
+                  role="radio"
+                  aria-checked={va.pageMode === "normal"}
+                  disabled={blocked || !va.enabled}
+                  onClick={() => setPageMode("normal")}
+                >
+                  <span className="viewer-auto-window viewer-auto-overlay-window">
+                    <span className="viewer-auto-video" />
+                  </span>
+                  <span className="viewer-auto-choice">{msg("viewerAutoNormal") || "Viewer"}</span>
+                </button>
+                <button
+                  type="button"
+                  className={
+                    "viewer-auto-state is-theater" + (va.pageMode === "theater" ? " is-active" : "")
+                  }
+                  role="radio"
+                  aria-checked={va.pageMode === "theater"}
+                  disabled={blocked || !va.enabled}
+                  onClick={() => setPageMode("theater")}
+                >
+                  <span className="viewer-auto-window">
+                    <span className="viewer-auto-video" />
+                  </span>
+                  <span className="viewer-auto-choice">
+                    {msg("viewerAutoTheater") || "Theater"}
+                  </span>
+                </button>
+              </div>
+              <div className="viewer-mode-option">
+                <span className="viewer-mode-copy">
+                  <span className="viewer-mode-title">
+                    <strong>{autoLabel}</strong>
+                    <InfoTip beta tip={msg("betaNote")} />
+                  </span>
+                  <span>{msg("optViewerAutoHint")}</span>
                 </span>
-                <span className="viewer-auto-choice">{msg("overlayBtnOff") || "Off"}</span>
-              </button>
-              <button
-                type="button"
-                className={
-                  "viewer-auto-state is-viewer" + (va.pageMode === "normal" ? " is-active" : "")
-                }
-                role="radio"
-                aria-checked={va.pageMode === "normal"}
-                disabled={blocked || !va.enabled}
-                onClick={() => setPageMode("normal")}
-              >
-                <span className="viewer-auto-window viewer-auto-overlay-window">
-                  <span className="viewer-auto-video" />
-                </span>
-                <span className="viewer-auto-choice">{msg("viewerAutoNormal") || "Viewer"}</span>
-              </button>
-              <button
-                type="button"
-                className={
-                  "viewer-auto-state is-theater" + (va.pageMode === "theater" ? " is-active" : "")
-                }
-                role="radio"
-                aria-checked={va.pageMode === "theater"}
-                disabled={blocked || !va.enabled}
-                onClick={() => setPageMode("theater")}
-              >
-                <span className="viewer-auto-window">
-                  <span className="viewer-auto-video" />
-                </span>
-                <span className="viewer-auto-choice">{msg("viewerAutoTheater") || "Theater"}</span>
-              </button>
-            </div>
-            <div className="viewer-mode-option">
-              <span className="viewer-mode-copy">
-                <span className="viewer-mode-title">
-                  <strong>{autoLabel}</strong>
-                  <InfoTip beta tip={msg("betaNote")} />
-                </span>
-                <span>{msg("optViewerAutoHint")}</span>
-              </span>
-              <Switch
-                id="viewerAutoModeToggle"
-                checked={autoOpen}
-                ariaLabel={autoLabel}
-                disabled={blocked || !va.enabled}
-                onChange={setAutoOpen}
-              />
+                <Switch
+                  id="viewerAutoModeToggle"
+                  checked={autoOpen}
+                  ariaLabel={autoLabel}
+                  disabled={blocked || !va.enabled}
+                  onChange={setAutoOpen}
+                />
+              </div>
             </div>
             <div className="viewer-auto-save">
               <SaveScope
