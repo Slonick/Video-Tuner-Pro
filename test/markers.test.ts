@@ -156,6 +156,23 @@ describe("fetchSponsorSegments", () => {
     expect(SPONSOR_COLORS.sponsor).toBeTruthy();
   });
 
+  it("caches SponsorBlock responses by video id", async () => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ segment: [10, 20], category: "sponsor" }],
+    });
+
+    const first = fetchSponsorSegments("cached-video", fetchFn as unknown as typeof fetch);
+    const second = fetchSponsorSegments("cached-video", fetchFn as unknown as typeof fetch);
+
+    expect(await first).toEqual([{ start: 10, end: 20, category: "sponsor" }]);
+    expect(await second).toEqual([{ start: 10, end: 20, category: "sponsor" }]);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    await fetchSponsorSegments("another-video", fetchFn as unknown as typeof fetch);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it("returns [] on 404s and network failures", async () => {
     const notFound = vi.fn().mockResolvedValue({ ok: false });
     expect(await fetchSponsorSegments("abc", notFound as unknown as typeof fetch)).toEqual([]);

@@ -156,11 +156,34 @@ export function readYouTubeChapters(duration: number, root: ParentNode = documen
   }));
 }
 
+const sponsorCache = new WeakMap<typeof fetch, Map<string, Promise<SponsorSegment[]>>>();
+const MAX_SPONSOR_CACHE = 32;
+
 // SponsorBlock's public segments for a video; [] on 404/errors/timeouts. The
 // API answers with open CORS, so a plain content-script fetch works.
 export async function fetchSponsorSegments(
   videoId: string,
   fetchFn: typeof fetch = fetch,
+): Promise<SponsorSegment[]> {
+  let cache = sponsorCache.get(fetchFn);
+  if (!cache) {
+    cache = new Map();
+    sponsorCache.set(fetchFn, cache);
+  }
+  const cached = cache.get(videoId);
+  if (cached) return cached;
+  if (cache.size >= MAX_SPONSOR_CACHE) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+  const promise = fetchSponsorSegmentsUncached(videoId, fetchFn);
+  cache.set(videoId, promise);
+  return promise;
+}
+
+async function fetchSponsorSegmentsUncached(
+  videoId: string,
+  fetchFn: typeof fetch,
 ): Promise<SponsorSegment[]> {
   const controller = typeof AbortController === "function" ? new AbortController() : null;
   const timer =
