@@ -321,7 +321,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   // Poll while open so live-sync speed changes show in the readout.
   const missesRef = useRef(0);
   useEffect(() => {
-    if (!hasTab) return;
+    if (!hasTab || !live) return;
     const id = setInterval(() => {
       void send<SpeedResponse>("getSpeed").then((resp) => {
         if (!resp) return;
@@ -337,7 +337,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [hasTab, send, applyChannel, apply]);
+  }, [hasTab, live, send, applyChannel, apply]);
 
   return {
     speed,

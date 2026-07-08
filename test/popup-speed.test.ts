@@ -169,6 +169,42 @@ describe("live lock", () => {
     expect(byId("liveWarn").style.display).toBe("none");
     expect(document.querySelector(".speed-section")?.classList.contains("locked")).toBe(false);
   });
+
+  it("does not keep polling speed on a non-live page", async () => {
+    const { sendSpy } = await mountApp({ tab: YT });
+    const getSpeedCalls = () =>
+      sendSpy.mock.calls.filter((c) => (c[1] as { action: string }).action === "getSpeed").length;
+    const before = getSpeedCalls();
+
+    await wait(1100);
+
+    expect(getSpeedCalls()).toBe(before);
+  });
+
+  it("keeps polling speed while live so the catch-up readout updates", async () => {
+    let speed = 1;
+    const { sendSpy } = await mountApp({
+      tab: YT,
+      replies: {
+        getSpeed: () => ({
+          speed,
+          channel: null,
+          channelName: "",
+          scope: null,
+          live: true,
+        }),
+      },
+    });
+    const getSpeedCalls = () =>
+      sendSpy.mock.calls.filter((c) => (c[1] as { action: string }).action === "getSpeed").length;
+    const before = getSpeedCalls();
+    speed = 1.05;
+
+    await wait(1100);
+
+    expect(getSpeedCalls()).toBeGreaterThan(before);
+    expect(readout()).toBe("105%");
+  });
 });
 
 // The "Save for" scope is a single menu button: the trigger (setDefaultBtn) is just
