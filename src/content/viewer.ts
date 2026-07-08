@@ -69,6 +69,7 @@ let seekWrapEl: HTMLSpanElement | null = null;
 let volEl: HTMLInputElement | null = null;
 let timeEl: HTMLSpanElement | null = null;
 let barTimer: ReturnType<typeof setTimeout> | undefined;
+let barVisibilityTimer: ReturnType<typeof setTimeout> | undefined;
 let seeking = false; // mid-drag on the seek slider — don't fight the user
 let media: AbortController | null = null; // per-session media/UI listeners
 let marksEl: HTMLDivElement | null = null; // chapter ticks + sponsor bands layer
@@ -700,9 +701,13 @@ function setViewerCursor(hidden: boolean): void {
 
 function showBar(): void {
   if (!bar) return;
+  const wasHidden = bar.style.visibility === "hidden";
   setViewerCursor(false);
+  clearTimeout(barVisibilityTimer);
+  bar.style.visibility = "visible";
   bar.style.opacity = "1";
   bar.style.pointerEvents = "auto";
+  if (wasHidden) syncTime();
   clearTimeout(barTimer);
   if (video?.paused) return; // paused → controls stay up, like every player
   barTimer = setTimeout(() => {
@@ -710,6 +715,10 @@ function showBar(): void {
     setViewerCursor(true);
     bar.style.opacity = "0";
     bar.style.pointerEvents = "none";
+    clearTimeout(barVisibilityTimer);
+    barVisibilityTimer = setTimeout(() => {
+      if (bar?.style.opacity === "0") bar.style.visibility = "hidden";
+    }, 260);
   }, BAR_HIDE_MS);
 }
 
@@ -725,6 +734,7 @@ function syncVolume(): void {
 }
 function syncTime(): void {
   if (!video) return;
+  if (bar?.style.visibility === "hidden" && !seeking) return;
   const timeline = mediaTimeline(video);
   const prevTimelineKind = lastTimelineKind;
   lastTimelineKind = timeline.kind;
@@ -939,7 +949,7 @@ function mountBar(): void {
     `-webkit-backdrop-filter:${GLASS_REFRACTION}blur(10px) saturate(180%) brightness(1.04);` +
     `backdrop-filter:${GLASS_REFRACTION}blur(10px) saturate(180%) brightness(1.04);` +
     `font:13px/1.2 -apple-system,system-ui,sans-serif;` +
-    `opacity:0;pointer-events:none;transition:opacity .25s;z-index:1}` +
+    `opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s;z-index:1}` +
     `.bar.live{gap:6px;padding:8px 10px}` +
     `button{position:relative;width:32px;height:32px;flex:none;padding:0;border:0;border-radius:10px;` +
     `cursor:pointer;color:#fff;background:transparent;display:flex;align-items:center;justify-content:center;` +
@@ -1509,6 +1519,7 @@ export function exitViewer(): void {
       guardTimer = null;
     }
     clearTimeout(barTimer);
+    clearTimeout(barVisibilityTimer);
     media?.abort();
     media = null;
     styleGuard?.disconnect();

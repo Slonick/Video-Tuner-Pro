@@ -525,6 +525,32 @@ describe("control bar", () => {
     },
   );
 
+  it("stops updating hidden control-bar widgets until the bar is shown again", async () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = makeVideo(100);
+      h.primary = v;
+      await openViewer("normal");
+      v.play();
+      overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      expect(barEl()?.style.visibility).toBe("visible");
+      expect(barTime()).toBe("0:00 / 1:40");
+
+      await vi.advanceTimersByTimeAsync(2900);
+      expect(barEl()?.style.visibility).toBe("hidden");
+
+      v.currentTime = 40;
+      v.dispatchEvent(new Event("timeupdate"));
+      expect(barTime()).toBe("0:00 / 1:40");
+
+      overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      expect(barEl()?.style.visibility).toBe("visible");
+      expect(barTime()).toBe("0:40 / 1:40");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("a live stream hides the seek bar and shows LIVE", async () => {
     const { v } = makeVideo(Infinity);
     h.primary = v;
