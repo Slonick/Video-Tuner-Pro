@@ -48,6 +48,7 @@
   const ROOT_DEBUG_ATTR = "data-vtp-quality-debug";
   const MAX_CAPTURED_PLAYERS = 8;
   const MAX_CAPTURED_HLS = 8;
+  const VIDEOLESS_PLAYER_TTL_MS = 30_000;
 
   interface QualityOption {
     id: string;
@@ -70,10 +71,32 @@
     set: (id: string) => void | Promise<void>;
   }
 
+  function rememberCapturedPlayer(entry: CapturedPlayer): CapturedPlayer {
+    try {
+      Object.defineProperty(entry, "__vtpSeenAt", {
+        value: Date.now(),
+        writable: true,
+        configurable: true,
+      });
+    } catch (e) {
+      /* non-extensible page object wrapper */
+    }
+    return entry;
+  }
+
+  function capturedPlayerSeenAt(entry: CapturedPlayer): number {
+    return (entry as CapturedPlayer & { __vtpSeenAt?: number }).__vtpSeenAt ?? Date.now();
+  }
+
   function pruneCapturedPlayers(): void {
     const entries = win.__vtpQualityPlayers || [];
+    const now = Date.now();
     win.__vtpQualityPlayers = entries
-      .filter((entry) => !entry.video || entry.video.isConnected)
+      .filter(
+        (entry) =>
+          entry.video?.isConnected ||
+          (!entry.video && now - capturedPlayerSeenAt(entry) < VIDEOLESS_PLAYER_TTL_MS),
+      )
       .slice(-MAX_CAPTURED_PLAYERS);
   }
 
@@ -97,7 +120,7 @@
     if (!player || typeof player !== "object") return player;
     pruneCapturedPlayers();
     const existing = win.__vtpQualityPlayers!.find((entry) => entry.player === player);
-    if (!existing) win.__vtpQualityPlayers!.push({ player, video: null });
+    if (!existing) win.__vtpQualityPlayers!.push(rememberCapturedPlayer({ player, video: null }));
     if (win.__vtpQualityPlayers!.length > MAX_CAPTURED_PLAYERS) {
       win.__vtpQualityPlayers = win.__vtpQualityPlayers!.slice(-MAX_CAPTURED_PLAYERS);
     }

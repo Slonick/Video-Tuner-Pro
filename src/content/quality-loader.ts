@@ -30,6 +30,7 @@
   const ROOT_PICK_ATTR = "data-vtp-quality-pick";
   const MAX_CAPTURED_PLAYERS = 8;
   const MAX_CAPTURED_HLS = 8;
+  const VIDEOLESS_PLAYER_TTL_MS = 30_000;
 
   interface TrustedTypesLike {
     createPolicy?: (
@@ -64,9 +65,31 @@
     return win.__vtpQualityBridgeInstalled === QUALITY_BRIDGE_VERSION;
   }
 
+  function rememberCapturedPlayer(entry: CapturedPlayer): CapturedPlayer {
+    try {
+      Object.defineProperty(entry, "__vtpSeenAt", {
+        value: Date.now(),
+        writable: true,
+        configurable: true,
+      });
+    } catch (e) {
+      /* non-extensible page object wrapper */
+    }
+    return entry;
+  }
+
+  function capturedPlayerSeenAt(entry: CapturedPlayer): number {
+    return (entry as CapturedPlayer & { __vtpSeenAt?: number }).__vtpSeenAt ?? Date.now();
+  }
+
   function pruneCapturedPlayers(): void {
+    const now = Date.now();
     win.__vtpQualityPlayers = (win.__vtpQualityPlayers || [])
-      .filter((entry) => !entry.video || entry.video.isConnected)
+      .filter(
+        (entry) =>
+          entry.video?.isConnected ||
+          (!entry.video && now - capturedPlayerSeenAt(entry) < VIDEOLESS_PLAYER_TTL_MS),
+      )
       .slice(-MAX_CAPTURED_PLAYERS);
   }
 
@@ -84,7 +107,7 @@
     if (!player || typeof player !== "object") return player;
     pruneCapturedPlayers();
     const existing = win.__vtpQualityPlayers!.find((entry) => entry.player === player);
-    if (!existing) win.__vtpQualityPlayers!.push({ player, video: null });
+    if (!existing) win.__vtpQualityPlayers!.push(rememberCapturedPlayer({ player, video: null }));
     if (win.__vtpQualityPlayers!.length > MAX_CAPTURED_PLAYERS) {
       win.__vtpQualityPlayers = win.__vtpQualityPlayers!.slice(-MAX_CAPTURED_PLAYERS);
     }
@@ -233,9 +256,10 @@
     }
   }
 
+  let initialBridgeUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
+
   function bridgeUrl(): string | null {
-    const attrUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
-    if (attrUrl) return attrUrl;
+    if (initialBridgeUrl) return initialBridgeUrl;
     const runtime = (
       globalThis as typeof globalThis & {
         chrome?: { runtime?: { getURL?: (path: string) => string } };
@@ -251,7 +275,8 @@
           }
         ).browser?.runtime?.getURL
       )?.("quality-inject.js") || null;
-    return validBridgeUrl(resolved);
+    initialBridgeUrl = validBridgeUrl(resolved);
+    return initialBridgeUrl;
   }
 
   let trustedPolicy:

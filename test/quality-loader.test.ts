@@ -150,6 +150,23 @@ describe("quality loader", () => {
     expect(script.src).toBe(BRIDGE_URL);
   });
 
+  it("uses the initial extension bridge URL even if the page mutates the attribute", async () => {
+    await loadLoader();
+    document.documentElement.setAttribute(
+      BRIDGE_URL_ATTR,
+      "chrome-extension://other-extension/quality-inject.js",
+    );
+
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "q1", videoId: "v1" },
+      }),
+    );
+
+    const [script] = bridgeScripts();
+    expect(script.src).toBe(BRIDGE_URL);
+  });
+
   it("uses a Trusted Types script URL policy when the page requires it", async () => {
     const createScriptURL = vi.fn((url: string) => url);
     const createPolicy = vi.fn(() => ({ createScriptURL }));

@@ -290,6 +290,32 @@ describe("quality-inject request cost", () => {
       (window as typeof window & { __vtpQualityPlayers?: unknown[] }).__vtpQualityPlayers,
     ).toHaveLength(8);
   });
+
+  it("prunes IVS players that never attach a video", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    try {
+      (window as typeof window & { __vtpQualityPlayers?: unknown[] }).__vtpQualityPlayers = [];
+      const players = [{}, {}];
+      let next = 0;
+      (window as typeof window & { IVSPlayer?: unknown }).IVSPlayer = {
+        create: () => players[next++],
+      };
+      await import("../src/content/quality-inject.js");
+
+      (window as typeof window & { IVSPlayer: { create: () => unknown } }).IVSPlayer.create();
+      vi.setSystemTime(32_000);
+      (window as typeof window & { IVSPlayer: { create: () => unknown } }).IVSPlayer.create();
+
+      expect(
+        (
+          window as typeof window & { __vtpQualityPlayers?: Array<{ player: unknown }> }
+        ).__vtpQualityPlayers?.map((entry) => entry.player),
+      ).toEqual([players[1]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("quality-inject YouTube adapter", () => {
