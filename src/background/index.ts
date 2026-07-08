@@ -149,7 +149,7 @@ function reinjectOpenTabs(): void {
         call(() =>
           api.scripting.executeScript({
             target: { tabId, allFrames: true },
-            files: ["quality-inject.js"],
+            files: ["quality-loader.js"],
             world: "MAIN",
           }),
         );

@@ -45,6 +45,7 @@ const jsEntries = {
   "popup/popup": join(SRC, "popup/index.tsx"),
   "options/options": join(SRC, "options/index.tsx"),
   inject: join(SRC, "content/inject.ts"),   // MAIN-world Twitch/YouTube latency probe
+  "quality-loader": join(SRC, "content/quality-loader.ts"), // tiny MAIN-world lazy quality bootstrap
   "quality-inject": join(SRC, "content/quality-inject.ts"), // MAIN-world player quality bridge
   "audio-inject": join(SRC, "content/audio-inject.ts"), // MAIN-world detached-<audio> rate bridge
 };
