@@ -16,7 +16,13 @@ const trackedVideos = new Set<HTMLVideoElement>();
 const trackedAudios = new Set<HTMLAudioElement>();
 const drmVideos = new WeakSet<HTMLVideoElement>();
 const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
-const shadowHostCandidates = new Map<Element, number>();
+interface ShadowHostCandidate {
+  ref: WeakRef<Element>;
+  seenAt: number;
+  active: boolean;
+}
+const shadowHostCandidates: ShadowHostCandidate[] = [];
+const shadowHostCandidateRefs = new WeakMap<Element, ShadowHostCandidate>();
 const ADOPTED_VIEWER_VIDEO = "data-vtp-viewer-adopted-video";
 const MAX_SHADOW_HOST_CANDIDATES = 1024;
 const SHADOW_HOST_CANDIDATE_TTL_MS = 60_000;
@@ -67,7 +73,15 @@ function handleShadow(el: Element): boolean {
 }
 
 function rememberShadowHostCandidate(el: Element): void {
-  if (!isOwnNode(el)) shadowHostCandidates.set(el, Date.now());
+  if (isOwnNode(el)) return;
+  const existing = shadowHostCandidateRefs.get(el);
+  if (existing?.active) {
+    existing.seenAt = Date.now();
+    return;
+  }
+  const candidate = { ref: new WeakRef(el), seenAt: Date.now(), active: true };
+  shadowHostCandidateRefs.set(el, candidate);
+  shadowHostCandidates.push(candidate);
 }
 
 // Walk `root` once, registering any media and recursing through open shadow roots
@@ -131,21 +145,25 @@ function scanDirectMedia(root: ParentNode): boolean {
 function scanKnownShadowHosts(): boolean {
   let added = false;
   const now = Date.now();
-  for (const [host, seenAt] of Array.from(shadowHostCandidates)) {
-    if (!host.isConnected || isOwnNode(host)) {
-      shadowHostCandidates.delete(host);
+  let write = 0;
+  for (const candidate of shadowHostCandidates) {
+    const host = candidate.ref.deref();
+    if (!host || !host.isConnected || isOwnNode(host)) {
+      candidate.active = false;
       continue;
     }
     if (
-      shadowHostCandidates.size > MAX_SHADOW_HOST_CANDIDATES &&
+      shadowHostCandidates.length > MAX_SHADOW_HOST_CANDIDATES &&
       !host.shadowRoot &&
-      now - seenAt > SHADOW_HOST_CANDIDATE_TTL_MS
+      now - candidate.seenAt > SHADOW_HOST_CANDIDATE_TTL_MS
     ) {
-      shadowHostCandidates.delete(host);
+      candidate.active = false;
       continue;
     }
     if (handleShadow(host)) added = true;
+    shadowHostCandidates[write++] = candidate;
   }
+  shadowHostCandidates.length = write;
   return added;
 }
 
@@ -187,7 +205,8 @@ export function stopTracking(): void {
     observer.disconnect();
     observer = null;
   }
-  shadowHostCandidates.clear();
+  for (const candidate of shadowHostCandidates) candidate.active = false;
+  shadowHostCandidates.length = 0;
 }
 
 // Cheap backstop for the cases the observer can miss: direct media added without a

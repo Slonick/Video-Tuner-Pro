@@ -200,4 +200,27 @@ describe("media registry — reconcile backstop", () => {
       now.mockRestore();
     }
   });
+
+  it("can remember an evicted host again after it is re-added", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(0);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    for (let i = 0; i < 1030; i++) document.body.appendChild(document.createElement("div"));
+    track();
+    await flush();
+    try {
+      now.mockReturnValue(61_000);
+      reconcile();
+
+      host.remove();
+      document.body.appendChild(host);
+      await flush();
+      host.attachShadow({ mode: "open" }).appendChild(document.createElement("video"));
+      reconcile();
+
+      expect(collectVideos()).toHaveLength(1);
+    } finally {
+      now.mockRestore();
+    }
+  });
 });

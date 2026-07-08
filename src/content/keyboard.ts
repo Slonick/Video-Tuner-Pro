@@ -42,9 +42,6 @@ document.addEventListener(
   (e) => {
     if (e.defaultPrevented) return;
     if (!S.keyboardEnabled || !ctxValid()) return;
-    // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
-    const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
-    if (typingIn(target) || typingIn(deepActive())) return;
     const { slower, faster, reset, toggle, hold, overlay, viewer, theater } = S.keymap;
     const oneShotRepeat =
       e.repeat &&
@@ -83,6 +80,9 @@ document.addEventListener(
         e.code === theater);
     const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (speedStepKey || plainActionKey);
     if (preset === undefined && !actionKey) return;
+    // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
+    const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
+    if (typingIn(target) || typingIn(deepActive())) return;
     const viewerAction = e.code === viewer || e.code === theater;
     if (viewerAction && !S.viewerAutoEnabled) return;
     if (!primaryVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
