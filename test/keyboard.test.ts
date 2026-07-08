@@ -221,6 +221,29 @@ describe("keyboard shortcuts", () => {
     }
   });
 
+  it("restores hold-to-speed when focus moves into an iframe", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      const iframe = document.createElement("iframe");
+      document.body.append(iframe);
+      Object.defineProperty(document, "activeElement", { value: iframe, configurable: true });
+      S.currentSpeed = 1.25;
+      S.holdSpeed = 2;
+      press("KeyX");
+      window.dispatchEvent(new Event("blur"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(S.holdActive).toBe(false);
+      expect(m.setSpeed).toHaveBeenLastCalledWith(1.25, false, true);
+    } finally {
+      Object.defineProperty(document, "activeElement", {
+        value: document.body,
+        configurable: true,
+      });
+      vi.useRealTimers();
+    }
+  });
+
   it("restores hold-to-speed on keyup", () => {
     S.currentSpeed = 1.25;
     press("KeyX");

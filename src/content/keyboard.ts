@@ -139,7 +139,7 @@ function releaseHold(): void {
 
 function releaseHoldOnWindowBlur(): void {
   setTimeout(() => {
-    if (!document.hasFocus()) releaseHold();
+    if (!document.hasFocus() || document.activeElement instanceof HTMLIFrameElement) releaseHold();
   }, 0);
 }
 
