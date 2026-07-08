@@ -31,8 +31,7 @@ const BADGE_STYLE: CSSProperties = {
   boxShadow: "0 0 0 1px rgba(255,255,255,0.14)",
   whiteSpace: "nowrap",
   opacity: 0,
-  transition:
-    "opacity .25s, padding .22s cubic-bezier(.2,0,0,1), min-width .22s cubic-bezier(.2,0,0,1), transform .22s cubic-bezier(.2,0,0,1), background .22s, box-shadow .22s",
+  transition: "opacity .25s",
   WebkitBackdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
   backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
 };
@@ -63,14 +62,33 @@ const PIN_STYLE: CSSProperties = {
   transition: "opacity .15s,transform .15s",
 };
 
+const NOTICE_STYLE: CSSProperties = {
+  position: "absolute",
+  left: "calc(100% + 8px)",
+  top: "50%",
+  minWidth: "42px",
+  padding: "10px 14px",
+  borderRadius: "999px",
+  background: "rgb(20 20 22 / calc(0.34 * var(--glass-opacity, 1)))",
+  boxShadow: "0 0 0 1px rgba(255,255,255,0.16),0 14px 36px rgba(0,0,0,0.24)",
+  WebkitBackdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
+  backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
+  opacity: 0,
+  pointerEvents: "none",
+  transform: "translateY(-50%) scale(.72)",
+  transformOrigin: "left center",
+  transition: "opacity .22s, transform .28s cubic-bezier(.2,0,0,1)",
+};
+
 interface Props {
   divRef: (n: HTMLDivElement | null) => void;
   dotRef: (n: HTMLElement | null) => void;
   textRef: (n: HTMLSpanElement | null) => void;
   pinRef: (n: HTMLSpanElement | null) => void;
+  noticeRef: (n: HTMLSpanElement | null) => void;
 }
 
-function Badge({ divRef, dotRef, textRef, pinRef }: Props) {
+function Badge({ divRef, dotRef, textRef, pinRef, noticeRef }: Props) {
   return (
     <div ref={divRef} style={BADGE_STYLE}>
       <i ref={dotRef} style={DOT_STYLE} aria-hidden="true"></i>
@@ -80,6 +98,7 @@ function Badge({ divRef, dotRef, textRef, pinRef }: Props) {
           <path d="M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z" />
         </svg>
       </span>
+      <span ref={noticeRef} style={NOTICE_STYLE}></span>
     </div>
   );
 }
@@ -90,6 +109,7 @@ export interface BadgeRefs {
   dotEl: HTMLElement; // video/stream indicator dot
   textEl: HTMLSpanElement; // speed/time text
   pinEl: HTMLSpanElement; // pin button
+  noticeEl: HTMLSpanElement; // transient playback notice bubble
 }
 
 // Create the shadow host, render the badge into it synchronously, and hand the
@@ -106,6 +126,7 @@ export function mountBadge(): BadgeRefs {
   let dotEl: HTMLElement | null = null;
   let textEl: HTMLSpanElement | null = null;
   let pinEl: HTMLSpanElement | null = null;
+  let noticeEl: HTMLSpanElement | null = null;
   flushSync(() =>
     createRoot(shadow).render(
       <Badge
@@ -121,6 +142,9 @@ export function mountBadge(): BadgeRefs {
         pinRef={(n) => {
           pinEl = n;
         }}
+        noticeRef={(n) => {
+          noticeEl = n;
+        }}
       />,
     ),
   );
@@ -128,5 +152,5 @@ export function mountBadge(): BadgeRefs {
   // static and never re-renders, so React won't remove this trailing node). It's
   // not a <div>, so overlay.ts/tests still find the badge via querySelector("div").
   ensureGlassFilter(shadow);
-  return { host, el: el!, dotEl: dotEl!, textEl: textEl!, pinEl: pinEl! };
+  return { host, el: el!, dotEl: dotEl!, textEl: textEl!, pinEl: pinEl!, noticeEl: noticeEl! };
 }

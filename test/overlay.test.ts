@@ -80,6 +80,8 @@ const badgeEl = () =>
     .querySelector("[data-vtp-badge]")
     ?.shadowRoot?.querySelector("div") as HTMLElement | null) ?? null;
 const badgeText = () => badgeEl()?.querySelector("span")?.textContent;
+const badgeNotice = () =>
+  Array.from(badgeEl()?.querySelectorAll("span") ?? []).at(2) as HTMLSpanElement | undefined;
 // "Shown" = the badge element exists AND isn't display:none. (Absent counts as
 // not shown — so a disabled badge that was never created still fails correctly if
 // a regression makes it appear.)
@@ -610,7 +612,7 @@ describe("flashBadge auto-hide", () => {
 });
 
 describe("badge notice", () => {
-  it("temporarily expands the badge and then restores the normal readout", async () => {
+  it("shows a separate right-side notice bubble without replacing the badge readout", async () => {
     vi.useFakeTimers();
     try {
       h.primary = fakeVideo();
@@ -618,15 +620,16 @@ describe("badge notice", () => {
 
       showBadgeNotice("Paused");
 
-      const el = badgeEl() as HTMLElement;
-      expect(badgeText()).toBe("Paused");
-      expect(el.style.minWidth).toBe("116px");
-      expect(el.style.opacity).toBe("1");
+      expect(badgeText()).toBe("1× · 1:00");
+      expect(badgeNotice()?.textContent).toBe("Paused");
+      expect(badgeNotice()?.style.opacity).toBe("1");
+      expect(badgeNotice()?.style.transform).toBe("translateY(-50%) scale(1)");
+      expect((badgeEl() as HTMLElement).style.background).toContain("rgb(20 20 22");
 
       await vi.advanceTimersByTimeAsync(1450);
 
       expect(badgeText()).toBe("1× · 1:00");
-      expect(el.style.minWidth).toBe("");
+      expect(badgeNotice()?.style.opacity).toBe("0");
     } finally {
       vi.useRealTimers();
     }
