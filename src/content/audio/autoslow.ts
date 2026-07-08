@@ -12,6 +12,7 @@ import { SyllableMeter, suggestEffectiveSpeed, rampStep, PACE } from "./pace.js"
 import { autoSlowLive, recordAutoSlowSample } from "./autoslow-state.js";
 
 const APPLY_MS = 100; // how often we re-evaluate and move the factor
+const PRIMARY_CACHE_MS = 250;
 // The reaction / ease-back settings (0..100) map onto these per-step move caps
 // (fraction of the user's speed changed per APPLY_MS). Slow-down can be brisker
 // than recovery, so the ranges differ.
@@ -24,6 +25,9 @@ let lastPrimary: HTMLVideoElement | null = null;
 let appliedEff = 0; // effective speed we last drove toward (0 = uninitialised)
 let lastApplyAt = -Infinity;
 let lastDenseAt = -Infinity; // last time the perceived rate was at/over the ceiling
+let lastProbeAt = -Infinity;
+let cachedPrimary: HTMLVideoElement | null = null;
+let cachedBlocked = true;
 
 // Playback speed sampled each tick, kept over the same trailing window as the
 // syllable meter. The perceived rate is a ~4 s average, so to recover a stable
@@ -67,6 +71,16 @@ function release(): void {
   }
 }
 
+function primaryForAutoSlow(now: number): HTMLVideoElement | null {
+  if (now - lastProbeAt >= PRIMARY_CACHE_MS) {
+    const v = primaryVideo();
+    cachedPrimary = v;
+    cachedBlocked = !v || isLive(v) || onStreamPage() || v.paused;
+    lastProbeAt = now;
+  }
+  return cachedBlocked ? null : cachedPrimary;
+}
+
 // One sample tick (scheduled at PACE.SAMPLE_MS by the content entry). Reads the
 // primary analyser's RMS, feeds the meter, and every APPLY_MS nudges the factor.
 export function autoSlowSample(): void {
@@ -79,11 +93,12 @@ export function autoSlowSample(): void {
   const ctx = audioContext();
   if (!ctx || ctx.state !== "running") return;
 
-  const v = primaryVideo();
+  const now = Date.now();
+  const v = primaryForAutoSlow(now);
   const g = v ? audioGraphs.get(v) : null;
   // Streams are owned by live-sync (which drives the rate to stay near the edge),
   // so auto-slow stays out — same as manual speed, which onStreamPage() also gates.
-  if (!v || !g || !g.analyserIn || isLive(v) || onStreamPage() || v.paused) {
+  if (!v || !g || !g.analyserIn) {
     release();
     return;
   }
@@ -98,7 +113,6 @@ export function autoSlowSample(): void {
   if (!buf || buf.length !== an.fftSize) buf = new Float32Array(an.fftSize);
   an.getFloatTimeDomainData(buf);
 
-  const now = Date.now();
   // ~23 ms RMS window — the high-pass detector reads the envelope's modulation, not peaks.
   meter.push(rmsLinear(buf), now);
   // Track the actual playback speed over the same window as the meter.

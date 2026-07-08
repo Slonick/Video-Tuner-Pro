@@ -88,6 +88,16 @@ function stopTimers() {
   }
 }
 
+function syncBufferSampler(hasVideo = collectVideos().length > 0) {
+  if (hasVideo) {
+    if (bufferSampler == null) bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
+  } else if (bufferSampler != null) {
+    clearInterval(bufferSampler);
+    bufferSampler = null;
+    recordBufferSample();
+  }
+}
+
 // The extension context dies on reload/update; shut down cleanly when it does.
 // Exported so live.js can call it without a circular value dependency.
 export function teardown() {
@@ -273,10 +283,12 @@ function tick() {
   const keys = channelKeys();
   if (keys.length && !sameChannelKeys(lastChannelKeys, keys))
     reresolve(preferKnownChannelKeys(keys));
+  const videoCount = collectVideos().length;
+  syncBufferSampler(videoCount > 0);
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
   // resets it via wake().
-  tickInterval = collectVideos().length ? TICK_MIN : Math.min(TICK_MAX, tickInterval * 2);
+  tickInterval = videoCount ? TICK_MIN : Math.min(TICK_MAX, tickInterval * 2);
   liveTick = setTimeout(tick, tickInterval);
 }
 
@@ -287,7 +299,7 @@ function tick() {
 function startTimers(immediate = false) {
   if (liveTick == null) liveTick = setTimeout(tick, immediate ? 0 : tickInterval);
   if (audioSampler == null) audioSampler = setInterval(recordAudioSample, A_HIST_MS);
-  if (bufferSampler == null) bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
+  syncBufferSampler();
   // Always running; the sample body no-ops cheaply while auto-slow is off.
   if (autoSlowSampler == null) autoSlowSampler = setInterval(autoSlowSample, AUTOSLOW_MS);
 }

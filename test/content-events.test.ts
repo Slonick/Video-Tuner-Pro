@@ -10,8 +10,10 @@ const fx = vi.hoisted(() => ({
   stopTracking: vi.fn(),
   reconcile: vi.fn(),
   markDrmVideo: vi.fn(),
+  recordBufferSample: vi.fn(),
   addStorageListener: vi.fn(),
   keys: [] as string[],
+  videos: [] as HTMLVideoElement[],
   resolveSpeed: vi.fn(),
   onStream: false,
 }));
@@ -80,9 +82,12 @@ vi.mock("../src/content/audio/autoslow-config.js", () => ({
 }));
 vi.mock("../src/content/viewer-auto.js", () => ({ applyResolvedViewerAutoFromStore: vi.fn() }));
 vi.mock("../src/content/viewer-fit.js", () => ({ applyResolvedViewerFitFromStore: vi.fn() }));
-vi.mock("../src/content/bitrate.js", () => ({ recordBufferSample: vi.fn(), BUF_HIST_MS: 1000 }));
+vi.mock("../src/content/bitrate.js", () => ({
+  recordBufferSample: fx.recordBufferSample,
+  BUF_HIST_MS: 1000,
+}));
 vi.mock("../src/content/videos.js", () => ({
-  collectVideos: () => [],
+  collectVideos: () => fx.videos,
   startTracking: fx.startTracking,
   stopTracking: fx.stopTracking,
   reconcile: fx.reconcile,
@@ -117,6 +122,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fx.onStream = false;
   fx.keys = [];
+  fx.videos = [];
   fx.resolveSpeed.mockImplementation(
     (
       keys: string[],
@@ -167,6 +173,44 @@ describe("content media events", () => {
     expect(fx.controlLive).toHaveBeenCalled();
     expect(fx.updateTimeBadge).not.toHaveBeenCalled();
     expect(fx.flashBadge).not.toHaveBeenCalled();
+  });
+});
+
+describe("content graph samplers", () => {
+  it("does not run the buffer sampler before a page has video", async () => {
+    await loadIndex();
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(fx.recordBufferSample).not.toHaveBeenCalled();
+  });
+
+  it("starts the buffer sampler after video appears", async () => {
+    await loadIndex();
+    const v = media(false);
+    fx.videos = [v];
+
+    v.dispatchEvent(new Event("play"));
+    await vi.advanceTimersByTimeAsync(1001);
+
+    expect(fx.recordBufferSample).toHaveBeenCalled();
+  });
+
+  it("stops the buffer sampler when the page no longer has video", async () => {
+    await loadIndex();
+    const v = media(false);
+    fx.videos = [v];
+    v.dispatchEvent(new Event("play"));
+    await vi.advanceTimersByTimeAsync(1001);
+    fx.recordBufferSample.mockClear();
+
+    fx.videos = [];
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(fx.recordBufferSample).toHaveBeenCalled();
+    const callsAfterStop = fx.recordBufferSample.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fx.recordBufferSample).toHaveBeenCalledTimes(callsAfterStop);
   });
 });
 
