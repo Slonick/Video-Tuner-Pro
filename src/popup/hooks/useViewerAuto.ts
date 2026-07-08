@@ -72,10 +72,16 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
     },
     [setMode],
   );
-  const setEnabled = useCallback((next: boolean) => {
-    setEnabledState(next);
-    STORE.set({ viewerAutoEnabled: next });
-  }, []);
+  const setEnabled = useCallback(
+    (next: boolean) => {
+      const prev = enabled;
+      setEnabledState(next);
+      STORE.set({ viewerAutoEnabled: next }, (ok) => {
+        if (ok === false) setEnabledState(prev);
+      });
+    },
+    [enabled],
+  );
   useStored(["viewerAutoEnabled"], (r) => setEnabledState(r.viewerAutoEnabled !== false));
 
   const applyResolved = useCallback(

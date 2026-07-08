@@ -627,6 +627,20 @@ describe("viewer auto-open scope control", () => {
     );
   });
 
+  it("rolls back the global viewer-mode switch when storage rejects it", async () => {
+    const { saved } = await mountApp({
+      tab: YT,
+      settings: { viewerAutoEnabled: true },
+      failSetKeys: ["viewerAutoEnabled"],
+    });
+
+    click("viewerAutoToggle");
+    await flush();
+
+    expect(saved().viewerAutoEnabled).toBe(true);
+    expect(byId("viewerAutoToggle").getAttribute("aria-checked")).toBe("true");
+  });
+
   it("uses the inner auto-open switch without changing page state", async () => {
     const { lastCall } = await mountApp({
       tab: YT,
