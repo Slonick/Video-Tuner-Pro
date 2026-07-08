@@ -137,6 +137,11 @@ describe("normalizeKeymap", () => {
     expect(km.slower).toBe("KeyZ");
     expect(km.faster).not.toBe("KeyZ");
   });
+  it("keeps a core action bound when a corrupt blob duplicates its default key", () => {
+    const km = normalizeKeymap({ slower: "KeyD", faster: "KeyD" });
+    expect(km.slower).toBe("KeyA");
+    expect(km.faster).toBe("KeyD");
+  });
   it("does not let a default binding shadow a later stored action", () => {
     const km = normalizeKeymap({ reset: "KeyO", viewer: "KeyV", theater: "KeyT" });
     expect(km.reset).toBe("KeyO");

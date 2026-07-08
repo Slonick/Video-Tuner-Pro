@@ -181,11 +181,23 @@ export function normalizeKeymap(raw: unknown): Keymap {
   const legacy = !!raw && typeof raw === "object";
   const used = new Set<string>();
 
-  for (const a of ACTIONS) {
+  for (let i = 0; i < ACTIONS.length; i++) {
+    const a = ACTIONS[i];
     const code = src[a];
+    const defaultOwner =
+      typeof code === "string" && isBindableCode(code)
+        ? ACTIONS.find((action) => DEFAULT_KEYMAP[action] === code)
+        : null;
+    const laterDefaultOwnerWantsCode =
+      !!defaultOwner && ACTIONS.indexOf(defaultOwner) > i && src[defaultOwner] === code;
     if (code === "") {
       out[a] = ""; // explicitly unbound — the action does nothing
-    } else if (typeof code === "string" && isBindableCode(code) && !used.has(code)) {
+    } else if (
+      typeof code === "string" &&
+      isBindableCode(code) &&
+      !used.has(code) &&
+      !laterDefaultOwnerWantsCode
+    ) {
       out[a] = code;
     } else if (legacy && (a === "viewer" || a === "theater") && !(a in src)) {
       out[a] = "";
