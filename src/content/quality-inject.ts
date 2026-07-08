@@ -46,6 +46,8 @@
   const ROOT_PICK_ATTR = "data-vtp-quality-pick";
   const ROOT_RESP_ATTR = "data-vtp-quality-response";
   const ROOT_DEBUG_ATTR = "data-vtp-quality-debug";
+  const MAX_CAPTURED_PLAYERS = 8;
+  const MAX_CAPTURED_HLS = 8;
 
   interface QualityOption {
     id: string;
@@ -68,10 +70,37 @@
     set: (id: string) => void | Promise<void>;
   }
 
+  function pruneCapturedPlayers(): void {
+    const entries = win.__vtpQualityPlayers || [];
+    win.__vtpQualityPlayers = entries
+      .filter((entry) => !entry.video || entry.video.isConnected)
+      .slice(-MAX_CAPTURED_PLAYERS);
+  }
+
+  function pruneCapturedHls(): void {
+    const entries = win.__vtpQualityHls || [];
+    win.__vtpQualityHls = entries
+      .filter((entry) => {
+        const media = entry.hls.media;
+        if (media instanceof HTMLMediaElement) return media.isConnected;
+        return !!entry.video?.isConnected;
+      })
+      .slice(-MAX_CAPTURED_HLS);
+  }
+
+  function pruneCapturedState(): void {
+    pruneCapturedPlayers();
+    pruneCapturedHls();
+  }
+
   function capturePlayer(player: unknown): unknown {
     if (!player || typeof player !== "object") return player;
+    pruneCapturedPlayers();
     const existing = win.__vtpQualityPlayers!.find((entry) => entry.player === player);
     if (!existing) win.__vtpQualityPlayers!.push({ player, video: null });
+    if (win.__vtpQualityPlayers!.length > MAX_CAPTURED_PLAYERS) {
+      win.__vtpQualityPlayers = win.__vtpQualityPlayers!.slice(-MAX_CAPTURED_PLAYERS);
+    }
     const entry = existing || win.__vtpQualityPlayers![win.__vtpQualityPlayers!.length - 1];
     const rec = player as Record<string, unknown>;
     const attach = rec.attachHTMLVideoElement;
@@ -153,12 +182,16 @@
   }
 
   function captureHls(hls: HlsLike, video: HTMLVideoElement | null): void {
+    pruneCapturedHls();
     const existing = win.__vtpQualityHls!.find((entry) => entry.hls === hls);
     if (existing) {
       if (video) existing.video = video;
       return;
     }
     win.__vtpQualityHls!.push({ hls, video });
+    if (win.__vtpQualityHls!.length > MAX_CAPTURED_HLS) {
+      win.__vtpQualityHls = win.__vtpQualityHls!.slice(-MAX_CAPTURED_HLS);
+    }
   }
 
   function hookHlsConstructor(value: unknown): boolean {
@@ -167,8 +200,9 @@
     const attach = proto?.attachMedia;
     if (!proto || typeof attach !== "function" || proto.__vtpWrapped) return !!proto?.__vtpWrapped;
     proto.attachMedia = function (this: HlsLike, media: HTMLMediaElement, ...args: unknown[]) {
+      const result = attach.apply(this, [media, ...args] as unknown as [HTMLMediaElement]);
       if (media instanceof HTMLVideoElement) captureHls(this, media);
-      return attach.apply(this, [media, ...args] as unknown as [HTMLMediaElement]);
+      return result;
     };
     proto.__vtpWrapped = true;
     return true;
@@ -500,6 +534,7 @@
   }
   function hlsAdapter(v: HTMLVideoElement): Adapter | null {
     let hls: HlsLike | null = null;
+    pruneCapturedHls();
     for (const entry of win.__vtpQualityHls || []) {
       if (entry.hls.media instanceof HTMLVideoElement && entry.video !== entry.hls.media)
         entry.video = entry.hls.media;
@@ -915,6 +950,7 @@
   }
   function ivsAdapter(v: HTMLVideoElement): Adapter | null {
     let player: IvsLike | null = null;
+    pruneCapturedPlayers();
     for (const entry of win.__vtpQualityPlayers || []) {
       const p = entry.player as IvsLike;
       if (typeof p?.getQualities !== "function" || typeof p?.setQuality !== "function") continue;
@@ -927,7 +963,7 @@
           /* not ready */
         }
       }
-      if (!pv || pv === v) {
+      if (pv === v) {
         player = p;
         break;
       }
@@ -982,6 +1018,7 @@
   }
 
   function adapterFor(v: HTMLVideoElement): Adapter | null {
+    pruneCapturedState();
     const find = (): Adapter | null =>
       youtubeAdapter(v) ||
       ivsAdapter(v) ||
@@ -1097,6 +1134,7 @@
     adapter: Adapter | null,
     presetOptions?: QualityOption[],
     presetCurrent?: string,
+    debugVideoId?: unknown,
   ): Promise<void> {
     if (!isActiveBridge()) return;
     const options = presetOptions || (adapter ? await adapter.options() : []);
@@ -1111,9 +1149,12 @@
       current,
     };
     document.documentElement.setAttribute(ROOT_RESP_ATTR, JSON.stringify(payload));
-    if (!adapter || options.length < 2) {
+    const debugEnabled = document.documentElement.getAttribute(ROOT_DEBUG_ATTR) === "1";
+    if (debugEnabled && (!adapter || options.length < 2)) {
       try {
-        const video = videoById(document.documentElement.getAttribute(ROOT_VIDEO_ATTR));
+        const video = videoById(
+          debugVideoId ?? document.documentElement.getAttribute(ROOT_VIDEO_ATTR),
+        );
         if (video) {
           const debug = debugFor(video, adapter);
           document.documentElement.setAttribute(ROOT_DEBUG_ATTR, debug);
@@ -1151,10 +1192,16 @@
         if (!isActiveBridge()) return;
         const current = d.qualityId;
         const selected = before.map((opt) => ({ ...opt, current: opt.id === current }));
-        await respond(d.requestId, adapter, selected.length ? selected : undefined, current);
+        await respond(
+          d.requestId,
+          adapter,
+          selected.length ? selected : undefined,
+          current,
+          d.videoId,
+        );
         return;
       }
-      await respond(d.requestId, adapter);
+      await respond(d.requestId, adapter, undefined, undefined, d.videoId);
     } finally {
       rootsCache = new WeakMap();
     }
