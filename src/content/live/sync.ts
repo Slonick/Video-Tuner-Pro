@@ -68,7 +68,9 @@ function setLiveRate(video: HTMLVideoElement, rate: number, decisionChanged: boo
 // Dispatcher: on a live stream, speed is controlled ONLY here. Sync OFF → hold
 // 100%. Sync ON → auto catch-up. Throttled: the indicator writes to the DOM,
 // which re-triggers the observer.
-export function controlLive(): void {
+export function controlLive(
+  snapshot: { live?: HTMLVideoElement | null; onStream?: boolean } = {},
+): void {
   if (!ctxValid()) {
     teardown();
     return;
@@ -76,7 +78,7 @@ export function controlLive(): void {
   const now = Date.now();
   if (now - lastControlAt < 250) return;
   lastControlAt = now;
-  const live = liveVideo();
+  const live = snapshot.live !== undefined ? snapshot.live : liveVideo();
   if (live !== activeLiveVideo) {
     activeLiveVideo = live;
     lastStepAt = 0;
@@ -91,7 +93,7 @@ export function controlLive(): void {
   // Not a live stream. Wait out the sticky window, then restore the user's
   // intended non-live speed — otherwise a (mistaken) live detection would leave
   // playback stuck at 100%.
-  if (onStreamPage()) return;
+  if (snapshot.onStream !== undefined ? snapshot.onStream : onStreamPage()) return;
   if (S.speedManual) return;
   if (Math.abs(S.currentSpeed - S.userSpeed) > 0.001) {
     S.currentSpeed = S.userSpeed;

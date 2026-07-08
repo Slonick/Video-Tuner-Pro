@@ -229,9 +229,10 @@ function applyToVideo(video: HTMLVideoElement, primaryLive: boolean): void {
   video.addEventListener("loadedmetadata", resetDvr);
 
   // Re-evaluate live state as the stream loads and as playback progresses.
-  video.addEventListener("durationchange", controlLive);
-  video.addEventListener("loadedmetadata", controlLive);
-  video.addEventListener("timeupdate", controlLive);
+  const reevaluateLive = () => controlLive();
+  video.addEventListener("durationchange", reevaluateLive);
+  video.addEventListener("loadedmetadata", reevaluateLive);
+  video.addEventListener("timeupdate", reevaluateLive);
 }
 
 // <audio> never gets a badge, live-sync, or the compressor — just the rate.
@@ -277,9 +278,16 @@ export function resetAudios(): void {
   publishAudioRate(); // toggle is off now — clear the bridge so the page world resets too
 }
 
-export function applyAll(): void {
-  const videos = collectVideos();
-  const primaryLive = videos.length ? activePrimaryIsLive() : false;
+export function applyAll(
+  snapshot: { videos?: HTMLVideoElement[]; primaryLive?: boolean } = {},
+): void {
+  const videos = snapshot.videos ?? collectVideos();
+  const primaryLive =
+    snapshot.primaryLive !== undefined
+      ? snapshot.primaryLive
+      : videos.length
+        ? activePrimaryIsLive()
+        : false;
   videos.forEach((v) => applyToVideo(v, primaryLive));
   videos.forEach(probeLive); // sample media edge for generic live detection
   applyAudioComp(videos);

@@ -337,11 +337,13 @@ export function applyBadgeGlass(): void {
 }
 
 // video and auto-hides after a moment.
-export function updateTimeBadge(): void {
+export function updateTimeBadge(
+  snapshot: { video?: HTMLVideoElement | null; stream?: boolean; anchor?: HTMLElement | null } = {},
+): void {
   removeCurrentStaleBadgeHost();
-  const v = primaryVideo();
-  const anchor = viewerAnchorVideo() ?? v;
-  const stream = onStreamPage();
+  const v = snapshot.video !== undefined ? snapshot.video : primaryVideo();
+  const anchor = snapshot.anchor !== undefined ? snapshot.anchor : (viewerAnchorVideo() ?? v);
+  const stream = snapshot.stream !== undefined ? snapshot.stream : onStreamPage();
   // Two independent toggles: streamBadge for live, showRemaining for VODs. VODs
   // also need a real finite duration (to compute remaining); streams don't —
   // they show latency/buffer seconds, so skip the duration check there.

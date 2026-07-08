@@ -221,10 +221,10 @@ export function collectAudios(): HTMLAudioElement[] {
 }
 
 // Main playback surface — what the overlay/badge anchors to.
-export function primaryVideo(): HTMLVideoElement | null {
+export function primaryVideoFrom(videos: HTMLVideoElement[]): HTMLVideoElement | null {
   const candidates: { video: HTMLVideoElement; area: number }[] = [];
   let largestArea = 0;
-  for (const v of collectVideos()) {
+  for (const v of videos) {
     const r = v.getBoundingClientRect();
     if (r.width < 40 || r.height < 40) continue;
     const area = r.width * r.height;
@@ -243,6 +243,10 @@ export function primaryVideo(): HTMLVideoElement | null {
     }
   }
   return best;
+}
+
+export function primaryVideo(): HTMLVideoElement | null {
+  return primaryVideoFrom(collectVideos());
 }
 
 export function markDrmVideo(video: HTMLVideoElement): void {

@@ -185,9 +185,9 @@ export function probeLive(v: HTMLVideoElement): void {
 
 // Pick the main live <video>: prefer the one that's actually playing and largest,
 // so tiny preview/ad players don't make detection flicker on/off.
-export function liveVideo(): HTMLVideoElement | null {
+export function liveVideoFrom(videos: HTMLVideoElement[]): HTMLVideoElement | null {
   const candidates: { video: HTMLVideoElement; area: number }[] = [];
-  for (const v of collectVideos()) {
+  for (const v of videos) {
     if (!isLive(v)) continue;
     const r = v.getBoundingClientRect();
     if (r.width < 40 || r.height < 40) continue;
@@ -208,10 +208,14 @@ export function liveVideo(): HTMLVideoElement | null {
   return best;
 }
 
+export function liveVideo(): HTMLVideoElement | null {
+  return liveVideoFrom(collectVideos());
+}
+
 // True if this page is a live stream, staying sticky through brief detection
 // flickers (quality switches momentarily report a finite duration on Twitch).
-export function onStreamPage(): boolean {
-  if (liveVideo()) return true;
+export function onStreamPage(live?: HTMLVideoElement | null): boolean {
+  if (live === undefined ? liveVideo() : live) return true;
   if (Date.now() - dvrSeenAt < 6000) return false; // scrubbed back into the DVR buffer
   return Date.now() - liveSeenAt < 6000;
 }

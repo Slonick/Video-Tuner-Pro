@@ -5,6 +5,7 @@ const fx = vi.hoisted(() => ({
   applyAll: vi.fn(),
   controlLive: vi.fn(),
   updateTimeBadge: vi.fn(),
+  updateLauncher: vi.fn(),
   flashBadge: vi.fn(),
   startTracking: vi.fn(),
   stopTracking: vi.fn(),
@@ -14,6 +15,7 @@ const fx = vi.hoisted(() => ({
   addStorageListener: vi.fn(),
   keys: [] as string[],
   videos: [] as HTMLVideoElement[],
+  live: null as HTMLVideoElement | null,
   resolveSpeed: vi.fn(),
   onStream: false,
 }));
@@ -50,7 +52,12 @@ vi.mock("../src/shared/presets.js", () => ({
 }));
 vi.mock("../src/content/speed.js", () => ({ applyAll: fx.applyAll, reassertRate: vi.fn() }));
 vi.mock("../src/content/live/sync.js", () => ({ controlLive: fx.controlLive }));
-vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => fx.onStream }));
+vi.mock("../src/content/live/detection.js", () => ({
+  isLive: (v: HTMLVideoElement) => v === fx.live,
+  liveVideoFrom: (videos: HTMLVideoElement[]) => videos.find((v) => v === fx.live) ?? null,
+  onStreamPage: (live?: HTMLVideoElement | null) =>
+    live === undefined ? fx.onStream : !!live || fx.onStream,
+}));
 vi.mock("../src/content/live/target.js", () => ({ applyResolvedTargetFromStore: vi.fn() }));
 vi.mock("../src/content/audio/compressor.js", () => ({ applyAudioComp: vi.fn() }));
 vi.mock("../src/content/audio/status.js", () => ({ engageAudio: vi.fn() }));
@@ -60,7 +67,7 @@ vi.mock("../src/content/badge/overlay.js", () => ({
   ownsBadgeNode: () => false,
 }));
 vi.mock("../src/content/overlay/launcher.js", () => ({
-  updateLauncher: vi.fn(),
+  updateLauncher: fx.updateLauncher,
   ownsLauncherNode: () => false,
 }));
 vi.mock("../src/content/viewer.js", () => ({
@@ -88,6 +95,7 @@ vi.mock("../src/content/bitrate.js", () => ({
 }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => fx.videos,
+  primaryVideoFrom: (videos: HTMLVideoElement[]) => videos[0] ?? null,
   startTracking: fx.startTracking,
   stopTracking: fx.stopTracking,
   reconcile: fx.reconcile,
@@ -121,6 +129,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   fx.onStream = false;
+  fx.live = null;
   fx.keys = [];
   fx.videos = [];
   fx.resolveSpeed.mockImplementation(
@@ -177,6 +186,20 @@ describe("content media events", () => {
 });
 
 describe("content graph samplers", () => {
+  it("passes one media snapshot through the background tick", async () => {
+    const v = media(false);
+    fx.videos = [v];
+    fx.live = v;
+    await loadIndex();
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(fx.applyAll).toHaveBeenCalledWith({ videos: [v], primaryLive: true });
+    expect(fx.controlLive).toHaveBeenCalledWith({ live: v, onStream: true });
+    expect(fx.updateTimeBadge).toHaveBeenCalledWith({ video: v, stream: true });
+    expect(fx.updateLauncher).toHaveBeenCalledWith({ primary: v });
+  });
+
   it("does not run the buffer sampler before a page has video", async () => {
     await loadIndex();
 

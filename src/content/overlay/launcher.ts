@@ -943,14 +943,14 @@ export function applyLauncherGlass(): void {
   host?.style.setProperty("--glass-opacity", String(S.glassOpacity));
 }
 
-export function updateLauncher(): void {
+export function updateLauncher(snapshot: { primary?: HTMLVideoElement | null } = {}): void {
   resetDetachedHost();
   const paused = viewerLayoutPaused();
   const viewerAnchor = viewerAnchorVideo();
   if (viewerAnchor) {
     fabVideo = viewerAnchor;
   } else if (!paused || !fabVideo) {
-    fabVideo = primaryVideo();
+    fabVideo = snapshot.primary !== undefined ? snapshot.primary : primaryVideo();
   }
   // No video to overlay → nothing can show; close any open popup and hide the FAB.
   if (!fabVideo) {

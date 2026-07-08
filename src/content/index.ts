@@ -16,7 +16,7 @@ import { normalizePresetSet } from "../shared/presets.js";
 import { S } from "./state.js";
 import { applyAll, reassertRate } from "./speed.js";
 import { controlLive } from "./live/sync.js";
-import { onStreamPage } from "./live/detection.js";
+import { isLive, liveVideoFrom, onStreamPage } from "./live/detection.js";
 import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
@@ -30,7 +30,14 @@ import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
 import { applyResolvedViewerAutoFromStore } from "./viewer-auto.js";
 import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
-import { collectVideos, startTracking, stopTracking, reconcile, markDrmVideo } from "./videos.js";
+import {
+  collectVideos,
+  primaryVideoFrom,
+  startTracking,
+  stopTracking,
+  reconcile,
+  markDrmVideo,
+} from "./videos.js";
 import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
@@ -276,14 +283,19 @@ function tick() {
     lastReconcileAt = now;
     reconcile(); // rare backstop for shadow roots attached to pre-existing elements
   }
-  applyAll();
-  controlLive();
-  updateTimeBadge();
-  updateLauncher();
+  const videos = collectVideos();
+  const primary = primaryVideoFrom(videos);
+  const live = liveVideoFrom(videos);
+  const stream = onStreamPage(live);
+  const primaryLive = primary ? isLive(primary) : stream;
+  applyAll({ videos, primaryLive });
+  controlLive({ live, onStream: stream });
+  updateTimeBadge({ video: primary, stream });
+  updateLauncher({ primary });
   const keys = channelKeys();
   if (keys.length && !sameChannelKeys(lastChannelKeys, keys))
     reresolve(preferKnownChannelKeys(keys));
-  const videoCount = collectVideos().length;
+  const videoCount = videos.length;
   syncBufferSampler(videoCount > 0);
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
