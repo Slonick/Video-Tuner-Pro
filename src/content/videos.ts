@@ -9,12 +9,14 @@ export const seenAudios = new WeakSet<HTMLAudioElement>();
 // shadow root found to contain media, so additions (and in-place swaps, e.g. a
 // quality change recreating the <video> inside a player's shadow root) are caught
 // as they happen. Consumers read the set instead of re-walking the document, so the
-// hot path is O(tracked media), not O(DOM size). reconcile() is the only full walk
-// left and runs only as a rare backstop (see index.ts).
+// hot path is O(tracked media), not O(DOM size). The initial seed is the only
+// full walk; periodic reconcile() uses a cheaper media-only pass plus known
+// shadow-host checks (see index.ts).
 const trackedVideos = new Set<HTMLVideoElement>();
 const trackedAudios = new Set<HTMLAudioElement>();
 const drmVideos = new WeakSet<HTMLVideoElement>();
 const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
+const shadowHostCandidates = new Set<Element>();
 const ADOPTED_VIEWER_VIDEO = "data-vtp-viewer-adopted-video";
 let observer: MutationObserver | null = null;
 let tracking = false;
@@ -62,6 +64,10 @@ function handleShadow(el: Element): boolean {
   return added;
 }
 
+function rememberShadowHostCandidate(el: Element): void {
+  if (!isOwnNode(el)) shadowHostCandidates.add(el);
+}
+
 // Walk `root` once, registering any media and recursing through open shadow roots
 // (including `root`'s own shadow root, which querySelectorAll can't reach). Returns
 // whether any NEW media element was registered (used to decide whether a re-apply
@@ -71,6 +77,7 @@ function scanTree(root: ParentNode): boolean {
   let added = false;
   if (root instanceof Element) {
     if (isOwnNode(root)) return false;
+    rememberShadowHostCandidate(root);
     if (addMedia(root)) added = true;
     if (handleShadow(root)) added = true;
   }
@@ -81,6 +88,7 @@ function scanTree(root: ParentNode): boolean {
     return added;
   }
   for (const el of all) {
+    rememberShadowHostCandidate(el);
     if (addMedia(el)) added = true;
     if (handleShadow(el)) added = true;
   }
@@ -90,6 +98,7 @@ function scanTree(root: ParentNode): boolean {
 function scanAddedElement(root: Element): boolean {
   let added = false;
   if (isOwnNode(root)) return false;
+  rememberShadowHostCandidate(root);
   if (addMedia(root)) added = true;
   if (handleShadow(root)) added = true;
   try {
@@ -98,8 +107,33 @@ function scanAddedElement(root: Element): boolean {
     return added;
   }
   for (const el of root.querySelectorAll("*")) {
+    rememberShadowHostCandidate(el);
     if (addMedia(el)) added = true;
     if (handleShadow(el)) added = true;
+  }
+  return added;
+}
+
+function scanDirectMedia(root: ParentNode): boolean {
+  let added = false;
+  try {
+    for (const media of root.querySelectorAll("video,audio")) {
+      if (addMedia(media)) added = true;
+    }
+  } catch (e) {
+    /* inaccessible root */
+  }
+  return added;
+}
+
+function scanKnownShadowHosts(): boolean {
+  let added = false;
+  for (const host of Array.from(shadowHostCandidates)) {
+    if (!host.isConnected || isOwnNode(host)) {
+      shadowHostCandidates.delete(host);
+      continue;
+    }
+    if (handleShadow(host)) added = true;
   }
   return added;
 }
@@ -142,14 +176,17 @@ export function stopTracking(): void {
     observer.disconnect();
     observer = null;
   }
+  shadowHostCandidates.clear();
 }
 
-// Full shadow-piercing scan → merge into the set and observe any media-bearing
-// roots. The rare backstop for the one case the observer can't see: a shadow root
-// attached to an element that was already present (attachShadow fires no mutation).
-// Called from the background tick at a slow cadence, not per consumer call.
+// Cheap backstop for the cases the observer can miss: direct media added without a
+// mutation callback we saw, or a shadow root attached to a known element
+// (attachShadow fires no mutation). Called from the background tick at a slow
+// cadence, not per consumer call.
 export function reconcile(): boolean {
-  return scanTree(document);
+  const addedDirect = scanDirectMedia(document);
+  const addedShadow = scanKnownShadowHosts();
+  return addedDirect || addedShadow;
 }
 
 // Read the tracked videos, dropping any that have since left the DOM (lazy prune —

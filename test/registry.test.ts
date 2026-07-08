@@ -167,4 +167,18 @@ describe("media registry — reconcile backstop", () => {
     reconcile();
     expect(collectVideos()).toHaveLength(1);
   });
+
+  it("does not full-scan the document during reconcile", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    track();
+    await flush();
+    const queryAll = vi.spyOn(document, "querySelectorAll");
+
+    host.attachShadow({ mode: "open" }).appendChild(document.createElement("video"));
+    reconcile();
+
+    expect(collectVideos()).toHaveLength(1);
+    expect(queryAll).not.toHaveBeenCalledWith("*");
+  });
 });
