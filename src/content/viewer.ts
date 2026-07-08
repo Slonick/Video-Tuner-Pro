@@ -80,6 +80,7 @@ let media: AbortController | null = null; // per-session media/UI listeners
 let marksEl: HTMLDivElement | null = null; // chapter ticks + sponsor bands layer
 let markerTipEl: HTMLDivElement | null = null;
 let marksLoaded = false; // duration arrived and the layer was populated
+let marksSourceKey = "";
 let markerRanges: MarkerRange[] = [];
 let activeMarker: MarkerRange | null = null;
 // Chapters are read from the site player's own progress bar BEFORE the video
@@ -1300,6 +1301,24 @@ function clearMarkerHover(): void {
   clearMarkerHighlight();
 }
 
+function markerSourceKey(v: HTMLVideoElement): string {
+  return `${v.currentSrc || v.src || ""}|${Number.isFinite(v.duration) ? v.duration : ""}`;
+}
+
+function resetMarkersForSource(): void {
+  if (!video) return;
+  const key = markerSourceKey(video);
+  if (key === marksSourceKey) return;
+  marksSourceKey = key;
+  marksLoaded = false;
+  marksEl?.replaceChildren();
+  markerRanges = [];
+  activeMarker = null;
+  clearMarkerHover();
+  pendingChapters =
+    isYouTube() && Number.isFinite(video.duration) ? readYouTubeChapters(video.duration) : [];
+}
+
 function showMarkerHover(e: PointerEvent): void {
   if (!seekWrapEl || !markerTipEl || !video) return;
   const timeline = mediaTimeline(video);
@@ -1330,6 +1349,7 @@ async function loadMarkers(): Promise<void> {
   if (!marksEl || !video) return;
   const dur = video.duration;
   if (!Number.isFinite(dur) || dur <= 0) return;
+  marksSourceKey = markerSourceKey(video);
   marksLoaded = true;
   marksEl.textContent = "";
   markerRanges = [];
@@ -1422,6 +1442,15 @@ function wireVideo(v: HTMLVideoElement): void {
   v.addEventListener(
     "durationchange",
     () => {
+      resetMarkersForSource();
+      if (!marksLoaded) loadMarkers();
+    },
+    opt,
+  );
+  v.addEventListener(
+    "loadedmetadata",
+    () => {
+      resetMarkersForSource();
       if (!marksLoaded) loadMarkers();
     },
     opt,
@@ -1684,6 +1713,7 @@ export function exitViewer(): void {
     styleGuard = null;
     pendingChapters = [];
     marksLoaded = false;
+    marksSourceKey = "";
     markerRanges = [];
     activeMarker = null;
     if (video) {

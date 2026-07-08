@@ -390,6 +390,38 @@ describe("launcher — open / close", () => {
     expect(S.overlayBtnPos).not.toBeNull();
   });
 
+  it("finishes a drag on document pointerup if the FAB lost pointer capture", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    const fab = fabEl()!;
+    fire(fab, "pointerdown", 580, 158);
+    fire(fab, "pointermove", 100, 100);
+    fire(document, "pointerup", 100, 100);
+    const leftAfterDrop = fab.style.left;
+    fire(fab, "pointermove", 200, 200);
+
+    expect(frameEl()?.style.display ?? "none").not.toBe("block");
+    expect(S.overlayBtnPos).not.toBeNull();
+    expect(fab.style.left).toBe(leftAfterDrop);
+  });
+
+  it("cancels a drag on window blur without saving the transient position", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    const fab = fabEl()!;
+    fire(fab, "pointerdown", 580, 158);
+    fire(fab, "pointermove", 100, 100);
+    window.dispatchEvent(new Event("blur"));
+    const leftAfterBlur = fab.style.left;
+    fire(fab, "pointermove", 200, 200);
+
+    expect(frameEl()?.style.display ?? "none").not.toBe("block");
+    expect(S.overlayBtnPos).toBeNull();
+    expect(fab.style.left).toBe(leftAfterBlur);
+  });
+
   it("does not mutate the previous button-position map while saving a drag", () => {
     const map = { other: { fx: 0.1, fy: 0.2 } };
     STORE.set({ overlayBtnPos: map });

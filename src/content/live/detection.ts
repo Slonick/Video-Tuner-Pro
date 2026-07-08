@@ -19,9 +19,9 @@ interface DvrState {
   lastMediaTime: number;
 }
 
-let dvrGeneration = 0;
 let dvrSeenAt = 0;
-const dvrState = new WeakMap<HTMLVideoElement, DvrState>();
+let dvrGeneration = 0;
+let dvrState = new WeakMap<HTMLVideoElement, DvrState>();
 
 function dvrActive(video: HTMLVideoElement): boolean {
   const state = dvrState.get(video);
@@ -65,6 +65,12 @@ export function trackDvr(video: HTMLVideoElement): void {
 export function resetDvr(): void {
   dvrGeneration++;
   dvrSeenAt = 0;
+}
+
+export function resetDvrFor(video: HTMLVideoElement): void {
+  const state = dvrState.get(video);
+  dvrState.delete(video);
+  if (state?.active) dvrSeenAt = 0;
 }
 
 // A live edge has no real length. Chromium signals that with duration === Infinity;

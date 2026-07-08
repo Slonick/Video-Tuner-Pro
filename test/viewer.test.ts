@@ -105,6 +105,7 @@ const viewerBackdropVisual = () =>
   overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLElement | null;
 const viewerBackdropVideo = () =>
   overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLVideoElement | null;
+const chapterMarks = () => Array.from(barEl()?.querySelectorAll(".mark-chapter") ?? []);
 
 function setFullscreen(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
@@ -549,6 +550,38 @@ describe("control bar", () => {
     expect(v.currentTime).toBe(50);
     v.dispatchEvent(new Event("timeupdate"));
     expect(barTime()).toBe("0:50 / 1:40");
+  });
+
+  it("reloads seek markers when a SPA swaps the source on the same video", async () => {
+    vi.stubGlobal("location", { hostname: "www.youtube.com" });
+    try {
+      let src = "blob:first";
+      const { v } = makeVideo(100);
+      Object.defineProperty(v, "currentSrc", { get: () => src, configurable: true });
+      const bar = document.createElement("div");
+      bar.className = "ytp-chapters-container";
+      const first = document.createElement("div");
+      const second = document.createElement("div");
+      first.getBoundingClientRect = () => ({ width: 50 }) as DOMRect;
+      second.getBoundingClientRect = () => ({ width: 50 }) as DOMRect;
+      bar.append(first, second);
+      document.body.append(bar);
+      h.primary = v;
+
+      await openViewer("normal");
+      expect((chapterMarks()[0] as HTMLElement).style.width).toBe("50%");
+
+      src = "blob:second";
+      first.getBoundingClientRect = () => ({ width: 25 }) as DOMRect;
+      second.getBoundingClientRect = () => ({ width: 75 }) as DOMRect;
+      v.dispatchEvent(new Event("durationchange"));
+      await flush();
+
+      expect(chapterMarks()).toHaveLength(2);
+      expect((chapterMarks()[0] as HTMLElement).style.width).toBe("25%");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("volume and mute drive the media element", async () => {

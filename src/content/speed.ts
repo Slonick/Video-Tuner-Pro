@@ -6,7 +6,7 @@ import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
 import { collectVideos, collectAudios, primaryVideo, seenVideos, seenAudios } from "./videos.js";
-import { isLive, probeLive, onStreamPage, trackDvr, resetDvr } from "./live/detection.js";
+import { isLive, probeLive, onStreamPage, trackDvr, resetDvrFor } from "./live/detection.js";
 import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { updateBadge } from "./badge/icon.js";
@@ -226,7 +226,7 @@ function applyToVideo(video: HTMLVideoElement, primaryLive: boolean): void {
   // the fresh value; reset it when new content loads.
   video.addEventListener("seeking", () => trackDvr(video));
   video.addEventListener("timeupdate", () => trackDvr(video));
-  video.addEventListener("loadedmetadata", resetDvr);
+  video.addEventListener("loadedmetadata", () => resetDvrFor(video));
 
   // Re-evaluate live state as the stream loads and as playback progresses.
   const reevaluateLive = () => controlLive();

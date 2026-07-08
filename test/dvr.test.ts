@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isLive, onStreamPage, trackDvr, resetDvr } from "../src/content/live/detection.js";
+import {
+  isLive,
+  onStreamPage,
+  trackDvr,
+  resetDvr,
+  resetDvrFor,
+} from "../src/content/live/detection.js";
 
 // YouTube's control-bar LIVE badge — carries ytp-live-badge-is-livehead only when
 // playback sits at the live edge (verified against the real player). A bare
@@ -111,6 +117,19 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     const newVideo = setBadge(false);
     trackDvr(setTime(newVideo, 50));
     expect(isLive(newVideo)).toBe(true);
+  });
+
+  it("metadata loading on another video does not clear the main DVR state", () => {
+    const main = setBadge(false);
+    trackDvr(setTime(main, 1000));
+    trackDvr(setTime(main, 400));
+    expect(isLive(main)).toBe(false);
+
+    const preview = document.createElement("video");
+    resetDvrFor(preview);
+
+    expect(isLive(main)).toBe(false);
+    expect(onStreamPage()).toBe(false);
   });
 
   it("a fresh live video overrides another video's recent DVR sticky window", () => {

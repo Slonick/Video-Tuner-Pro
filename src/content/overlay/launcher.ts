@@ -81,6 +81,7 @@ let hoverY = 0;
 let fabVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let dragging = false;
 let moved = false;
+let dragPointerId: number | null = null;
 let dragDX = 0,
   dragDY = 0;
 let downX = 0,
@@ -599,6 +600,7 @@ function hookFabDrag(el: HTMLElement): void {
     if (e.button !== 0) return;
     dragging = true;
     moved = false;
+    dragPointerId = e.pointerId ?? -1;
     dragVideo = fabVideo;
     dragWasViewerOpen = !!dragVideo && dragVideo !== primaryVideo();
     try {
@@ -625,12 +627,13 @@ function hookFabDrag(el: HTMLElement): void {
     el.style.top = Math.round(e.clientY - dragDY) + "px";
     flashFab();
   });
-  const drop = () => {
+  const drop = (save = true) => {
     if (!dragging) return;
     dragging = false;
+    dragPointerId = null;
     el.style.cursor = "pointer";
     if (!moved) {
-      togglePopup();
+      if (save) togglePopup();
       return;
     }
     // Use what was true when the drag STARTED, not a fresh read: the viewer can
@@ -639,7 +642,7 @@ function hookFabDrag(el: HTMLElement): void {
     // while el's on-screen position still reflects the popped-out box — an
     // end-of-drag re-check would then compute garbage against a box the drag
     // never actually happened over.
-    if (!dragVideo) return;
+    if (!save || !dragVideo) return;
     const r = dragVideo.getBoundingClientRect();
     const pos = badgeFraction(el.getBoundingClientRect(), r);
     // While the viewer is open, fabVideo is the popped-out surface, not the page
@@ -656,11 +659,25 @@ function hookFabDrag(el: HTMLElement): void {
       if (fabVideo) positionFab(fabVideo);
     }
   };
-  el.addEventListener("pointerup", drop);
-  el.addEventListener("pointercancel", drop);
+  el.addEventListener("pointerup", () => drop());
+  el.addEventListener("pointercancel", () => drop(false));
+  const finishFromOutside = (e: PointerEvent) => {
+    if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
+    drop();
+  };
+  const cancelFromOutside = (e: PointerEvent) => {
+    if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
+    drop(false);
+  };
+  document.addEventListener("pointerup", finishFromOutside, true);
+  document.addEventListener("pointercancel", cancelFromOutside, true);
+  window.addEventListener("pointerup", finishFromOutside, true);
+  window.addEventListener("pointercancel", cancelFromOutside, true);
+  window.addEventListener("blur", () => drop(false), true);
   el.addEventListener("dblclick", (e) => {
     e.preventDefault();
     dragging = false;
+    dragPointerId = null;
     S.overlayBtnPos = null;
     if (fabVideo) positionFab(fabVideo);
     resetFabPos();
@@ -925,6 +942,8 @@ function resetDetachedHost(): void {
   if (!host || host.isConnected) return;
   radialOpen = false;
   open = false;
+  dragging = false;
+  dragPointerId = null;
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
   clearTimeout(radialCloseTimer);

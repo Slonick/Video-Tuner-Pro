@@ -11,6 +11,7 @@ const m = vi.hoisted(() => {
     list: [] as unknown[],
     graphs: new Map<unknown, unknown>(),
     setupGraph: vi.fn(),
+    routable: true,
     lastSkipVal: null as string | null,
     lastSkipByVideo: new Map<unknown, string | null>(),
     stream: false,
@@ -30,7 +31,7 @@ vi.mock("../src/content/videos.js", () => ({
 vi.mock("../src/content/audio/routing.js", () => ({
   audioContext: () => ({ currentTime: 0 }),
   audioGraphs: m.graphs,
-  graphForCurrentSource: (v: unknown) => m.graphs.get(v) ?? null,
+  graphForCurrentSource: (v: unknown) => (m.routable ? (m.graphs.get(v) ?? null) : null),
   setupGraph: m.setupGraph,
   hookAudioGesture: vi.fn(),
   resumeAudioCtx: vi.fn(),
@@ -64,6 +65,7 @@ describe("applyAudioComp param mapping", () => {
     m.compOn = true;
     m.lastSkipVal = null;
     m.lastSkipByVideo.clear();
+    m.routable = true;
     S.audioCompEnabled = true;
     S.audioCompThreshold = -40;
     S.audioCompKnee = 25;
@@ -126,6 +128,24 @@ describe("applyAudioComp param mapping", () => {
     expect(target(g.gain.gain)).toBe(1);
   });
 
+  it("ramps an existing graph transparent when routing yields during translation", () => {
+    m.compOn = false;
+    m.routable = false;
+    const v = {} as HTMLVideoElement;
+    const g = makeGraph();
+    m.graphs.set(v, g);
+    m.list = [v];
+    m.primary = v;
+
+    const res = applyAudioComp();
+
+    expect(res.engaged).toBe(1);
+    expect(m.setupGraph).not.toHaveBeenCalled();
+    expect(target(g.comp.ratio)).toBe(1);
+    expect(target(g.comp.threshold)).toBe(0);
+    expect(target(g.gain.gain)).toBe(1);
+  });
+
   it("skips re-poking params when nothing changed (same _key)", () => {
     const v = {} as HTMLVideoElement;
     const g = makeGraph();
@@ -161,6 +181,7 @@ describe("applyAudioComp routing decisions", () => {
     m.lastSkipVal = null;
     m.lastSkipByVideo.clear();
     m.setupGraph.mockReset();
+    m.routable = true;
     m.stream = false;
     S.autoSlowEnabled = false;
   });
