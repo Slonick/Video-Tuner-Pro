@@ -711,7 +711,7 @@ function sizeVideo(): void {
       "position:absolute !important;left:50% !important;top:50% !important;" +
       "transform:translate(-50%,-50%) !important;" +
       `width:${box.w}px !important;height:${box.h}px !important;` +
-      "border-radius:12px !important;box-shadow:0 24px 80px rgba(0,0,0,0.55) !important;" +
+      "border-radius:12px !important;box-shadow:0 32px 104px rgba(0,0,0,0.62),0 8px 28px rgba(0,0,0,0.35) !important;" +
       "overflow:hidden !important;background:#000 !important;z-index:1 !important;" +
       "will-change:transform,width,height,left,top,opacity !important;contain:paint !important;";
   }
