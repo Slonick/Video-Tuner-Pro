@@ -92,6 +92,9 @@ let desiredCss = "";
 let desiredShellCss = "";
 let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boolean } | null =
   null;
+let surfaceTransition: Animation | null = null;
+let surfaceTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+let surfaceTransitionToken = 0;
 let mirrored = false;
 let mirrorStream: MediaStream | null = null;
 let sourceRect: DOMRect | null = null;
@@ -485,35 +488,84 @@ function rectFrame(r: DOMRect, radius = "0px"): Keyframe {
   };
 }
 
-function animateSurfaceFrom(first: DOMRect | null): Animation | null {
+interface SurfaceFrame {
+  rect: DOMRect;
+  radius: string;
+}
+
+function frameFromRect(rect: DOMRect | null, radius = "0px"): SurfaceFrame | null {
+  return visibleRect(rect) ? { rect, radius } : null;
+}
+
+function currentSurfaceFrame(): SurfaceFrame | null {
   const shell = surfaceShell;
-  if (!canAnimate(shell) || !visibleRect(first)) return null;
+  if (!shell) return null;
+  const rect = shell.getBoundingClientRect();
+  if (!visibleRect(rect)) return null;
+  return {
+    rect,
+    radius: getComputedStyle(shell).borderRadius || shell.style.borderRadius || "0px",
+  };
+}
+
+function cancelSurfaceTransition(): void {
+  surfaceTransitionToken++;
+  if (surfaceTransitionTimer != null) {
+    clearTimeout(surfaceTransitionTimer);
+    surfaceTransitionTimer = null;
+  }
+  const anim = surfaceTransition;
+  surfaceTransition = null;
+  if (!anim) return;
+  anim.onfinish = null;
+  anim.oncancel = null;
+  try {
+    anim.cancel();
+  } catch (e) {}
+}
+
+function interruptSurfaceTransition(): SurfaceFrame | null {
+  const frame = currentSurfaceFrame();
+  cancelSurfaceTransition();
+  return frame;
+}
+
+function animateSurfaceFrom(first: SurfaceFrame | null): Animation | null {
+  const shell = surfaceShell;
+  if (!canAnimate(shell) || !first) return null;
   const last = shell.getBoundingClientRect();
   if (!visibleRect(last)) return null;
   const finalCss = desiredShellCss;
   const finalRadius = shell.style.borderRadius || "0px";
+  const token = ++surfaceTransitionToken;
   layoutPaused = true;
   if (bar) {
     bar.style.opacity = "0";
     bar.style.pointerEvents = "none";
   }
   Object.assign(shell.style, {
-    left: `${first.left}px`,
-    top: `${first.top}px`,
-    width: `${first.width}px`,
-    height: `${first.height}px`,
+    left: `${first.rect.left}px`,
+    top: `${first.rect.top}px`,
+    width: `${first.rect.width}px`,
+    height: `${first.rect.height}px`,
     transform: "none",
-    borderRadius: "0px",
+    borderRadius: first.radius,
   } as Partial<CSSStyleDeclaration>);
   shell.getBoundingClientRect();
-  const anim = shell.animate([rectFrame(first, "0px"), rectFrame(last, finalRadius)], {
+  const anim = shell.animate([rectFrame(first.rect, first.radius), rectFrame(last, finalRadius)], {
     duration: VIEWER_ANIM_MS,
     easing: "cubic-bezier(0.2, 0, 0, 1)",
   });
+  surfaceTransition = anim;
   let settled = false;
   const settle = () => {
-    if (settled || surfaceShell !== shell) return;
+    if (settled || surfaceShell !== shell || surfaceTransitionToken !== token) return;
     settled = true;
+    if (surfaceTransitionTimer != null) {
+      clearTimeout(surfaceTransitionTimer);
+      surfaceTransitionTimer = null;
+    }
+    if (surfaceTransition === anim) surfaceTransition = null;
     shell.style.cssText = finalCss;
     layoutPaused = false;
     layoutBar();
@@ -521,14 +573,18 @@ function animateSurfaceFrom(first: DOMRect | null): Animation | null {
     showBar();
   };
   anim.onfinish = settle;
-  window.setTimeout(settle, VIEWER_ANIM_MS + 80);
+  anim.oncancel = () => {
+    if (surfaceTransition === anim) surfaceTransition = null;
+  };
+  surfaceTransitionTimer = window.setTimeout(settle, VIEWER_ANIM_MS + 80);
   return anim;
 }
 
 function animateSurfaceTo(target: DOMRect | null): Animation | null {
   const shell = surfaceShell;
   if (!canAnimate(shell)) return null;
-  const first = shell.getBoundingClientRect();
+  const firstFrame = interruptSurfaceTransition();
+  const first = firstFrame?.rect ?? shell.getBoundingClientRect();
   if (!visibleRect(first) || !visibleRect(target)) {
     return shell.animate(
       [
@@ -542,7 +598,7 @@ function animateSurfaceTo(target: DOMRect | null): Animation | null {
       },
     );
   }
-  const startRadius = shell.style.borderRadius || "0px";
+  const startRadius = firstFrame?.radius || shell.style.borderRadius || "0px";
   Object.assign(shell.style, {
     left: `${first.left}px`,
     top: `${first.top}px`,
@@ -750,14 +806,19 @@ function layoutBar(): void {
 }
 
 function setFormat(f: ViewerFormat): void {
-  const surface = surfaceVideo ?? video;
-  const firstRect = fmt && fmt !== f && surface ? surface.getBoundingClientRect() : null;
+  const switchingFormat = !!fmt && fmt !== f;
+  const firstFrame = switchingFormat ? interruptSurfaceTransition() : null;
   fmt = f;
   document.documentElement.setAttribute(ATTR, f);
   fmtBtn?.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
   applyOverlayBackdrop();
   sizeVideo();
-  if (firstRect) animateSurfaceFrom(firstRect);
+  const transition = firstFrame ? animateSurfaceFrom(firstFrame) : null;
+  if (switchingFormat && !transition) {
+    layoutPaused = false;
+    layoutBar();
+    showBar();
+  }
   overlay?.focus({ preventScroll: true });
   notifyViewerState();
   notifyViewerLayout();
@@ -1574,7 +1635,7 @@ async function enter(
   setFormat(format);
   dispatchViewerLayout();
   animateBackdropIn();
-  const enterAnim = animateSurfaceFrom(firstRect);
+  const enterAnim = animateSurfaceFrom(frameFromRect(firstRect));
   syncPlay();
   syncVolume();
   syncTime();

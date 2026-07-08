@@ -288,6 +288,69 @@ describe("toggleViewer — lifecycle", () => {
     expect(document.querySelectorAll("[data-vtp-viewer-overlay]").length).toBe(1);
   });
 
+  it("interrupts in-flight format animations from the current surface frame", async () => {
+    vi.useFakeTimers();
+    const { v } = makeVideo();
+    h.primary = v;
+    const originalAnimate = Element.prototype.animate;
+    const originalRect = Element.prototype.getBoundingClientRect;
+    const cancels: ReturnType<typeof vi.fn>[] = [];
+    const animate = vi.fn(function () {
+      const cancel = vi.fn(function (this: Animation) {
+        const done = this.oncancel;
+        if (typeof done === "function")
+          done.call(this, new Event("cancel") as AnimationPlaybackEvent);
+      });
+      cancels.push(cancel);
+      return { onfinish: null, oncancel: null, cancel } as unknown as Animation;
+    });
+    Object.defineProperty(Element.prototype, "animate", { value: animate, configurable: true });
+    Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+      value: function (this: Element) {
+        if (
+          this instanceof HTMLElement &&
+          this.parentElement?.hasAttribute("data-vtp-viewer-overlay")
+        )
+          return {
+            left: 80,
+            top: 40,
+            width: 480,
+            height: 270,
+            right: 560,
+            bottom: 310,
+          } as DOMRect;
+        return originalRect.call(this);
+      },
+      configurable: true,
+    });
+
+    try {
+      await openViewer("normal");
+      await openViewer("theater");
+      await openViewer("normal");
+      await vi.advanceTimersByTimeAsync(600);
+      await flush();
+      expect(viewerFormat()).toBe("normal");
+      expect(document.querySelectorAll("[data-vtp-viewer-overlay]").length).toBe(1);
+      expect(cancels.some((cancel) => cancel.mock.calls.length > 0)).toBe(true);
+    } finally {
+      if (originalAnimate) {
+        Object.defineProperty(Element.prototype, "animate", {
+          value: originalAnimate,
+          configurable: true,
+        });
+      } else {
+        delete (Element.prototype as { animate?: Element["animate"] }).animate;
+      }
+      Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+        value: originalRect,
+        configurable: true,
+      });
+      exitViewer();
+      vi.useRealTimers();
+    }
+  });
+
   it("does not dispatch an extra layout event on the next animation frame", async () => {
     vi.useFakeTimers();
     const { v } = makeVideo();
