@@ -48,6 +48,56 @@ describe("quality loader", () => {
     expect(bridgeScripts()).toHaveLength(0);
   });
 
+  it("captures HLS media before the heavy bridge is loaded", async () => {
+    await loadLoader();
+    class FakeHls {
+      media: HTMLMediaElement | null = null;
+
+      attachMedia(media: HTMLMediaElement) {
+        this.media = media;
+      }
+    }
+    (window as typeof window & { Hls?: unknown }).Hls = FakeHls;
+    const video = document.createElement("video");
+    document.body.append(video);
+
+    const hls = new FakeHls();
+    hls.attachMedia(video);
+
+    expect(bridgeScripts()).toHaveLength(0);
+    expect(
+      (window as typeof window & { __vtpQualityHls?: Array<{ hls: unknown; video: unknown }> })
+        .__vtpQualityHls,
+    ).toEqual([{ hls, video }]);
+  });
+
+  it("captures IVS players before the heavy bridge is loaded", async () => {
+    await loadLoader();
+    const video = document.createElement("video");
+    const player = {
+      attachHTMLVideoElement(target: HTMLVideoElement) {
+        return target;
+      },
+    };
+    (window as typeof window & { IVSPlayer?: unknown }).IVSPlayer = {
+      create: () => player,
+    };
+
+    const created = (
+      window as typeof window & { IVSPlayer?: { create: () => typeof player } }
+    ).IVSPlayer!.create();
+    created.attachHTMLVideoElement(video);
+
+    expect(bridgeScripts()).toHaveLength(0);
+    expect(
+      (
+        window as typeof window & {
+          __vtpQualityPlayers?: Array<{ player: unknown; video: unknown }>;
+        }
+      ).__vtpQualityPlayers,
+    ).toEqual([{ player, video }]);
+  });
+
   it("loads the bridge once and replays the original request", async () => {
     await loadLoader();
     const replayed: unknown[] = [];
