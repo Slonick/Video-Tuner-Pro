@@ -605,6 +605,8 @@ describe("control bar", () => {
 
     await openViewer("normal");
 
+    expect(v.style.getPropertyValue("visibility")).toBe("hidden");
+    expect(v.style.getPropertyPriority("visibility")).toBe("important");
     const bg = viewerBackdropVideo();
     expect(bg).toBeTruthy();
     expect(bg?.srcObject).toBe(stream);
@@ -615,9 +617,34 @@ describe("control bar", () => {
     await flush();
     expect(viewerBackdropVideo()).toBeNull();
     exitViewer();
+    expect(v.style.getPropertyValue("visibility")).toBe("");
     expect(stop).toHaveBeenCalled();
     play.mockRestore();
     pause.mockRestore();
+  });
+
+  it("restores the source video's previous inline visibility after mirror mode", async () => {
+    const { v } = makeVideo();
+    installBackdropMirror(v);
+    v.style.setProperty("visibility", "collapse");
+    h.primary = v;
+
+    await openViewer("normal");
+    expect(v.style.getPropertyValue("visibility")).toBe("hidden");
+
+    exitViewer();
+    expect(v.style.getPropertyValue("visibility")).toBe("collapse");
+  });
+
+  it("does not hide the page video when it is adopted into the viewer", async () => {
+    const { v } = makeVideo();
+    S.viewerBackdropVideo = false;
+    h.primary = v;
+
+    await openViewer("normal");
+
+    expect(v.style.getPropertyValue("visibility")).toBe("");
+    exitViewer();
   });
 
   it("uses a downscaled canvas for the mirrored background when canvas drawing is available", async () => {

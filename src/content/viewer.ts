@@ -57,6 +57,8 @@ let holder: Comment | null = null; // marks the video's original DOM spot
 let sourceParent: Node | null = null;
 let sourceNextSibling: Node | null = null;
 let prevCss = ""; // the video's inline style before we took over
+let prevSourceVisibility = "";
+let prevSourceVisibilityPriority = "";
 let prevControls = false;
 let prevOverflow = ""; // <html>'s inline overflow (scroll lock restore)
 let hooked = false;
@@ -1435,6 +1437,22 @@ function refreshMirrorStream(): void {
   }
 }
 
+function hideMirroredSource(v: HTMLVideoElement): void {
+  prevSourceVisibility = v.style.getPropertyValue("visibility");
+  prevSourceVisibilityPriority = v.style.getPropertyPriority("visibility");
+  v.style.setProperty("visibility", "hidden", "important");
+}
+
+function restoreMirroredSource(v: HTMLVideoElement): void {
+  if (prevSourceVisibility) {
+    v.style.setProperty("visibility", prevSourceVisibility, prevSourceVisibilityPriority);
+  } else {
+    v.style.removeProperty("visibility");
+  }
+  prevSourceVisibility = "";
+  prevSourceVisibilityPriority = "";
+}
+
 // Auto-open on playback (the `viewerAuto` setting). Once per video element:
 // exiting adds the video to the seen set, so a manual close isn't fought the
 // next time the user hits play.
@@ -1485,6 +1503,8 @@ async function enter(
   sourceRect = firstRect;
   normalBox = null;
   prevCss = v.style.cssText;
+  prevSourceVisibility = "";
+  prevSourceVisibilityPriority = "";
   prevControls = v.controls;
   overlay = document.createElement("div");
   overlay.setAttribute(OVERLAY, "");
@@ -1522,6 +1542,7 @@ async function enter(
   if (mirror) {
     mirrored = true;
     surfaceVideo = mirror;
+    hideMirroredSource(v);
     surfaceShell.appendChild(mirror);
   } else {
     sourceParent = v.parentNode;
@@ -1606,7 +1627,9 @@ export function exitViewer(): void {
     activeMarker = null;
     if (video) {
       autoSeen.add(video); // closing means "not this one again"
-      if (!mirrored) {
+      if (mirrored) {
+        restoreMirroredSource(video);
+      } else {
         video.removeAttribute(ADOPTED_VIDEO);
         video.controls = prevControls;
         video.style.cssText = prevCss;
