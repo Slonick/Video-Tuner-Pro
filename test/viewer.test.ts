@@ -101,6 +101,8 @@ const barInputs = () => Array.from(barEl()?.querySelectorAll("input") ?? []) as 
 const barTime = () => barEl()?.querySelector(".time")?.textContent ?? null;
 const qwraps = () => Array.from(barEl()?.querySelectorAll(".qwrap") ?? []) as HTMLElement[];
 const viewerBackdrop = () => overlayEl()?.querySelector("div") as HTMLElement | null;
+const viewerBackdropVisual = () =>
+  overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLElement | null;
 const viewerBackdropVideo = () =>
   overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLVideoElement | null;
 
@@ -616,6 +618,31 @@ describe("control bar", () => {
     expect(stop).toHaveBeenCalled();
     play.mockRestore();
     pause.mockRestore();
+  });
+
+  it("uses a downscaled canvas for the mirrored background when canvas drawing is available", async () => {
+    const { v } = makeVideo();
+    installBackdropMirror(v);
+    const drawImage = vi.fn();
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+    try {
+      S.viewerBackdropVideo = true;
+      h.primary = v;
+
+      await openViewer("normal");
+
+      const bg = viewerBackdropVisual() as HTMLCanvasElement | null;
+      expect(bg?.tagName).toBe("CANVAS");
+      expect(bg?.width).toBeLessThan(window.innerWidth);
+      expect(bg?.height).toBeLessThan(window.innerHeight);
+      expect(drawImage).toHaveBeenCalled();
+      expect(viewerBackdrop()?.style.backdropFilter).toBe("");
+      exitViewer();
+    } finally {
+      getContext.mockRestore();
+    }
   });
 
   it("keeps the glass blur when background video is disabled before opening", async () => {

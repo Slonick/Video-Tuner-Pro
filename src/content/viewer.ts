@@ -31,6 +31,8 @@ const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
 const VIEWER_ANIM_MS = 420;
 const VIEWER_BACKDROP_VIDEO_ANIM_MS = 680;
+const BACKDROP_CANVAS_SCALE = 0.125;
+const BACKDROP_CANVAS_MS = 66;
 // A CSS/backdrop-filter blur can't invent pixels past its own box, so an element
 // blurred exactly at the viewport edge fades toward whatever's behind it there —
 // a visible vignette right at the screen border. Overscanning the box (then
@@ -48,7 +50,8 @@ let video: HTMLVideoElement | null = null; // the page media element we control
 let surfaceVideo: HTMLVideoElement | null = null; // the overlay video we render/style
 let overlay: HTMLDivElement | null = null;
 let backdropEl: HTMLDivElement | null = null;
-let backdropVideo: HTMLVideoElement | null = null;
+let backdropVideo: HTMLVideoElement | HTMLCanvasElement | null = null;
+let backdropCanvasTimer: ReturnType<typeof setTimeout> | null = null;
 let surfaceShell: HTMLDivElement | null = null;
 let holder: Comment | null = null; // marks the video's original DOM spot
 let sourceParent: Node | null = null;
@@ -232,10 +235,91 @@ export function refreshViewerBackdrop(): void {
 }
 
 function removeBackdropVideo(): void {
-  backdropVideo?.pause();
+  if (backdropCanvasTimer != null) {
+    clearTimeout(backdropCanvasTimer);
+    backdropCanvasTimer = null;
+  }
+  if (backdropVideo instanceof HTMLVideoElement) {
+    backdropVideo.pause();
+    backdropVideo.srcObject = null;
+  }
   backdropVideo?.remove();
-  if (backdropVideo) backdropVideo.srcObject = null;
   backdropVideo = null;
+}
+
+function styleBackdropVideo(el: HTMLElement): void {
+  Object.assign(el.style, {
+    position: "absolute",
+    // Replaced media elements keep their intrinsic size unless explicitly sized.
+    top: `-${BACKDROP_OVERSCAN}px`,
+    left: `-${BACKDROP_OVERSCAN}px`,
+    width: `calc(100% + ${BACKDROP_OVERSCAN * 2}px)`,
+    height: `calc(100% + ${BACKDROP_OVERSCAN * 2}px)`,
+    transform: "none",
+    transformOrigin: "0 0",
+    borderRadius: "0",
+    objectFit: "cover",
+    filter: "blur(22px) saturate(135%) brightness(0.9)",
+    opacity: backdropEl?.style.opacity === "0" ? "0" : "1",
+    pointerEvents: "none",
+    willChange: "transform, opacity",
+    zIndex: "0",
+  } as Partial<CSSStyleDeclaration>);
+}
+
+function backdropCanvasSize(): { w: number; h: number } {
+  return {
+    w: Math.max(1, Math.ceil((window.innerWidth + BACKDROP_OVERSCAN * 2) * BACKDROP_CANVAS_SCALE)),
+    h: Math.max(1, Math.ceil((window.innerHeight + BACKDROP_OVERSCAN * 2) * BACKDROP_CANVAS_SCALE)),
+  };
+}
+
+function drawBackdropCanvas(): boolean {
+  if (!(backdropVideo instanceof HTMLCanvasElement)) return false;
+  const source = surfaceVideo ?? video;
+  if (!source) return false;
+  const ctx = backdropVideo.getContext("2d");
+  if (!ctx) return false;
+  const { w, h } = backdropCanvasSize();
+  if (backdropVideo.width !== w) backdropVideo.width = w;
+  if (backdropVideo.height !== h) backdropVideo.height = h;
+  try {
+    ctx.drawImage(source, 0, 0, w, h);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function scheduleBackdropCanvas(): void {
+  if (!(backdropVideo instanceof HTMLCanvasElement) || backdropCanvasTimer != null) return;
+  if (video?.paused) return;
+  backdropCanvasTimer = setTimeout(() => {
+    backdropCanvasTimer = null;
+    if (!drawBackdropCanvas()) {
+      createBackdropVideoFallback();
+      return;
+    }
+    scheduleBackdropCanvas();
+  }, BACKDROP_CANVAS_MS);
+}
+
+function createBackdropVideoFallback(): HTMLVideoElement | null {
+  if (!overlay || !backdropEl || !mirrorStream) return null;
+  const videoEl = document.createElement("video");
+  videoEl.srcObject = mirrorStream;
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+  videoEl.autoplay = true;
+  videoEl.controls = false;
+  videoEl.setAttribute("aria-hidden", "true");
+  videoEl.setAttribute("data-vtp-viewer-backdrop-video", "");
+  styleBackdropVideo(videoEl);
+  backdropVideo?.remove();
+  backdropVideo = videoEl;
+  overlay.insertBefore(videoEl, backdropEl);
+  videoEl.play()?.catch(() => {});
+  return videoEl;
 }
 
 export function syncViewerBackdropVideo(): void {
@@ -244,36 +328,23 @@ export function syncViewerBackdropVideo(): void {
     return;
   }
   if (!backdropVideo) {
-    backdropVideo = document.createElement("video");
-    backdropVideo.srcObject = mirrorStream;
-    backdropVideo.muted = true;
-    backdropVideo.playsInline = true;
-    backdropVideo.autoplay = true;
-    backdropVideo.controls = false;
-    backdropVideo.setAttribute("aria-hidden", "true");
-    backdropVideo.setAttribute("data-vtp-viewer-backdrop-video", "");
-    Object.assign(backdropVideo.style, {
-      position: "absolute",
-      // A <video> is a replaced element: with inset alone and width/height auto it
-      // falls back to its own intrinsic size (the source's resolution) instead of
-      // stretching to fill, unlike a plain div — so size it explicitly via calc().
-      top: `-${BACKDROP_OVERSCAN}px`,
-      left: `-${BACKDROP_OVERSCAN}px`,
-      width: `calc(100% + ${BACKDROP_OVERSCAN * 2}px)`,
-      height: `calc(100% + ${BACKDROP_OVERSCAN * 2}px)`,
-      transform: "none",
-      transformOrigin: "0 0",
-      borderRadius: "0",
-      objectFit: "cover",
-      filter: "blur(22px) saturate(135%) brightness(0.9)",
-      opacity: backdropEl.style.opacity === "0" ? "0" : "1",
-      pointerEvents: "none",
-      willChange: "transform, opacity",
-      zIndex: "0",
-    } as Partial<CSSStyleDeclaration>);
-    overlay.insertBefore(backdropVideo, backdropEl);
+    const canvas = document.createElement("canvas");
+    canvas.setAttribute("aria-hidden", "true");
+    canvas.setAttribute("data-vtp-viewer-backdrop-video", "");
+    styleBackdropVideo(canvas);
+    backdropVideo = canvas;
+    if (!drawBackdropCanvas()) {
+      createBackdropVideoFallback();
+    } else {
+      overlay.insertBefore(canvas, backdropEl);
+      scheduleBackdropCanvas();
+    }
+  } else if (backdropVideo instanceof HTMLCanvasElement) {
+    if (!drawBackdropCanvas()) createBackdropVideoFallback();
+    else scheduleBackdropCanvas();
+  } else {
+    backdropVideo.play()?.catch(() => {});
   }
-  backdropVideo.play()?.catch(() => {});
 }
 
 function canAnimate(el: Element | null): el is Element & { animate: Element["animate"] } {
@@ -726,6 +797,7 @@ function showBar(): void {
 function syncPlay(): void {
   playBtn?.setAttribute("aria-pressed", video && !video.paused ? "true" : "false");
   if (video?.paused) showBar();
+  else scheduleBackdropCanvas();
 }
 function syncVolume(): void {
   if (!video) return;
@@ -1351,9 +1423,13 @@ function refreshMirrorStream(): void {
     mirrorStream?.getTracks().forEach((t) => t.stop());
     mirrorStream = stream;
     surfaceVideo.srcObject = stream;
-    if (backdropVideo) backdropVideo.srcObject = stream;
+    if (backdropVideo instanceof HTMLVideoElement) backdropVideo.srcObject = stream;
+    else if (backdropVideo instanceof HTMLCanvasElement && !drawBackdropCanvas()) {
+      createBackdropVideoFallback();
+    }
     surfaceVideo.play()?.catch(() => {});
-    backdropVideo?.play()?.catch(() => {});
+    if (backdropVideo instanceof HTMLVideoElement) backdropVideo.play()?.catch(() => {});
+    else scheduleBackdropCanvas();
   } catch (e) {
     /* keep the existing mirror */
   }
