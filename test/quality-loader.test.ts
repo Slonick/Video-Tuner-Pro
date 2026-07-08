@@ -36,7 +36,7 @@ beforeEach(() => {
     .__vtpQualityLoaderInstalled;
   delete (window as typeof window & { __vtpQualityLoaderCleanup?: () => void })
     .__vtpQualityLoaderCleanup;
-  vi.stubGlobal("chrome", { runtime: { getURL: () => BRIDGE_URL } });
+  vi.stubGlobal("chrome", {});
 });
 
 afterEach(() => {
@@ -137,6 +137,19 @@ describe("quality loader", () => {
     ]);
   });
 
+  it("loads the bridge from the DOM attribute without extension runtime access", async () => {
+    await loadLoader();
+
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "q1", videoId: "v1" },
+      }),
+    );
+
+    const [script] = bridgeScripts();
+    expect(script.src).toBe(BRIDGE_URL);
+  });
+
   it("uses a Trusted Types script URL policy when the page requires it", async () => {
     const createScriptURL = vi.fn((url: string) => url);
     const createPolicy = vi.fn(() => ({ createScriptURL }));
@@ -217,16 +230,13 @@ describe("quality loader", () => {
     );
     await flush();
 
-    const [script] = bridgeScripts();
-    expect(script.src).toBe(BRIDGE_URL);
+    expect(bridgeScripts()).toHaveLength(0);
     expect(document.querySelectorAll('script[src^="https://example.com/"]')).toHaveLength(0);
   });
 
-  it("rejects a bridge URL from another extension origin", async () => {
-    document.documentElement.setAttribute(
-      BRIDGE_URL_ATTR,
-      "chrome-extension://other-extension/quality-inject.js",
-    );
+  it("falls back to runtime.getURL when the DOM attribute is absent", async () => {
+    document.documentElement.removeAttribute(BRIDGE_URL_ATTR);
+    vi.stubGlobal("chrome", { runtime: { getURL: () => BRIDGE_URL } });
     await loadLoader();
 
     document.dispatchEvent(

@@ -221,17 +221,12 @@
   installIvsHook();
   installHlsHook();
 
-  function bridgeTrustKey(parsed: URL): string {
-    return `${parsed.protocol}//${parsed.host}`;
-  }
-
-  function validBridgeUrl(url: string | null, trustedKey?: string): string | null {
+  function validBridgeUrl(url: string | null): string | null {
     if (!url) return null;
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "chrome-extension:" && parsed.protocol !== "moz-extension:")
         return null;
-      if (trustedKey && bridgeTrustKey(parsed) !== trustedKey) return null;
       return parsed.pathname.endsWith("/quality-inject.js") ? url : null;
     } catch (e) {
       return null;
@@ -239,6 +234,8 @@
   }
 
   function bridgeUrl(): string | null {
+    const attrUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
+    if (attrUrl) return attrUrl;
     const runtime = (
       globalThis as typeof globalThis & {
         chrome?: { runtime?: { getURL?: (path: string) => string } };
@@ -254,14 +251,7 @@
           }
         ).browser?.runtime?.getURL
       )?.("quality-inject.js") || null;
-    const trusted = validBridgeUrl(resolved);
-    if (!trusted) return null;
-    const trustedKey = bridgeTrustKey(new URL(trusted));
-    const attrUrl = validBridgeUrl(
-      document.documentElement.getAttribute(BRIDGE_URL_ATTR),
-      trustedKey,
-    );
-    return attrUrl || trusted;
+    return validBridgeUrl(resolved);
   }
 
   let trustedPolicy:
