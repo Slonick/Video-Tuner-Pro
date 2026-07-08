@@ -181,4 +181,23 @@ describe("media registry — reconcile backstop", () => {
     expect(collectVideos()).toHaveLength(1);
     expect(queryAll).not.toHaveBeenCalledWith("*");
   });
+
+  it("drops old connected shadow-host candidates only after heavy DOM churn", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(0);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    for (let i = 0; i < 1030; i++) document.body.appendChild(document.createElement("div"));
+    track();
+    await flush();
+    try {
+      now.mockReturnValue(61_000);
+      reconcile();
+      host.attachShadow({ mode: "open" }).appendChild(document.createElement("video"));
+      reconcile();
+
+      expect(collectVideos()).toHaveLength(0);
+    } finally {
+      now.mockRestore();
+    }
+  });
 });

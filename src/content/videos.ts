@@ -16,8 +16,10 @@ const trackedVideos = new Set<HTMLVideoElement>();
 const trackedAudios = new Set<HTMLAudioElement>();
 const drmVideos = new WeakSet<HTMLVideoElement>();
 const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
-const shadowHostCandidates = new Set<Element>();
+const shadowHostCandidates = new Map<Element, number>();
 const ADOPTED_VIEWER_VIDEO = "data-vtp-viewer-adopted-video";
+const MAX_SHADOW_HOST_CANDIDATES = 1024;
+const SHADOW_HOST_CANDIDATE_TTL_MS = 60_000;
 let observer: MutationObserver | null = null;
 let tracking = false;
 
@@ -65,7 +67,7 @@ function handleShadow(el: Element): boolean {
 }
 
 function rememberShadowHostCandidate(el: Element): void {
-  if (!isOwnNode(el)) shadowHostCandidates.add(el);
+  if (!isOwnNode(el)) shadowHostCandidates.set(el, Date.now());
 }
 
 // Walk `root` once, registering any media and recursing through open shadow roots
@@ -128,8 +130,17 @@ function scanDirectMedia(root: ParentNode): boolean {
 
 function scanKnownShadowHosts(): boolean {
   let added = false;
-  for (const host of Array.from(shadowHostCandidates)) {
+  const now = Date.now();
+  for (const [host, seenAt] of Array.from(shadowHostCandidates)) {
     if (!host.isConnected || isOwnNode(host)) {
+      shadowHostCandidates.delete(host);
+      continue;
+    }
+    if (
+      shadowHostCandidates.size > MAX_SHADOW_HOST_CANDIDATES &&
+      !host.shadowRoot &&
+      now - seenAt > SHADOW_HOST_CANDIDATE_TTL_MS
+    ) {
       shadowHostCandidates.delete(host);
       continue;
     }
