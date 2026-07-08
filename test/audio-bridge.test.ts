@@ -9,6 +9,7 @@ vi.mock("../src/content/channel.js", () => ({ channelKeys: () => [] as string[] 
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => [] as HTMLVideoElement[],
   collectAudios: () => [] as HTMLAudioElement[],
+  primaryVideoFrom: () => null,
   seenVideos: new WeakSet(),
   seenAudios: new WeakSet(),
 }));

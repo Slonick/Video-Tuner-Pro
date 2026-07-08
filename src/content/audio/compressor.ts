@@ -50,13 +50,16 @@ function applyGraphParams(g: AudioGraph): void {
   }
 }
 
-export function applyAudioComp(videos?: HTMLVideoElement[]): {
+export function applyAudioComp(
+  videos?: HTMLVideoElement[],
+  primary?: HTMLVideoElement | null,
+): {
   engaged: number;
   skipped: number;
   reason: string | null;
 } {
   const list = videos || collectVideos();
-  const primary = primaryVideo();
+  const main = primary !== undefined ? primary : primaryVideo();
   let engaged = 0,
     skipped = 0,
     reason: string | null = null;
@@ -71,7 +74,7 @@ export function applyAudioComp(videos?: HTMLVideoElement[]): {
       // audio-capture slot (createMediaElementSource is one-shot, can't be released)
       // and blocking other audio extensions on every page.
       const need =
-        S.audioCompEnabled || (S.autoSlowEnabled && v === primary && !onStreamPage() && !isLive(v));
+        S.audioCompEnabled || (S.autoSlowEnabled && v === main && !onStreamPage() && !isLive(v));
       if (!need) continue;
       g = setupGraph(v);
       if (!g) {
@@ -87,7 +90,7 @@ export function applyAudioComp(videos?: HTMLVideoElement[]): {
   }
   // Always allow the context to resume on a user gesture, so metering works even
   // with compression off.
-  if (primary) {
+  if (main) {
     hookAudioGesture();
     resumeAudioCtx();
   }

@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
 vi.mock("../src/content/channel.js", () => ({ channelKeys: () => h.keys }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => h.videos,
+  primaryVideoFrom: (videos: HTMLVideoElement[]) => videos[0] ?? null,
   primaryVideo: () => {
     h.primaryReads++;
     return h.videos[0] ?? null;

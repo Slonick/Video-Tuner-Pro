@@ -23,8 +23,8 @@ export interface MonitorData {
 }
 
 export function monitorData(): MonitorData {
-  applyAudioComp(); // make sure the meter graph is engaged
   const v = primaryVideo();
+  applyAudioComp(undefined, v); // make sure the meter graph is engaged
   const live = onStreamPage();
   // The live graph plots latency-to-broadcaster where the site exposes it
   // (Twitch/YouTube), else the buffered-ahead seconds. Only meaningful on streams.

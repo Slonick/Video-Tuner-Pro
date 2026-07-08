@@ -5,7 +5,14 @@ import { channelKeys } from "./channel.js";
 import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
-import { collectVideos, collectAudios, primaryVideo, seenVideos, seenAudios } from "./videos.js";
+import {
+  collectVideos,
+  collectAudios,
+  primaryVideo,
+  primaryVideoFrom,
+  seenVideos,
+  seenAudios,
+} from "./videos.js";
 import { isLive, probeLive, onStreamPage, trackDvr, resetDvrFor } from "./live/detection.js";
 import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
@@ -288,9 +295,10 @@ export function applyAll(
       : videos.length
         ? activePrimaryIsLive()
         : false;
+  const primary = primaryVideoFrom(videos);
   videos.forEach((v) => applyToVideo(v, primaryLive));
   videos.forEach(probeLive); // sample media edge for generic live detection
-  applyAudioComp(videos);
+  applyAudioComp(videos, primary);
   if (S.audioSpeedEnabled) collectAudios().forEach(applyToAudio);
   publishAudioRate(); // keep the MAIN-world bridge in step with the toggle + speed
   updateBadge();
