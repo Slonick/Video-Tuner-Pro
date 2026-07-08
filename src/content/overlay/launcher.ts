@@ -330,7 +330,7 @@ function closeRadial(resumeHide = false): void {
       b.style.visibility = "visible";
       b.style.pointerEvents = "none";
     }
-    for (const b of closingItems) b.getBoundingClientRect();
+    fab?.getBoundingClientRect();
     radialFrame = requestAnimationFrame(() => {
       radialFrame = 0;
       if (radialOpen || !rItems) return;

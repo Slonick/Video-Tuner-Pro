@@ -592,7 +592,7 @@ describe("launcher — radial viewer menu", () => {
     }
   });
 
-  it("commits the fanned position before starting the close animation", async () => {
+  it("starts the close animation from the fanned position without per-item layout reads", async () => {
     await openMenu();
     const [normal] = items();
     const readRect = vi.fn(
@@ -602,7 +602,7 @@ describe("launcher — radial viewer menu", () => {
 
     fire(document.body, "pointerdown", 900, 900);
 
-    expect(readRect).toHaveBeenCalled();
+    expect(readRect).not.toHaveBeenCalled();
     expect(normal.style.opacity).toBe("1");
     expect(normal.style.transform).toBe("scale(1)");
     await frame();
