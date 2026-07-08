@@ -466,23 +466,29 @@ describe("control bar", () => {
     expect(mute.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("hides the cursor with the control bar while playing", async () => {
-    vi.useFakeTimers();
-    try {
-      const { v } = makeVideo();
-      h.primary = v;
-      await openViewer("theater");
-      v.play();
-      overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-      expect(overlayEl()?.style.cursor).toBe("");
-      await vi.advanceTimersByTimeAsync(2700);
-      expect(overlayEl()?.style.cursor).toBe("none");
-      overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-      expect(overlayEl()?.style.cursor).toBe("");
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+  it.each(["normal", "theater"] as const)(
+    "hides the cursor with the control bar while playing in %s mode",
+    async (mode) => {
+      vi.useFakeTimers();
+      try {
+        const { v } = makeVideo();
+        h.primary = v;
+        await openViewer(mode);
+        v.play();
+        overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        expect(overlayEl()?.style.cursor).toBe("");
+        expect(viewerAnchorVideo()?.style.cursor).toBe("");
+        await vi.advanceTimersByTimeAsync(2700);
+        expect(overlayEl()?.style.cursor).toBe("none");
+        expect(viewerAnchorVideo()?.style.cursor).toBe("none");
+        overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        expect(overlayEl()?.style.cursor).toBe("");
+        expect(viewerAnchorVideo()?.style.cursor).toBe("");
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 
   it("a live stream hides the seek bar and shows LIVE", async () => {
     const { v } = makeVideo(Infinity);

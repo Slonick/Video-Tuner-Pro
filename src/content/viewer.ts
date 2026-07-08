@@ -692,16 +692,25 @@ function setFormat(f: ViewerFormat): void {
   notifyViewerLayout();
 }
 
+function setViewerCursor(hidden: boolean): void {
+  const value = hidden ? "none" : "";
+  if (overlay) overlay.style.cursor = value;
+  if (surfaceShell) surfaceShell.style.cursor = value;
+  if (surfaceVideo) surfaceVideo.style.cursor = value;
+  if (backdropVideo) backdropVideo.style.cursor = value;
+  if (bar) bar.style.cursor = value;
+}
+
 function showBar(): void {
   if (!bar) return;
-  if (overlay) overlay.style.cursor = "";
+  setViewerCursor(false);
   bar.style.opacity = "1";
   bar.style.pointerEvents = "auto";
   clearTimeout(barTimer);
   if (video?.paused) return; // paused → controls stay up, like every player
   barTimer = setTimeout(() => {
     if (!bar || video?.paused) return;
-    if (overlay) overlay.style.cursor = "none";
+    setViewerCursor(true);
     bar.style.opacity = "0";
     bar.style.pointerEvents = "none";
   }, BAR_HIDE_MS);
