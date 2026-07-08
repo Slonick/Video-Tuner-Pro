@@ -38,6 +38,7 @@ async function reloadInjectKeepingBridgeState(): Promise<void> {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.stubGlobal("location", { hostname: "www.youtube.com" });
   document.body.innerHTML = "";
   document.documentElement.removeAttribute("data-vtp-live");
   document.documentElement.removeAttribute("data-vtp-latency");
@@ -46,6 +47,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("MAIN-world live probe", () => {
@@ -63,6 +65,47 @@ describe("MAIN-world live probe", () => {
     await loadInject();
 
     expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("does not publish YouTube live state outside YouTube hosts", async () => {
+    vi.stubGlobal("location", { hostname: "example.com" });
+    makeYoutubePlayer(640, 360, true);
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBeNull();
+  });
+
+  it("does not scan Twitch fiber players outside Twitch hosts", async () => {
+    vi.stubGlobal("location", { hostname: "example.com" });
+    const getLiveLatency = vi.fn(() => 2.5);
+    const video = document.createElement("video") as HTMLVideoElement & {
+      __reactFiber$vtp?: unknown;
+    };
+    video.__reactFiber$vtp = {
+      memoizedProps: { mediaPlayerInstance: { getLiveLatency } },
+    };
+    document.body.append(video);
+
+    await loadInject();
+
+    expect(getLiveLatency).not.toHaveBeenCalled();
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
+  });
+
+  it("reads Twitch latency on Twitch hosts", async () => {
+    vi.stubGlobal("location", { hostname: "www.twitch.tv" });
+    const video = document.createElement("video") as HTMLVideoElement & {
+      __reactFiber$vtp?: unknown;
+    };
+    video.__reactFiber$vtp = {
+      memoizedProps: { mediaPlayerInstance: { getLiveLatency: () => 2.54 } },
+    };
+    document.body.append(video);
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("2.5");
   });
 
   it("stops publishing after a newer bridge version takes ownership", async () => {

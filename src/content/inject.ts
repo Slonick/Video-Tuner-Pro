@@ -27,6 +27,9 @@
   win.__vtpLatencyBridgeInstalled = BRIDGE_VERSION;
   const ATTR = "data-vtp-latency";
   const LIVE_ATTR = "data-vtp-live";
+  const HOSTNAME = location.hostname;
+  const IS_TWITCH = /(^|\.)twitch\.tv$/i.test(HOSTNAME);
+  const IS_YOUTUBE = /(^|\.)youtube(-nocookie)?\.com$/i.test(HOSTNAME);
 
   function isActiveBridge(): boolean {
     return win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION;
@@ -134,6 +137,7 @@
 
   let twitchPlayer: TwitchPlayer | null = null;
   function twitchLatency(): number | null {
+    if (!IS_TWITCH) return null;
     let lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
     if (lat == null) {
       twitchPlayer = findTwitchPlayer();
@@ -277,6 +281,7 @@
   }
 
   function youtubePlayer(): YouTubePlayer | null {
+    if (!IS_YOUTUBE) return null;
     // Both the watch player (#movie_player) and the Shorts player (#shorts-player)
     // carry .html5-video-player. After an SPA navigation the previous one lingers
     // in the DOM but hidden (clientWidth/Height 0) — and still reports its old
