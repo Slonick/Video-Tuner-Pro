@@ -20,6 +20,7 @@ import {
   ownsViewerNode,
   refreshViewerBackdrop,
   fmtTime,
+  VIEWER_LAYOUT_EVENT,
 } from "../src/content/viewer.js";
 
 // A controllable media element: play/pause flip `paused` and fire the real
@@ -283,6 +284,40 @@ describe("toggleViewer — lifecycle", () => {
     await openViewer("theater");
     expect(viewerFormat()).toBe("theater");
     expect(document.querySelectorAll("[data-vtp-viewer-overlay]").length).toBe(1);
+  });
+
+  it("does not dispatch an extra layout event on the next animation frame", async () => {
+    vi.useFakeTimers();
+    const { v } = makeVideo();
+    h.primary = v;
+    const originalAnimate = Element.prototype.animate;
+    Object.defineProperty(Element.prototype, "animate", {
+      value: vi.fn(() => ({ onfinish: null, oncancel: null }) as unknown as Animation),
+      configurable: true,
+    });
+    const onLayout = vi.fn();
+    document.addEventListener(VIEWER_LAYOUT_EVENT, onLayout);
+
+    try {
+      toggleViewer("normal");
+      await flush();
+      const beforeFrame = onLayout.mock.calls.length;
+      expect(beforeFrame).toBeGreaterThan(0);
+      await vi.advanceTimersByTimeAsync(16);
+      expect(onLayout).toHaveBeenCalledTimes(beforeFrame);
+    } finally {
+      document.removeEventListener(VIEWER_LAYOUT_EVENT, onLayout);
+      if (originalAnimate) {
+        Object.defineProperty(Element.prototype, "animate", {
+          value: originalAnimate,
+          configurable: true,
+        });
+      } else {
+        delete (Element.prototype as { animate?: Element["animate"] }).animate;
+      }
+      exitViewer();
+      vi.useRealTimers();
+    }
   });
 
   it("re-toggling the active format exits and restores the video exactly", async () => {

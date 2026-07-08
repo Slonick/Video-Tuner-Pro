@@ -194,9 +194,6 @@ function notifyViewerState(): void {
 
 function dispatchViewerLayout(): void {
   document.dispatchEvent(new Event(VIEWER_LAYOUT_EVENT));
-  const raf =
-    window.requestAnimationFrame ?? ((fn: FrameRequestCallback) => window.setTimeout(fn, 0));
-  raf(() => document.dispatchEvent(new Event(VIEWER_LAYOUT_EVENT)));
 }
 
 function notifyViewerLayout(): void {
