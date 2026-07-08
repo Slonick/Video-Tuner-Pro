@@ -165,6 +165,7 @@ document.addEventListener(
       exitViewer();
       return;
     }
+    if (!S.keyboardEnabled) return;
     if (!video) return;
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const timeline = mediaTimeline(video);
@@ -770,10 +771,10 @@ export function viewerFitMode(): ViewerFitMode {
   return S.viewerFit;
 }
 
-export function setViewerFitMode(mode: unknown): ViewerFitMode {
+export function setViewerFitMode(mode: unknown, notify = false): ViewerFitMode {
   S.viewerFit = normalizeViewerFit(mode);
   sizeVideo();
-  showBadgeNotice(`Fit: ${fitLabel(S.viewerFit)}`);
+  if (notify) showBadgeNotice(`Fit: ${fitLabel(S.viewerFit)}`);
   return S.viewerFit;
 }
 
@@ -1281,7 +1282,7 @@ function mountBar(): void {
       item.textContent = fitLabel(m);
       if (m === S.viewerFit) item.setAttribute("aria-current", "true");
       item.addEventListener("click", () => {
-        setViewerFitMode(m);
+        setViewerFitMode(m, true);
         fitMenu?.classList.remove("open");
       });
       fitMenu.appendChild(item);

@@ -292,7 +292,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "setViewerFit") {
     return actInVideoFrame(
       sendResponse,
-      () => setViewerFitMode(request.mode),
+      () => setViewerFitMode(request.mode, true),
       (mode) => ({
         success: true,
         mode,

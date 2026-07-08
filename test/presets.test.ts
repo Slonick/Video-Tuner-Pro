@@ -142,6 +142,11 @@ describe("normalizeKeymap", () => {
     expect(km.slower).toBe("KeyA");
     expect(km.faster).toBe("KeyD");
   });
+  it("keeps a later core action bound when a partial blob takes its default key", () => {
+    const km = normalizeKeymap({ slower: "KeyD" });
+    expect(km.slower).toBe("KeyA");
+    expect(km.faster).toBe("KeyD");
+  });
   it("does not let a default binding shadow a later stored action", () => {
     const km = normalizeKeymap({ reset: "KeyO", viewer: "KeyV", theater: "KeyT" });
     expect(km.reset).toBe("KeyO");

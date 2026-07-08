@@ -637,12 +637,15 @@ describe("badge notice", () => {
     }
   });
 
-  it("uses a compact notice bubble for speed-only notices", () => {
+  it("does not re-render the badge on repeated notice updates", () => {
     h.primary = fakeVideo();
     updateTimeBadge();
+    h.primaryCalls = 0;
 
-    showBadgeNotice("1×");
+    showBadgeNotice("+0:05");
+    showBadgeNotice("+0:10");
 
-    expect(badgeNotice()?.style.padding).toBe("6px 8px");
+    expect(h.primaryCalls).toBe(0);
+    expect(badgeNotice()?.textContent).toBe("+0:10");
   });
 });

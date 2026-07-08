@@ -416,7 +416,7 @@ describe("viewer frame actions", () => {
 
   it("setViewerFit only runs in a frame with video", () => {
     const { resp } = send({ action: "setViewerFit", mode: "cover" });
-    expect(viewer.setViewerFitMode).toHaveBeenCalledWith("cover");
+    expect(viewer.setViewerFitMode).toHaveBeenCalledWith("cover", true);
     expect(resp).toEqual({ success: true, mode: "cover" });
   });
 

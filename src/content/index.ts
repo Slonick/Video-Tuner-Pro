@@ -20,13 +20,7 @@ import { isLive, liveVideoFrom, onStreamPage } from "./live/detection.js";
 import { applyResolvedTargetFromStore } from "./live/target.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
-import {
-  updateTimeBadge,
-  flashBadge,
-  showBadgeNotice,
-  ownsBadgeNode,
-  fmtTime,
-} from "./badge/overlay.js";
+import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
 import { ownsViewerNode, refreshViewerBackdrop } from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
@@ -69,9 +63,6 @@ let autoSlowSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
 let mediaScheduled = false;
 let mediaShouldFlashBadge = false;
-const seekStarts = new WeakMap<HTMLMediaElement, number>();
-const lastVolume = new WeakMap<HTMLMediaElement, number>();
-const lastRate = new WeakMap<HTMLMediaElement, number>();
 let lastChannelKeys: string[] = []; // re-resolve speed when the channel identity changes
 
 // Background-tick cadence: 1s while the page has a video, backing off toward 5s on
@@ -391,50 +382,6 @@ function scheduleMediaPass(flashBadgeAfterApply: boolean): void {
   });
 }
 
-function noticeForMediaEvent(e: Event): void {
-  const t = e.target;
-  if (!(t instanceof HTMLMediaElement) || !ctxValid()) return;
-  if (t instanceof HTMLAudioElement) return;
-  switch (e.type) {
-    case "play":
-      showBadgeNotice("Playing");
-      break;
-    case "pause":
-      showBadgeNotice("Paused");
-      break;
-    case "seeking":
-      seekStarts.set(t, t.currentTime);
-      break;
-    case "seeked": {
-      const from = seekStarts.get(t);
-      seekStarts.delete(t);
-      if (from == null) return;
-      const delta = t.currentTime - from;
-      if (Math.abs(delta) < 1) return;
-      showBadgeNotice(`${delta > 0 ? "+" : "-"}${fmtTime(Math.abs(delta))}`);
-      break;
-    }
-    case "volumechange": {
-      const vol = t.muted ? 0 : Math.round(t.volume * 100);
-      if (lastVolume.get(t) === vol) return;
-      lastVolume.set(t, vol);
-      showBadgeNotice(t.muted || vol === 0 ? "Muted" : `Volume ${vol}%`);
-      break;
-    }
-    case "ratechange": {
-      if (t instanceof HTMLVideoElement && isLive(t)) return;
-      const rate = Math.round(t.playbackRate * 100) / 100;
-      if (lastRate.get(t) === rate || (lastRate.get(t) == null && Math.abs(rate - 1) < 0.001)) {
-        lastRate.set(t, rate);
-        return;
-      }
-      lastRate.set(t, rate);
-      showBadgeNotice(`${rate}×`);
-      break;
-    }
-  }
-}
-
 // Don't burn CPU on hidden tabs: stop the timers in the background, restart (and
 // immediately catch up) when the tab is shown again.
 document.addEventListener("visibilitychange", () => {
@@ -468,10 +415,6 @@ for (const ev of ["play", "loadedmetadata", "durationchange"]) {
     },
     true,
   );
-}
-
-for (const ev of ["play", "pause", "seeking", "seeked", "volumechange", "ratechange"]) {
-  document.addEventListener(ev, noticeForMediaEvent, true);
 }
 
 document.addEventListener(

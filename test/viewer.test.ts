@@ -141,6 +141,7 @@ beforeEach(() => {
   S.viewerAutoEnabled = true;
   S.viewerAuto = "off";
   S.viewerBackdropVideo = false;
+  S.keyboardEnabled = true;
   setFullscreen(null);
   setWebkitFullscreen(null);
 });
@@ -608,6 +609,19 @@ describe("control bar", () => {
     );
 
     expect(v.currentTime).toBe(5);
+  });
+
+  it("leaves arrow keys alone when keyboard shortcuts are disabled", async () => {
+    const { v } = makeVideo(100);
+    h.primary = v;
+    await openViewer("normal");
+    S.keyboardEnabled = false;
+
+    const e = new KeyboardEvent("keydown", { key: "ArrowRight", cancelable: true });
+    document.dispatchEvent(e);
+
+    expect(v.currentTime).toBe(0);
+    expect(e.defaultPrevented).toBe(false);
   });
 
   it("reloads seek markers when a SPA swaps the source on the same video", async () => {

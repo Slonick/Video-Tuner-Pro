@@ -237,7 +237,7 @@ describe("content media events", () => {
     expect(fx.flashBadge).not.toHaveBeenCalled();
   });
 
-  it("surfaces play, pause, seek, volume, and rate notices through the badge", async () => {
+  it("does not surface page-originated media state changes as badge notices", async () => {
     await loadIndex();
     const v = media(false);
 
@@ -252,32 +252,7 @@ describe("content media events", () => {
     v.playbackRate = 1.75;
     v.dispatchEvent(new Event("ratechange"));
 
-    expect(fx.showBadgeNotice).toHaveBeenCalledWith("Playing");
-    expect(fx.showBadgeNotice).toHaveBeenCalledWith("Paused");
-    expect(fx.showBadgeNotice).toHaveBeenCalledWith("+0:25");
-    expect(fx.showBadgeNotice).toHaveBeenCalledWith("Volume 40%");
-    expect(fx.showBadgeNotice).toHaveBeenCalledWith("1.75×");
-  });
-
-  it("does not surface an initial default 1x ratechange as a notice", async () => {
-    await loadIndex();
-    const v = media(false);
-
-    v.dispatchEvent(new Event("ratechange"));
-
-    expect(fx.showBadgeNotice).not.toHaveBeenCalledWith("1×");
-  });
-
-  it("does not surface live-sync 1x rate assertions as notices", async () => {
-    await loadIndex();
-    const v = media(false);
-    fx.live = v;
-    fx.onStream = true;
-
-    v.playbackRate = 1.5;
-    v.dispatchEvent(new Event("ratechange"));
-
-    expect(fx.showBadgeNotice).not.toHaveBeenCalledWith("1.5×");
+    expect(fx.showBadgeNotice).not.toHaveBeenCalled();
   });
 });
 
