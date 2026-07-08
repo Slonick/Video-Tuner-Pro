@@ -230,4 +230,28 @@ describe("MAIN-world live probe", () => {
 
     expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("7.0");
   });
+
+  it("backs off repeated full HLS scans when no active instance is found", async () => {
+    const video = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    const hlsReads = vi.fn(() => null);
+    Object.defineProperty(video, "hls", { get: hlsReads, configurable: true, enumerable: true });
+    document.body.append(video);
+
+    await loadInject();
+    const firstScanReads = hlsReads.mock.calls.length;
+    expect(firstScanReads).toBeGreaterThan(0);
+
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(hlsReads).toHaveBeenCalledTimes(firstScanReads);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const secondScanReads = hlsReads.mock.calls.length;
+    expect(secondScanReads).toBeGreaterThan(firstScanReads);
+
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(hlsReads).toHaveBeenCalledTimes(secondScanReads);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(hlsReads.mock.calls.length).toBeGreaterThan(secondScanReads);
+  });
 });

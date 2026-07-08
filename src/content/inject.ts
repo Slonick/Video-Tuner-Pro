@@ -255,19 +255,31 @@
   }
   let hlsInst: HlsLike | null = null;
   let nextHlsScanAt = 0;
+  let hlsScanDelay = 5000;
+  const HLS_SCAN_INITIAL_MS = 5000;
+  const HLS_SCAN_MAX_MS = 60000;
+  function resetHlsScanBackoff(): void {
+    nextHlsScanAt = 0;
+    hlsScanDelay = HLS_SCAN_INITIAL_MS;
+  }
   function ensureHls(): HlsLike | null {
     if (activeHls(hlsInst)) return hlsInst;
     hlsInst = null;
     const captured = sharedHls();
     if (captured) {
-      nextHlsScanAt = 0;
+      resetHlsScanBackoff();
       hlsInst = captured;
       return hlsInst;
     }
     const now = Date.now();
     if (now < nextHlsScanAt) return null;
     hlsInst = findHls();
-    if (!hlsInst) nextHlsScanAt = now + 5000;
+    if (hlsInst) {
+      resetHlsScanBackoff();
+    } else {
+      nextHlsScanAt = now + hlsScanDelay;
+      hlsScanDelay = Math.min(hlsScanDelay * 2, HLS_SCAN_MAX_MS);
+    }
     return hlsInst;
   }
   function hlsLatency(): number | null {
