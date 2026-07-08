@@ -1171,13 +1171,14 @@
     document.dispatchEvent(new CustomEvent(RESP, { detail: payload }));
   }
 
-  let handledRequest = "";
+  const inflightRequests = new Set<string>();
 
   async function handleRequest(e: Event, d: Detail, type: typeof REQ | typeof SET): Promise<void> {
     if (!isActiveBridge()) return;
     if (typeof d.requestId !== "string") return;
-    if (d.requestId === handledRequest) return;
-    handledRequest = d.requestId;
+    const requestKey = `${type}:${d.requestId}:${d.videoId ?? ""}:${d.qualityId ?? ""}`;
+    if (inflightRequests.has(requestKey)) return;
+    inflightRequests.add(requestKey);
     try {
       const v = videoFromEvent(e, d.videoId);
       const adapter = v ? adapterFor(v) : null;
@@ -1203,6 +1204,7 @@
       }
       await respond(d.requestId, adapter, undefined, undefined, d.videoId);
     } finally {
+      inflightRequests.delete(requestKey);
       rootsCache = new WeakMap();
     }
   }

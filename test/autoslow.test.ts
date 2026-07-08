@@ -73,6 +73,7 @@ async function loadAutoSlow() {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(1_000);
+  Object.defineProperty(document, "hidden", { value: false, configurable: true });
   m.primary = null;
   m.primaryReads = 0;
   m.liveReads = 0;
@@ -110,5 +111,17 @@ describe("autoSlowSample", () => {
     expect(m.primaryReads).toBe(2);
     expect(m.liveReads).toBe(2);
     expect(m.streamReads).toBe(2);
+  });
+
+  it("releases the slowdown when the tab is hidden", async () => {
+    const { autoSlowSample } = await loadAutoSlow();
+    const { S } = await import("../src/content/state.js");
+    S.autoSlowFactor = 0.5;
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+
+    autoSlowSample();
+
+    expect(S.autoSlowFactor).toBe(1);
+    expect(m.reapply).toHaveBeenCalled();
   });
 });

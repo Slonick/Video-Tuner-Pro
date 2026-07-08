@@ -194,6 +194,31 @@ describe("quality-inject request cost", () => {
     expect(document.documentElement.getAttribute("data-vtp-quality-debug")).toBeNull();
   });
 
+  it("answers a reused request id after the previous request has finished", async () => {
+    await import("../src/content/quality-inject.js");
+
+    const video = document.createElement("video");
+    video.setAttribute("data-vtp-quality-id", "v1");
+    document.body.append(video);
+
+    const first = waitForResponse("repeat");
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "repeat", videoId: "v1" },
+      }),
+    );
+    await first;
+
+    const second = responseWithin("repeat", 50);
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "repeat", videoId: "v1" },
+      }),
+    );
+
+    expect(await second).not.toBeNull();
+  });
+
   it("collects unsupported-player debug details only when explicitly requested", async () => {
     await import("../src/content/quality-inject.js");
 

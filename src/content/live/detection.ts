@@ -110,8 +110,8 @@ export function isLive(video: HTMLVideoElement): boolean {
       (video.closest && video.closest(".html5-video-player")) ||
       document.querySelector(".html5-video-player");
     if (player) {
-      if (player.classList.contains("ytp-live")) return true;
-      if (player.querySelector(".ytp-time-display.ytp-live")) return true;
+      if (player.classList.contains("ytp-live")) return !dvrActive(video);
+      if (player.querySelector(".ytp-time-display.ytp-live")) return !dvrActive(video);
     }
   }
 

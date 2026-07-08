@@ -86,7 +86,7 @@ function primaryForAutoSlow(now: number): HTMLVideoElement | null {
 export function autoSlowSample(): void {
   // Master off, or the hold-to-speed key is held (a deliberate temporary speed) →
   // stay out of the way and hand the rate back.
-  if (!S.autoSlowEnabled || S.holdActive) {
+  if (!S.autoSlowEnabled || S.holdActive || document.hidden) {
     release();
     return;
   }

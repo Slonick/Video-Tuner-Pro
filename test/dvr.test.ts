@@ -87,6 +87,19 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     expect(onStreamPage()).toBe(false);
   });
 
+  it("YouTube live CSS classes still respect scrubbed-back DVR mode", () => {
+    const video = setBadge(false);
+    trackDvr(setTime(video, 1000));
+    trackDvr(setTime(video, 400));
+    document.documentElement.removeAttribute("data-vtp-live");
+    const player = document.createElement("div");
+    player.className = "html5-video-player ytp-live";
+    document.body.append(player);
+    player.append(video);
+
+    expect(isLive(video)).toBe(false);
+  });
+
   it("new content loading (resetDvr) starts at the live edge", () => {
     const oldVideo = setBadge(false);
     trackDvr(setTime(oldVideo, 1000));
