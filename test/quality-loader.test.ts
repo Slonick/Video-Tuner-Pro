@@ -36,7 +36,7 @@ beforeEach(() => {
     .__vtpQualityLoaderInstalled;
   delete (window as typeof window & { __vtpQualityLoaderCleanup?: () => void })
     .__vtpQualityLoaderCleanup;
-  vi.stubGlobal("chrome", {});
+  vi.stubGlobal("chrome", { runtime: { getURL: () => BRIDGE_URL } });
 });
 
 afterEach(() => {
@@ -190,6 +190,7 @@ describe("quality loader", () => {
 
   it("does not inject a page-relative bridge when the extension URL is unavailable", async () => {
     document.documentElement.removeAttribute(BRIDGE_URL_ATTR);
+    vi.stubGlobal("chrome", {});
     await loadLoader();
 
     document.dispatchEvent(
@@ -216,7 +217,26 @@ describe("quality loader", () => {
     );
     await flush();
 
-    expect(bridgeScripts()).toHaveLength(0);
+    const [script] = bridgeScripts();
+    expect(script.src).toBe(BRIDGE_URL);
     expect(document.querySelectorAll('script[src^="https://example.com/"]')).toHaveLength(0);
+  });
+
+  it("rejects a bridge URL from another extension origin", async () => {
+    document.documentElement.setAttribute(
+      BRIDGE_URL_ATTR,
+      "chrome-extension://other-extension/quality-inject.js",
+    );
+    await loadLoader();
+
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-request", {
+        detail: { requestId: "q1", videoId: "v1" },
+      }),
+    );
+    await flush();
+
+    const [script] = bridgeScripts();
+    expect(script.src).toBe(BRIDGE_URL);
   });
 });
