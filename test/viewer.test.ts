@@ -812,6 +812,7 @@ describe("control bar", () => {
 
     expect(viewerBackdropVideo()).toBeNull();
     expect(viewerBackdrop()?.style.backdropFilter).toContain("blur(14px)");
+    expect(viewerBackdrop()?.style.backdropFilter).not.toContain("url(");
     exitViewer();
     play.mockRestore();
     pause.mockRestore();

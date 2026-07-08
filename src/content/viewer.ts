@@ -225,12 +225,11 @@ function applyOverlayBackdrop(): void {
       backdropEl.style.removeProperty("-webkit-backdrop-filter");
       backdropEl.style.backdropFilter = "";
     } else {
-      ensureGlassFilter(document);
       backdropEl.style.setProperty(
         "-webkit-backdrop-filter",
-        `${GLASS_REFRACTION}blur(14px) saturate(180%) brightness(1.04)`,
+        "blur(14px) saturate(180%) brightness(1.04)",
       );
-      backdropEl.style.backdropFilter = `${GLASS_REFRACTION}blur(14px) saturate(180%) brightness(1.04)`;
+      backdropEl.style.backdropFilter = "blur(14px) saturate(180%) brightness(1.04)";
     }
   }
   syncViewerBackdropVideo();
