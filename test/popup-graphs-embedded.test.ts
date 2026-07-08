@@ -82,6 +82,30 @@ describe("graph polling under the Firefox overlay", () => {
     expect(g.tgt.out).toBe(-25);
   });
 
+  it("backs off monitor polling while all graphs are idle", async () => {
+    const sent = embed({ getMonitor: {} });
+    vi.resetModules();
+    vi.useFakeTimers();
+    const { startPoll } = await import("../src/popup/graphs/poll.js");
+    const g = await makeState();
+
+    const stop = startPoll(
+      g,
+      () => 42,
+      () => {},
+      () => {},
+    );
+    await vi.advanceTimersByTimeAsync(80);
+    expect(sent).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(900);
+    expect(sent).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(100);
+    stop();
+    expect(sent).toHaveLength(2);
+  });
+
   it("seeds history through the relay too once a graph goes active", async () => {
     const sent = embed({
       getMonitor: { audio: { active: true, enabled: true, in: -10, out: -10 } },

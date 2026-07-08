@@ -32,23 +32,42 @@ interface HistoryResp {
   buffer?: number[][];
 }
 
-// Poll the page ~13×/s and fold monitor data into the shared graph state. `getTabId`
+const ACTIVE_POLL_MS = 75;
+const IDLE_POLL_MS = 1000;
+
+function activeGraphs(g: GraphState): boolean {
+  return g.audioActive || g.bufLive || g.asActive;
+}
+
+// Poll the page ~13×/s while a graph is active, backing off when all cards are
+// idle. `getTabId`
 // supplies the active tab; `onTranslating` reports VOT state to the caller (React).
-// Returns a function that stops the interval.
+// Returns a function that stops the timer.
 export function startPoll(
   g: GraphState,
   getTabId: () => number | null,
   onTranslating: (on: boolean) => void,
   onBlocked: (reason: string | null) => void,
 ): () => void {
-  const id = setInterval(() => {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  const schedule = () => {
+    if (stopped) return;
+    timer = setTimeout(poll, activeGraphs(g) ? ACTIVE_POLL_MS : IDLE_POLL_MS);
+  };
+  const poll = () => {
+    timer = null;
     const tabId = getTabId();
-    if (tabId == null) return;
+    if (tabId == null) {
+      schedule();
+      return;
+    }
     void sendToTab<MonitorResp>(tabId, { action: "getMonitor" }).then((resp) => {
       if (!resp) {
         g.audioActive = false;
         onTranslating(false);
         onBlocked(null);
+        schedule();
         return;
       }
       const a = resp.audio || {};
@@ -170,7 +189,12 @@ export function startPoll(
         g.bufAheadAt = 0;
         g.bufLimited = false;
       }
+      schedule();
     });
-  }, 75);
-  return () => clearInterval(id);
+  };
+  timer = setTimeout(poll, ACTIVE_POLL_MS);
+  return () => {
+    stopped = true;
+    if (timer != null) clearTimeout(timer);
+  };
 }
