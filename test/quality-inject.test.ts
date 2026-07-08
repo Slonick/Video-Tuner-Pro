@@ -222,6 +222,60 @@ describe("quality-inject request cost", () => {
     expect(queryAll.mock.calls.filter(([selector]) => selector === "*")).toHaveLength(0);
   });
 
+  it("refreshes stale player roots after an unsupported adapter miss expires", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    try {
+      await import("../src/content/quality-inject.js");
+
+      const video = document.createElement("video");
+      video.setAttribute("data-vtp-quality-id", "v1");
+      document.body.append(video);
+
+      const first = waitForResponse("late-1");
+      document.dispatchEvent(
+        new CustomEvent("vtp-quality-request", {
+          detail: { requestId: "late-1", videoId: "v1" },
+        }),
+      );
+      await first;
+
+      const qualities = [{ height: 360 }, { height: 720 }];
+      const player = {
+        selected: qualities[1],
+        getQualities: vi.fn(() => qualities),
+        getQuality: vi.fn(() => player.selected),
+        setQuality: vi.fn(),
+        isAutoQualityMode: vi.fn(() => false),
+        setAutoQualityMode: vi.fn(),
+      };
+      const host = document.createElement("div") as HTMLDivElement & {
+        __reactFiber$vtp?: unknown;
+      };
+      host.__reactFiber$vtp = {
+        child: {
+          memoizedProps: {
+            mediaPlayerInstance: player,
+          },
+        },
+      };
+      host.append(video);
+      document.body.append(host);
+      now.mockReturnValue(3_500);
+
+      const second = waitForResponse("late-2");
+      document.dispatchEvent(
+        new CustomEvent("vtp-quality-request", {
+          detail: { requestId: "late-2", videoId: "v1" },
+        }),
+      );
+
+      const detail = await second;
+      expect(detail.options.map((opt) => opt.id)).toEqual(["auto", "::360:::0", "::720:::1"]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it("answers a reused request id after the previous request has finished", async () => {
     await import("../src/content/quality-inject.js");
 

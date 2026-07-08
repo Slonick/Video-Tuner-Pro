@@ -422,6 +422,7 @@ function noticeForMediaEvent(e: Event): void {
       break;
     }
     case "ratechange": {
+      if (t instanceof HTMLVideoElement && isLive(t)) return;
       const rate = Math.round(t.playbackRate * 100) / 100;
       if (lastRate.get(t) === rate || (lastRate.get(t) == null && Math.abs(rate - 1) < 0.001)) {
         lastRate.set(t, rate);

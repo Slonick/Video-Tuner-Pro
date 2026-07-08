@@ -592,6 +592,24 @@ describe("control bar", () => {
     expect(v.muted).toBe(false);
   });
 
+  it("keeps arrow controls active after the viewer seek slider has focus", async () => {
+    const { v } = makeVideo(100);
+    h.primary = v;
+    await openViewer("normal");
+    const [seek] = barInputs();
+
+    seek.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      }),
+    );
+
+    expect(v.currentTime).toBe(5);
+  });
+
   it("reloads seek markers when a SPA swaps the source on the same video", async () => {
     vi.stubGlobal("location", { hostname: "www.youtube.com" });
     try {

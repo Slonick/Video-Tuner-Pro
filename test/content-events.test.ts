@@ -267,6 +267,18 @@ describe("content media events", () => {
 
     expect(fx.showBadgeNotice).not.toHaveBeenCalledWith("1×");
   });
+
+  it("does not surface live-sync 1x rate assertions as notices", async () => {
+    await loadIndex();
+    const v = media(false);
+    fx.live = v;
+    fx.onStream = true;
+
+    v.playbackRate = 1.5;
+    v.dispatchEvent(new Event("ratechange"));
+
+    expect(fx.showBadgeNotice).not.toHaveBeenCalledWith("1.5×");
+  });
 });
 
 describe("content graph samplers", () => {

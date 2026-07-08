@@ -153,7 +153,7 @@ document.addEventListener(
       e.target) as HTMLElement | null;
     if (
       target &&
-      (target.tagName === "INPUT" ||
+      ((target.tagName === "INPUT" && (target as HTMLInputElement).type !== "range") ||
         target.tagName === "TEXTAREA" ||
         target.tagName === "SELECT" ||
         target.isContentEditable)

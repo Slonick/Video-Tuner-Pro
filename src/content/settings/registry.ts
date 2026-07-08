@@ -12,6 +12,7 @@ import { S } from "../state.js";
 import { applyAll, resetAudios } from "../speed.js";
 import { updateTimeBadge, flashBadge, applyBadgeGlass } from "../badge/overlay.js";
 import { updateLauncher, applyLauncherGlass } from "../overlay/launcher.js";
+import { releaseAutoSlow } from "../audio/autoslow.js";
 
 // One settings key. `parse` turns a raw stored value into the typed value (default +
 // clamp/normalize); `set` writes it onto S (a typed setter, so field and value types
@@ -166,12 +167,14 @@ export const REGISTRY: Entry<unknown>[] = [
   }),
   // Auto-slow response dynamics (floor + hold/reaction/ease-back) — global scalars
   // with no side-effect; the scoped target stays bespoke.
-  // Master on/off — global (like the compressor), not per-scope. The sampler resets
-  // the slowdown itself when it sees the flag off, so no apply side-effect here.
+  // Master on/off — global (like the compressor), not per-scope.
   entry({
     key: "autoSlowEnabled",
     parse: (raw) => raw === true,
     set: (v) => (S.autoSlowEnabled = v),
+    apply: () => {
+      if (!S.autoSlowEnabled) releaseAutoSlow();
+    },
   }),
   entry({
     key: "autoSlowFloor",

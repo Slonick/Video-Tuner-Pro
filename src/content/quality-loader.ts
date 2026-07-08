@@ -256,10 +256,12 @@
     }
   }
 
-  let initialBridgeUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
+  let runtimeBridgeUrl: string | null | undefined;
 
   function bridgeUrl(): string | null {
-    if (initialBridgeUrl) return initialBridgeUrl;
+    const attrUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
+    if (attrUrl) return attrUrl;
+    if (runtimeBridgeUrl !== undefined) return runtimeBridgeUrl;
     const runtime = (
       globalThis as typeof globalThis & {
         chrome?: { runtime?: { getURL?: (path: string) => string } };
@@ -275,8 +277,8 @@
           }
         ).browser?.runtime?.getURL
       )?.("quality-inject.js") || null;
-    initialBridgeUrl = validBridgeUrl(resolved);
-    return initialBridgeUrl;
+    runtimeBridgeUrl = validBridgeUrl(resolved);
+    return runtimeBridgeUrl;
   }
 
   let trustedPolicy:

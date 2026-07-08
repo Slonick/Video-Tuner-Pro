@@ -1055,6 +1055,7 @@
     const cached = adapterCache.get(v);
     if (cached?.key === cacheKey && (cached.adapter || Date.now() < cached.until))
       return cached.adapter;
+    rootsCache.delete(v);
     const find = (): Adapter | null =>
       youtubeAdapter(v) ||
       ivsAdapter(v) ||

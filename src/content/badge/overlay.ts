@@ -152,6 +152,10 @@ function setNoticeVisual(on: boolean): void {
     : "translate(-18px, -50%) scale(.36)";
 }
 
+function compactNotice(text: string): boolean {
+  return /^(\d+(?:\.\d+)?|\.\d+)×$/.test(text);
+}
+
 // Pin/unpin for this site: pinned → the badge stays visible (no auto-hide).
 function togglePin(): void {
   const on = !S.badgePinned;
@@ -304,6 +308,10 @@ export function showBadgeNotice(text: string): void {
   if (!timeBadgeEl || !badgeNoticeEl || timeBadgeEl.style.display === "none") return;
   clearTimeout(badgeNoticeTimer);
   badgeNoticeEl.textContent = text;
+  badgeNoticeEl.style.padding = compactNotice(text) ? "6px 8px" : "8px 11px";
+  badgeNoticeEl.style.animation = "none";
+  void badgeNoticeEl.offsetWidth;
+  badgeNoticeEl.style.animation = "vtp-badge-notice-in .36s cubic-bezier(.16,1,.3,1)";
   setNoticeVisual(true);
   flashBadge();
   badgeNoticeTimer = setTimeout(() => {

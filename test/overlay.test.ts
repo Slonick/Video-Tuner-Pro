@@ -624,6 +624,7 @@ describe("badge notice", () => {
       expect(badgeNotice()?.textContent).toBe("Paused");
       expect(badgeNotice()?.style.opacity).toBe("1");
       expect(badgeNotice()?.style.transform).toBe("translate(0, -50%) scale(1)");
+      expect(badgeNotice()?.style.animation).toContain("vtp-badge-notice-in");
       expect((badgeEl() as HTMLElement).style.background).toContain("rgb(20 20 22");
 
       await vi.advanceTimersByTimeAsync(1450);
@@ -634,5 +635,14 @@ describe("badge notice", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("uses a compact notice bubble for speed-only notices", () => {
+    h.primary = fakeVideo();
+    updateTimeBadge();
+
+    showBadgeNotice("1×");
+
+    expect(badgeNotice()?.style.padding).toBe("6px 8px");
   });
 });

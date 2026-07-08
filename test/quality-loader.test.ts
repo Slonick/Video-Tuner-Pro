@@ -150,12 +150,10 @@ describe("quality loader", () => {
     expect(script.src).toBe(BRIDGE_URL);
   });
 
-  it("uses the initial extension bridge URL even if the page mutates the attribute", async () => {
+  it("reads the bridge URL attribute lazily when quality is requested", async () => {
+    document.documentElement.removeAttribute(BRIDGE_URL_ATTR);
     await loadLoader();
-    document.documentElement.setAttribute(
-      BRIDGE_URL_ATTR,
-      "chrome-extension://other-extension/quality-inject.js",
-    );
+    document.documentElement.setAttribute(BRIDGE_URL_ATTR, BRIDGE_URL);
 
     document.dispatchEvent(
       new CustomEvent("vtp-quality-request", {

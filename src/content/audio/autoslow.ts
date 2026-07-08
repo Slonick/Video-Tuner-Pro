@@ -71,6 +71,10 @@ function release(): void {
   }
 }
 
+export function releaseAutoSlow(): void {
+  release();
+}
+
 function primaryForAutoSlow(now: number): HTMLVideoElement | null {
   if (now - lastProbeAt >= PRIMARY_CACHE_MS) {
     const v = primaryVideo();

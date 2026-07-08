@@ -66,7 +66,7 @@ const NOTICE_STYLE: CSSProperties = {
   position: "absolute",
   left: "calc(100% + 8px)",
   top: "50%",
-  padding: "9px 12px",
+  padding: "8px 11px",
   borderRadius: "999px",
   background: "rgb(20 20 22 / calc(0.34 * var(--glass-opacity, 1)))",
   boxShadow: "0 0 0 1px rgba(255,255,255,0.16),0 14px 36px rgba(0,0,0,0.24)",
@@ -78,6 +78,14 @@ const NOTICE_STYLE: CSSProperties = {
   transformOrigin: "left center",
   transition: "opacity .2s, transform .34s cubic-bezier(.16,1,.3,1)",
 };
+
+const BADGE_KEYFRAMES = `
+@keyframes vtp-badge-notice-in {
+  0% { opacity: 0; transform: translate(-22px, -50%) scale(.24); }
+  62% { opacity: 1; transform: translate(3px, -50%) scale(1.04); }
+  100% { opacity: 1; transform: translate(0, -50%) scale(1); }
+}
+`;
 
 interface Props {
   divRef: (n: HTMLDivElement | null) => void;
@@ -151,5 +159,8 @@ export function mountBadge(): BadgeRefs {
   // static and never re-renders, so React won't remove this trailing node). It's
   // not a <div>, so overlay.ts/tests still find the badge via querySelector("div").
   ensureGlassFilter(shadow);
+  const style = document.createElement("style");
+  style.textContent = BADGE_KEYFRAMES;
+  shadow.append(style);
   return { host, el: el!, dotEl: dotEl!, textEl: textEl!, pinEl: pinEl!, noticeEl: noticeEl! };
 }
