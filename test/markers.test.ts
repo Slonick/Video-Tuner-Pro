@@ -180,6 +180,24 @@ describe("fetchSponsorSegments", () => {
     expect(await fetchSponsorSegments("abc", boom as unknown as typeof fetch)).toEqual([]);
   });
 
+  it("does not cache a transient SponsorBlock network failure", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("net"))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ segment: [10, 20], category: "sponsor" }],
+      });
+
+    expect(await fetchSponsorSegments("retry-video", fetchFn as unknown as typeof fetch)).toEqual(
+      [],
+    );
+    expect(await fetchSponsorSegments("retry-video", fetchFn as unknown as typeof fetch)).toEqual([
+      { start: 10, end: 20, category: "sponsor" },
+    ]);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it("times out a stuck request", async () => {
     vi.useFakeTimers();
     const fetchFn = vi.fn((_url: string, init?: RequestInit) => {

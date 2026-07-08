@@ -176,7 +176,10 @@ export async function fetchSponsorSegments(
     const oldest = cache.keys().next().value;
     if (oldest) cache.delete(oldest);
   }
-  const promise = fetchSponsorSegmentsUncached(videoId, fetchFn);
+  const promise = fetchSponsorSegmentsUncached(videoId, fetchFn).catch(() => {
+    cache.delete(videoId);
+    return [];
+  });
   cache.set(videoId, promise);
   return promise;
 }
@@ -202,8 +205,6 @@ async function fetchSponsorSegmentsUncached(
     return data
       .filter((d) => Array.isArray(d.segment) && d.segment.length === 2 && d.category)
       .map((d) => ({ start: d.segment![0], end: d.segment![1], category: d.category! }));
-  } catch (e) {
-    return [];
   } finally {
     if (timer != null) clearTimeout(timer);
   }
