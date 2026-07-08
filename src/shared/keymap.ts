@@ -174,20 +174,24 @@ export function chordLabel(spec: string | null, mac: boolean = IS_MAC): string {
 
 // Coerce stored/partial input into a full, valid keymap. An empty string is a
 // deliberate "unbound" (the action is disabled); invalid or duplicate bindings
-// fall back to the default for that action (defaults never collide).
+// fall back to the default when that default does not collide with a user binding.
 export function normalizeKeymap(raw: unknown): Keymap {
   const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const out: Keymap = { ...DEFAULT_KEYMAP };
   const legacy = !!raw && typeof raw === "object";
-  if (legacy && !("viewer" in src)) out.viewer = "";
-  if (legacy && !("theater" in src)) out.theater = "";
   const used = new Set<string>();
+
   for (const a of ACTIONS) {
     const code = src[a];
     if (code === "") {
       out[a] = ""; // explicitly unbound — the action does nothing
     } else if (typeof code === "string" && isBindableCode(code) && !used.has(code)) {
       out[a] = code;
+    } else if (legacy && (a === "viewer" || a === "theater") && !(a in src)) {
+      out[a] = "";
+    } else {
+      const fallback = DEFAULT_KEYMAP[a];
+      out[a] = fallback && !used.has(fallback) ? fallback : "";
     }
     if (out[a]) used.add(out[a]); // an unbound "" never reserves a code
   }

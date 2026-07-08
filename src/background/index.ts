@@ -196,7 +196,8 @@ if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
 // never clobbers an existing (or already-synced) value. syncTargetGlobal also
 // defers to the legacy `liveSyncTarget` global, which loadSpeed still honours.
 if (api.runtime && api.runtime.onInstalled) {
-  api.runtime.onInstalled.addListener(() => {
+  api.runtime.onInstalled.addListener((details?: { reason?: string }) => {
+    if (details?.reason && details.reason !== "install") return;
     whenReady(() => {
       STORE.get(["globalSpeed", "syncTargetGlobal", "liveSyncTarget"], (r) => {
         const seed: Record<string, unknown> = {};

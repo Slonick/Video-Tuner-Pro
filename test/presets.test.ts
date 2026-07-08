@@ -137,6 +137,11 @@ describe("normalizeKeymap", () => {
     expect(km.slower).toBe("KeyZ");
     expect(km.faster).not.toBe("KeyZ");
   });
+  it("does not let a default binding shadow a later stored action", () => {
+    const km = normalizeKeymap({ reset: "KeyO", viewer: "KeyV", theater: "KeyT" });
+    expect(km.reset).toBe("KeyO");
+    expect(km.overlay).toBe("");
+  });
 });
 
 describe("keymap helpers", () => {
