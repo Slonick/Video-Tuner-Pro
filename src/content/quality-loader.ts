@@ -25,11 +25,18 @@
 
   const REQ = "vtp-quality-request";
   const SET = "vtp-quality-set";
+  const BRIDGE_URL_ATTR = "data-vtp-quality-bridge-url";
   const ROOT_REQ_ATTR = "data-vtp-quality-request";
   const ROOT_PICK_ATTR = "data-vtp-quality-pick";
   const MAX_CAPTURED_PLAYERS = 8;
   const MAX_CAPTURED_HLS = 8;
 
+  interface TrustedTypesLike {
+    createPolicy?: (
+      name: string,
+      rules: { createScriptURL: (url: string) => string },
+    ) => { createScriptURL: (url: string) => unknown };
+  }
   interface CapturedPlayer {
     player: unknown;
     video: HTMLVideoElement | null;
@@ -214,14 +221,28 @@
   installIvsHook();
   installHlsHook();
 
-  function bridgeUrl(): string {
+  function validBridgeUrl(url: string | null): string | null {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "chrome-extension:" && parsed.protocol !== "moz-extension:")
+        return null;
+      return parsed.pathname.endsWith("/quality-inject.js") ? url : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function bridgeUrl(): string | null {
+    const attrUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
+    if (attrUrl) return attrUrl;
     const runtime = (
       globalThis as typeof globalThis & {
         chrome?: { runtime?: { getURL?: (path: string) => string } };
         browser?: { runtime?: { getURL?: (path: string) => string } };
       }
     ).chrome?.runtime;
-    return (
+    const resolved =
       (
         runtime?.getURL ||
         (
@@ -229,16 +250,40 @@
             browser?: { runtime?: { getURL?: (path: string) => string } };
           }
         ).browser?.runtime?.getURL
-      )?.("quality-inject.js") || "quality-inject.js"
-    );
+      )?.("quality-inject.js") || null;
+    return validBridgeUrl(resolved);
+  }
+
+  let trustedPolicy:
+    | {
+        createScriptURL: (url: string) => unknown;
+      }
+    | null
+    | undefined;
+
+  function bridgeScriptUrl(url: string): string | unknown {
+    const tt = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesLike }).trustedTypes;
+    if (!tt?.createPolicy) return url;
+    if (trustedPolicy === undefined) {
+      try {
+        trustedPolicy = tt.createPolicy("video-tuner-quality-loader", {
+          createScriptURL: (value) => value,
+        });
+      } catch (e) {
+        trustedPolicy = null;
+      }
+    }
+    return trustedPolicy?.createScriptURL(url) ?? url;
   }
 
   function loadBridge(): Promise<void> {
     if (bridgeLoaded()) return Promise.resolve();
     if (loading) return loading;
+    const url = bridgeUrl();
+    if (!url) return Promise.reject(new Error("quality bridge URL is unavailable"));
     const promise = new Promise<void>((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = bridgeUrl();
+      (script as unknown as { src: string | unknown }).src = bridgeScriptUrl(url);
       script.async = false;
       script.onload = () => {
         script.remove();

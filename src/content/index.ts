@@ -43,6 +43,18 @@ import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
 import { channelKeys, sameChannelIdentity, sameChannelKeys } from "./channel.js";
 
+try {
+  const getURL = api.runtime?.getURL;
+  if (typeof getURL === "function") {
+    document.documentElement.setAttribute(
+      "data-vtp-quality-bridge-url",
+      getURL("quality-inject.js"),
+    );
+  }
+} catch (e) {
+  /* orphaned or mocked extension context */
+}
+
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;
