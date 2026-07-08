@@ -8,12 +8,16 @@ const m = vi.hoisted(() => ({
   resetToSaved: vi.fn(),
   toggleViewer: vi.fn(),
   hasVideo: true,
+  primaryCalls: 0,
   viewerFormat: null as string | null,
 }));
 
 vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed, resetToSaved: m.resetToSaved }));
 vi.mock("../src/content/videos.js", () => ({
-  primaryVideo: () => (m.hasVideo ? ({} as HTMLVideoElement) : null),
+  primaryVideo: () => {
+    m.primaryCalls++;
+    return m.hasVideo ? ({} as HTMLVideoElement) : null;
+  },
 }));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
 vi.mock("../src/content/viewer.js", () => ({
@@ -48,6 +52,7 @@ describe("keyboard shortcuts", () => {
     S.holdActive = false;
     S.holdPrev = 1.0;
     m.hasVideo = true;
+    m.primaryCalls = 0;
     m.viewerFormat = null;
     document.body.innerHTML = "";
   });
@@ -110,6 +115,13 @@ describe("keyboard shortcuts", () => {
       new KeyboardEvent("keydown", { code: "KeyD", bubbles: true, cancelable: true }),
     );
     expect(m.setSpeed).not.toHaveBeenCalled();
+    expect(m.primaryCalls).toBe(0);
+  });
+
+  it("does not look for video on repeated one-shot actions", () => {
+    press("KeyV", { repeat: true });
+    expect(m.toggleViewer).not.toHaveBeenCalled();
+    expect(m.primaryCalls).toBe(0);
   });
 
   it("does nothing when there's no video to act on", () => {

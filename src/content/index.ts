@@ -117,6 +117,16 @@ function syncBufferSampler(hasVideo = collectVideos().length > 0) {
   }
 }
 
+function syncAutoSlowSampler(): void {
+  if (S.autoSlowEnabled && !document.hidden) {
+    if (autoSlowSampler == null) autoSlowSampler = setInterval(autoSlowSample, AUTOSLOW_MS);
+  } else if (autoSlowSampler != null) {
+    clearInterval(autoSlowSampler);
+    autoSlowSampler = null;
+    autoSlowSample();
+  }
+}
+
 // The extension context dies on reload/update; shut down cleanly when it does.
 // Exported so live.js can call it without a circular value dependency.
 export function teardown() {
@@ -324,8 +334,7 @@ function startTimers(immediate = false) {
   if (liveTick == null) liveTick = setTimeout(tick, immediate ? 0 : tickInterval);
   if (audioSampler == null) audioSampler = setInterval(recordAudioSample, A_HIST_MS);
   syncBufferSampler();
-  // Always running; the sample body no-ops cheaply while auto-slow is off.
-  if (autoSlowSampler == null) autoSlowSampler = setInterval(autoSlowSample, AUTOSLOW_MS);
+  syncAutoSlowSampler();
 }
 
 // A media event or the tab regaining focus: drop back to the fast cadence and
@@ -464,6 +473,7 @@ api.storage.onChanged.addListener((changes, area) => {
   // audio-speed re-applies/resets, the overlay button re-evaluates) come from the
   // registry in one pass.
   applyRegistryChanges(changes);
+  if (changes.autoSlowEnabled) syncAutoSlowSampler();
   if (changes.domains || changes.channels || changes.globalSpeed) {
     reresolve();
   }

@@ -42,7 +42,22 @@ document.addEventListener(
   (e) => {
     if (e.defaultPrevented) return;
     if (!S.keyboardEnabled || !ctxValid()) return;
+    // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
+    const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
+    if (typingIn(target) || typingIn(deepActive())) return;
     const { slower, faster, reset, toggle, hold, overlay, viewer, theater } = S.keymap;
+    const oneShotRepeat =
+      e.repeat &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      (e.code === reset ||
+        e.code === toggle ||
+        e.code === overlay ||
+        e.code === viewer ||
+        e.code === theater);
+    if (oneShotRepeat) return;
     // A preset whose assigned chord matches this exact event (may use modifiers).
     let preset: number | undefined;
     for (let i = 0; i < S.presetKeys.length; i++) {
@@ -68,9 +83,6 @@ document.addEventListener(
         e.code === theater);
     const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (speedStepKey || plainActionKey);
     if (preset === undefined && !actionKey) return;
-    // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
-    const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
-    if (typingIn(target) || typingIn(deepActive())) return;
     const viewerAction = e.code === viewer || e.code === theater;
     if (viewerAction && !S.viewerAutoEnabled) return;
     if (!primaryVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
@@ -80,7 +92,6 @@ document.addEventListener(
       if (!e.repeat) setSpeed(preset, false, true);
       return;
     }
-    if (e.repeat && e.code !== slower && e.code !== faster && e.code !== hold) return;
     if (e.code === overlay) {
       toggleOverlayPopup();
       return;

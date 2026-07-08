@@ -341,6 +341,11 @@ export function updateTimeBadge(
   snapshot: { video?: HTMLVideoElement | null; stream?: boolean; anchor?: HTMLElement | null } = {},
 ): void {
   removeCurrentStaleBadgeHost();
+  if (!S.streamBadge && !S.showRemaining) {
+    if (timeBadgeEl) timeBadgeEl.style.display = "none";
+    badgeVideo = null;
+    return;
+  }
   const v = snapshot.video !== undefined ? snapshot.video : primaryVideo();
   const anchor = snapshot.anchor !== undefined ? snapshot.anchor : (viewerAnchorVideo() ?? v);
   const stream = snapshot.stream !== undefined ? snapshot.stream : onStreamPage();

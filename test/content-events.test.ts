@@ -12,7 +12,11 @@ const fx = vi.hoisted(() => ({
   reconcile: vi.fn(),
   markDrmVideo: vi.fn(),
   recordBufferSample: vi.fn(),
+  autoSlowSample: vi.fn(),
   addStorageListener: vi.fn(),
+  storageListener: null as
+    | ((changes: Record<string, { newValue?: unknown }>, area: string) => void)
+    | null,
   keys: [] as string[],
   videos: [] as HTMLVideoElement[],
   live: null as HTMLVideoElement | null,
@@ -21,7 +25,18 @@ const fx = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/content/platform/browser.js", () => ({
-  api: { storage: { onChanged: { addListener: fx.addStorageListener } } },
+  api: {
+    storage: {
+      onChanged: {
+        addListener: (
+          fn: (changes: Record<string, { newValue?: unknown }>, area: string) => void,
+        ) => {
+          fx.storageListener = fn;
+          fx.addStorageListener(fn);
+        },
+      },
+    },
+  },
   ctxValid: () => true,
 }));
 vi.mock("../src/content/platform/storage.js", () => ({
@@ -83,7 +98,10 @@ vi.mock("../src/content/audio/metering.js", () => ({
   recordAudioSample: vi.fn(),
   A_HIST_MS: 1000,
 }));
-vi.mock("../src/content/audio/autoslow.js", () => ({ autoSlowSample: vi.fn(), AUTOSLOW_MS: 1000 }));
+vi.mock("../src/content/audio/autoslow.js", () => ({
+  autoSlowSample: fx.autoSlowSample,
+  AUTOSLOW_MS: 1000,
+}));
 vi.mock("../src/content/audio/autoslow-config.js", () => ({
   applyResolvedAutoSlowFromStore: vi.fn(),
 }));
@@ -132,6 +150,7 @@ beforeEach(() => {
   fx.live = null;
   fx.keys = [];
   fx.videos = [];
+  fx.storageListener = null;
   fx.resolveSpeed.mockImplementation(
     (
       keys: string[],
@@ -234,6 +253,25 @@ describe("content graph samplers", () => {
     const callsAfterStop = fx.recordBufferSample.mock.calls.length;
     await vi.advanceTimersByTimeAsync(3000);
     expect(fx.recordBufferSample).toHaveBeenCalledTimes(callsAfterStop);
+  });
+
+  it("runs the auto-slow sampler only while auto-slow is enabled", async () => {
+    await loadIndex();
+    const { S } = await import("../src/content/state.js");
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fx.autoSlowSample).not.toHaveBeenCalled();
+
+    S.autoSlowEnabled = true;
+    fx.storageListener?.({ autoSlowEnabled: { newValue: true } }, "sync");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fx.autoSlowSample).toHaveBeenCalledTimes(1);
+
+    S.autoSlowEnabled = false;
+    fx.storageListener?.({ autoSlowEnabled: { newValue: false } }, "sync");
+    expect(fx.autoSlowSample).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fx.autoSlowSample).toHaveBeenCalledTimes(2);
   });
 });
 

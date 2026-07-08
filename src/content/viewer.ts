@@ -299,6 +299,7 @@ function drawBackdropCanvas(): boolean {
 
 function scheduleBackdropCanvas(): void {
   if (!(backdropVideo instanceof HTMLCanvasElement) || backdropCanvasTimer != null) return;
+  if (document.hidden) return;
   if (video?.paused) return;
   backdropCanvasTimer = setTimeout(() => {
     backdropCanvasTimer = null;
@@ -309,6 +310,17 @@ function scheduleBackdropCanvas(): void {
     scheduleBackdropCanvas();
   }, BACKDROP_CANVAS_MS);
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    if (backdropCanvasTimer != null) {
+      clearTimeout(backdropCanvasTimer);
+      backdropCanvasTimer = null;
+    }
+  } else {
+    scheduleBackdropCanvas();
+  }
+});
 
 function createBackdropVideoFallback(): HTMLVideoElement | null {
   if (!overlay || !backdropEl || !mirrorStream) return null;

@@ -11,8 +11,14 @@ const h = vi.hoisted(() => ({
   latency: null as number | null,
   buffer: 0,
   limited: false,
+  primaryCalls: 0,
 }));
-vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => h.primary }));
+vi.mock("../src/content/videos.js", () => ({
+  primaryVideo: () => {
+    h.primaryCalls++;
+    return h.primary;
+  },
+}));
 vi.mock("../src/content/viewer.js", () => ({
   VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
   viewerAnchorVideo: () => h.anchor,
@@ -86,6 +92,7 @@ beforeEach(() => {
   h.latency = null;
   h.buffer = 0;
   h.limited = false;
+  h.primaryCalls = 0;
   S.showRemaining = true;
   S.streamBadge = true;
   S.badgePos = null;
@@ -140,6 +147,17 @@ describe("updateTimeBadge — visibility", () => {
     h.primary = fakeVideo();
     updateTimeBadge();
     expect(badgeShown()).toBe(false);
+  });
+
+  it("does not walk media when both badge modes are disabled", () => {
+    S.showRemaining = false;
+    S.streamBadge = false;
+    h.primary = fakeVideo();
+
+    updateTimeBadge();
+
+    expect(badgeShown()).toBe(false);
+    expect(h.primaryCalls).toBe(0);
   });
 
   it("hides on a live stream when the stream badge is disabled", () => {

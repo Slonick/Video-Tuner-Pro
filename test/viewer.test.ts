@@ -768,6 +768,38 @@ describe("control bar", () => {
     }
   });
 
+  it("pauses the mirrored background canvas loop while the tab is hidden", async () => {
+    vi.useFakeTimers();
+    const { v } = makeVideo();
+    installBackdropMirror(v);
+    await v.play();
+    const drawImage = vi.fn();
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    try {
+      S.viewerBackdropVideo = true;
+      h.primary = v;
+
+      await openViewer("normal");
+      expect(drawImage).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(200);
+      expect(drawImage).toHaveBeenCalledTimes(1);
+
+      Object.defineProperty(document, "hidden", { value: false, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(66);
+
+      expect(drawImage).toHaveBeenCalledTimes(2);
+      exitViewer();
+    } finally {
+      Object.defineProperty(document, "hidden", { value: false, configurable: true });
+      getContext.mockRestore();
+    }
+  });
+
   it("keeps the glass blur when background video is disabled before opening", async () => {
     const { v } = makeVideo();
     installBackdropMirror(v);
