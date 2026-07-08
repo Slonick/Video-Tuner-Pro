@@ -142,6 +142,7 @@ function positionFab(v: HTMLElement): void {
 // is open.
 function radialList(): HTMLButtonElement[] {
   if (!rItems) return [];
+  if (!S.viewerAutoEnabled) return [];
   if (isDrmVideo(primaryVideo())) return viewerFormat() ? [rItems.exit] : [];
   const f = viewerFormat();
   const visual = [

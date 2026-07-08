@@ -161,6 +161,7 @@ export function setViewerState(format: ViewerFormat | "off"): void {
     else document.dispatchEvent(new Event(CLOSE_EVENT));
     return;
   }
+  if (!S.viewerAutoEnabled) return;
   if (viewerFormat() === format) return;
   if (fmt) setFormat(format);
   else {
@@ -693,12 +694,14 @@ function setFormat(f: ViewerFormat): void {
 
 function showBar(): void {
   if (!bar) return;
+  if (overlay) overlay.style.cursor = "";
   bar.style.opacity = "1";
   bar.style.pointerEvents = "auto";
   clearTimeout(barTimer);
   if (video?.paused) return; // paused → controls stay up, like every player
   barTimer = setTimeout(() => {
     if (!bar || video?.paused) return;
+    if (overlay) overlay.style.cursor = "none";
     bar.style.opacity = "0";
     bar.style.pointerEvents = "none";
   }, BAR_HIDE_MS);
@@ -1586,6 +1589,7 @@ export function exitViewer(): void {
 // format → switch; open in the same format → close. So V and T each toggle
 // their own view and jump straight between the two.
 export function toggleViewer(format: ViewerFormat): void {
+  if (!S.viewerAutoEnabled) return;
   if (fmt) {
     if (fmt === format) exitViewer();
     else setFormat(format);

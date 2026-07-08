@@ -43,6 +43,7 @@ describe("keyboard shortcuts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     S.keyboardEnabled = true;
+    S.viewerAutoEnabled = true;
     S.currentSpeed = 1.0;
     S.holdActive = false;
     S.holdPrev = 1.0;
@@ -137,6 +138,13 @@ describe("keyboard shortcuts", () => {
 
   it("viewer keys are ignored without a video", () => {
     m.hasVideo = false;
+    press("KeyV");
+    press("KeyT");
+    expect(m.toggleViewer).not.toHaveBeenCalled();
+  });
+
+  it("viewer keys are ignored when viewer modes are disabled", () => {
+    S.viewerAutoEnabled = false;
     press("KeyV");
     press("KeyT");
     expect(m.toggleViewer).not.toHaveBeenCalled();

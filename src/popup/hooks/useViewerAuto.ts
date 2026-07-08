@@ -65,6 +65,13 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
     modeRef.current = normalize(next);
     setModeState(modeRef.current);
   }, []);
+  const setPickedMode = useCallback(
+    (next: ViewerAutoMode) => {
+      modeHoldUntil.current = Date.now() + 1200;
+      setMode(next);
+    },
+    [setMode],
+  );
   const setEnabled = useCallback((next: boolean) => {
     setEnabledState(next);
     STORE.set({ viewerAutoEnabled: next });
@@ -99,19 +106,14 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
   const setPageMode = useCallback(
     (next: ViewerAutoMode) => {
       const mode = normalize(next);
-      const previousMode = modeRef.current;
       const previousPageMode = pageModeRef.current;
-      modeHoldUntil.current = Date.now() + 1200;
       pageModeHoldUntil.current = Date.now() + 1200;
-      setMode(mode);
       pageModeRef.current = mode;
       setPageModeState(mode);
       if (!hasTab) return;
       void send<ViewerStateResponse>("setViewerState", { mode }).then((resp) => {
         if (!resp || resp.success === false) {
-          modeHoldUntil.current = 0;
           pageModeHoldUntil.current = 0;
-          setMode(previousMode);
           pageModeRef.current = previousPageMode;
           setPageModeState(previousPageMode);
           return;
@@ -265,7 +267,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
     saved,
     savedValues,
     setEnabled,
-    setMode,
+    setMode: setPickedMode,
     setPageMode,
     save,
     resetScope,

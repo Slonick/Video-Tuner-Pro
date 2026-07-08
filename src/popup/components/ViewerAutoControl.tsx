@@ -34,8 +34,10 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
   const sectionRef = useRef<HTMLDivElement>(null);
   const [backdropVideo, setBackdropVideoState] = useState(false);
   const { open, toggle } = useCardOverlay(sectionRef, slotRef, true);
-  const label = msg("optViewerAutoLabel") || "Auto pop-out on play";
+  const label = msg("viewerModesLabel") || "Viewer modes";
+  const autoLabel = msg("optViewerAutoLabel") || "Auto-open selected mode";
   const backdropLabel = msg("viewerBackdropVideo") || "Background video";
+  const autoOpen = va.mode !== "off";
 
   useStored(["viewerBackdropVideo"], (r) => {
     setBackdropVideoState(r.viewerBackdropVideo === true);
@@ -51,6 +53,17 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
     setBackdropVideoState(on);
     STORE.set({ viewerBackdropVideo: on });
   };
+  const selectedAutoMode = (): ViewerAutoMode =>
+    va.pageMode === "normal" || va.pageMode === "theater" ? va.pageMode : "normal";
+  const setAutoOpen = (on: boolean) => {
+    if (blocked || !va.enabled) return;
+    va.setMode(on ? selectedAutoMode() : "off");
+  };
+  const setPageMode = (mode: ViewerAutoMode) => {
+    if (blocked || !va.enabled) return;
+    va.setPageMode(mode);
+    if (autoOpen && mode !== "off") va.setMode(mode);
+  };
 
   return (
     <div ref={slotRef} className="viewer-auto-slot card-slot">
@@ -59,7 +72,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
         className={
           "sync-section viewer-auto-section overlay-card" +
           (open ? " is-overlay" : "") +
-          (blocked ? " locked" : "")
+          (blocked || !va.enabled ? " locked" : "")
         }
       >
         <div className="sec-head">
@@ -67,22 +80,23 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
             <span className="sec-text">
               <span className="sec-title-row">
                 <strong>{label}</strong>
-                <InfoTip beta tip={msg("betaNote")} />
               </span>
               <span className="switch-sub">
                 {va.enabled
-                  ? `${msg(VIEWER_AUTO_LABEL[va.mode])} · ${
+                  ? `${msg(VIEWER_AUTO_LABEL[va.pageMode])} · ${
                       va.scope === "channel"
                         ? va.channelName || msg("scopeThisChannel")
                         : va.scope === "site"
                           ? msg("scopeThisSite")
                           : va.scope === "global"
                             ? msg("scopeEverywhere")
-                            : msg("optViewerAutoHint")
+                            : autoOpen
+                              ? autoLabel
+                              : msg("viewerModesHint")
                     }`
                   : blocked
                     ? msg("viewerDrmBlocked") || "Unavailable on protected video"
-                    : msg("optViewerAutoHint")}
+                    : msg("viewerModesHint")}
               </span>
             </span>
           </Button>
@@ -110,8 +124,8 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 }
                 role="radio"
                 aria-checked={va.pageMode === "off"}
-                disabled={blocked}
-                onClick={() => va.setPageMode("off")}
+                disabled={blocked || !va.enabled}
+                onClick={() => setPageMode("off")}
               >
                 <span className="viewer-auto-window">
                   <span className="viewer-auto-video" />
@@ -130,8 +144,8 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 }
                 role="radio"
                 aria-checked={va.pageMode === "normal"}
-                disabled={blocked}
-                onClick={() => va.setPageMode("normal")}
+                disabled={blocked || !va.enabled}
+                onClick={() => setPageMode("normal")}
               >
                 <span className="viewer-auto-window viewer-auto-overlay-window">
                   <span className="viewer-auto-video" />
@@ -145,14 +159,30 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 }
                 role="radio"
                 aria-checked={va.pageMode === "theater"}
-                disabled={blocked}
-                onClick={() => va.setPageMode("theater")}
+                disabled={blocked || !va.enabled}
+                onClick={() => setPageMode("theater")}
               >
                 <span className="viewer-auto-window">
                   <span className="viewer-auto-video" />
                 </span>
                 <span className="viewer-auto-choice">{msg("viewerAutoTheater") || "Theater"}</span>
               </button>
+            </div>
+            <div className="viewer-mode-option">
+              <span className="viewer-mode-copy">
+                <span className="viewer-mode-title">
+                  <strong>{autoLabel}</strong>
+                  <InfoTip beta tip={msg("betaNote")} />
+                </span>
+                <span>{msg("optViewerAutoHint")}</span>
+              </span>
+              <Switch
+                id="viewerAutoModeToggle"
+                checked={autoOpen}
+                ariaLabel={autoLabel}
+                disabled={blocked || !va.enabled}
+                onChange={setAutoOpen}
+              />
             </div>
             <div className="viewer-auto-save">
               <SaveScope
@@ -169,6 +199,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 onPick={va.pickScope}
                 saveId="viewerAutoSetBtn"
                 resetId="viewerAutoResetBtn"
+                disabled={blocked || !va.enabled}
               />
             </div>
             <div className="viewer-backdrop-option">
@@ -180,7 +211,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 id="viewerBackdropVideoToggle"
                 checked={backdropVideo}
                 ariaLabel={backdropLabel}
-                disabled={blocked}
+                disabled={blocked || !va.enabled}
                 onChange={setBackdropVideo}
               />
             </div>
@@ -193,7 +224,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
               id="viewerFitSeg"
               className="seg viewer-auto-seg"
               ariaLabel={msg("viewerFitAria") || "Fill mode"}
-              disabled={blocked}
+              disabled={blocked || !va.enabled}
               items={VIEWER_FIT_MODES.map((m) => ({
                 value: m,
                 label: msg(VIEWER_FIT_LABEL[m]) || m,
@@ -216,6 +247,7 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
                 onPick={fit.pickScope}
                 saveId="viewerFitSetBtn"
                 resetId="viewerFitResetBtn"
+                disabled={blocked || !va.enabled}
               />
             </div>
           </div>

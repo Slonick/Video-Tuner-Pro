@@ -102,6 +102,7 @@ beforeEach(() => {
   v.paused = false;
   vi.clearAllMocks();
   S.overlayButton = "fullscreen";
+  S.viewerAutoEnabled = true;
   S.overlayBtnPos = null;
   S.overlayPanelPos = null;
   STORE.set({ overlayBtnPos: {}, overlayPanelPos: {} });
@@ -439,6 +440,12 @@ describe("launcher — radial viewer menu", () => {
     expect(shown(theater)).toBe(true);
     expect(shown(pip)).toBe(false);
     expect(exit.style.display).toBe("none");
+  });
+
+  it("hides radial viewer actions when viewer modes are disabled", async () => {
+    S.viewerAutoEnabled = false;
+    await openMenu();
+    expect(items().some(shown)).toBe(false);
   });
 
   it("hides viewer format actions on protected video", async () => {

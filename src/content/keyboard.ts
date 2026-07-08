@@ -72,6 +72,7 @@ document.addEventListener(
     const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
     if (typingIn(target) || typingIn(deepActive())) return;
     const viewerAction = e.code === viewer || e.code === theater;
+    if (viewerAction && !S.viewerAutoEnabled) return;
     if (!primaryVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
 
     e.preventDefault();

@@ -106,6 +106,7 @@ html.vtp-embedded .group-label::after {
 }
 
 .viewer-auto-section.locked .viewer-auto-state,
+.viewer-auto-section.locked .viewer-mode-option,
 .viewer-auto-section.locked .viewer-backdrop-option,
 .viewer-auto-section.locked .viewer-auto-seg,
 .viewer-auto-section.locked .viewer-auto-save {
@@ -176,6 +177,7 @@ html.vtp-embedded .group-label::after {
   min-width: 0;
 }
 
+.viewer-mode-option,
 .viewer-backdrop-option {
   display: flex;
   align-items: center;
@@ -187,6 +189,7 @@ html.vtp-embedded .group-label::after {
   background: var(--glass-l1);
 }
 
+.viewer-mode-copy,
 .viewer-backdrop-copy {
   display: flex;
   min-width: 0;
@@ -194,11 +197,19 @@ html.vtp-embedded .group-label::after {
   gap: 2px;
 }
 
+.viewer-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.viewer-mode-copy strong,
 .viewer-backdrop-copy strong {
   font-size: 13px;
   line-height: 1.15;
 }
 
+.viewer-mode-copy span,
 .viewer-backdrop-copy span {
   overflow: hidden;
   color: var(--muted);

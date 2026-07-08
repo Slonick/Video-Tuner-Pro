@@ -109,6 +109,7 @@ export const REGISTRY: Entry<unknown>[] = [
     key: "viewerAutoEnabled",
     parse: (raw) => raw !== false,
     set: (v) => (S.viewerAutoEnabled = v),
+    apply: () => updateLauncher(),
   }),
   entry({
     key: "viewerBackdropVideo",

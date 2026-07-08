@@ -524,7 +524,7 @@ describe("Options · Saved", () => {
 
     const cats = [...document.querySelectorAll(".saved-cat")] as HTMLElement[];
     const autoCat = cats.find((c) => c.textContent?.includes("Auto-slow dense speech"))!;
-    const viewerAutoCat = cats.find((c) => c.textContent?.includes("Auto pop-out on play"))!;
+    const viewerAutoCat = cats.find((c) => c.textContent?.includes("Auto-open selected mode"))!;
     const fitCat = cats.find((c) => c.textContent?.includes("Fill mode"))!;
 
     expect(autoCat.textContent).toContain("a.com");

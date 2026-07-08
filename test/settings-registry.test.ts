@@ -131,6 +131,12 @@ describe("applyRegistryChanges — value + side-effects", () => {
     expect(fx.updateLauncher).toHaveBeenCalledTimes(1);
   });
 
+  it("re-evaluates the launcher when viewer modes are toggled", () => {
+    applyRegistryChanges(changes({ viewerAutoEnabled: false }));
+    expect(S.viewerAutoEnabled).toBe(false);
+    expect(fx.updateLauncher).toHaveBeenCalledTimes(1);
+  });
+
   it("sets audio-compressor values without firing a side-effect (that stays bespoke)", () => {
     const touched = applyRegistryChanges(changes({ audioCompRatio: 4 }));
     expect(touched).toBe(true);

@@ -220,6 +220,15 @@ describe("toggleViewer — lifecycle", () => {
     expect(overlayEl()).toBeNull();
   });
 
+  it("does not open while viewer modes are disabled", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    S.viewerAutoEnabled = false;
+    await openViewer("normal");
+    expect(viewerFormat()).toBeNull();
+    expect(overlayEl()).toBeNull();
+  });
+
   it("adopts the video into the overlay and marks its old spot", async () => {
     const { wrap, v } = makeVideo();
     v.controls = true;
@@ -455,6 +464,24 @@ describe("control bar", () => {
     mute.click();
     expect(v.muted).toBe(true);
     expect(mute.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("hides the cursor with the control bar while playing", async () => {
+    vi.useFakeTimers();
+    try {
+      const { v } = makeVideo();
+      h.primary = v;
+      await openViewer("theater");
+      v.play();
+      overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      expect(overlayEl()?.style.cursor).toBe("");
+      await vi.advanceTimersByTimeAsync(2700);
+      expect(overlayEl()?.style.cursor).toBe("none");
+      overlayEl()?.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      expect(overlayEl()?.style.cursor).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a live stream hides the seek bar and shows LIVE", async () => {

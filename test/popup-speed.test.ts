@@ -430,14 +430,15 @@ describe("viewer auto-open scope control", () => {
     await flush();
   };
 
-  it("carries a beta marker in the header", async () => {
+  it("carries a beta marker on the auto-open row", async () => {
     await mountApp({
       tab: YT,
       replies: {
         getViewerAuto: { mode: "off", scope: null, channel: "UCabc", channelName: "Ch" },
       },
     });
-    expect(document.querySelector(".viewer-auto-section .beta-glyph")?.textContent).toBe("β");
+    expect(document.querySelector(".viewer-mode-option .beta-glyph")?.textContent).toBe("β");
+    expect(document.querySelector(".sec-title-row .beta-glyph")).toBeNull();
   });
 
   it("saves the selected auto-open mode to a chosen scope", async () => {
@@ -449,6 +450,8 @@ describe("viewer auto-open scope control", () => {
       },
     });
     pickViewerAuto("Theater");
+    await flush();
+    click("viewerAutoModeToggle");
     await flush();
     await openViewerAutoMenu();
     row("channel")!.click();
@@ -622,6 +625,54 @@ describe("viewer auto-open scope control", () => {
     expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
       "Viewer",
     );
+  });
+
+  it("uses the inner auto-open switch without changing page state", async () => {
+    const { lastCall } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerAuto: { mode: "off", scope: null, channel: "UCabc", channelName: "Ch" },
+        getViewerState: { mode: "theater" },
+      },
+    });
+    click("viewerAutoModeToggle");
+    await flush();
+    await openViewerAutoMenu();
+    row("channel")!.click();
+    await flush();
+    expect(lastCall("setViewerState")).toBeUndefined();
+    expect(lastCall("rememberViewerAuto")).toMatchObject({
+      action: "rememberViewerAuto",
+      scope: "channel",
+      mode: "theater",
+    });
+  });
+
+  it("keeps a just-picked auto-open setting when the saved mode resolves late", async () => {
+    const { lastCall } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerAuto: {
+          __delayMs: 80,
+          mode: "off",
+          scope: null,
+          channel: "UCabc",
+          channelName: "Ch",
+        },
+        getViewerState: { mode: "theater" },
+      },
+    });
+    click("viewerAutoModeToggle");
+    await flush();
+    await wait(120);
+    await openViewerAutoMenu();
+    row("channel")!.click();
+    await flush();
+    expect(lastCall("rememberViewerAuto")).toMatchObject({
+      action: "rememberViewerAuto",
+      scope: "channel",
+      mode: "theater",
+    });
   });
 
   it("resets the saved viewer auto mode for the active scope", async () => {
