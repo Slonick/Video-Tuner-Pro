@@ -227,7 +227,7 @@ describe("sync ON (runLiveSync)", () => {
     expect(v.playbackRate).toBe(1.0);
   });
 
-  it("does not sample dropped frames when no catch-up can be applied", () => {
+  it("keeps the dropped-frame baseline fresh when no catch-up can be applied", () => {
     const v = fakeVideo();
     const getQuality = vi.fn(v.getVideoPlaybackQuality);
     v.getVideoPlaybackQuality = getQuality;
@@ -239,8 +239,28 @@ describe("sync ON (runLiveSync)", () => {
 
     controlLive();
 
-    expect(getQuality).not.toHaveBeenCalled();
+    expect(getQuality).toHaveBeenCalledTimes(1);
     expect(v.playbackRate).toBe(1.0);
+  });
+
+  it("does not let old 1x dropped frames block a later catch-up decision", () => {
+    const v = fakeVideo({ droppedVideoFrames: 0 });
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+    h.liveVideo.mockReturnValue(v);
+    h.forwardBuffer.mockReturnValue(10);
+    h.streamLatency.mockReturnValue(4.9);
+
+    controlLive();
+    v.droppedVideoFrames = 12;
+    vi.setSystemTime(T + 300);
+    controlLive();
+    expect(v.playbackRate).toBe(1.0);
+
+    h.streamLatency.mockReturnValue(6.5);
+    vi.setSystemTime(T + 600);
+    controlLive();
+    expect(v.playbackRate).toBeCloseTo(1.05, 5);
   });
 
   it("does not inherit the dwell window when the live video element changes", () => {

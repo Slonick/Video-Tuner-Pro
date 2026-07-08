@@ -92,6 +92,8 @@ let downX = 0,
 // save a fraction computed against the wrong box.
 let dragVideo: HTMLElement | null = null;
 let dragWasViewerOpen = false;
+let fabDragDrop: ((save?: boolean) => void) | null = null;
+let fabGlobalDragHooked = false;
 
 // True if a node belongs to our launcher — the media observer ignores our own
 // DOM writes so they don't feed back into applyAll (mirrors ownsBadgeNode).
@@ -596,9 +598,28 @@ export function toggleOverlayPopup(): void {
   togglePopup();
 }
 
+function hookGlobalFabDrag(): void {
+  if (fabGlobalDragHooked) return;
+  fabGlobalDragHooked = true;
+  const finishFromOutside = (e: PointerEvent) => {
+    if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
+    fabDragDrop?.();
+  };
+  const cancelFromOutside = (e: PointerEvent) => {
+    if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
+    fabDragDrop?.(false);
+  };
+  document.addEventListener("pointerup", finishFromOutside, true);
+  document.addEventListener("pointercancel", cancelFromOutside, true);
+  window.addEventListener("pointerup", finishFromOutside, true);
+  window.addEventListener("pointercancel", cancelFromOutside, true);
+  window.addEventListener("blur", () => fabDragDrop?.(false), true);
+}
+
 // Drag anywhere over the video; a press without a drag toggles the popup. Mirrors
 // the badge's drag handling so the two controls behave identically.
 function hookFabDrag(el: HTMLElement): void {
+  hookGlobalFabDrag();
   el.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     dragging = true;
@@ -664,19 +685,7 @@ function hookFabDrag(el: HTMLElement): void {
   };
   el.addEventListener("pointerup", () => drop());
   el.addEventListener("pointercancel", () => drop(false));
-  const finishFromOutside = (e: PointerEvent) => {
-    if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
-    drop();
-  };
-  const cancelFromOutside = (e: PointerEvent) => {
-    if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
-    drop(false);
-  };
-  document.addEventListener("pointerup", finishFromOutside, true);
-  document.addEventListener("pointercancel", cancelFromOutside, true);
-  window.addEventListener("pointerup", finishFromOutside, true);
-  window.addEventListener("pointercancel", cancelFromOutside, true);
-  window.addEventListener("blur", () => drop(false), true);
+  fabDragDrop = drop;
   el.addEventListener("dblclick", (e) => {
     e.preventDefault();
     dragging = false;

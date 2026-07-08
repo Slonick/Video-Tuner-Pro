@@ -181,6 +181,28 @@ describe("live lock", () => {
     expect(getSpeedCalls()).toBe(before);
   });
 
+  it("detects when an open non-live popup becomes live", async () => {
+    let calls = 0;
+    await mountApp({
+      tab: YT,
+      replies: {
+        getSpeed: () => ({
+          speed: ++calls >= 2 ? 1.05 : 1,
+          channel: null,
+          channelName: "",
+          scope: null,
+          live: calls >= 2,
+        }),
+      },
+    });
+    expect(byId("liveWarn").style.display).toBe("none");
+
+    await wait(1700);
+
+    expect(byId("liveWarn").style.display).toBe("inline-flex");
+    expect(readout()).toBe("105%");
+  });
+
   it("keeps polling speed while live so the catch-up readout updates", async () => {
     let speed = 1;
     const { sendSpy } = await mountApp({

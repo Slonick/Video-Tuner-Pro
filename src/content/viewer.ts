@@ -1365,11 +1365,12 @@ async function loadMarkers(): Promise<void> {
   marksEl.textContent = "";
   markerRanges = [];
   clearMarkerHover();
+  const keyAtEntry = marksSourceKey;
   if ((S.sponsorMarks || hasNativeSponsorBlock()) && isYouTube()) {
     const id = youTubeVideoId();
     if (id) {
       const segs = await fetchSponsorSegments(id);
-      if (!fmt || !marksEl) return;
+      if (!fmt || !marksEl || marksSourceKey !== keyAtEntry) return;
       for (const sg of segs) {
         const d = document.createElement("div");
         d.className = "mark-seg";

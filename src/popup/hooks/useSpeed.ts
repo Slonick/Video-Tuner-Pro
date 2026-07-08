@@ -339,6 +339,23 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     return () => clearInterval(id);
   }, [hasTab, live, send, applyChannel, apply]);
 
+  useEffect(() => {
+    if (!hasTab || live) return;
+    const id = setInterval(() => {
+      void send<SpeedResponse>("getSpeed").then((resp) => {
+        if (!resp) return;
+        applyChannel(resp.channel, resp.channelName, resp.channelKeys);
+        setDrm(!!resp.drm);
+        if (resp.live) {
+          missesRef.current = 0;
+          setLive(true);
+          if (typeof resp.speed === "number") apply(resp.speed, false);
+        }
+      });
+    }, 1500);
+    return () => clearInterval(id);
+  }, [hasTab, live, send, applyChannel, apply]);
+
   return {
     speed,
     presets,

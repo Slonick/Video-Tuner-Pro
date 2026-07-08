@@ -129,6 +129,7 @@ function runLiveSync(video: HTMLVideoElement): void {
 
   const lag = lat != null ? lat : buffer;
   const floor = catchupBufferFloor(lat, target, S.liveSyncBufferReserve);
+  const rawDropped = droppedFramesDelta(video);
   let desired = decideCatchupSpeed({
     buffer,
     latency: lat,
@@ -142,7 +143,6 @@ function runLiveSync(video: HTMLVideoElement): void {
     // A rate switch itself drops a frame or two, and a bail here causes another
     // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
     // Ignore drops briefly after the catch-up decision changes and below a real burst.
-    const rawDropped = droppedFramesDelta(video);
     dropped = Date.now() - lastRateDecisionAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
     if (dropped > 0) {
       desired = decideCatchupSpeed({

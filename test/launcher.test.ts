@@ -126,6 +126,25 @@ function enterWebkitFullscreen(el: Element | null = document.body) {
 }
 
 describe("updateLauncher — eligibility", () => {
+  it("registers global FAB drag fallbacks only once across remounts", () => {
+    const docAdd = vi.spyOn(document, "addEventListener");
+    const winAdd = vi.spyOn(window, "addEventListener");
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+
+    updateLauncher();
+    host()?.remove();
+    updateLauncher();
+
+    expect(docAdd.mock.calls.filter(([type]) => type === "pointerup")).toHaveLength(1);
+    expect(docAdd.mock.calls.filter(([type]) => type === "pointercancel")).toHaveLength(1);
+    expect(winAdd.mock.calls.filter(([type]) => type === "pointerup")).toHaveLength(1);
+    expect(winAdd.mock.calls.filter(([type]) => type === "pointercancel")).toHaveLength(1);
+    expect(winAdd.mock.calls.filter(([type]) => type === "blur")).toHaveLength(1);
+    docAdd.mockRestore();
+    winAdd.mockRestore();
+  });
+
   it("does not mount when disabled", () => {
     S.overlayButton = "off";
     h.primary = fakeVideo();
