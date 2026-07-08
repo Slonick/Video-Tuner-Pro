@@ -227,6 +227,22 @@ describe("sync ON (runLiveSync)", () => {
     expect(v.playbackRate).toBe(1.0);
   });
 
+  it("does not sample dropped frames when no catch-up can be applied", () => {
+    const v = fakeVideo();
+    const getQuality = vi.fn(v.getVideoPlaybackQuality);
+    v.getVideoPlaybackQuality = getQuality;
+    S.liveSyncEnabled = true;
+    S.liveSyncTarget = 5;
+    h.liveVideo.mockReturnValue(v);
+    h.streamLatency.mockReturnValue(4.9);
+    h.forwardBuffer.mockReturnValue(10);
+
+    controlLive();
+
+    expect(getQuality).not.toHaveBeenCalled();
+    expect(v.playbackRate).toBe(1.0);
+  });
+
   it("does not inherit the dwell window when the live video element changes", () => {
     const first = fakeVideo();
     const second = fakeVideo();

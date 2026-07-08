@@ -125,11 +125,6 @@ function runLiveSync(video: HTMLVideoElement): void {
   // (we play faster than real-time toward the live edge), so the buffer still
   // gates the catch-up as an anti-stall guard.
   const lat = streamLatency();
-  // A rate switch itself drops a frame or two, and a bail here causes another
-  // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
-  // Ignore drops briefly after the catch-up decision changes and below a real burst.
-  const rawDropped = droppedFramesDelta(video);
-  const dropped = Date.now() - lastRateDecisionAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
   const target = Math.max(S.liveSyncTarget, MIN_FORWARD_BUFFER);
 
   const lag = lat != null ? lat : buffer;
@@ -137,10 +132,28 @@ function runLiveSync(video: HTMLVideoElement): void {
   let desired = decideCatchupSpeed({
     buffer,
     latency: lat,
-    dropped,
+    dropped: 0,
     target,
     reserve: S.liveSyncBufferReserve,
   });
+  const holdingCatchup = S.currentSpeed > 1 && lag > target && buffer > floor + 0.05;
+  let dropped = 0;
+  if (desired > 1 || holdingCatchup) {
+    // A rate switch itself drops a frame or two, and a bail here causes another
+    // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
+    // Ignore drops briefly after the catch-up decision changes and below a real burst.
+    const rawDropped = droppedFramesDelta(video);
+    dropped = Date.now() - lastRateDecisionAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
+    if (dropped > 0) {
+      desired = decideCatchupSpeed({
+        buffer,
+        latency: lat,
+        dropped,
+        target,
+        reserve: S.liveSyncBufferReserve,
+      });
+    }
+  }
   if (
     desired <= 1 &&
     S.currentSpeed > 1 &&
