@@ -623,13 +623,14 @@ describe("badge notice", () => {
       expect(badgeText()).toBe("1× · 1:00");
       expect(badgeNotice()?.textContent).toBe("Paused");
       expect(badgeNotice()?.style.opacity).toBe("1");
-      expect(badgeNotice()?.style.transform).toBe("translateY(-50%) scale(1)");
+      expect(badgeNotice()?.style.transform).toBe("translate(0, -50%) scale(1)");
       expect((badgeEl() as HTMLElement).style.background).toContain("rgb(20 20 22");
 
       await vi.advanceTimersByTimeAsync(1450);
 
       expect(badgeText()).toBe("1× · 1:00");
       expect(badgeNotice()?.style.opacity).toBe("0");
+      expect(badgeNotice()?.style.transform).toBe("translate(-18px, -50%) scale(.36)");
     } finally {
       vi.useRealTimers();
     }

@@ -66,8 +66,7 @@ const NOTICE_STYLE: CSSProperties = {
   position: "absolute",
   left: "calc(100% + 8px)",
   top: "50%",
-  minWidth: "42px",
-  padding: "10px 14px",
+  padding: "9px 12px",
   borderRadius: "999px",
   background: "rgb(20 20 22 / calc(0.34 * var(--glass-opacity, 1)))",
   boxShadow: "0 0 0 1px rgba(255,255,255,0.16),0 14px 36px rgba(0,0,0,0.24)",
@@ -75,9 +74,9 @@ const NOTICE_STYLE: CSSProperties = {
   backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
   opacity: 0,
   pointerEvents: "none",
-  transform: "translateY(-50%) scale(.72)",
+  transform: "translate(-18px, -50%) scale(.36)",
   transformOrigin: "left center",
-  transition: "opacity .22s, transform .28s cubic-bezier(.2,0,0,1)",
+  transition: "opacity .2s, transform .34s cubic-bezier(.16,1,.3,1)",
 };
 
 interface Props {

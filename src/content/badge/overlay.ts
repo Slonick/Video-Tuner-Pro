@@ -147,7 +147,9 @@ function setPinVisual(on: boolean): void {
 function setNoticeVisual(on: boolean): void {
   if (!badgeNoticeEl) return;
   badgeNoticeEl.style.opacity = on ? "1" : "0";
-  badgeNoticeEl.style.transform = on ? "translateY(-50%) scale(1)" : "translateY(-50%) scale(.72)";
+  badgeNoticeEl.style.transform = on
+    ? "translate(0, -50%) scale(1)"
+    : "translate(-18px, -50%) scale(.36)";
 }
 
 // Pin/unpin for this site: pinned → the badge stays visible (no auto-hide).

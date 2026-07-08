@@ -258,6 +258,15 @@ describe("content media events", () => {
     expect(fx.showBadgeNotice).toHaveBeenCalledWith("Volume 40%");
     expect(fx.showBadgeNotice).toHaveBeenCalledWith("1.75×");
   });
+
+  it("does not surface an initial default 1x ratechange as a notice", async () => {
+    await loadIndex();
+    const v = media(false);
+
+    v.dispatchEvent(new Event("ratechange"));
+
+    expect(fx.showBadgeNotice).not.toHaveBeenCalledWith("1×");
+  });
 });
 
 describe("content graph samplers", () => {

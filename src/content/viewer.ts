@@ -149,11 +149,52 @@ document.addEventListener(
   "keydown",
   (e) => {
     if (!fmt) return;
+    const target = ((typeof e.composedPath === "function" && e.composedPath()[0]) ||
+      e.target) as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable)
+    )
+      return;
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopImmediatePropagation();
       exitViewer();
       return;
+    }
+    if (!video) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const timeline = mediaTimeline(video);
+      if (timeline.kind !== "vod" && timeline.kind !== "dvr") return;
+      const step = e.shiftKey ? 10 : 5;
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const next = Math.min(
+        timeline.start + timeline.len,
+        Math.max(timeline.start, video.currentTime + dir * step),
+      );
+      const delta = next - video.currentTime;
+      if (Math.abs(delta) < 0.001) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      video.currentTime = next;
+      syncTime();
+      showBadgeNotice(`${delta > 0 ? "+" : "-"}${fmtTime(Math.abs(delta))}`);
+      return;
+    }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const step = e.shiftKey ? 0.1 : 0.05;
+      const dir = e.key === "ArrowUp" ? 1 : -1;
+      const next = Math.min(1, Math.max(0, video.volume + dir * step));
+      if (Math.abs(next - video.volume) < 0.001 && video.muted === (next === 0)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      video.volume = next;
+      video.muted = next === 0;
+      syncVolume();
+      showBadgeNotice(video.muted ? "Muted" : `Volume ${Math.round(next * 100)}%`);
     }
   },
   true,

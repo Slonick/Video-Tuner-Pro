@@ -71,6 +71,7 @@ let mediaScheduled = false;
 let mediaShouldFlashBadge = false;
 const seekStarts = new WeakMap<HTMLMediaElement, number>();
 const lastVolume = new WeakMap<HTMLMediaElement, number>();
+const lastRate = new WeakMap<HTMLMediaElement, number>();
 let lastChannelKeys: string[] = []; // re-resolve speed when the channel identity changes
 
 // Background-tick cadence: 1s while the page has a video, backing off toward 5s on
@@ -422,6 +423,11 @@ function noticeForMediaEvent(e: Event): void {
     }
     case "ratechange": {
       const rate = Math.round(t.playbackRate * 100) / 100;
+      if (lastRate.get(t) === rate || (lastRate.get(t) == null && Math.abs(rate - 1) < 0.001)) {
+        lastRate.set(t, rate);
+        return;
+      }
+      lastRate.set(t, rate);
       showBadgeNotice(`${rate}×`);
       break;
     }

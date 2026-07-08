@@ -40,6 +40,24 @@ function makeVideo(duration = 100) {
   });
   let paused = true;
   Object.defineProperty(v, "paused", { get: () => paused, configurable: true });
+  let volume = 1;
+  Object.defineProperty(v, "volume", {
+    get: () => volume,
+    set: (x: number) => {
+      volume = x;
+      v.dispatchEvent(new Event("volumechange"));
+    },
+    configurable: true,
+  });
+  let muted = false;
+  Object.defineProperty(v, "muted", {
+    get: () => muted,
+    set: (x: boolean) => {
+      muted = x;
+      v.dispatchEvent(new Event("volumechange"));
+    },
+    configurable: true,
+  });
   v.getBoundingClientRect = () =>
     ({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 }) as DOMRect;
   v.play = () => {
@@ -550,6 +568,28 @@ describe("control bar", () => {
     expect(v.currentTime).toBe(50);
     v.dispatchEvent(new Event("timeupdate"));
     expect(barTime()).toBe("0:50 / 1:40");
+  });
+
+  it("arrow keys seek and adjust volume while the viewer is open", async () => {
+    const { v } = makeVideo(100);
+    h.primary = v;
+    await openViewer("normal");
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", cancelable: true }));
+    expect(v.currentTime).toBe(5);
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, cancelable: true }),
+    );
+    expect(v.currentTime).toBe(0);
+
+    v.volume = 0.5;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", cancelable: true }));
+    expect(v.volume).toBeCloseTo(0.55);
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", shiftKey: true, cancelable: true }),
+    );
+    expect(v.volume).toBeCloseTo(0.45);
+    expect(v.muted).toBe(false);
   });
 
   it("reloads seek markers when a SPA swaps the source on the same video", async () => {
