@@ -32,7 +32,12 @@ vi.mock("../src/content/live/catchup.js", () => ({ catchupBufferLimited: () => h
 
 import { S } from "../src/content/state.js";
 import { STORE } from "../src/content/platform/storage.js";
-import { updateTimeBadge, flashBadge, ownsBadgeNode } from "../src/content/badge/overlay.js";
+import {
+  updateTimeBadge,
+  flashBadge,
+  showBadgeNotice,
+  ownsBadgeNode,
+} from "../src/content/badge/overlay.js";
 
 function fakeVideo(rect: Partial<DOMRect> = {}) {
   const r = {
@@ -598,6 +603,30 @@ describe("flashBadge auto-hide", () => {
       await vi.advanceTimersByTimeAsync(16);
       await vi.advanceTimersByTimeAsync(5000);
       expect(el.style.opacity).toBe("1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("badge notice", () => {
+  it("temporarily expands the badge and then restores the normal readout", async () => {
+    vi.useFakeTimers();
+    try {
+      h.primary = fakeVideo();
+      updateTimeBadge();
+
+      showBadgeNotice("Paused");
+
+      const el = badgeEl() as HTMLElement;
+      expect(badgeText()).toBe("Paused");
+      expect(el.style.minWidth).toBe("116px");
+      expect(el.style.opacity).toBe("1");
+
+      await vi.advanceTimersByTimeAsync(1450);
+
+      expect(badgeText()).toBe("1× · 1:00");
+      expect(el.style.minWidth).toBe("");
     } finally {
       vi.useRealTimers();
     }

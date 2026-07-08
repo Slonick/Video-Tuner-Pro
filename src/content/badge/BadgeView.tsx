@@ -31,7 +31,8 @@ const BADGE_STYLE: CSSProperties = {
   boxShadow: "0 0 0 1px rgba(255,255,255,0.14)",
   whiteSpace: "nowrap",
   opacity: 0,
-  transition: "opacity .25s",
+  transition:
+    "opacity .25s, padding .22s cubic-bezier(.2,0,0,1), min-width .22s cubic-bezier(.2,0,0,1), transform .22s cubic-bezier(.2,0,0,1), background .22s, box-shadow .22s",
   WebkitBackdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
   backdropFilter: GLASS_REFRACTION + "blur(7px) saturate(180%) brightness(1.04)",
 };

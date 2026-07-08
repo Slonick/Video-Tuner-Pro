@@ -7,6 +7,7 @@ const fx = vi.hoisted(() => ({
   updateTimeBadge: vi.fn(),
   updateLauncher: vi.fn(),
   flashBadge: vi.fn(),
+  showBadgeNotice: vi.fn(),
   startTracking: vi.fn(),
   stopTracking: vi.fn(),
   reconcile: vi.fn(),
@@ -79,6 +80,11 @@ vi.mock("../src/content/audio/status.js", () => ({ engageAudio: vi.fn() }));
 vi.mock("../src/content/badge/overlay.js", () => ({
   updateTimeBadge: fx.updateTimeBadge,
   flashBadge: fx.flashBadge,
+  showBadgeNotice: fx.showBadgeNotice,
+  fmtTime: (s: number) => {
+    const t = Math.round(s);
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  },
   ownsBadgeNode: () => false,
 }));
 vi.mock("../src/content/overlay/launcher.js", () => ({
@@ -140,6 +146,10 @@ async function loadIndex(): Promise<void> {
 function media(paused: boolean): HTMLVideoElement {
   const v = document.createElement("video");
   Object.defineProperty(v, "paused", { value: paused, configurable: true });
+  Object.defineProperty(v, "currentTime", { value: 0, writable: true, configurable: true });
+  Object.defineProperty(v, "volume", { value: 1, writable: true, configurable: true });
+  Object.defineProperty(v, "muted", { value: false, writable: true, configurable: true });
+  Object.defineProperty(v, "playbackRate", { value: 1, writable: true, configurable: true });
   document.body.append(v);
   return v;
 }
@@ -225,6 +235,28 @@ describe("content media events", () => {
     expect(fx.controlLive).toHaveBeenCalled();
     expect(fx.updateTimeBadge).not.toHaveBeenCalled();
     expect(fx.flashBadge).not.toHaveBeenCalled();
+  });
+
+  it("surfaces play, pause, seek, volume, and rate notices through the badge", async () => {
+    await loadIndex();
+    const v = media(false);
+
+    v.dispatchEvent(new Event("play"));
+    v.dispatchEvent(new Event("pause"));
+    v.currentTime = 10;
+    v.dispatchEvent(new Event("seeking"));
+    v.currentTime = 35;
+    v.dispatchEvent(new Event("seeked"));
+    v.volume = 0.4;
+    v.dispatchEvent(new Event("volumechange"));
+    v.playbackRate = 1.75;
+    v.dispatchEvent(new Event("ratechange"));
+
+    expect(fx.showBadgeNotice).toHaveBeenCalledWith("Playing");
+    expect(fx.showBadgeNotice).toHaveBeenCalledWith("Paused");
+    expect(fx.showBadgeNotice).toHaveBeenCalledWith("+0:25");
+    expect(fx.showBadgeNotice).toHaveBeenCalledWith("Volume 40%");
+    expect(fx.showBadgeNotice).toHaveBeenCalledWith("1.75×");
   });
 });
 

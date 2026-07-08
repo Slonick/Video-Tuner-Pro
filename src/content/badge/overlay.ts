@@ -52,6 +52,8 @@ let badgeDotEl: HTMLElement | null = null; // video/stream indicator dot (left o
 let badgeTextEl: HTMLSpanElement | null = null; // holds the speed/time text (so the pin stays put)
 let badgePinEl: HTMLSpanElement | null = null;
 let timeBadgeHideTimer: Timer | undefined;
+let badgeNoticeTimer: Timer | undefined;
+let badgeNoticeActive = false;
 let badgeVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let badgeMoveHooked = false;
 let badgeUpdateFrame: number | null = null;
@@ -138,8 +140,23 @@ function saveBadgePinned(on: boolean): void {
 // dimmed when loose.
 function setPinVisual(on: boolean): void {
   if (!badgePinEl) return;
+  if (badgeNoticeActive) return;
   badgePinEl.style.opacity = on ? "1" : "0.5";
   badgePinEl.style.transform = on ? "none" : "rotate(40deg)";
+}
+
+function setNoticeVisual(on: boolean): void {
+  if (!timeBadgeEl) return;
+  badgeNoticeActive = on;
+  timeBadgeEl.style.minWidth = on ? "116px" : "";
+  timeBadgeEl.style.padding = on ? "12px 18px" : "";
+  timeBadgeEl.style.transform = on ? "scale(1.035)" : "";
+  timeBadgeEl.style.boxShadow = on
+    ? "0 0 0 1px rgba(255,255,255,0.18),0 14px 36px rgba(0,0,0,0.24)"
+    : "";
+  if (badgePinEl) badgePinEl.style.display = on ? "none" : "inline-flex";
+  if (badgeDotEl && on) badgeDotEl.style.display = "none";
+  if (!on) setPinVisual(S.badgePinned);
 }
 
 // Pin/unpin for this site: pinned → the badge stays visible (no auto-hide).
@@ -246,6 +263,7 @@ function renderBadge(v: HTMLVideoElement, anchor: HTMLElement): void {
   const txt = badgeTextEl;
   if (!el || !txt) return;
   if (!dragging) positionBadge(el, anchor);
+  if (badgeNoticeActive) return;
   const speed = v.playbackRate || S.currentSpeed || 1;
   const sp = Math.round(speed * 100) / 100;
   const stream = onStreamPage();
@@ -287,6 +305,20 @@ export function flashBadge(): void {
     timeBadgeEl.style.opacity = "0";
     timeBadgeEl.style.pointerEvents = "none"; // hidden → don't block clicks on the video
   }, 2600);
+}
+
+export function showBadgeNotice(text: string): void {
+  updateTimeBadge();
+  if (!timeBadgeEl || !badgeTextEl || timeBadgeEl.style.display === "none") return;
+  clearTimeout(badgeNoticeTimer);
+  setNoticeVisual(true);
+  badgeTextEl.textContent = text;
+  flashBadge();
+  badgeNoticeTimer = setTimeout(() => {
+    setNoticeVisual(false);
+    updateTimeBadge();
+    flashBadge();
+  }, 1450);
 }
 
 function hookBadgeMouse(): void {

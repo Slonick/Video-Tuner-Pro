@@ -19,6 +19,7 @@ import { i18n } from "./platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
 import { isLive } from "./live/detection.js";
 import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
+import { showBadgeNotice } from "./badge/overlay.js";
 
 export type ViewerFormat = "normal" | "theater";
 export const VIEWER_LAYOUT_EVENT = "vtp-viewer-layout";
@@ -731,6 +732,7 @@ export function viewerFitMode(): ViewerFitMode {
 export function setViewerFitMode(mode: unknown): ViewerFitMode {
   S.viewerFit = normalizeViewerFit(mode);
   sizeVideo();
+  showBadgeNotice(`Fit: ${fitLabel(S.viewerFit)}`);
   return S.viewerFit;
 }
 
@@ -834,6 +836,7 @@ function setFormat(f: ViewerFormat): void {
   overlay?.focus({ preventScroll: true });
   notifyViewerState();
   notifyViewerLayout();
+  showBadgeNotice(f === "theater" ? "Theater" : "Viewer");
 }
 
 function setViewerCursor(hidden: boolean): void {
@@ -1051,6 +1054,7 @@ function renderQuality(state: QualityState): void {
       pendingQuality = opt;
       pendingQualityUntil = Date.now() + 12_000;
       if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(opt.label);
+      showBadgeNotice(`Quality: ${opt.label}`);
       const next = await qualityRequest("vtp-quality-set", opt.id);
       pendingQuality = null;
       pendingQualityUntil = 0;
