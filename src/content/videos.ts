@@ -167,6 +167,15 @@ function scanKnownShadowHosts(): boolean {
   return added;
 }
 
+function usableTrackedVideo(v: HTMLVideoElement): boolean {
+  return (
+    v.isConnected &&
+    !isOwnNode(v) &&
+    (!v.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]") ||
+      v.hasAttribute(ADOPTED_VIEWER_VIDEO))
+  );
+}
+
 function handleMutations(mutations: MutationRecord[]): void {
   if (!ctxValid()) {
     onContextDead();
@@ -227,16 +236,19 @@ export function collectVideos(): HTMLVideoElement[] {
   if (!tracking) scanTree(document);
   const out: HTMLVideoElement[] = [];
   for (const v of trackedVideos) {
-    if (
-      v.isConnected &&
-      !isOwnNode(v) &&
-      (!v.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]") ||
-        v.hasAttribute(ADOPTED_VIEWER_VIDEO))
-    )
-      out.push(v);
+    if (usableTrackedVideo(v)) out.push(v);
     else trackedVideos.delete(v);
   }
   return out;
+}
+
+export function hasVideos(): boolean {
+  if (!tracking) scanTree(document);
+  for (const v of trackedVideos) {
+    if (usableTrackedVideo(v)) return true;
+    trackedVideos.delete(v);
+  }
+  return false;
 }
 
 // Only used when the opt-in "speed up audio" toggle is on — see applyAll.

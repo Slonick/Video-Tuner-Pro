@@ -32,6 +32,7 @@ import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
 import {
   collectVideos,
+  hasVideos,
   primaryVideoFrom,
   startTracking,
   stopTracking,
@@ -109,7 +110,7 @@ function stopTimers() {
   }
 }
 
-function syncBufferSampler(hasVideo = collectVideos().length > 0) {
+function syncBufferSampler(hasVideo = hasVideos()) {
   if (hasVideo) {
     if (bufferSampler == null) bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
   } else if (bufferSampler != null) {

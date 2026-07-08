@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   collectVideos,
+  hasVideos,
   collectAudios,
   startTracking,
   stopTracking,
@@ -43,6 +44,14 @@ describe("media registry — scan-on-read fallback (registry not running)", () =
     expect(collectVideos()).toContain(v);
     v.remove();
     expect(collectVideos()).not.toContain(v);
+  });
+
+  it("reports whether any tracked video is usable", () => {
+    const v = document.createElement("video");
+    document.body.appendChild(v);
+    expect(hasVideos()).toBe(true);
+    v.remove();
+    expect(hasVideos()).toBe(false);
   });
 });
 

@@ -5,7 +5,7 @@ import { getDomain } from "./core/domain.js";
 import { channelKeys, currentChannel, currentChannelName } from "./channel.js";
 import { clamp, clampTarget } from "./core/clamp.js";
 import { S } from "./state.js";
-import { collectVideos, isDrmVideo, primaryVideo } from "./videos.js";
+import { hasVideos, isDrmVideo, primaryVideo } from "./videos.js";
 import { onStreamPage } from "./live/detection.js";
 import {
   setSpeed,
@@ -72,7 +72,7 @@ function replyFromVideoFrame(
   sendResponse: (response?: unknown) => void,
   build: () => unknown,
 ): boolean {
-  const hasVid = collectVideos().length > 0;
+  const hasVid = hasVideos();
   const reply = () => {
     try {
       sendResponse(build());
@@ -94,7 +94,7 @@ function actInVideoFrame(
   act: () => unknown,
   build: (result: unknown) => unknown,
 ): boolean {
-  if (collectVideos().length <= 0) return false;
+  if (!hasVideos()) return false;
   let result: unknown;
   try {
     result = act();

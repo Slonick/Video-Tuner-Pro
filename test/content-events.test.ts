@@ -113,6 +113,7 @@ vi.mock("../src/content/bitrate.js", () => ({
 }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => fx.videos,
+  hasVideos: () => fx.videos.length > 0,
   primaryVideoFrom: (videos: HTMLVideoElement[]) => videos[0] ?? null,
   startTracking: fx.startTracking,
   stopTracking: fx.stopTracking,

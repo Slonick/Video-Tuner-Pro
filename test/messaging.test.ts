@@ -34,6 +34,7 @@ vi.mock("../src/content/channel.js", () => ({
 }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => (h.hasVideo ? [{}] : []),
+  hasVideos: () => h.hasVideo,
   primaryVideo: () => (h.hasVideo ? ({} as HTMLVideoElement) : null),
   isDrmVideo: () => h.drm,
 }));

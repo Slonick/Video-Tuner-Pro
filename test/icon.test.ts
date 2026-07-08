@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => h.videos,
+  hasVideos: () => h.videos.length > 0,
 }));
 
 vi.mock("../src/content/live/detection.js", () => ({
