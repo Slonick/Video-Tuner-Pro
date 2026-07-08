@@ -162,6 +162,14 @@ const SITES: Site[] = [
   },
 ];
 
+let cachedKeyUrl = "";
+let cachedKeys: string[] | null = null;
+
+export function clearChannelKeyCache(): void {
+  cachedKeyUrl = "";
+  cachedKeys = null;
+}
+
 function siteFor(host: string): Site | null {
   return SITES.find((s) => s.host.test(host)) ?? null;
 }
@@ -229,7 +237,11 @@ function siteLogin(site: Site): string | null {
 // other site has a single key: "<ns>:<login>" (login lower-cased, so /XQC and /xqc
 // share one entry).
 export function channelKeys(): string[] {
+  const cacheUrl = `${window.location.hostname}${window.location.pathname}${window.location.search || ""}`;
+  if (cachedKeyUrl === cacheUrl && cachedKeys) return [...cachedKeys];
   const h = window.location.hostname;
+  let keys: string[] = [];
+  let cacheable = true;
   if (YT_HOST.test(h)) {
     if (!YT_WATCH.test(window.location.pathname)) return [];
     let id: string | null = null,
@@ -257,14 +269,19 @@ export function channelKeys(): string[] {
         }
       }
     }
-    return [id, handle].filter((k): k is string => k != null);
-  }
-  const site = siteFor(h);
-  if (site) {
+    keys = [id, handle].filter((k): k is string => k != null);
+    cacheable = !!id;
+  } else {
+    const site = siteFor(h);
+    if (!site) return [];
     const login = siteLogin(site);
-    return login ? [site.ns + ":" + login] : [];
+    keys = login ? [site.ns + ":" + login] : [];
   }
-  return [];
+  if (keys.length && cacheable) {
+    cachedKeyUrl = cacheUrl;
+    cachedKeys = keys;
+  }
+  return [...keys];
 }
 
 export function sameChannelIdentity(a: string[], b: string[]): boolean {

@@ -3,16 +3,19 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   currentChannel,
   channelKeys,
+  clearChannelKeyCache,
   currentChannelName,
   sameChannelIdentity,
   sameChannelKeys,
 } from "../src/content/channel.js";
 
-function at(hostname: string, pathname: string): void {
-  vi.stubGlobal("location", { hostname, pathname });
+function at(hostname: string, pathname: string, search = ""): void {
+  clearChannelKeyCache();
+  vi.stubGlobal("location", { hostname, pathname, search });
 }
 
 afterEach(() => {
+  clearChannelKeyCache();
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });
@@ -139,6 +142,44 @@ describe("currentChannel (stable per-channel key)", () => {
   it("is null before the owner link has rendered", () => {
     at("www.youtube.com", "/watch");
     expect(currentChannel()).toBeNull();
+  });
+
+  it("does not cache an empty YouTube owner before it renders", () => {
+    at("www.youtube.com", "/watch", "?v=one");
+    expect(channelKeys()).toEqual([]);
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@Later">Later</a></ytd-video-owner-renderer>`;
+    expect(channelKeys()).toEqual(["@Later"]);
+  });
+
+  it("reuses rendered YouTube owner keys while the URL is unchanged", () => {
+    at("www.youtube.com", "/watch", "?v=one");
+    document.body.innerHTML = `<ytd-video-owner-renderer>
+         <a class="yt-simple-endpoint" href="/@Stable">Stable</a>
+         <a class="yt-simple-endpoint" href="/channel/UCstable">Stable</a>
+       </ytd-video-owner-renderer>`;
+    expect(channelKeys()).toEqual(["channel/UCstable", "@Stable"]);
+    document.body.innerHTML = "";
+    expect(channelKeys()).toEqual(["channel/UCstable", "@Stable"]);
+  });
+
+  it("does not freeze a YouTube handle before the canonical id appears", () => {
+    at("www.youtube.com", "/watch", "?v=one");
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@Stable">Stable</a></ytd-video-owner-renderer>`;
+    expect(channelKeys()).toEqual(["@Stable"]);
+    document.body.innerHTML = `<ytd-video-owner-renderer>
+         <a class="yt-simple-endpoint" href="/@Stable">Stable</a>
+         <a class="yt-simple-endpoint" href="/channel/UCstable">Stable</a>
+       </ytd-video-owner-renderer>`;
+    expect(channelKeys()).toEqual(["channel/UCstable", "@Stable"]);
+  });
+
+  it("invalidates rendered YouTube owner keys when the video URL changes", () => {
+    at("www.youtube.com", "/watch", "?v=one");
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@One">One</a></ytd-video-owner-renderer>`;
+    expect(channelKeys()).toEqual(["@One"]);
+    at("www.youtube.com", "/watch", "?v=two");
+    document.body.innerHTML = `<ytd-video-owner-renderer><a class="yt-simple-endpoint" href="/@Two">Two</a></ytd-video-owner-renderer>`;
+    expect(channelKeys()).toEqual(["@Two"]);
   });
 });
 

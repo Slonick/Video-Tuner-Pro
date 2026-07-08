@@ -70,6 +70,38 @@ describe("media registry — incremental tracking", () => {
     expect(onMediaChange).not.toHaveBeenCalled();
   });
 
+  it("does not deep-scan unrelated added subtrees", async () => {
+    track();
+    const queryAll = vi.spyOn(Element.prototype, "querySelectorAll");
+    try {
+      const row = document.createElement("div");
+      for (let i = 0; i < 20; i++) row.appendChild(document.createElement("span"));
+
+      document.body.appendChild(row);
+      await flush();
+
+      expect(onMediaChange).not.toHaveBeenCalled();
+      expect(queryAll).not.toHaveBeenCalledWith("*");
+    } finally {
+      queryAll.mockRestore();
+    }
+  });
+
+  it("still deep-scans added subtrees that contain media", async () => {
+    track();
+    const row = document.createElement("div");
+    const nested = document.createElement("section");
+    const v = document.createElement("video");
+    nested.appendChild(v);
+    row.appendChild(nested);
+
+    document.body.appendChild(row);
+    await flush();
+
+    expect(collectVideos()).toContain(v);
+    expect(onMediaChange).toHaveBeenCalled();
+  });
+
   it("catches a video added to a host's own shadow root (web-component player)", async () => {
     track();
     const host = document.createElement("div");

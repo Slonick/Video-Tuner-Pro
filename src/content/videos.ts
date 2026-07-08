@@ -87,6 +87,23 @@ function scanTree(root: ParentNode): boolean {
   return added;
 }
 
+function scanAddedElement(root: Element): boolean {
+  let added = false;
+  if (isOwnNode(root)) return false;
+  if (addMedia(root)) added = true;
+  if (handleShadow(root)) added = true;
+  try {
+    if (!root.querySelector("video,audio")) return added;
+  } catch (e) {
+    return added;
+  }
+  for (const el of root.querySelectorAll("*")) {
+    if (addMedia(el)) added = true;
+    if (handleShadow(el)) added = true;
+  }
+  return added;
+}
+
 function handleMutations(mutations: MutationRecord[]): void {
   if (!ctxValid()) {
     onContextDead();
@@ -95,7 +112,7 @@ function handleMutations(mutations: MutationRecord[]): void {
   let added = false;
   for (const m of mutations) {
     for (const n of m.addedNodes) {
-      if (n instanceof Element && scanTree(n)) added = true;
+      if (n instanceof Element && scanAddedElement(n)) added = true;
     }
   }
   // Only re-apply when the media set actually changed; an unrelated DOM mutation
