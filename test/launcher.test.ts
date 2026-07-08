@@ -312,6 +312,31 @@ describe("launcher — open / close", () => {
     expect(fab.style.top).toBe("141px");
   });
 
+  it("coalesces mousemove hover checks into one animation frame", async () => {
+    S.overlayButton = "always";
+    const readRect = vi.fn(
+      () =>
+        ({
+          left: 0,
+          top: 0,
+          width: 640,
+          height: 360,
+          right: 640,
+          bottom: 360,
+        }) as DOMRect,
+    );
+    h.primary = { getBoundingClientRect: readRect } as unknown as HTMLVideoElement;
+    updateLauncher();
+    readRect.mockClear();
+
+    fire(document, "mousemove", 100, 100);
+    fire(document, "mousemove", 101, 101);
+
+    expect(readRect).not.toHaveBeenCalled();
+    await frame();
+    expect(readRect).toHaveBeenCalledTimes(2);
+  });
+
   it("opens the popup iframe on a click (no drag) and closes on backdrop click", () => {
     S.overlayButton = "always";
     h.primary = fakeVideo();

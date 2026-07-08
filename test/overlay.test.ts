@@ -76,6 +76,7 @@ const badgeShown = () => {
   const el = badgeEl();
   return !!el && el.style.display !== "none";
 };
+const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 beforeEach(() => {
   document.querySelectorAll("[data-vtp-badge]").forEach((node) => node.remove());
@@ -236,26 +237,53 @@ describe("updateTimeBadge — positioning", () => {
     expect(el.style.top).toBe("350px");
   });
 
-  it("repositions on window resize outside the pop-out viewer", () => {
+  it("repositions on window resize outside the pop-out viewer", async () => {
     S.badgePos = { fx: 0.5, fy: 0.5 };
     h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
     updateTimeBadge();
     h.primary = fakeVideo({ left: 20, top: 30, width: 800, height: 450, right: 820, bottom: 480 });
     window.dispatchEvent(new Event("resize"));
+    await frame();
     const el = badgeEl() as HTMLElement;
     expect(el.style.left).toBe("420px");
     expect(el.style.top).toBe("255px");
   });
 
-  it("repositions on window scroll outside the pop-out viewer", () => {
+  it("repositions on window scroll outside the pop-out viewer", async () => {
     S.badgePos = { fx: 0.5, fy: 0.5 };
     h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
     updateTimeBadge();
     h.primary = fakeVideo({ left: 0, top: -120, width: 640, height: 360, right: 640, bottom: 240 });
     window.dispatchEvent(new Event("scroll"));
+    await frame();
     const el = badgeEl() as HTMLElement;
     expect(el.style.left).toBe("320px");
     expect(el.style.top).toBe("60px");
+  });
+
+  it("coalesces layout-event repositioning into one animation frame", async () => {
+    S.badgePos = { fx: 0.5, fy: 0.5 };
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const readRect = vi.fn(
+      () =>
+        ({
+          left: 20,
+          top: 30,
+          width: 800,
+          height: 450,
+          right: 820,
+          bottom: 480,
+        }) as DOMRect,
+    );
+    (h.primary as HTMLVideoElement).getBoundingClientRect = readRect;
+
+    window.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event("resize"));
+
+    expect(readRect).not.toHaveBeenCalled();
+    await frame();
+    expect(readRect).toHaveBeenCalledTimes(1);
   });
 
   it("positions against the viewer anchor while the pop-out viewer is open", () => {
@@ -268,13 +296,14 @@ describe("updateTimeBadge — positioning", () => {
     expect(el.style.top).toBe("275px");
   });
 
-  it("repositions immediately when the viewer anchor changes", () => {
+  it("repositions when the viewer anchor changes", async () => {
     S.badgePos = { fx: 0.5, fy: 0.5 };
     h.primary = fakeVideo({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360 });
     h.anchor = fakeVideo({ left: 100, top: 50, width: 800, height: 450, right: 900, bottom: 500 });
     updateTimeBadge();
     h.anchor = null;
     document.dispatchEvent(new Event("vtp-viewer-layout"));
+    await frame();
     const el = badgeEl() as HTMLElement;
     expect(el.style.left).toBe("320px");
     expect(el.style.top).toBe("180px");
@@ -499,28 +528,60 @@ describe("badge pin", () => {
 });
 
 describe("flashBadge auto-hide", () => {
-  it("reveals on mouse move over the video, then fades after the timeout", () => {
-    vi.useFakeTimers();
+  it("coalesces mousemove hover checks into one animation frame", async () => {
     h.primary = fakeVideo();
     updateTimeBadge();
-    const el = badgeEl() as HTMLElement;
-    el.style.opacity = "0";
-    fire(document, "mousemove", { clientX: 100, clientY: 100 }); // inside the 640x360 frame
-    expect(el.style.opacity).toBe("1");
-    vi.advanceTimersByTime(2600);
-    expect(el.style.opacity).toBe("0");
-    vi.useRealTimers();
+    const readRect = vi.fn(
+      () =>
+        ({
+          left: 0,
+          top: 0,
+          width: 640,
+          height: 360,
+          right: 640,
+          bottom: 360,
+        }) as DOMRect,
+    );
+    (h.primary as HTMLVideoElement).getBoundingClientRect = readRect;
+
+    fire(document, "mousemove", { clientX: 100, clientY: 100 });
+    fire(document, "mousemove", { clientX: 101, clientY: 101 });
+
+    expect(readRect).not.toHaveBeenCalled();
+    await frame();
+    expect(readRect).toHaveBeenCalledTimes(1);
   });
 
-  it("stays visible while pinned (no fade scheduled)", () => {
+  it("reveals on mouse move over the video, then fades after the timeout", async () => {
     vi.useFakeTimers();
-    S.badgePinned = true;
-    h.primary = fakeVideo();
-    updateTimeBadge();
-    const el = badgeEl() as HTMLElement;
-    fire(document, "mousemove", { clientX: 100, clientY: 100 });
-    vi.advanceTimersByTime(5000);
-    expect(el.style.opacity).toBe("1");
-    vi.useRealTimers();
+    try {
+      h.primary = fakeVideo();
+      updateTimeBadge();
+      const el = badgeEl() as HTMLElement;
+      el.style.opacity = "0";
+      fire(document, "mousemove", { clientX: 100, clientY: 100 }); // inside the 640x360 frame
+      await vi.advanceTimersByTimeAsync(16);
+      expect(el.style.opacity).toBe("1");
+      await vi.advanceTimersByTimeAsync(2600);
+      expect(el.style.opacity).toBe("0");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stays visible while pinned (no fade scheduled)", async () => {
+    vi.useFakeTimers();
+    try {
+      S.badgePinned = true;
+      h.primary = fakeVideo();
+      updateTimeBadge();
+      const el = badgeEl() as HTMLElement;
+      fire(document, "mousemove", { clientX: 100, clientY: 100 });
+      await vi.advanceTimersByTimeAsync(16);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(el.style.opacity).toBe("1");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

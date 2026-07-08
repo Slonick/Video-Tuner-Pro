@@ -76,6 +76,8 @@ let open = false;
 let hideTimer: Timer | undefined;
 let mouseHooked = false;
 let hoverRaf = 0;
+let hoverX = 0;
+let hoverY = 0;
 let fabVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let dragging = false;
 let moved = false;
@@ -811,20 +813,21 @@ function hookMouse(): void {
   document.addEventListener(
     "mousemove",
     (e) => {
-      const v = fabVideo;
-      if (!eligible() || !fab || !v) return;
-      const r = v.getBoundingClientRect();
-      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
-        return;
-      // Self-heal here, not just on resize/viewer-layout events: a site player
-      // can resize/relayout its video for reasons we have no hook into (an ad,
-      // a quality switch, its own transition), silently leaving the button
-      // stuck over stale geometry until something else happens to trigger a
-      // reposition. Hovering the video is the one moment we know for certain
-      // the real, current rect is worth reading.
+      hoverX = e.clientX;
+      hoverY = e.clientY;
       if (hoverRaf) return;
       hoverRaf = requestAnimationFrame(() => {
         hoverRaf = 0;
+        const v = fabVideo;
+        if (!eligible() || !fab || !v) return;
+        const r = v.getBoundingClientRect();
+        if (hoverX < r.left || hoverX > r.right || hoverY < r.top || hoverY > r.bottom) return;
+        // Self-heal here, not just on resize/viewer-layout events: a site player
+        // can resize/relayout its video for reasons we have no hook into (an ad,
+        // a quality switch, its own transition), silently leaving the button
+        // stuck over stale geometry until something else happens to trigger a
+        // reposition. Hovering the video is the one moment we know for certain
+        // the real, current rect is worth reading.
         if (fabVideo !== v) return;
         if (!dragging) positionFab(v);
         flashFab();

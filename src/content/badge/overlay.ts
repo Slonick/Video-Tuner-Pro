@@ -54,6 +54,10 @@ let badgePinEl: HTMLSpanElement | null = null;
 let timeBadgeHideTimer: Timer | undefined;
 let badgeVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let badgeMoveHooked = false;
+let badgeUpdateFrame: number | null = null;
+let badgeHoverFrame: number | null = null;
+let badgeHoverX = 0;
+let badgeHoverY = 0;
 let dragging = false;
 let dragDX = 0,
   dragDY = 0;
@@ -291,19 +295,38 @@ function hookBadgeMouse(): void {
   document.addEventListener(
     "mousemove",
     (e) => {
-      const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
-      const bv = badgeVideo;
-      if (!enabled || !timeBadgeEl || !bv) return;
-      const r = bv.getBoundingClientRect();
-      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
-        return;
-      // Only reveal the badge here — content is re-rendered by the 1s tick
-      // (updateTimeBadge). Rendering per mousemove made the continuous buffer
-      // value flicker at pointer-event rate.
-      flashBadge();
+      badgeHoverX = e.clientX;
+      badgeHoverY = e.clientY;
+      if (badgeHoverFrame != null) return;
+      badgeHoverFrame = requestAnimationFrame(() => {
+        badgeHoverFrame = null;
+        const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
+        const bv = badgeVideo;
+        if (!enabled || !timeBadgeEl || !bv) return;
+        const r = bv.getBoundingClientRect();
+        if (
+          badgeHoverX < r.left ||
+          badgeHoverX > r.right ||
+          badgeHoverY < r.top ||
+          badgeHoverY > r.bottom
+        )
+          return;
+        // Only reveal the badge here — content is re-rendered by the 1s tick
+        // (updateTimeBadge). Rendering per mousemove made the continuous buffer
+        // value flicker at pointer-event rate.
+        flashBadge();
+      });
     },
     { passive: true },
   );
+}
+
+function scheduleTimeBadgeUpdate(): void {
+  if (badgeUpdateFrame != null) return;
+  badgeUpdateFrame = requestAnimationFrame(() => {
+    badgeUpdateFrame = null;
+    updateTimeBadge();
+  });
 }
 
 // Keep the badge's content/position fresh (called every tick). Visibility is
@@ -361,6 +384,6 @@ export function updateTimeBadge(): void {
   }
 }
 
-document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateTimeBadge());
-window.addEventListener("resize", () => updateTimeBadge(), { passive: true });
-window.addEventListener("scroll", () => updateTimeBadge(), { passive: true });
+document.addEventListener(VIEWER_LAYOUT_EVENT, scheduleTimeBadgeUpdate);
+window.addEventListener("resize", scheduleTimeBadgeUpdate, { passive: true });
+window.addEventListener("scroll", scheduleTimeBadgeUpdate, { passive: true });
