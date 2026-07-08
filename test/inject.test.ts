@@ -141,12 +141,26 @@ describe("MAIN-world live probe", () => {
 
     await loadInject();
 
-    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.00");
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.0");
 
     liveVideo.remove();
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
+  });
+
+  it("does not rewrite unchanged live probe attributes on every tick", async () => {
+    const liveVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    liveVideo.hls = { latency: 4.04, media: liveVideo };
+    document.body.append(liveVideo);
+    const setAttribute = vi.spyOn(document.documentElement, "setAttribute");
+
+    await loadInject();
+    setAttribute.mockClear();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.0");
+    expect(setAttribute).not.toHaveBeenCalledWith("data-vtp-latency", expect.any(String));
   });
 
   it("uses the quality bridge HLS registry while full HLS scans are backed off", async () => {
@@ -155,7 +169,7 @@ describe("MAIN-world live probe", () => {
     document.body.append(liveVideo);
 
     await loadInject();
-    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.00");
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("4.0");
 
     liveVideo.remove();
     await vi.advanceTimersByTimeAsync(1000);
@@ -171,6 +185,6 @@ describe("MAIN-world live probe", () => {
     document.body.append(nextVideo);
     await vi.advanceTimersByTimeAsync(1000);
 
-    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("7.00");
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("7.0");
   });
 });

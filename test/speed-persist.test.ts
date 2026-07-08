@@ -9,11 +9,15 @@ const h = vi.hoisted(() => ({
   videos: [] as HTMLVideoElement[],
   live: false,
   liveVideos: new WeakSet<HTMLVideoElement>(),
+  primaryReads: 0,
 }));
 vi.mock("../src/content/channel.js", () => ({ channelKeys: () => h.keys }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => h.videos,
-  primaryVideo: () => h.videos[0] ?? null,
+  primaryVideo: () => {
+    h.primaryReads++;
+    return h.videos[0] ?? null;
+  },
   seenVideos: new WeakSet(),
 }));
 vi.mock("../src/content/live/detection.js", () => ({
@@ -63,6 +67,7 @@ beforeEach(() => {
   h.videos = [];
   h.live = false;
   h.liveVideos = new WeakSet<HTMLVideoElement>();
+  h.primaryReads = 0;
   onStream = false;
   S.currentSpeed = 1.0;
   S.userSpeed = 1.0;
@@ -270,6 +275,14 @@ describe("applyAll", () => {
     expect(live.playbackRate).toBe(1);
     expect(preview.playbackRate).toBeCloseTo(1.75, 5);
     expect(preview.defaultPlaybackRate).toBeCloseTo(1.75, 5);
+  });
+
+  it("resolves the primary live state once per pass", () => {
+    h.videos = [fakeVideo(1), fakeVideo(1), fakeVideo(1), fakeVideo(1)];
+
+    applyAll();
+
+    expect(h.primaryReads).toBe(1);
   });
 });
 

@@ -32,6 +32,14 @@
     return win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION;
   }
 
+  function setAttrIfChanged(root: HTMLElement, name: string, value: string | null): void {
+    if (value == null) {
+      if (root.hasAttribute(name)) root.removeAttribute(name);
+    } else if (root.getAttribute(name) !== value) {
+      root.setAttribute(name, value);
+    }
+  }
+
   // --- Narrow shapes of the private internals we touch -----------------------
   interface TwitchStats {
     hlsLatencyBroadcaster?: number;
@@ -364,11 +372,9 @@
       const lat = tw != null ? tw : (youtubeLatency() ?? hlsLatency());
       const root = document.documentElement;
       if (!root) return;
-      if (lat != null) root.setAttribute(ATTR, lat.toFixed(2));
-      else if (root.hasAttribute(ATTR)) root.removeAttribute(ATTR);
+      setAttrIfChanged(root, ATTR, lat != null ? (Math.round(lat * 10) / 10).toFixed(1) : null);
       const live = youtubeIsLive();
-      if (live != null) root.setAttribute(LIVE_ATTR, live ? "1" : "0");
-      else if (root.hasAttribute(LIVE_ATTR)) root.removeAttribute(LIVE_ATTR);
+      setAttrIfChanged(root, LIVE_ATTR, live == null ? null : live ? "1" : "0");
     } catch (e) {
       /* ignore */
     }
