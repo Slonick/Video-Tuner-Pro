@@ -323,4 +323,25 @@ describe("content channel alias changes", () => {
       undefined,
     );
   });
+
+  it("drops a manual override when an SPA navigation reaches a different channel", async () => {
+    vi.mocked(STORE.get).mockImplementation((_keys, cb) => {
+      cb({ domains: {}, channels: { "@one": 1.5, "@two": 2 } });
+    });
+    fx.keys = ["@one"];
+    await loadIndex();
+    const { S } = await import("../src/content/state.js");
+
+    await vi.advanceTimersByTimeAsync(1000);
+    S.speedManual = true;
+    S.currentSpeed = 1.25;
+    S.userSpeed = 1.25;
+
+    fx.keys = ["@two"];
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(S.speedManual).toBe(false);
+    expect(S.currentSpeed).toBe(2);
+    expect(S.userSpeed).toBe(2);
+  });
 });

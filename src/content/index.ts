@@ -264,12 +264,21 @@ function loadSpeed() {
 // check; the owner link may render a beat after navigation).
 function reresolve(keys?: string[]) {
   if (!ctxValid()) return;
+  const resolvedKeys = keys ?? channelKeys();
+  if (
+    S.speedManual &&
+    lastChannelKeys.length > 0 &&
+    resolvedKeys.length > 0 &&
+    !sameChannelIdentity(lastChannelKeys, resolvedKeys)
+  ) {
+    S.speedManual = false;
+  }
   STORE.get(["domains", "channels", "globalSpeed"], (r) => {
     applyResolved(
       (r.domains || {}) as Record<string, number>,
       (r.channels || {}) as Record<string, number>,
       r.globalSpeed as number | undefined,
-      keys,
+      resolvedKeys,
     );
     applyAll();
     controlLive();
