@@ -143,6 +143,10 @@ function media(paused: boolean): HTMLVideoElement {
   return v;
 }
 
+async function nextFrame(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(16);
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
@@ -171,10 +175,28 @@ afterEach(() => {
 });
 
 describe("content media events", () => {
+  it("coalesces a burst of media events into one apply pass", async () => {
+    await loadIndex();
+    const v = media(false);
+
+    v.dispatchEvent(new Event("loadedmetadata"));
+    v.dispatchEvent(new Event("durationchange"));
+    v.dispatchEvent(new Event("play"));
+    expect(fx.applyAll).not.toHaveBeenCalled();
+
+    await nextFrame();
+
+    expect(fx.applyAll).toHaveBeenCalledTimes(1);
+    expect(fx.controlLive).toHaveBeenCalledTimes(1);
+    expect(fx.updateTimeBadge).toHaveBeenCalledTimes(1);
+    expect(fx.flashBadge).toHaveBeenCalledTimes(1);
+  });
+
   it("surfaces the badge when duration arrives after autoplay has already started", async () => {
     await loadIndex();
 
     media(false).dispatchEvent(new Event("durationchange"));
+    await nextFrame();
 
     expect(fx.applyAll).toHaveBeenCalled();
     expect(fx.controlLive).toHaveBeenCalled();
@@ -196,6 +218,7 @@ describe("content media events", () => {
     await loadIndex();
 
     media(false).dispatchEvent(new Event("durationchange"));
+    await nextFrame();
 
     expect(fx.applyAll).toHaveBeenCalled();
     expect(fx.controlLive).toHaveBeenCalled();
@@ -233,7 +256,8 @@ describe("content graph samplers", () => {
     fx.videos = [v];
 
     v.dispatchEvent(new Event("play"));
-    await vi.advanceTimersByTimeAsync(1001);
+    await nextFrame();
+    await vi.advanceTimersByTimeAsync(1000);
 
     expect(fx.recordBufferSample).toHaveBeenCalled();
   });

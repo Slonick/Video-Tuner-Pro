@@ -60,6 +60,8 @@ let audioSampler: ReturnType<typeof setInterval> | null = null;
 let bufferSampler: ReturnType<typeof setInterval> | null = null;
 let autoSlowSampler: ReturnType<typeof setInterval> | null = null;
 let observerScheduled = false;
+let mediaScheduled = false;
+let mediaShouldFlashBadge = false;
 let lastChannelKeys: string[] = []; // re-resolve speed when the channel identity changes
 
 // Background-tick cadence: 1s while the page has a video, backing off toward 5s on
@@ -340,12 +342,34 @@ function startTimers(immediate = false) {
 // A media event or the tab regaining focus: drop back to the fast cadence and
 // re-tick promptly instead of waiting out a backed-off interval. No-op while
 // hidden (timers stopped) — visibilitychange restarts them.
-function wake() {
+function wake(delay = 0) {
   tickInterval = TICK_MIN;
   if (liveTick != null) {
     clearTimeout(liveTick);
-    liveTick = setTimeout(tick, 0);
+    liveTick = setTimeout(tick, delay);
   }
+}
+
+function scheduleMediaPass(flashBadgeAfterApply: boolean): void {
+  mediaShouldFlashBadge = mediaShouldFlashBadge || flashBadgeAfterApply;
+  if (mediaScheduled) return;
+  mediaScheduled = true;
+  requestAnimationFrame(() => {
+    mediaScheduled = false;
+    const shouldFlash = mediaShouldFlashBadge;
+    mediaShouldFlashBadge = false;
+    if (!ctxValid()) {
+      teardown();
+      return;
+    }
+    applyAll();
+    controlLive();
+    syncBufferSampler();
+    if (shouldFlash) {
+      updateTimeBadge();
+      flashBadge();
+    }
+  });
 }
 
 // Don't burn CPU on hidden tabs: stop the timers in the background, restart (and
@@ -373,16 +397,11 @@ for (const ev of ["play", "loadedmetadata", "durationchange"]) {
     (e) => {
       if (!(e.target instanceof HTMLMediaElement)) return;
       if (!ctxValid()) return;
-      wake(); // media showed up — reset any no-video backoff to the fast cadence
-      applyAll();
-      controlLive();
+      wake(TICK_MIN); // media showed up — reset any no-video backoff to the fast cadence
       // Surface the badge whenever playback starts (covers autoplay pages where
       // the user never moves the pointer over the video). updateTimeBadge mounts
       // it if needed; flashBadge reveals it and resumes the usual auto-hide.
-      if (e.type === "play" || (!e.target.paused && !onStreamPage())) {
-        updateTimeBadge();
-        flashBadge();
-      }
+      scheduleMediaPass(e.type === "play" || (!e.target.paused && !onStreamPage()));
     },
     true,
   );
