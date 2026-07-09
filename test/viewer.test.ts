@@ -857,6 +857,31 @@ describe("control bar", () => {
     expect(barTime()).toBe("LIVE");
   });
 
+  it("does not measure control children when switching to live layout", async () => {
+    const { v } = makeVideo(100);
+    h.primary = v;
+    await openViewer("normal");
+    Object.defineProperty(v, "duration", { value: Infinity, configurable: true });
+    const originalRect = Element.prototype.getBoundingClientRect;
+    const rect = vi.fn(function (this: Element) {
+      if (barEl()?.contains(this)) throw new Error("measured control child");
+      return originalRect.call(this);
+    });
+    Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+      value: rect,
+      configurable: true,
+    });
+    try {
+      v.dispatchEvent(new Event("durationchange"));
+      expect(barEl()?.style.width).toBe("max-content");
+    } finally {
+      Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+        value: originalRect,
+        configurable: true,
+      });
+    }
+  });
+
   it("a live DVR stream uses the seekable window instead of the sentinel duration", async () => {
     const { v } = makeVideo(9_223_372_036);
     v.currentTime = 1_090;

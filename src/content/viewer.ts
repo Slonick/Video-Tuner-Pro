@@ -932,21 +932,9 @@ function layoutBar(): void {
   const timeline = video ? mediaTimeline(video) : null;
   const live = timeline?.kind === "live";
   bar.classList.toggle("live", live);
-  let w = Math.min(Math.max(r.width - 32, 280), 760);
-  if (live) {
-    const visible = Array.from(bar.children).filter((el) => {
-      return getComputedStyle(el).display !== "none";
-    });
-    const gap = 6;
-    const padding = 20;
-    const content = visible.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0);
-    const max = qualityWrap?.style.display === "none" ? 320 : 380;
-    w = Math.min(
-      Math.max(Math.ceil(content + gap * Math.max(visible.length - 1, 0) + padding), 260),
-      max,
-    );
-  }
-  bar.style.width = Math.round(w) + "px";
+  bar.style.width = live
+    ? "max-content"
+    : Math.round(Math.min(Math.max(r.width - 32, 280), 760)) + "px";
   bar.style.left = Math.round(r.left + r.width / 2) + "px";
   bar.style.bottom = Math.max(Math.round(window.innerHeight - r.bottom + 14), 14) + "px";
 }
