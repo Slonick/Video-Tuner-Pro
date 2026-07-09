@@ -99,6 +99,10 @@ function syncTopLayerAttr(): void {
   else document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
 }
 
+function syncFabExpanded(): void {
+  fab?.setAttribute("aria-expanded", open || radialOpen ? "true" : "false");
+}
+
 // True if a node belongs to our launcher — the media observer ignores our own
 // DOM writes so they don't feed back into applyAll (mirrors ownsBadgeNode).
 export function ownsLauncherNode(node: Node | null): boolean {
@@ -286,6 +290,7 @@ function openRadial(): void {
     clearTimeout(radialIdleTimer);
     snapRadialAtFab();
     syncTopLayerAttr();
+    syncFabExpanded();
     return;
   }
   if (radialOpen) {
@@ -300,6 +305,7 @@ function openRadial(): void {
   }
   radialOpen = true;
   syncTopLayerAttr();
+  syncFabExpanded();
   clearTimeout(radialIdleTimer);
   snapRadialAtFab(items);
   radialFrame = requestAnimationFrame(() => {
@@ -325,6 +331,7 @@ function openRadial(): void {
 function closeRadial(resumeHide = false): void {
   radialOpen = false;
   syncTopLayerAttr();
+  syncFabExpanded();
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
   clearTimeout(radialCloseTimer);
@@ -368,6 +375,15 @@ function scheduleRadialClose(): void {
 function keepRadialOpen(): void {
   clearTimeout(radialTimer);
   radialTimer = undefined;
+}
+
+function focusRadialItem(delta = 0): void {
+  const items = radialList().filter((b) => b.style.visibility !== "hidden");
+  if (!items.length) return;
+  const active = shadow?.activeElement;
+  const current = active instanceof HTMLButtonElement ? items.indexOf(active) : -1;
+  const next = current < 0 ? 0 : (current + delta + items.length) % items.length;
+  items[next]?.focus();
 }
 
 function ownsRadialEvent(e: Event): boolean {
@@ -512,7 +528,8 @@ function openPopup(): void {
   if (open || !shadow) return;
   closeRadial();
   open = true;
-  fab?.setAttribute("aria-expanded", "true"); // morphs the icon play → ✕
+  fab?.setAttribute("data-popup-open", "true"); // morphs the icon play → ✕
+  syncFabExpanded();
   if (!backdrop) {
     backdrop = document.createElement("div");
     // Transparent click-catcher (close on outside click); the frost lives on the
@@ -580,7 +597,8 @@ function openPopup(): void {
 function closePopup(): void {
   if (!open) return;
   open = false;
-  fab?.setAttribute("aria-expanded", "false"); // morphs the icon ✕ → play
+  fab?.setAttribute("data-popup-open", "false"); // morphs the icon ✕ → play
+  syncFabExpanded();
   if (frame) frame.style.display = "none";
   if (backdrop) backdrop.style.display = "none";
   syncTopLayerAttr();
@@ -722,7 +740,9 @@ function mount(): void {
   fab = document.createElement("button");
   fab.type = "button";
   fab.setAttribute("aria-label", i18n("overlayBtnAria") || "Open Video Tuner");
+  fab.setAttribute("aria-haspopup", "menu");
   fab.setAttribute("aria-expanded", "false");
+  fab.setAttribute("data-popup-open", "false");
   Object.assign(fab.style, {
     position: "fixed",
     zIndex: "2147483647",
@@ -754,8 +774,8 @@ function mount(): void {
     "transition:opacity .2s ease,transform .3s cubic-bezier(.34,1.2,.64,1)}" +
     ".vtp-ico svg{display:block}" +
     ".vtp-ico-close{opacity:0;transform:rotate(-90deg) scale(.4)}" +
-    "button[aria-expanded='true'] .vtp-ico-play{opacity:0;transform:rotate(90deg) scale(.4)}" +
-    "button[aria-expanded='true'] .vtp-ico-close{opacity:1;transform:none}" +
+    "button[data-popup-open='true'] .vtp-ico-play{opacity:0;transform:rotate(90deg) scale(.4)}" +
+    "button[data-popup-open='true'] .vtp-ico-close{opacity:1;transform:none}" +
     "@media (prefers-reduced-motion:reduce){.vtp-ico{transition:none}}";
   shadow.append(iconStyle);
   // Two stacked icons, built via DOMParser rather than innerHTML (the AMO linter
@@ -800,6 +820,20 @@ function mount(): void {
   shadow.append(rItems.theater, rItems.normal, rItems.pip, rItems.exit);
   fab.addEventListener("mouseenter", openRadial);
   fab.addEventListener("mouseleave", scheduleRadialClose);
+  fab.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && (open || radialOpen)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (open) closePopup();
+      else closeRadial(true);
+      return;
+    }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    e.stopPropagation();
+    openRadial();
+    requestAnimationFrame(() => focusRadialItem());
+  });
 }
 
 // One radial-menu item: a smaller glass sibling of the FAB, hidden until the
@@ -841,6 +875,26 @@ function radialButton(svg: string, label: string, onClick: () => void): HTMLButt
   b.addEventListener("click", (e) => {
     e.stopPropagation();
     onClick();
+  });
+  b.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeRadial(true);
+      fab?.focus();
+      return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      focusRadialItem(-1);
+      return;
+    }
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      focusRadialItem(1);
+    }
   });
   return b;
 }

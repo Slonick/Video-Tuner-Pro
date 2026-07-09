@@ -84,6 +84,10 @@ function fire(el: EventTarget, type: string, x = 0, y = 0) {
   el.dispatchEvent(new MouseEvent(type, { button: 0, clientX: x, clientY: y, bubbles: true }));
 }
 
+function key(el: EventTarget, key: string) {
+  el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+}
+
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 const get = (keys: string[]): Record<string, unknown> => {
   let out: Record<string, unknown> = {};
@@ -516,6 +520,32 @@ describe("launcher — radial viewer menu", () => {
     expect(shown(theater)).toBe(true);
     expect(shown(pip)).toBe(false);
     expect(exit.style.display).toBe("none");
+  });
+
+  it("opens and navigates the radial menu from the keyboard", async () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    const fab = fabEl()!;
+
+    expect(fab.getAttribute("aria-haspopup")).toBe("menu");
+    expect(fab.getAttribute("aria-expanded")).toBe("false");
+    key(fab, "ArrowLeft");
+    await frame();
+
+    const [theater, normal] = items();
+    expect(shown(theater)).toBe(true);
+    expect(shown(normal)).toBe(true);
+    expect(fab.getAttribute("aria-expanded")).toBe("true");
+    expect(fab.getAttribute("data-popup-open")).toBe("false");
+    expect(host()?.shadowRoot?.activeElement).toBe(normal);
+
+    key(normal, "ArrowDown");
+    expect(host()?.shadowRoot?.activeElement).toBe(theater);
+
+    key(theater, "Escape");
+    expect(fab.getAttribute("aria-expanded")).toBe("false");
+    expect(host()?.shadowRoot?.activeElement).toBe(fab);
   });
 
   it("hides radial viewer actions when viewer modes are disabled", async () => {
