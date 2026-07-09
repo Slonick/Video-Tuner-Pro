@@ -24,6 +24,18 @@ function setTime(video: HTMLVideoElement, currentTime: number): HTMLVideoElement
   return video;
 }
 
+function setSeekable(video: HTMLVideoElement, start: number, end: number): HTMLVideoElement {
+  Object.defineProperty(video, "seekable", {
+    configurable: true,
+    value: {
+      length: 1,
+      start: () => start,
+      end: () => end,
+    } as TimeRanges,
+  });
+  return video;
+}
+
 describe("YouTube DVR (scrubbed back from a live stream)", () => {
   beforeEach(() => {
     createdVideos = [];
@@ -31,7 +43,7 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     document.documentElement.setAttribute("data-vtp-live", "1"); // player says isLive
   });
   afterEach(() => {
-    for (const video of createdVideos) resetDvrFor(video);
+    for (const video of createdVideos) resetDvrFor(video, true);
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-vtp-live");
     document.documentElement.removeAttribute("data-vtp-latency");
@@ -98,6 +110,40 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     expect(onStreamPage()).toBe(false);
   });
 
+  it("a same-page MediaSource metadata reload preserves DVR mode", () => {
+    const video = setBadge(false);
+    trackDvr(setTime(video, 1000));
+    trackDvr(setTime(video, 400));
+    expect(isLive(video)).toBe(false);
+
+    resetDvrFor(video);
+
+    expect(isLive(video)).toBe(false);
+    expect(onStreamPage()).toBe(false);
+  });
+
+  it("an SPA navigation resets DVR state even when the video element is reused", () => {
+    vi.stubGlobal("location", {
+      hostname: "www.youtube.com",
+      pathname: "/watch",
+      search: "?v=one",
+    });
+    const video = setBadge(false);
+    trackDvr(setTime(video, 1000));
+    trackDvr(setTime(video, 400));
+    expect(isLive(video)).toBe(false);
+
+    vi.stubGlobal("location", {
+      hostname: "www.youtube.com",
+      pathname: "/watch",
+      search: "?v=two",
+    });
+    resetDvrFor(video);
+    trackDvr(setTime(video, 20));
+
+    expect(isLive(video)).toBe(true);
+  });
+
   it("YouTube live CSS classes still respect scrubbed-back DVR mode", () => {
     const video = setBadge(false);
     trackDvr(setTime(video, 1000));
@@ -121,14 +167,39 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     expect(isLive(newVideo)).toBe(true);
   });
 
-  it("DVR is YouTube-only — a Twitch backward seek is unaffected", () => {
+  it("a Twitch backward seek enters DVR mode and enables recording controls", () => {
     vi.stubGlobal("location", { hostname: "www.twitch.tv" });
-    const video = setBadge(false);
+    document.documentElement.removeAttribute("data-vtp-live");
+    const video = setSeekable(setBadge(false), 0, 1000);
+    Object.defineProperty(video, "duration", { value: Infinity, configurable: true });
     trackDvr(setTime(video, 1000));
     trackDvr(setTime(video, 400)); // a backward scrub
-    // DVR mode is YouTube-only: on Twitch trackDvr never engages, so the live
-    // flag still wins and the page stays a stream after scrubbing back.
+    expect(isLive(video)).toBe(false);
+    expect(onStreamPage()).toBe(false);
+  });
+
+  it("returning a generic DVR stream to its seekable edge restores live mode", () => {
+    vi.stubGlobal("location", { hostname: "www.twitch.tv" });
+    document.documentElement.removeAttribute("data-vtp-live");
+    const video = setSeekable(setBadge(false), 0, 1000);
+    Object.defineProperty(video, "duration", { value: Infinity, configurable: true });
+    trackDvr(setTime(video, 1000));
+    trackDvr(setTime(video, 400));
+    expect(isLive(video)).toBe(false);
+
+    trackDvr(setTime(video, 998));
+    expect(isLive(video)).toBe(true);
     expect(onStreamPage()).toBe(true);
+  });
+
+  it("never treats a finite VOD backward seek as DVR", () => {
+    vi.stubGlobal("location", { hostname: "example.com" });
+    document.documentElement.removeAttribute("data-vtp-live");
+    const video = setSeekable(setBadge(false), 0, 1000);
+    Object.defineProperty(video, "duration", { value: 1000, configurable: true });
+    trackDvr(setTime(video, 900));
+    trackDvr(setTime(video, 400));
+    expect(isLive(video)).toBe(false);
   });
 
   it("DVR state does not leak from one video element to another", () => {

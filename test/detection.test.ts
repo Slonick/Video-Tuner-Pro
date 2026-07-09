@@ -135,6 +135,7 @@ describe("isLive (live signals are scoped to the video's own player)", () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    document.documentElement.removeAttribute("data-vtp-live");
     document.body.innerHTML = "";
   });
 
@@ -164,6 +165,17 @@ describe("isLive (live signals are scoped to the video's own player)", () => {
     });
 
     expect(isLive(video)).toBe(false);
+  });
+
+  it("prefers the current player's live marker over a transient bridge VOD flag", () => {
+    document.body.innerHTML =
+      `<div class="html5-video-player ytp-live">` +
+      `<span class="ytp-time-display ytp-live"></span><video></video></div>`;
+    const video = document.querySelector("video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 4774, configurable: true });
+    document.documentElement.setAttribute("data-vtp-live", "0");
+
+    expect(isLive(video)).toBe(true);
   });
 });
 

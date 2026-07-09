@@ -16,14 +16,19 @@ function isYouTube(): boolean {
 interface DvrState {
   active: boolean;
   lastMediaTime: number;
+  pageKey: string;
 }
 
 let dvrSeenAt = 0;
 const dvrState = new WeakMap<HTMLVideoElement, DvrState>();
 
+function currentPageKey(): string {
+  return `${location.hostname || ""}${location.pathname || ""}${location.search || ""}`;
+}
+
 function dvrActive(video: HTMLVideoElement): boolean {
   const state = dvrState.get(video);
-  if (state?.active && publishedAtLiveHead()) {
+  if (state?.active && atLiveHead(video)) {
     state.active = false;
     dvrSeenAt = 0;
   }
@@ -41,40 +46,86 @@ function publishedAtLiveHead(): boolean {
   return Number.isFinite(latency) && latency >= 0 && latency <= 15;
 }
 
+function seekableDistanceFromHead(video: HTMLVideoElement): number | null {
+  try {
+    const ranges = video.seekable;
+    if (!ranges?.length) return null;
+    const end = ranges.end(ranges.length - 1);
+    const distance = end - video.currentTime;
+    return Number.isFinite(distance) ? Math.max(0, distance) : null;
+  } catch {
+    return null;
+  }
+}
+
+function atLiveHead(video: HTMLVideoElement): boolean {
+  if (publishedAtLiveHead()) return true;
+  if (isYouTube()) {
+    const player =
+      (video.closest && video.closest(".html5-video-player")) ||
+      document.querySelector(".html5-video-player") ||
+      document;
+    const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
+    if (badge?.classList.contains("ytp-live-badge-is-livehead")) return true;
+  }
+  const distance = seekableDistanceFromHead(video);
+  return distance != null && distance <= 3;
+}
+
+function hasUnderlyingLiveSignal(video: HTMLVideoElement): boolean {
+  const flag = document.documentElement.getAttribute("data-vtp-live");
+  if (flag === "1") return true;
+  if (flag === "0") return false;
+  if (unboundedDuration(video.duration)) return true;
+  if (liveProbe.get(video)?.live) return true;
+  if (!isYouTube()) return false;
+  const player =
+    (video.closest && video.closest(".html5-video-player")) ||
+    document.querySelector(".html5-video-player");
+  return !!(
+    player?.classList.contains("ytp-live") || player?.querySelector(".ytp-time-display.ytp-live")
+  );
+}
+
 // Drive DVR detection from a live <video>'s timeupdate/seeking events. A backward
 // jump in playback position is the user scrubbing into the recording — Live-sync
 // only ever changes the rate, so playback time never moves backward on its own.
 // Returning to the live head clears it, detected via YouTube's own LIVE badge
 // (it carries `ytp-live-badge-is-livehead` only when playback sits at the edge).
 export function trackDvr(video: HTMLVideoElement): void {
-  if (!isYouTube()) {
-    dvrSeenAt = 0;
-    return;
-  }
-  if (document.documentElement.getAttribute("data-vtp-live") !== "1") return;
   let state = dvrState.get(video);
+  const pageKey = currentPageKey();
+  if (state && state.pageKey !== pageKey) {
+    if (state.active) dvrSeenAt = 0;
+    dvrState.delete(video);
+    state = undefined;
+  }
   if (!state) {
-    state = { active: false, lastMediaTime: 0 };
+    state = { active: false, lastMediaTime: 0, pageKey };
     dvrState.set(video, state);
   }
   const t = video.currentTime;
-  const player =
-    (video.closest && video.closest(".html5-video-player")) ||
-    document.querySelector(".html5-video-player") ||
-    document;
-  const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
-  if (publishedAtLiveHead() || (badge && badge.classList.contains("ytp-live-badge-is-livehead"))) {
+  if (state.active && atLiveHead(video)) {
     state.active = false;
     dvrSeenAt = 0;
-  } else if (state.lastMediaTime && t < state.lastMediaTime - 3) {
+  } else if (
+    !state.active &&
+    hasUnderlyingLiveSignal(video) &&
+    state.lastMediaTime &&
+    t < state.lastMediaTime - 3
+  ) {
     state.active = true;
     dvrSeenAt = Date.now();
   }
   state.lastMediaTime = t;
 }
 
-export function resetDvrFor(video: HTMLVideoElement): void {
+export function resetDvrFor(video: HTMLVideoElement, force = false): void {
   const state = dvrState.get(video);
+  if (!force && state?.active && state.pageKey === currentPageKey() && !atLiveHead(video)) {
+    state.lastMediaTime = video.currentTime;
+    return;
+  }
   dvrState.delete(video);
   if (state?.active) dvrSeenAt = 0;
 }
@@ -97,11 +148,11 @@ export function isLive(video: HTMLVideoElement): boolean {
   // (YouTube's getVideoData().isLive) to data-vtp-live — authoritative when
   // present, so it wins over the duration/DOM heuristics below.
   const flag = document.documentElement.getAttribute("data-vtp-live");
+  if (dvrActive(video)) return false;
   // YouTube DVR: a live broadcast you've scrubbed back from is a recording, not a
   // stream, until you return to the live edge (see trackDvr/dvrMode).
-  if (isYouTube() && flag === "1") return !dvrActive(video);
+  if (isYouTube() && flag === "1") return true;
   if (flag === "1") return true;
-  if (flag === "0") return false;
 
   // YouTube live (including DVR streams) reports a FINITE, growing duration, so
   // the duration check alone misses it. YouTube adds the "ytp-live" class to the
@@ -116,10 +167,16 @@ export function isLive(video: HTMLVideoElement): boolean {
       (video.closest && video.closest(".html5-video-player")) ||
       document.querySelector(".html5-video-player");
     if (player) {
-      if (player.classList.contains("ytp-live")) return !dvrActive(video);
-      if (player.querySelector(".ytp-time-display.ytp-live")) return !dvrActive(video);
+      if (player.classList.contains("ytp-live")) return true;
+      if (player.querySelector(".ytp-time-display.ytp-live")) return true;
     }
   }
+
+  // A transient `getVideoData().isLive === false` is common while YouTube swaps
+  // its MediaSource. Do not let that bridge value suppress live markers scoped
+  // to the current player; once those markers are absent, the explicit VOD flag
+  // can safely clear sticky live state after SPA navigation.
+  if (flag === "0") return false;
 
   // Most live MSE streams report an infinite duration (Twitch, many players).
   if (unboundedDuration(video.duration)) return true;

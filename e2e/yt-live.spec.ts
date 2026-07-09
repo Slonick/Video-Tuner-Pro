@@ -1,22 +1,22 @@
-// LIVE smoke run against real youtube.com (not committed as a CI test — run
-// manually). Verifies on the real player: adoption, style enforcement (no
+// Network smokes against real youtube.com (not CI tests — run manually).
+// The VOD case verifies on the real player: mirroring, style enforcement (no
 // drift), the quality mirror, chapter ticks and sponsor bands.
 import { test, expect } from "./fixtures/extension.js";
 
 test.setTimeout(120_000);
 
-// Live network smoke against real youtube.com — not for CI. Run manually:
-//   YT_LIVE=1 npx playwright test e2e/yt-live.spec.ts
-test.skip(!process.env.YT_LIVE, "live YouTube smoke — set YT_LIVE=1 to run");
+// Real-network VOD smoke. A separate test below requires an actual live URL.
+//   YT_NETWORK=1 npx playwright test e2e/yt-live.spec.ts
 
 // A video known for chapters + SponsorBlock segments (LTT-style tech video
 // tends to have both). Fall back assertions are lenient where content varies.
 const URL_CHAPTERS = "https://www.youtube.com/watch?v=1La4QzGeaaQ"; // typical chaptered video
 
-test("live YouTube: pop-out, quality, chapters, no drift", async ({
+test("real YouTube VOD: viewer, quality, chapters, no drift", async ({
   page,
   serviceWorker,
 }, testInfo) => {
+  test.skip(!process.env.YT_NETWORK, "real YouTube VOD smoke — set YT_NETWORK=1 to run");
   await serviceWorker.evaluate(() => chrome.storage.sync.set({ sponsorMarks: true }));
   await page.goto(URL_CHAPTERS, { waitUntil: "domcontentloaded" });
   // Consent wall (fresh profile) — take whatever reject/accept button exists.
@@ -177,10 +177,67 @@ test("live YouTube: pop-out, quality, chapters, no drift", async ({
     return { h: v.videoHeight, playing: !v.paused, inOverlay: !!v };
   });
   console.log("PICK 144p:", JSON.stringify({ before, after }));
-  const thirdPartyClicks = await page.evaluate(() => Number(document.body.dataset.thirdPartyClicks || 0));
+  const thirdPartyClicks = await page.evaluate(() =>
+    Number(document.body.dataset.thirdPartyClicks || 0),
+  );
   console.log("THIRD-PARTY CLICKS:", thirdPartyClicks);
   expect(thirdPartyClicks).toBe(0); // foreign buttons must never be poked
   await page.screenshot({ path: testInfo.outputPath("yt-quality.png") });
   expect(after.inOverlay).toBe(true);
   expect(after.h).toBeLessThan(before);
+});
+
+test("real YouTube live: live layout, playback, and no VOD seek bar", async ({
+  page,
+}, testInfo) => {
+  const liveUrl = process.env.YT_LIVE_URL;
+  test.skip(!liveUrl, "real YouTube live smoke — set YT_LIVE_URL to an active broadcast");
+
+  await page.goto(liveUrl!, { waitUntil: "domcontentloaded" });
+  const consent = page.locator(
+    'button:has-text("Reject all"), button:has-text("Отклонить все"), [aria-label*="Reject"], button:has-text("Accept all")',
+  );
+  try {
+    await consent.first().click({ timeout: 7000 });
+  } catch {
+    /* no consent wall */
+  }
+  await page.waitForSelector("video.html5-main-video", { timeout: 30_000 });
+  await page.evaluate(() => {
+    const video = document.querySelector("video.html5-main-video") as HTMLVideoElement;
+    video.muted = true;
+    return video.play().catch(() => {});
+  });
+  await expect
+    .poll(() => page.locator("html").getAttribute("data-vtp-live"), { timeout: 30_000 })
+    .toBe("1");
+
+  await page.keyboard.press("KeyT");
+  await expect(page.locator("[data-vtp-viewer-overlay]")).toBeVisible({ timeout: 15_000 });
+  const before = await page.evaluate(
+    () => (document.querySelector("video.html5-main-video") as HTMLVideoElement).currentTime,
+  );
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const overlay = document.querySelector("[data-vtp-viewer-overlay]");
+          const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((element) =>
+            element.shadowRoot?.querySelector(".bar"),
+          )?.shadowRoot;
+          const seek = shadow?.querySelector('input[type="range"]') as HTMLElement | null;
+          return {
+            time: shadow?.querySelector(".time")?.textContent?.trim() || "",
+            seekVisible: !!seek && seek.style.display !== "none",
+          };
+        }),
+      { timeout: 15_000 },
+    )
+    .toEqual({ time: "LIVE", seekVisible: false });
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(
+    () => (document.querySelector("video.html5-main-video") as HTMLVideoElement).currentTime,
+  );
+  expect(after).toBeGreaterThan(before + 0.5);
+  await page.screenshot({ path: testInfo.outputPath("youtube-live.png") });
 });

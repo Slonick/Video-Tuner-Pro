@@ -22,9 +22,17 @@ function makeYoutubePlayer(width: number, height: number, live: boolean): HTMLEl
 function setYoutubePlayerResponse(
   player: HTMLElement,
   details: { videoId: string; isLive?: boolean; isLiveContent?: boolean },
+  isLiveNow?: boolean,
 ): void {
   (player as HTMLElement & { getPlayerResponse?: () => unknown }).getPlayerResponse = () => ({
     videoDetails: details,
+    ...(typeof isLiveNow === "boolean"
+      ? {
+          microformat: {
+            playerMicroformatRenderer: { liveBroadcastDetails: { isLiveNow } },
+          },
+        }
+      : {}),
   });
 }
 
@@ -88,6 +96,64 @@ describe("MAIN-world live probe", () => {
       isLive: true,
       isLiveContent: true,
     });
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("uses liveBroadcastDetails for an active stream whose video flags are false", async () => {
+    vi.stubGlobal("location", {
+      hostname: "www.youtube.com",
+      href: "https://www.youtube.com/watch?v=jCV9cOM77iE",
+    });
+    const player = makeYoutubePlayer(640, 360, false);
+    (player as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "jCV9cOM77iE",
+    });
+    setYoutubePlayerResponse(
+      player,
+      { videoId: "jCV9cOM77iE", isLive: false, isLiveContent: false },
+      true,
+    );
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("treats a finished live broadcast as a VOD", async () => {
+    const player = makeYoutubePlayer(640, 360, false);
+    (player as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "finished-stream",
+    });
+    setYoutubePlayerResponse(player, { videoId: "finished-stream", isLiveContent: true }, false);
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("0");
+  });
+
+  it("selects the visible player that matches the current YouTube URL", async () => {
+    vi.stubGlobal("location", {
+      hostname: "www.youtube.com",
+      href: "https://www.youtube.com/watch?v=current-live",
+    });
+    const stale = makeYoutubePlayer(640, 360, false);
+    (stale as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "stale-vod",
+    });
+    setYoutubePlayerResponse(stale, { videoId: "stale-vod", isLive: false });
+
+    const current = makeYoutubePlayer(640, 360, false);
+    (current as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "current-live",
+    });
+    setYoutubePlayerResponse(current, { videoId: "current-live", isLiveContent: true }, true);
 
     await loadInject();
 

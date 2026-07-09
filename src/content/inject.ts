@@ -12,7 +12,7 @@
 // internals, so we describe narrow shapes for exactly the fields we read.
 (function () {
   "use strict";
-  const BRIDGE_VERSION = "2026-07-09-youtube-live-response";
+  const BRIDGE_VERSION = "2026-07-10-current-youtube-live";
   const win = window as typeof window & {
     __vtpLatencyBridgeInstalled?: boolean | string;
     __vtpLatencyBridgeCleanup?: () => void;
@@ -67,6 +67,11 @@
   }
   interface YouTubePlayerResponse {
     videoDetails?: YouTubeVideoDetails | null;
+    microformat?: {
+      playerMicroformatRenderer?: {
+        liveBroadcastDetails?: { isLiveNow?: unknown } | null;
+      } | null;
+    } | null;
   }
   interface YouTubePlayer extends HTMLElement {
     getVideoData?: () => {
@@ -330,10 +335,27 @@
     // video's getVideoData().isLive. Read only a VISIBLE player so a stale live
     // watch player can't make Shorts (or an inline preview) look like a stream.
     const players = document.querySelectorAll<HTMLElement>(".html5-video-player");
+    const locationHref =
+      typeof location.href === "string"
+        ? location.href
+        : `https://${HOSTNAME}${location.pathname || "/"}${location.search || ""}`;
+    const url = new URL(locationHref);
+    const pathId = /^\/(?:shorts|live|embed)\/([^/?#]+)/.exec(url.pathname)?.[1];
+    const currentId = url.searchParams.get("v") || pathId || null;
+    let fallback: YouTubePlayer | null = null;
     for (const p of players) {
-      if (p.clientWidth > 0 && p.clientHeight > 0) return p as YouTubePlayer;
+      if (p.clientWidth <= 0 || p.clientHeight <= 0) continue;
+      const player = p as YouTubePlayer;
+      if (!fallback || p.querySelector("video.html5-main-video")) fallback = player;
+      if (!currentId || typeof player.getVideoData !== "function") continue;
+      try {
+        const data = player.getVideoData();
+        if ((data?.video_id ?? data?.videoId) === currentId) return player;
+      } catch (e) {
+        /* use the visible main-player fallback */
+      }
     }
-    return null;
+    return fallback;
   }
 
   function youtubeResponseLive(
@@ -362,6 +384,10 @@
     if (typeof playerId === "string" && typeof responseId === "string" && playerId !== responseId) {
       return null;
     }
+    const isLiveNow =
+      response?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow;
+    if (isLiveNow === true) return true;
+    if (isLiveNow === false) return false;
     if (details.isLive === true || details.isLiveContent === true) return true;
     if (details.isLive === false || details.isLiveContent === false) return false;
     return null;
