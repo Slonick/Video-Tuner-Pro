@@ -89,14 +89,16 @@ function setSeekable(v: HTMLVideoElement, start: number, end: number): void {
 function installCapture(v: HTMLVideoElement): {
   stop: ReturnType<typeof vi.fn>;
   stream: MediaStream;
+  capture: ReturnType<typeof vi.fn>;
 } {
   const stop = vi.fn();
   const stream = {
     getVideoTracks: () => [{}],
     getTracks: () => [{ stop }],
   } as unknown as MediaStream;
-  Object.defineProperty(v, "captureStream", { value: () => stream, configurable: true });
-  return { stop, stream };
+  const capture = vi.fn(() => stream);
+  Object.defineProperty(v, "captureStream", { value: capture, configurable: true });
+  return { stop, stream, capture };
 }
 
 // open through a microtask flush so the DOM settles before assertions.
@@ -183,6 +185,41 @@ function installQualityBridge(
     );
   });
   return picks;
+}
+
+function installDelayedQualityBridge() {
+  document.addEventListener("vtp-quality-request", (e) => {
+    const d = (e as CustomEvent).detail;
+    document.dispatchEvent(
+      new CustomEvent("vtp-quality-response", {
+        detail: {
+          requestId: d.requestId,
+          options: [
+            { id: "auto", label: "Auto", current: true },
+            { id: "1", label: "720p" },
+          ],
+          current: "auto",
+        },
+      }),
+    );
+  });
+  document.addEventListener("vtp-quality-set", (e) => {
+    const d = (e as CustomEvent).detail;
+    setTimeout(() => {
+      document.dispatchEvent(
+        new CustomEvent("vtp-quality-response", {
+          detail: {
+            requestId: d.requestId,
+            options: [
+              { id: "auto", label: "Auto" },
+              { id: "1", label: "720p", current: true },
+            ],
+            current: "1",
+          },
+        }),
+      );
+    }, 20);
+  });
 }
 
 function installBackdropMirror(v: HTMLVideoElement) {
@@ -1105,6 +1142,29 @@ describe("control bar", () => {
     await flush();
     expect(picks).toEqual(["1"]);
     expect(btn.textContent).toContain("720p");
+  });
+
+  it("ignores a quality response that arrives after the viewer closed", async () => {
+    vi.useFakeTimers();
+    installDelayedQualityBridge();
+    const { v } = makeVideo();
+    const { capture } = installCapture(v);
+    h.primary = v;
+    await openViewer("theater");
+    await flush();
+
+    const quality = qwraps()[0];
+    const btn = quality.querySelector("button") as HTMLButtonElement;
+    btn.click();
+    await flush();
+    const items = Array.from(quality.querySelectorAll(".qitem")) as HTMLButtonElement[];
+    items[1].click();
+    exitViewer();
+
+    await vi.advanceTimersByTimeAsync(800);
+    await flush();
+
+    expect(capture).toHaveBeenCalledTimes(1);
   });
 
   it("the format button switches and the close button exits", async () => {

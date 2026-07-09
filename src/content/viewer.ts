@@ -115,6 +115,7 @@ let qualityReq = 0;
 let qualityVideoId = "";
 let pendingQuality: QualityOption | null = null;
 let pendingQualityUntil = 0;
+let viewerSession = 0;
 let lastTimelineKind: Timeline["kind"] | null = null;
 
 interface QualityOption {
@@ -1168,6 +1169,7 @@ function qualityButtonLabel(label: string): string {
 }
 
 function renderQuality(state: QualityState): void {
+  if (!fmt) return;
   const options = state.options.filter((o) => o && o.id && o.label);
   const confirmed = options.find((o) => o.current) ?? options.find((o) => o.id === state.current);
   const pending =
@@ -1191,12 +1193,14 @@ function renderQuality(state: QualityState): void {
     item.textContent = opt.label;
     if (opt.current || opt.id === state.current) item.setAttribute("aria-current", "true");
     item.addEventListener("click", async () => {
+      const session = viewerSession;
       qualityMenu?.classList.remove("open");
       pendingQuality = opt;
       pendingQualityUntil = Date.now() + 12_000;
       if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(opt.label);
       showBadgeNotice(notice("viewerNoticeQuality", `Quality: ${opt.label}`, opt.label));
       const next = await qualityRequest("vtp-quality-set", opt.id);
+      if (session !== viewerSession || !fmt) return;
       pendingQuality = null;
       pendingQualityUntil = 0;
       renderQuality({
@@ -1205,8 +1209,8 @@ function renderQuality(state: QualityState): void {
         options: next.options.map((o) => ({ ...o, current: o.id === opt.id })),
       });
       refreshMirrorStream();
-      window.setTimeout(() => refreshMirrorStream(), 700);
-      window.setTimeout(() => refreshQuality(), 700);
+      sessionTimeout(() => refreshMirrorStream(), 700, session);
+      sessionTimeout(() => refreshQuality(), 700, session);
     });
     qualityMenu.appendChild(item);
   }
@@ -1214,7 +1218,17 @@ function renderQuality(state: QualityState): void {
 
 async function refreshQuality(): Promise<void> {
   if (!fmt || !video || !qualityWrap) return;
-  renderQuality(await qualityRequest("vtp-quality-request"));
+  const session = viewerSession;
+  const state = await qualityRequest("vtp-quality-request");
+  if (session !== viewerSession || !fmt) return;
+  renderQuality(state);
+}
+
+function sessionTimeout(fn: () => void, ms: number, session = viewerSession): void {
+  const timer = window.setTimeout(() => {
+    if (session === viewerSession && fmt) fn();
+  }, ms);
+  media?.signal.addEventListener("abort", () => window.clearTimeout(timer), { once: true });
 }
 
 // Our control bar, inside a shadow-rooted host that spans the overlay (the
@@ -1754,6 +1768,7 @@ async function enter(
   surfaceShell = null;
   mirrored = false;
   if (!mirror) mirrorStream = null;
+  viewerSession++;
   sourceParent = null;
   sourceNextSibling = null;
   sourceRect = firstRect;
@@ -1963,6 +1978,7 @@ export function exitViewer(): void {
     sourceRect = null;
     layoutPaused = false;
     exiting = false;
+    viewerSession++;
     surfaceVideo = null;
     mirrored = false;
     video = null;
