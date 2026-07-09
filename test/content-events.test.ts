@@ -248,8 +248,8 @@ describe("content media events", () => {
     media(false).dispatchEvent(new Event("durationchange"));
     await nextFrame();
 
-    expect(fx.applyAll).toHaveBeenCalled();
-    expect(fx.controlLive).toHaveBeenCalled();
+    expect(fx.applyAll).not.toHaveBeenCalled();
+    expect(fx.controlLive).not.toHaveBeenCalled();
     expect(fx.updateTimeBadge).not.toHaveBeenCalled();
     expect(fx.flashBadge).not.toHaveBeenCalled();
   });

@@ -416,11 +416,13 @@ for (const ev of ["play", "loadedmetadata", "durationchange"]) {
     (e) => {
       if (!(e.target instanceof HTMLMediaElement)) return;
       if (!ctxValid()) return;
+      const streamPage = onStreamPage();
+      if (e.type === "durationchange" && streamPage) return;
       wake(TICK_MIN); // media showed up — reset any no-video backoff to the fast cadence
       // Surface the badge whenever playback starts (covers autoplay pages where
       // the user never moves the pointer over the video). updateTimeBadge mounts
       // it if needed; flashBadge reveals it and resumes the usual auto-hide.
-      scheduleMediaPass(e.type === "play" || (!e.target.paused && !onStreamPage()));
+      scheduleMediaPass(e.type === "play" || (!e.target.paused && !streamPage));
     },
     listenerOptions(true),
   );
