@@ -70,7 +70,7 @@ function validPosition(value: unknown): value is { fx: number; fy: number } {
 }
 
 function validStoredMapValue(map: StoredMapName, value: unknown): boolean {
-  if (map === "domains" || map === "channels") return finite(value) && value >= 0.07 && value <= 16;
+  if (map === "domains" || map === "channels") return finite(value) && value >= 0.1 && value <= 16;
   if (map === "syncTargets" || map === "syncTargetChannels")
     return finite(value) && value >= 1 && value <= 30;
   if (map === "autoSlowSites" || map === "autoSlowChannels") {

@@ -136,6 +136,18 @@ describe("background stored-map mutations", () => {
     expect(responses).toEqual([{ success: false }, { success: true }]);
   });
 
+  it("rejects saved speeds outside the playback clamp", () => {
+    const responses: unknown[] = [];
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", set: { "slow.example": 0.07 } },
+      {},
+      (response) => responses.push(response),
+    );
+
+    expect(responses).toEqual([{ success: false }]);
+    expect(h.pendingGets).toHaveLength(0);
+  });
+
   it("serializes clearing a whole map with adjacent writes", async () => {
     h.values.domains = { old: 1 };
     const responses: unknown[] = [];

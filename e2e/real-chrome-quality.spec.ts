@@ -2,7 +2,7 @@
 //
 // Usage:
 //   npm run test:real-chrome
-//   REAL_CHROME_SITES=youtube,twitch,boosty,kick npm run test:real-chrome
+//   REAL_CHROME_SITES=youtube,twitch,boosty,kick,dpbo npm run test:real-chrome
 //
 // The test uses one browser page and navigates it between targets so it never
 // opens multiple video tabs at once.
@@ -60,6 +60,11 @@ const TARGETS: Record<string, Target> = {
     consent: 'button:has-text("Accept all")',
     skipOffline: !process.env.REAL_CHROME_KICK_URL,
   },
+  dpbo: {
+    name: "dpbo",
+    url: process.env.REAL_CHROME_DPBO_URL || "https://dpbo.gfw.ovh/item/view/124450/s0e1",
+    video: "video",
+  },
 };
 
 test.setTimeout(240_000);
@@ -85,12 +90,13 @@ function findChromeForTesting(): string | undefined {
   } catch {
     /* fall back to the installed Chrome channel */
   }
-  const app = "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
+  const app =
+    "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
   return fs.existsSync(app) ? app : undefined;
 }
 
 function selectedTargets(): Target[] {
-  const names = (process.env.REAL_CHROME_SITES || "youtube,twitch,boosty,kick")
+  const names = (process.env.REAL_CHROME_SITES || "youtube,twitch,boosty,kick,dpbo")
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
@@ -113,7 +119,9 @@ async function dismissConsent(page: Page, selector?: string): Promise<void> {
 async function ensureRealChrome(page: Page): Promise<void> {
   const userAgent = await page.evaluate(() => navigator.userAgent);
   expect(userAgent, "test must run in real Google Chrome").toContain("Chrome/");
-  expect(userAgent, "test must not run in Chromium's headless shell").not.toContain("HeadlessChrome");
+  expect(userAgent, "test must not run in Chromium's headless shell").not.toContain(
+    "HeadlessChrome",
+  );
 }
 
 async function startPageVideo(page: Page, selector: string): Promise<void> {
@@ -184,8 +192,8 @@ async function forceInjectContentScripts(page: Page): Promise<void> {
     const tab = tabs.find((item) => item.url === pageUrl) || tabs.find((item) => item.active);
     if (!tab?.id) throw new Error(`Cannot find Chrome tab for ${pageUrl}`);
     const target = { tabId: tab.id };
+    await chrome.scripting.executeScript({ target, files: ["page-bridge.js"], world: "MAIN" });
     await chrome.scripting.executeScript({ target, files: ["quality-inject.js"], world: "MAIN" });
-    await chrome.scripting.executeScript({ target, files: ["audio-inject.js"], world: "MAIN" });
     await chrome.scripting.executeScript({ target, files: ["inject.js"], world: "MAIN" });
     await chrome.scripting.executeScript({ target, files: ["content.js"] });
   }, page.url());
@@ -199,11 +207,15 @@ async function enterTheaterViewer(page: Page): Promise<void> {
   } catch (error) {
     await forceInjectContentScripts(page);
     try {
-      await expect(theater, "extension theater launcher after chrome.scripting injection").toBeAttached(
-        { timeout: 30_000 },
-      );
+      await expect(
+        theater,
+        "extension theater launcher after chrome.scripting injection",
+      ).toBeAttached({ timeout: 30_000 });
     } catch (injectionError) {
-      const workers = page.context().serviceWorkers().map((worker) => worker.url());
+      const workers = page
+        .context()
+        .serviceWorkers()
+        .map((worker) => worker.url());
       throw new Error(
         [
           "Video Tuner Pro did not inject into the real Chrome page.",
