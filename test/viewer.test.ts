@@ -121,6 +121,9 @@ const barButtons = () => Array.from(barEl()?.querySelectorAll("button") ?? []); 
 const barInputs = () => Array.from(barEl()?.querySelectorAll("input") ?? []) as HTMLInputElement[]; // seek, vol
 const barTime = () => barEl()?.querySelector(".time")?.textContent ?? null;
 const qwraps = () => Array.from(barEl()?.querySelectorAll(".qwrap") ?? []) as HTMLElement[];
+const shadowActive = (el: Element) => (el.getRootNode() as ShadowRoot).activeElement;
+const key = (el: EventTarget, value: string) =>
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true }));
 const viewerBackdrop = () => overlayEl()?.querySelector("div") as HTMLElement | null;
 const viewerBackdropVisual = () =>
   overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLElement | null;
@@ -1160,11 +1163,16 @@ describe("control bar", () => {
     const qualityMenu = quality.querySelector(".qmenu") as HTMLElement;
     expect(qualityBtn.getAttribute("aria-expanded")).toBe("true");
     expect(qualityMenu.getAttribute("role")).toBe("menu");
-    expect(qualityMenu.querySelector(".qitem")?.getAttribute("role")).toBe("menuitemradio");
+    const qualityItems = Array.from(qualityMenu.querySelectorAll(".qitem")) as HTMLButtonElement[];
+    expect(qualityItems[0]?.getAttribute("role")).toBe("menuitemradio");
+    expect(shadowActive(qualityMenu)).toBe(qualityItems[0]);
+    key(qualityItems[0], "ArrowDown");
+    expect(shadowActive(qualityMenu)).toBe(qualityItems[1]);
+    key(qualityItems[1], "Escape");
 
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
     expect(viewerFormat()).toBe("theater");
     expect(qualityBtn.getAttribute("aria-expanded")).toBe("false");
+    expect(shadowActive(qualityMenu)).toBe(qualityBtn);
 
     const fit = qwraps()[1];
     const fitBtn = fit.querySelector("button") as HTMLButtonElement;
@@ -1172,7 +1180,11 @@ describe("control bar", () => {
     const fitMenu = fit.querySelector(".qmenu") as HTMLElement;
     expect(fitBtn.getAttribute("aria-expanded")).toBe("true");
     expect(fitMenu.getAttribute("role")).toBe("menu");
-    expect(fitMenu.querySelector(".qitem")?.getAttribute("role")).toBe("menuitemradio");
+    const fitItems = Array.from(fitMenu.querySelectorAll(".qitem")) as HTMLButtonElement[];
+    expect(fitItems[0]?.getAttribute("role")).toBe("menuitemradio");
+    expect(shadowActive(fitMenu)).toBe(fitItems[0]);
+    key(fitItems[0], "End");
+    expect(shadowActive(fitMenu)).toBe(fitItems[2]);
   });
 
   it("ignores a quality response that arrives after the viewer closed", async () => {

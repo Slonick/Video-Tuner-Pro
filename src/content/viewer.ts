@@ -107,6 +107,7 @@ let layoutPaused = false;
 let exiting = false;
 
 let fitMenu: HTMLDivElement | null = null;
+let fitBtn: HTMLButtonElement | null = null;
 let qualityWrap: HTMLSpanElement | null = null;
 let qualityBtn: HTMLButtonElement | null = null;
 let qualityLabelEl: HTMLSpanElement | null = null;
@@ -1228,6 +1229,7 @@ function renderQuality(state: QualityState): void {
       sessionTimeout(() => refreshMirrorStream(), 700, session);
       sessionTimeout(() => refreshQuality(), 700, session);
     });
+    item.addEventListener("keydown", (e) => handleMenuKey(e, qualityMenu, qualityBtn));
     qualityMenu.appendChild(item);
   }
 }
@@ -1257,10 +1259,56 @@ function setMenuOpen(
   trigger.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
+function menuItems(menu: HTMLDivElement | null): HTMLButtonElement[] {
+  return Array.from(menu?.querySelectorAll<HTMLButtonElement>(".qitem") ?? []);
+}
+
+function focusMenuItem(menu: HTMLDivElement | null, delta = 0): void {
+  const items = menuItems(menu);
+  if (!items.length) return;
+  const root = menu?.getRootNode();
+  const active = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+  const current = active instanceof HTMLButtonElement ? items.indexOf(active) : -1;
+  const next = current < 0 ? 0 : (current + delta + items.length) % items.length;
+  items[next]?.focus();
+}
+
+function handleMenuKey(
+  e: KeyboardEvent,
+  menu: HTMLDivElement | null,
+  trigger: HTMLButtonElement | null,
+): void {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpen(menu, trigger, false);
+    trigger?.focus();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+    e.preventDefault();
+    e.stopPropagation();
+    focusMenuItem(menu, 1);
+    return;
+  }
+  if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+    e.preventDefault();
+    e.stopPropagation();
+    focusMenuItem(menu, -1);
+    return;
+  }
+  if (e.key === "Home" || e.key === "End") {
+    e.preventDefault();
+    e.stopPropagation();
+    const items = menuItems(menu);
+    items[e.key === "Home" ? 0 : items.length - 1]?.focus();
+  }
+}
+
 function closeViewerMenus(): boolean {
   let closed = false;
   if (fitMenu?.classList.contains("open")) {
-    setMenuOpen(fitMenu, fitMenu.previousElementSibling as HTMLButtonElement | null, false);
+    setMenuOpen(fitMenu, fitBtn, false);
     closed = true;
   }
   if (qualityMenu?.classList.contains("open")) {
@@ -1420,7 +1468,7 @@ function mountBar(): void {
   // edges).
   const fwrap = document.createElement("span");
   fwrap.className = "qwrap";
-  const fitBtn = barButton(I_FIT, null, i18n("viewerFitAria") || "Fill mode");
+  fitBtn = barButton(I_FIT, null, i18n("viewerFitAria") || "Fill mode");
   fitBtn.setAttribute("aria-haspopup", "menu");
   fitBtn.setAttribute("aria-expanded", "false");
   fitMenu = document.createElement("div");
@@ -1446,9 +1494,11 @@ function mountBar(): void {
         setViewerFitMode(m, true);
         setMenuOpen(fitMenu, fitBtn, false);
       });
+      item.addEventListener("keydown", (e) => handleMenuKey(e, fitMenu, fitBtn));
       fitMenu.appendChild(item);
     }
     setMenuOpen(fitMenu, fitBtn, true);
+    focusMenuItem(fitMenu);
   });
   fwrap.append(fitBtn, fitMenu);
   qualityWrap = document.createElement("span");
@@ -1474,7 +1524,10 @@ function mountBar(): void {
     closeViewerMenus();
     const state = await qualityRequest("vtp-quality-request");
     renderQuality(state);
-    if (state.options.length >= 2) setMenuOpen(qualityMenu, qualityBtn, true);
+    if (state.options.length >= 2) {
+      setMenuOpen(qualityMenu, qualityBtn, true);
+      focusMenuItem(qualityMenu);
+    }
   });
   qualityWrap.append(qualityBtn, qualityMenu);
   fmtBtn = barButton(I_GROW, I_SHRINK, i18n("viewerTheaterAria") || "Pop out in theater format");
@@ -2014,6 +2067,7 @@ export function exitViewer(): void {
     seekEl = seekWrapEl = volEl = null;
     timeEl = null;
     fitMenu = null;
+    fitBtn = null;
     qualityWrap = null;
     qualityBtn = null;
     qualityLabelEl = null;
