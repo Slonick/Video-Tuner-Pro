@@ -461,6 +461,26 @@ describe("scope control", () => {
     expect(val("channel")?.textContent).toContain("150%");
   });
 
+  it("shows the latest saved YouTube alias when both channel keys exist", async () => {
+    await mountApp({
+      tab: YT,
+      settings: { channels: { "channel/UCabc": 2.0, "@some-handle": 1.5 } },
+      replies: {
+        getSpeed: {
+          speed: 1.5,
+          channel: "channel/UCabc",
+          channelKeys: ["channel/UCabc", "@some-handle"],
+          channelName: "Some Channel",
+          scope: "channel",
+          live: false,
+        },
+      },
+    });
+
+    await openMenu();
+    expect(val("channel")?.textContent).toContain("150%");
+  });
+
   it("Reset from the menu forgets that scope and pulls the fallback speed back", async () => {
     const { replies, lastCall } = await mountApp({ tab: YT, settings: { globalSpeed: 1.5 } });
     await flush();

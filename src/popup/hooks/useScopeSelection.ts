@@ -54,7 +54,11 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
       const channels = (r[storage.channelMap] || {}) as Record<string, unknown>;
       const globalKey = storage.global.find((k) => r[k] != null);
       const siteV = domain ? sites[domain] : undefined;
-      const savedChannelKey = channelKeys.current.find((k) => channels[k] != null);
+      const keys = new Set(channelKeys.current);
+      let savedChannelKey: string | null = null;
+      for (const key of Object.keys(channels)) {
+        if (keys.has(key) && channels[key] != null) savedChannelKey = key;
+      }
       const channelV = savedChannelKey ? channels[savedChannelKey] : undefined;
       setSaved({
         global: globalKey != null,
