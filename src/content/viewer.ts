@@ -20,6 +20,7 @@ import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
 import { isLive } from "./live/detection.js";
 import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
 import { showBadgeNotice } from "./badge/overlay.js";
+import { LAUNCHER_TOP_LAYER_ATTR, listenerObjectOptions, listenerOptions } from "./lifecycle.js";
 
 export type ViewerFormat = "normal" | "theater";
 export const VIEWER_LAYOUT_EVENT = "vtp-viewer-layout";
@@ -145,7 +146,7 @@ try {
   /* ignore */
 }
 
-document.addEventListener(CLOSE_EVENT, () => exitViewer());
+document.addEventListener(CLOSE_EVENT, () => exitViewer(), listenerOptions());
 document.addEventListener(
   "keydown",
   (e) => {
@@ -160,7 +161,17 @@ document.addEventListener(
         target.isContentEditable)
     )
       return;
+    if (
+      S.keyboardEnabled &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.code === S.keymap.hold
+    )
+      return;
     if (e.key === "Escape") {
+      if (document.documentElement.hasAttribute(LAUNCHER_TOP_LAYER_ATTR)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       exitViewer();
@@ -199,7 +210,7 @@ document.addEventListener(
       showBadgeNotice(video.muted ? "Muted" : `Volume ${Math.round(next * 100)}%`);
     }
   },
-  true,
+  listenerOptions(true),
 );
 
 export function viewerFormat(): ViewerFormat | null {
@@ -354,16 +365,20 @@ function scheduleBackdropCanvas(): void {
   }, BACKDROP_CANVAS_MS);
 }
 
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    if (backdropCanvasTimer != null) {
-      clearTimeout(backdropCanvasTimer);
-      backdropCanvasTimer = null;
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (document.hidden) {
+      if (backdropCanvasTimer != null) {
+        clearTimeout(backdropCanvasTimer);
+        backdropCanvasTimer = null;
+      }
+    } else {
+      scheduleBackdropCanvas();
     }
-  } else {
-    scheduleBackdropCanvas();
-  }
-});
+  },
+  listenerOptions(),
+);
 
 function createBackdropVideoFallback(): HTMLVideoElement | null {
   if (!overlay || !backdropEl || !mirrorStream) return null;
@@ -1250,6 +1265,8 @@ function mountBar(): void {
     seeking = true;
   });
   seekEl.addEventListener("pointerup", () => (seeking = false));
+  seekEl.addEventListener("pointercancel", () => (seeking = false));
+  seekEl.addEventListener("lostpointercapture", () => (seeking = false));
   seekEl.addEventListener("input", () => {
     if (!video) return;
     const timeline = mediaTimeline(video);
@@ -1489,12 +1506,12 @@ function hookGlobal(): void {
       sizeVideo();
       notifyViewerLayout();
     },
-    { passive: true },
+    listenerOptions({ passive: true }),
   );
   // Real fullscreen supersedes the viewer — the two fight over the same video.
   addFullscreenChangeListener(() => {
     if (currentFullscreenElement()) exitViewer();
-  });
+  }, listenerObjectOptions());
 }
 
 // Media listeners + style enforcer for the adopted element. The shared
@@ -1644,7 +1661,7 @@ document.addEventListener(
     autoSeen.add(t);
     enter(S.viewerAuto, t, { mirrorOnly: true });
   },
-  true,
+  listenerOptions(true),
 );
 
 async function enter(

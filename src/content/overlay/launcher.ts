@@ -25,6 +25,8 @@ import {
   viewerLayoutPaused,
 } from "../viewer.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../../shared/glass.js";
+import { LAUNCHER_TOP_LAYER_ATTR, listenerObjectOptions, listenerOptions } from "../lifecycle.js";
+import { subscribePointerMove } from "../pointer.js";
 
 type Timer = ReturnType<typeof setTimeout>;
 
@@ -75,9 +77,6 @@ let frameScale = 1; // last fit-scale from layoutFrame, reused by the open anima
 let open = false;
 let hideTimer: Timer | undefined;
 let mouseHooked = false;
-let hoverRaf = 0;
-let hoverX = 0;
-let hoverY = 0;
 let fabVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let dragging = false;
 let moved = false;
@@ -94,6 +93,11 @@ let dragVideo: HTMLElement | null = null;
 let dragWasViewerOpen = false;
 let fabDragDrop: ((save?: boolean) => void) | null = null;
 let fabGlobalDragHooked = false;
+
+function syncTopLayerAttr(): void {
+  if (open || radialOpen) document.documentElement.setAttribute(LAUNCHER_TOP_LAYER_ATTR, "");
+  else document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
+}
 
 // True if a node belongs to our launcher — the media observer ignores our own
 // DOM writes so they don't feed back into applyAll (mirrors ownsBadgeNode).
@@ -247,8 +251,8 @@ function syncRadial(): void {
   rItems.exit.style.display = f ? "flex" : "none";
 }
 
-document.addEventListener("enterpictureinpicture", syncRadial, true);
-document.addEventListener("leavepictureinpicture", syncRadial, true);
+document.addEventListener("enterpictureinpicture", syncRadial, listenerOptions(true));
+document.addEventListener("leavepictureinpicture", syncRadial, listenerOptions(true));
 
 function toggleNativePiP(): void {
   const v = nativePiPVideo();
@@ -281,6 +285,7 @@ function openRadial(): void {
     radialOpen = false;
     clearTimeout(radialIdleTimer);
     snapRadialAtFab();
+    syncTopLayerAttr();
     return;
   }
   if (radialOpen) {
@@ -294,6 +299,7 @@ function openRadial(): void {
     return;
   }
   radialOpen = true;
+  syncTopLayerAttr();
   clearTimeout(radialIdleTimer);
   snapRadialAtFab(items);
   radialFrame = requestAnimationFrame(() => {
@@ -318,6 +324,7 @@ function openRadial(): void {
 // timeout itself, which would re-show the FAB it just hid.
 function closeRadial(resumeHide = false): void {
   radialOpen = false;
+  syncTopLayerAttr();
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
   clearTimeout(radialCloseTimer);
@@ -552,6 +559,7 @@ function openPopup(): void {
   shadow.append(frame);
   frame.style.display = "block";
   backdrop.style.display = "block"; // cached backdrop is hidden on close — re-show it
+  syncTopLayerAttr();
   layoutFrame();
   positionPanel();
   // Entrance: the panel scales up + fades in about its centre (the translate keeps
@@ -575,6 +583,7 @@ function closePopup(): void {
   fab?.setAttribute("aria-expanded", "false"); // morphs the icon ✕ → play
   if (frame) frame.style.display = "none";
   if (backdrop) backdrop.style.display = "none";
+  syncTopLayerAttr();
   flashFab(); // resume the auto-hide countdown
 }
 
@@ -609,11 +618,11 @@ function hookGlobalFabDrag(): void {
     if (dragPointerId == null || (e.pointerId ?? -1) !== dragPointerId) return;
     fabDragDrop?.(false);
   };
-  document.addEventListener("pointerup", finishFromOutside, true);
-  document.addEventListener("pointercancel", cancelFromOutside, true);
-  window.addEventListener("pointerup", finishFromOutside, true);
-  window.addEventListener("pointercancel", cancelFromOutside, true);
-  window.addEventListener("blur", () => fabDragDrop?.(false), true);
+  document.addEventListener("pointerup", finishFromOutside, listenerOptions(true));
+  document.addEventListener("pointercancel", cancelFromOutside, listenerOptions(true));
+  window.addEventListener("pointerup", finishFromOutside, listenerOptions(true));
+  window.addEventListener("pointercancel", cancelFromOutside, listenerOptions(true));
+  window.addEventListener("blur", () => fabDragDrop?.(false), listenerOptions(true));
 }
 
 // Drag anywhere over the video; a press without a drag toggles the popup. Mirrors
@@ -839,57 +848,51 @@ function radialButton(svg: string, label: string, onClick: () => void): HTMLButt
 function hookMouse(): void {
   if (mouseHooked) return;
   mouseHooked = true;
-  document.addEventListener(
-    "mousemove",
-    (e) => {
-      hoverX = e.clientX;
-      hoverY = e.clientY;
-      if (hoverRaf) return;
-      hoverRaf = requestAnimationFrame(() => {
-        hoverRaf = 0;
-        const v = fabVideo;
-        if (!eligible() || !fab || !v) return;
-        const r = v.getBoundingClientRect();
-        if (hoverX < r.left || hoverX > r.right || hoverY < r.top || hoverY > r.bottom) return;
-        // Self-heal here, not just on resize/viewer-layout events: a site player
-        // can resize/relayout its video for reasons we have no hook into (an ad,
-        // a quality switch, its own transition), silently leaving the button
-        // stuck over stale geometry until something else happens to trigger a
-        // reposition. Hovering the video is the one moment we know for certain
-        // the real, current rect is worth reading.
-        if (fabVideo !== v) return;
-        if (!dragging) positionFab(v);
-        flashFab();
-      });
-    },
-    { passive: true },
-  );
+  subscribePointerMove(({ x, y }) => {
+    const v = fabVideo;
+    if (!eligible() || !fab || !v) return;
+    const r = v.getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) return;
+    // Self-heal here, not just on resize/viewer-layout events: a site player
+    // can resize/relayout its video for reasons we have no hook into (an ad,
+    // a quality switch, its own transition), silently leaving the button
+    // stuck over stale geometry until something else happens to trigger a
+    // reposition. Hovering the video is the one moment we know for certain
+    // the real, current rect is worth reading.
+    if (fabVideo !== v) return;
+    if (!dragging) positionFab(v);
+    flashFab();
+  });
   // The embedded popup reports its content height (so the iframe grows like the
   // real popup) and asks to close on Escape. Only trust messages from our frame.
-  window.addEventListener("message", (e) => {
-    if (!frame || e.source !== frame.contentWindow) return;
-    const d = e.data as {
-      type?: string;
-      height?: number;
-      close?: boolean;
-      drag?: string;
-      sx?: number;
-      sy?: number;
-      moved?: boolean;
-    } | null;
-    if (!d || d.type !== "vtp-overlay") return;
-    if (d.close) closePopup();
-    else if (d.drag === "start" && typeof d.sx === "number" && typeof d.sy === "number")
-      panelDragStart(d.sx, d.sy);
-    else if (d.drag === "move" && typeof d.sx === "number" && typeof d.sy === "number")
-      panelDragMove(d.sx, d.sy);
-    else if (d.drag === "end") panelDragEnd(d.moved === true);
-    else if (d.drag === "reset") resetPanelPos();
-    else if (typeof d.height === "number" && d.height > 0) {
-      frameH = Math.round(d.height);
-      layoutFrame();
-    }
-  });
+  window.addEventListener(
+    "message",
+    (e) => {
+      if (!frame || e.source !== frame.contentWindow) return;
+      const d = e.data as {
+        type?: string;
+        height?: number;
+        close?: boolean;
+        drag?: string;
+        sx?: number;
+        sy?: number;
+        moved?: boolean;
+      } | null;
+      if (!d || d.type !== "vtp-overlay") return;
+      if (d.close) closePopup();
+      else if (d.drag === "start" && typeof d.sx === "number" && typeof d.sy === "number")
+        panelDragStart(d.sx, d.sy);
+      else if (d.drag === "move" && typeof d.sx === "number" && typeof d.sy === "number")
+        panelDragMove(d.sx, d.sy);
+      else if (d.drag === "end") panelDragEnd(d.moved === true);
+      else if (d.drag === "reset") resetPanelPos();
+      else if (typeof d.height === "number" && d.height > 0) {
+        frameH = Math.round(d.height);
+        layoutFrame();
+      }
+    },
+    listenerOptions(),
+  );
   // Esc with focus on the page (the in-iframe case is covered by the message above).
   document.addEventListener(
     "keydown",
@@ -901,7 +904,7 @@ function hookMouse(): void {
       if (open) closePopup();
       else closeRadial();
     },
-    true,
+    listenerOptions(true),
   );
   window.addEventListener(
     "resize",
@@ -912,13 +915,13 @@ function hookMouse(): void {
       }
       updateLauncher();
     },
-    { passive: true },
+    listenerOptions({ passive: true }),
   );
   addFullscreenChangeListener(() => {
     closeRadial();
     updateLauncher();
     if (eligible()) flashFab(); // surface it the moment fullscreen begins
-  });
+  }, listenerObjectOptions());
   document.addEventListener(
     "pointermove",
     (e) => {
@@ -926,18 +929,22 @@ function hookMouse(): void {
       if (ownsRadialEvent(e)) keepRadialOpen();
       else scheduleRadialClose();
     },
-    { passive: true, capture: true },
+    listenerOptions({ passive: true, capture: true }),
   );
   document.addEventListener(
     "pointerdown",
     (e) => {
       if (radialOpen && !ownsRadialEvent(e)) closeRadial(true);
     },
-    true,
+    listenerOptions(true),
   );
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) closeRadial();
-  });
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (document.hidden) closeRadial();
+    },
+    listenerOptions(),
+  );
 }
 
 // Keep the launcher's eligibility, parent and position fresh (called each tick +
@@ -954,6 +961,7 @@ function resetDetachedHost(): void {
   if (!host || host.isConnected) return;
   radialOpen = false;
   open = false;
+  syncTopLayerAttr();
   dragging = false;
   dragPointerId = null;
   clearTimeout(radialTimer);
@@ -1011,4 +1019,4 @@ export function updateLauncher(snapshot: { primary?: HTMLVideoElement | null } =
   if (open) flashFab(); // keep it up while the popup is showing
 }
 
-document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateLauncher());
+document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateLauncher(), listenerOptions());

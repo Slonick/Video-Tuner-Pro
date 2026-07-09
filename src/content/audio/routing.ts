@@ -4,6 +4,7 @@ import { alog } from "../platform/log.js";
 import { translationActive } from "./translation.js";
 import { applyAudioComp } from "./compressor.js";
 import type { AudioGraph } from "./types.js";
+import { listenerOptions } from "../lifecycle.js";
 
 let audioCtx: AudioContext | null = null;
 export const audioGraphs = new WeakMap<HTMLVideoElement, AudioGraph>();
@@ -93,8 +94,8 @@ export function hookAudioGesture(): void {
   const resume = () => {
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
   };
-  document.addEventListener("click", resume, { capture: true, passive: true });
-  document.addEventListener("keydown", resume, { capture: true, passive: true });
+  document.addEventListener("click", resume, listenerOptions({ capture: true, passive: true }));
+  document.addEventListener("keydown", resume, listenerOptions({ capture: true, passive: true }));
 }
 
 function ensureAudioCtx(): AudioContext | null {
@@ -110,10 +111,14 @@ function ensureAudioCtx(): AudioContext | null {
     hookAudioGesture();
     // A fresh context starts "suspended" until a user gesture. When it resumes,
     // (re)build the graphs we deferred while it was suspended.
-    ctx.addEventListener("statechange", () => {
-      alog("AudioContext state:", ctx.state);
-      if (ctx.state === "running") applyAudioComp();
-    });
+    ctx.addEventListener(
+      "statechange",
+      () => {
+        alog("AudioContext state:", ctx.state);
+        if (ctx.state === "running") applyAudioComp();
+      },
+      listenerOptions(),
+    );
     resumeAudioCtx();
   }
   return audioCtx;
@@ -171,7 +176,7 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   audioSkipReasons.delete(video);
   lastAudioSkip = null;
   // Routed audio goes silent if the context is suspended, so resume on play.
-  video.addEventListener("playing", resumeAudioCtx, { passive: true });
+  video.addEventListener("playing", resumeAudioCtx, listenerOptions({ passive: true }));
   alog("audio: compression graph engaged on a video");
   return g;
 }

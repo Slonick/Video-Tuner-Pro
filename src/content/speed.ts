@@ -18,6 +18,7 @@ import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { updateBadge } from "./badge/icon.js";
 import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
+import { listenerOptions } from "./lifecycle.js";
 
 type Done = (ok?: boolean) => void;
 
@@ -225,21 +226,21 @@ function applyToVideo(video: HTMLVideoElement, primaryLive: boolean): void {
     if (isLive(video)) return;
     setNonLiveVideoRate(video);
   };
-  video.addEventListener("play", reapply);
-  video.addEventListener("loadeddata", reapply);
-  video.addEventListener("ratechange", reapply);
+  video.addEventListener("play", reapply, listenerOptions());
+  video.addEventListener("loadeddata", reapply, listenerOptions());
+  video.addEventListener("ratechange", reapply, listenerOptions());
 
   // Track DVR (scrubbed-back) state first, so the live re-evaluation below sees
   // the fresh value; reset it when new content loads.
-  video.addEventListener("seeking", () => trackDvr(video));
-  video.addEventListener("timeupdate", () => trackDvr(video));
-  video.addEventListener("loadedmetadata", () => resetDvrFor(video));
+  video.addEventListener("seeking", () => trackDvr(video), listenerOptions());
+  video.addEventListener("timeupdate", () => trackDvr(video), listenerOptions());
+  video.addEventListener("loadedmetadata", () => resetDvrFor(video), listenerOptions());
 
   // Re-evaluate live state as the stream loads and as playback progresses.
   const reevaluateLive = () => controlLive();
-  video.addEventListener("durationchange", reevaluateLive);
-  video.addEventListener("loadedmetadata", reevaluateLive);
-  video.addEventListener("timeupdate", reevaluateLive);
+  video.addEventListener("durationchange", reevaluateLive, listenerOptions());
+  video.addEventListener("loadedmetadata", reevaluateLive, listenerOptions());
+  video.addEventListener("timeupdate", reevaluateLive, listenerOptions());
 }
 
 // <audio> never gets a badge, live-sync, or the compressor — just the rate.
@@ -248,9 +249,9 @@ function applyToAudio(audio: HTMLAudioElement): void {
   if (seenAudios.has(audio)) return;
   seenAudios.add(audio);
   const reapply = () => setMediaRate(audio);
-  audio.addEventListener("play", reapply);
-  audio.addEventListener("loadeddata", reapply);
-  audio.addEventListener("ratechange", reapply);
+  audio.addEventListener("play", reapply, listenerOptions());
+  audio.addEventListener("loadeddata", reapply, listenerOptions());
+  audio.addEventListener("ratechange", reapply, listenerOptions());
 }
 
 // Bridge the desired audio rate to the MAIN-world hook (audio-inject.ts), which

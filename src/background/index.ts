@@ -68,15 +68,38 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // …and it relays its content-script messages through here too (the embedded frame
   // can't call tabs.sendMessage). Forward to the host tab and pipe the reply back.
   if (msg && msg.action === "relayToTab" && typeof msg.tabId === "number") {
-    try {
-      api.tabs.sendMessage(msg.tabId, msg.msg, (resp: unknown) => {
-        void api.runtime.lastError; // absorb "no receiver"; the popup treats null as no-reply
-        try {
-          sendResponse(resp);
-        } catch (e) {
-          /* popup closed before the reply */
+    const tabId = msg.tabId;
+    const owner = badgeOwners.get(tabId);
+    const finish = (resp: unknown) => {
+      try {
+        sendResponse(resp);
+      } catch (e) {
+        /* popup closed before the reply */
+      }
+    };
+    const relay = (frameId?: number) => {
+      try {
+        const options = typeof frameId === "number" ? { frameId } : undefined;
+        api.tabs.sendMessage(tabId, msg.msg, options, (resp: unknown) => {
+          const failed = !!api.runtime.lastError || !resp;
+          if (failed && typeof frameId === "number") {
+            relay();
+            return;
+          }
+          // Absorb "no receiver"; the popup treats null as no-reply.
+          void api.runtime.lastError;
+          finish(resp);
+        });
+      } catch (e) {
+        if (typeof frameId === "number") {
+          relay();
+          return;
         }
-      });
+        finish(undefined);
+      }
+    };
+    try {
+      relay(owner);
     } catch (e) {
       try {
         sendResponse(undefined);

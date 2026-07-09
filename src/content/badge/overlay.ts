@@ -11,6 +11,8 @@ import { onStreamPage } from "../live/detection.js";
 import { catchupBufferLimited } from "../live/catchup.js";
 import { forwardBuffer, streamLatency } from "../live/metrics.js";
 import { BADGE_HOST_ID, mountBadge } from "./BadgeView.js";
+import { listenerOptions } from "../lifecycle.js";
+import { subscribePointerMove } from "../pointer.js";
 
 type Timer = ReturnType<typeof setTimeout>;
 
@@ -57,9 +59,6 @@ let badgeNoticeTimer: Timer | undefined;
 let badgeVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
 let badgeMoveHooked = false;
 let badgeUpdateFrame: number | null = null;
-let badgeHoverFrame: number | null = null;
-let badgeHoverX = 0;
-let badgeHoverY = 0;
 let dragging = false;
 let dragDX = 0,
   dragDY = 0;
@@ -230,7 +229,7 @@ function hookBadgeDrag(el: HTMLElement): void {
       if (pointerId == null || e.pointerId !== pointerId) return;
       drop();
     },
-    true,
+    listenerOptions(true),
   );
   document.addEventListener(
     "pointercancel",
@@ -238,9 +237,9 @@ function hookBadgeDrag(el: HTMLElement): void {
       if (pointerId == null || e.pointerId !== pointerId) return;
       drop(false);
     },
-    true,
+    listenerOptions(true),
   );
-  window.addEventListener("blur", () => drop(false), true);
+  window.addEventListener("blur", () => drop(false), listenerOptions(true));
   el.addEventListener("dblclick", (e) => {
     e.preventDefault();
     dragging = false;
@@ -316,33 +315,17 @@ export function showBadgeNotice(text: string): void {
 function hookBadgeMouse(): void {
   if (badgeMoveHooked) return;
   badgeMoveHooked = true;
-  document.addEventListener(
-    "mousemove",
-    (e) => {
-      badgeHoverX = e.clientX;
-      badgeHoverY = e.clientY;
-      if (badgeHoverFrame != null) return;
-      badgeHoverFrame = requestAnimationFrame(() => {
-        badgeHoverFrame = null;
-        const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
-        const bv = badgeVideo;
-        if (!enabled || !timeBadgeEl || !bv) return;
-        const r = bv.getBoundingClientRect();
-        if (
-          badgeHoverX < r.left ||
-          badgeHoverX > r.right ||
-          badgeHoverY < r.top ||
-          badgeHoverY > r.bottom
-        )
-          return;
-        // Only reveal the badge here — content is re-rendered by the 1s tick
-        // (updateTimeBadge). Rendering per mousemove made the continuous buffer
-        // value flicker at pointer-event rate.
-        flashBadge();
-      });
-    },
-    { passive: true },
-  );
+  subscribePointerMove(({ x, y }) => {
+    const enabled = onStreamPage() ? S.streamBadge : S.showRemaining;
+    const bv = badgeVideo;
+    if (!enabled || !timeBadgeEl || !bv) return;
+    const r = bv.getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) return;
+    // Only reveal the badge here — content is re-rendered by the 1s tick
+    // (updateTimeBadge). Rendering per mousemove made the continuous buffer
+    // value flicker at pointer-event rate.
+    flashBadge();
+  });
 }
 
 function scheduleTimeBadgeUpdate(): void {
@@ -416,6 +399,6 @@ export function updateTimeBadge(
   }
 }
 
-document.addEventListener(VIEWER_LAYOUT_EVENT, scheduleTimeBadgeUpdate);
-window.addEventListener("resize", scheduleTimeBadgeUpdate, { passive: true });
-window.addEventListener("scroll", scheduleTimeBadgeUpdate, { passive: true });
+document.addEventListener(VIEWER_LAYOUT_EVENT, scheduleTimeBadgeUpdate, listenerOptions());
+window.addEventListener("resize", scheduleTimeBadgeUpdate, listenerOptions({ passive: true }));
+window.addEventListener("scroll", scheduleTimeBadgeUpdate, listenerOptions({ passive: true }));

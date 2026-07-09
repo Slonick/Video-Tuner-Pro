@@ -30,6 +30,7 @@ import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
 import { applyResolvedViewerAutoFromStore } from "./viewer-auto.js";
 import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
+import { LAUNCHER_TOP_LAYER_ATTR, abortContentListeners, listenerOptions } from "./lifecycle.js";
 import {
   collectVideos,
   hasVideos,
@@ -85,6 +86,7 @@ let lastReconcileAt = 0;
 // tear itself down.)
 try {
   document.querySelectorAll("[data-vtp-badge],[data-vtp-launcher]").forEach((n) => n.remove());
+  document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
 } catch (e) {
   /* ignore */
 }
@@ -133,6 +135,8 @@ function syncAutoSlowSampler(): void {
 // The extension context dies on reload/update; shut down cleanly when it does.
 // Exported so live.js can call it without a circular value dependency.
 export function teardown() {
+  abortContentListeners();
+  document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
   stopTimers();
   stopTracking(); // disconnects the media-registry observer
 }
@@ -384,17 +388,21 @@ function scheduleMediaPass(flashBadgeAfterApply: boolean): void {
 
 // Don't burn CPU on hidden tabs: stop the timers in the background, restart (and
 // immediately catch up) when the tab is shown again.
-document.addEventListener("visibilitychange", () => {
-  if (!ctxValid()) {
-    teardown();
-    return;
-  }
-  if (document.hidden) stopTimers();
-  else {
-    tickInterval = TICK_MIN;
-    startTimers(true);
-  }
-});
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (!ctxValid()) {
+      teardown();
+      return;
+    }
+    if (document.hidden) stopTimers();
+    else {
+      tickInterval = TICK_MIN;
+      startTimers(true);
+    }
+  },
+  listenerOptions(),
+);
 
 if (!document.hidden) startTimers();
 
@@ -413,7 +421,7 @@ for (const ev of ["play", "loadedmetadata", "durationchange"]) {
       // it if needed; flashBadge reveals it and resumes the usual auto-hide.
       scheduleMediaPass(e.type === "play" || (!e.target.paused && !onStreamPage()));
     },
-    true,
+    listenerOptions(true),
   );
 }
 
@@ -426,7 +434,7 @@ document.addEventListener(
       updateLauncher();
     }
   },
-  true,
+  listenerOptions(true),
 );
 
 // Hard-capture mode (opt-in, default off): swallow the page's ratechange in the
@@ -444,7 +452,7 @@ document.addEventListener(
     if (!ctxValid()) return;
     reassertRate(t);
   },
-  true,
+  listenerOptions(true),
 );
 
 // Coalesce a re-apply into a single rAF pass — the registry calls this only when a
@@ -479,7 +487,7 @@ function startObserver() {
 if (document.documentElement) {
   startObserver();
 } else {
-  document.addEventListener("DOMContentLoaded", startObserver);
+  document.addEventListener("DOMContentLoaded", startObserver, listenerOptions());
 }
 
 // React instantly when settings change in the popup.

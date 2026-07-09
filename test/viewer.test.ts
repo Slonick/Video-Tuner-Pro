@@ -22,6 +22,7 @@ import {
   fmtTime,
   VIEWER_LAYOUT_EVENT,
 } from "../src/content/viewer.js";
+import { LAUNCHER_TOP_LAYER_ATTR } from "../src/content/lifecycle.js";
 
 // A controllable media element: play/pause flip `paused` and fire the real
 // events; currentTime/duration/videoWidth behave like a loaded 720p video.
@@ -508,6 +509,19 @@ describe("toggleViewer — lifecycle", () => {
     expect(viewerFormat()).toBeNull();
   });
 
+  it("lets the launcher top layer handle Escape before the viewer", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    document.documentElement.setAttribute(LAUNCHER_TOP_LAYER_ATTR, "");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    expect(viewerFormat()).toBe("normal");
+
+    document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    expect(viewerFormat()).toBeNull();
+  });
+
   it("entering real fullscreen exits the viewer", async () => {
     const { v } = makeVideo();
     h.primary = v;
@@ -571,6 +585,27 @@ describe("control bar", () => {
     expect(v.currentTime).toBe(50);
     v.dispatchEvent(new Event("timeupdate"));
     expect(barTime()).toBe("0:50 / 1:40");
+  });
+
+  it("resumes seek syncing after a cancelled pointer seek", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    const [seek] = barInputs();
+
+    v.currentTime = 50;
+    v.dispatchEvent(new Event("timeupdate"));
+    expect(seek.value).toBe("500");
+
+    seek.dispatchEvent(new Event("pointerdown"));
+    seek.value = "123";
+    v.currentTime = 80;
+    v.dispatchEvent(new Event("timeupdate"));
+    expect(seek.value).toBe("123");
+
+    seek.dispatchEvent(new Event("pointercancel"));
+    v.dispatchEvent(new Event("timeupdate"));
+    expect(seek.value).toBe("800");
   });
 
   it("arrow keys seek and adjust volume while the viewer is open", async () => {

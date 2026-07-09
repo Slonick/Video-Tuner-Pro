@@ -19,6 +19,7 @@ import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
 import { toggleViewer, viewerFormat } from "./viewer.js";
+import { listenerOptions } from "./lifecycle.js";
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
 function deepActive(): Element | null {
@@ -128,7 +129,7 @@ document.addEventListener(
     else if (e.code === slower) setSpeed(S.currentSpeed - step, false, true);
     else if (e.code === reset) resetToSaved();
   },
-  true,
+  listenerOptions(true),
 );
 
 function releaseHold(): void {
@@ -151,14 +152,14 @@ document.addEventListener(
     if (!S.holdActive || e.code !== S.keymap.hold) return;
     releaseHold();
   },
-  true,
+  listenerOptions(true),
 );
 
-window.addEventListener("blur", releaseHoldOnWindowBlur, true);
+window.addEventListener("blur", releaseHoldOnWindowBlur, listenerOptions(true));
 document.addEventListener(
   "visibilitychange",
   () => {
     if (document.hidden) releaseHold();
   },
-  true,
+  listenerOptions(true),
 );
