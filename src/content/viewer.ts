@@ -208,7 +208,12 @@ document.addEventListener(
       video.volume = next;
       video.muted = next === 0;
       syncVolume();
-      showBadgeNotice(video.muted ? "Muted" : `Volume ${Math.round(next * 100)}%`);
+      const pct = String(Math.round(next * 100));
+      showBadgeNotice(
+        video.muted
+          ? notice("viewerNoticeMuted", "Muted")
+          : notice("viewerNoticeVolume", `Volume ${pct}%`, pct),
+      );
     }
   },
   listenerOptions(true),
@@ -783,6 +788,8 @@ const FIT_LABEL: Record<ViewerFitMode, [string, string]> = {
   fill: ["viewerFitFill", "Stretch"],
 };
 const fitLabel = (m: ViewerFitMode) => i18n(FIT_LABEL[m][0]) || FIT_LABEL[m][1];
+const notice = (key: string, fallback: string, subs?: string | string[]) =>
+  i18n(key, subs) || fallback;
 
 export function viewerFitMode(): ViewerFitMode {
   return S.viewerFit;
@@ -791,7 +798,10 @@ export function viewerFitMode(): ViewerFitMode {
 export function setViewerFitMode(mode: unknown, notify = false): ViewerFitMode {
   S.viewerFit = normalizeViewerFit(mode);
   sizeVideo();
-  if (notify) showBadgeNotice(`Fit: ${fitLabel(S.viewerFit)}`);
+  if (notify) {
+    const label = fitLabel(S.viewerFit);
+    showBadgeNotice(notice("viewerNoticeFit", `Fit: ${label}`, label));
+  }
   return S.viewerFit;
 }
 
@@ -895,7 +905,11 @@ function setFormat(f: ViewerFormat): void {
   overlay?.focus({ preventScroll: true });
   notifyViewerState();
   notifyViewerLayout();
-  showBadgeNotice(f === "theater" ? "Theater" : "Viewer");
+  showBadgeNotice(
+    f === "theater"
+      ? notice("viewerNoticeTheater", "Theater")
+      : notice("viewerNoticeViewer", "Viewer"),
+  );
 }
 
 function setViewerCursor(hidden: boolean): void {
@@ -1128,7 +1142,7 @@ function renderQuality(state: QualityState): void {
       pendingQuality = opt;
       pendingQualityUntil = Date.now() + 12_000;
       if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(opt.label);
-      showBadgeNotice(`Quality: ${opt.label}`);
+      showBadgeNotice(notice("viewerNoticeQuality", `Quality: ${opt.label}`, opt.label));
       const next = await qualityRequest("vtp-quality-set", opt.id);
       pendingQuality = null;
       pendingQualityUntil = 0;
