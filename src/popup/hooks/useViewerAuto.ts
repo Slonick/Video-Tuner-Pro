@@ -59,6 +59,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
   const [enabled, setEnabledState] = useState(false);
   const modeRef = useRef<ViewerAutoMode>("off");
   const pageModeRef = useRef<ViewerAutoMode>("off");
+  const pageModeRequestId = useRef(0);
   const modeHoldUntil = useRef(0);
   const pageModeHoldUntil = useRef(0);
   const setMode = useCallback((next: ViewerAutoMode) => {
@@ -117,7 +118,9 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
       pageModeRef.current = mode;
       setPageModeState(mode);
       if (!hasTab) return;
+      const requestId = ++pageModeRequestId.current;
       void send<ViewerStateResponse>("setViewerState", { mode }).then((resp) => {
+        if (requestId !== pageModeRequestId.current) return;
         if (!resp || resp.success === false) {
           pageModeHoldUntil.current = 0;
           pageModeRef.current = previousPageMode;

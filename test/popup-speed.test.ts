@@ -635,6 +635,29 @@ describe("viewer auto-open scope control", () => {
     );
   });
 
+  it("ignores an older viewer-mode response after a newer pick", async () => {
+    await mountApp({
+      tab: YT,
+      replies: {
+        getViewerState: { mode: "normal" },
+        setViewerState: (msg: Record<string, unknown>) =>
+          msg.mode === "theater"
+            ? { __delayMs: 80, success: true, mode: "theater" }
+            : { success: true, mode: msg.mode },
+      },
+    });
+
+    pickViewerAuto("Theater");
+    await flush();
+    pickViewerAuto("Off");
+    await flush();
+    await wait(120);
+
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Off",
+    );
+  });
+
   it("still accepts page viewer events while a picked mode is waiting out stale replies", async () => {
     const { emitRuntimeMessage } = await mountApp({
       tab: YT,
