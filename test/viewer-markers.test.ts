@@ -109,4 +109,27 @@ describe("viewer marker hover", () => {
     expect(root.querySelector(".mark-chapter.active")).toBeTruthy();
     expect(root.querySelector(".mark-tip")?.textContent).toBe("Chapter 1");
   });
+
+  it("shows marker tooltips from keyboard seek focus and input", async () => {
+    h.primary = makeVideo();
+    toggleViewer("normal");
+    await flush();
+
+    const root = shadowRoot()!;
+    const seekWrap = root.querySelector(".seekwrap") as HTMLElement;
+    const seek = root.querySelector(".seek") as HTMLInputElement;
+    seekWrap.getBoundingClientRect = () =>
+      ({ left: 100, top: 0, width: 500, height: 16, right: 600, bottom: 16 }) as DOMRect;
+
+    seek.focus();
+    seek.value = "150";
+    seek.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(root.querySelector(".mark-seg")?.classList.contains("active")).toBe(true);
+    expect(root.querySelector(".mark-tip")?.classList.contains("show")).toBe(true);
+    expect(root.querySelector(".mark-tip")?.textContent).toBe("Sponsor");
+
+    seek.blur();
+    expect(root.querySelector(".mark-tip")?.classList.contains("show")).toBe(false);
+  });
 });

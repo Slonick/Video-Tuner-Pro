@@ -1426,6 +1426,8 @@ function mountBar(): void {
   marksEl.className = "marks";
   markerTipEl = document.createElement("div");
   markerTipEl.className = "mark-tip";
+  markerTipEl.id = "vtp-viewer-marker-tip";
+  markerTipEl.setAttribute("role", "tooltip");
   seekEl = document.createElement("input");
   seekEl.type = "range";
   seekEl.className = "seek";
@@ -1433,6 +1435,7 @@ function mountBar(): void {
   seekEl.max = "1000";
   seekEl.step = "1";
   seekEl.setAttribute("aria-label", i18n("viewerSeekAria") || "Seek");
+  seekEl.setAttribute("aria-describedby", markerTipEl.id);
   seekEl.addEventListener("pointerdown", () => {
     seeking = true;
   });
@@ -1445,7 +1448,10 @@ function mountBar(): void {
     if (timeline.kind !== "vod" && timeline.kind !== "dvr") return;
     video.currentTime = timeline.start + (Number(seekEl!.value) / 1000) * timeline.len;
     syncTime();
+    showMarkerAtSeek();
   });
+  seekEl.addEventListener("focus", showMarkerAtSeek);
+  seekEl.addEventListener("blur", clearMarkerHover);
   seekWrap.addEventListener("pointermove", showMarkerHover);
   seekWrap.addEventListener("pointerleave", clearMarkerHover);
   muteBtn = barButton(I_SOUND, I_MUTED, i18n("viewerMuteAria") || "Mute");
@@ -1594,14 +1600,8 @@ function resetMarkersForSource(): void {
     isYouTube() && Number.isFinite(video.duration) ? readYouTubeChapters(video.duration) : [];
 }
 
-function showMarkerHover(e: PointerEvent): void {
+function showMarkerAtTime(t: number, x: number): void {
   if (!seekWrapEl || !markerTipEl || !video) return;
-  const timeline = mediaTimeline(video);
-  if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
-  const r = seekWrapEl.getBoundingClientRect();
-  if (r.width <= 0) return;
-  const x = Math.min(r.width, Math.max(0, e.clientX - r.left));
-  const t = timeline.start + (x / r.width) * timeline.len;
   const next =
     markerRanges
       .filter((m) => t >= m.start && t <= m.end)
@@ -1618,6 +1618,26 @@ function showMarkerHover(e: PointerEvent): void {
   }
   markerTipEl.style.left = Math.round(clampMarkerFloatX(x, 80)) + "px";
   markerTipEl.classList.add("show");
+}
+
+function showMarkerAtSeek(): void {
+  if (!seekWrapEl || !seekEl || !video) return;
+  const timeline = mediaTimeline(video);
+  if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
+  const r = seekWrapEl.getBoundingClientRect();
+  if (r.width <= 0) return;
+  const ratio = Math.min(1, Math.max(0, Number(seekEl.value) / 1000));
+  showMarkerAtTime(timeline.start + ratio * timeline.len, ratio * r.width);
+}
+
+function showMarkerHover(e: PointerEvent): void {
+  if (!seekWrapEl || !video) return;
+  const timeline = mediaTimeline(video);
+  if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
+  const r = seekWrapEl.getBoundingClientRect();
+  if (r.width <= 0) return;
+  const x = Math.min(r.width, Math.max(0, e.clientX - r.left));
+  showMarkerAtTime(timeline.start + (x / r.width) * timeline.len, x);
 }
 
 async function loadMarkers(): Promise<void> {
