@@ -87,6 +87,7 @@ let marksLoaded = false; // duration arrived and the layer was populated
 let marksSourceKey = "";
 let markerRanges: MarkerRange[] = [];
 let activeMarker: MarkerRange | null = null;
+let seekWrapRect: DOMRect | null = null;
 // Chapters are read from the site player's own progress bar BEFORE the video
 // is adopted — YouTube tears its player UI down once the element leaves.
 let pendingChapters: { start: number; title: string }[] = [];
@@ -1056,6 +1057,7 @@ function syncTime(): void {
           : `${fmtTime(timeline.pos)} / ${fmtTime(timeline.len)}`;
   }
   if (timeline.kind !== prevTimelineKind || seekWrapEl?.style.display !== prevSeekDisplay) {
+    seekWrapRect = null;
     layoutBar();
   }
 }
@@ -1437,6 +1439,7 @@ function mountBar(): void {
   seekEl.setAttribute("aria-label", i18n("viewerSeekAria") || "Seek");
   seekEl.setAttribute("aria-describedby", markerTipEl.id);
   seekEl.addEventListener("pointerdown", () => {
+    seekWrapRect = null;
     seeking = true;
   });
   seekEl.addEventListener("pointerup", () => (seeking = false));
@@ -1452,6 +1455,9 @@ function mountBar(): void {
   });
   seekEl.addEventListener("focus", showMarkerAtSeek);
   seekEl.addEventListener("blur", clearMarkerHover);
+  seekWrap.addEventListener("pointerenter", () => {
+    seekWrapRect = null;
+  });
   seekWrap.addEventListener("pointermove", showMarkerHover);
   seekWrap.addEventListener("pointerleave", clearMarkerHover);
   muteBtn = barButton(I_SOUND, I_MUTED, i18n("viewerMuteAria") || "Mute");
@@ -1564,12 +1570,15 @@ function addMarkerRange(start: number, end: number, label: string, el: HTMLEleme
   markerRanges.push({ start, end, label, el });
 }
 
-function clampMarkerFloatX(x: number, width: number): number {
+function currentSeekWrapRect(): DOMRect | null {
+  if (!seekWrapEl) return null;
+  if (!seekWrapRect) seekWrapRect = seekWrapEl.getBoundingClientRect();
+  return seekWrapRect;
+}
+
+function clampMarkerFloatX(x: number, width: number, wrapWidth: number): number {
   const pad = width / 2 + 4;
-  return Math.min(
-    Math.max(x, pad),
-    Math.max(pad, (seekWrapEl?.getBoundingClientRect().width ?? 0) - pad),
-  );
+  return Math.min(Math.max(x, pad), Math.max(pad, wrapWidth - pad));
 }
 
 function clearMarkerHighlight(): void {
@@ -1580,6 +1589,7 @@ function clearMarkerHighlight(): void {
 
 function clearMarkerHover(): void {
   clearMarkerHighlight();
+  seekWrapRect = null;
 }
 
 function markerSourceKey(v: HTMLVideoElement): string {
@@ -1602,6 +1612,8 @@ function resetMarkersForSource(): void {
 
 function showMarkerAtTime(t: number, x: number): void {
   if (!seekWrapEl || !markerTipEl || !video) return;
+  const r = currentSeekWrapRect();
+  if (!r || r.width <= 0) return;
   const next =
     markerRanges
       .filter((m) => t >= m.start && t <= m.end)
@@ -1616,7 +1628,7 @@ function showMarkerAtTime(t: number, x: number): void {
     next.el.classList.add("active");
     markerTipEl.textContent = next.label;
   }
-  markerTipEl.style.left = Math.round(clampMarkerFloatX(x, 80)) + "px";
+  markerTipEl.style.left = Math.round(clampMarkerFloatX(x, 80, r.width)) + "px";
   markerTipEl.classList.add("show");
 }
 
@@ -1624,8 +1636,8 @@ function showMarkerAtSeek(): void {
   if (!seekWrapEl || !seekEl || !video) return;
   const timeline = mediaTimeline(video);
   if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
-  const r = seekWrapEl.getBoundingClientRect();
-  if (r.width <= 0) return;
+  const r = currentSeekWrapRect();
+  if (!r || r.width <= 0) return;
   const ratio = Math.min(1, Math.max(0, Number(seekEl.value) / 1000));
   showMarkerAtTime(timeline.start + ratio * timeline.len, ratio * r.width);
 }
@@ -1634,8 +1646,8 @@ function showMarkerHover(e: PointerEvent): void {
   if (!seekWrapEl || !video) return;
   const timeline = mediaTimeline(video);
   if ((timeline.kind !== "vod" && timeline.kind !== "dvr") || timeline.len <= 0) return;
-  const r = seekWrapEl.getBoundingClientRect();
-  if (r.width <= 0) return;
+  const r = currentSeekWrapRect();
+  if (!r || r.width <= 0) return;
   const x = Math.min(r.width, Math.max(0, e.clientX - r.left));
   showMarkerAtTime(timeline.start + (x / r.width) * timeline.len, x);
 }

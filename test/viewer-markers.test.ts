@@ -110,6 +110,28 @@ describe("viewer marker hover", () => {
     expect(root.querySelector(".mark-tip")?.textContent).toBe("Chapter 1");
   });
 
+  it("reuses the seek bar rect while hovering across markers", async () => {
+    h.primary = makeVideo();
+    toggleViewer("normal");
+    await flush();
+
+    const root = shadowRoot()!;
+    const seekWrap = root.querySelector(".seekwrap") as HTMLElement;
+    const measure = vi.fn(
+      () => ({ left: 100, top: 0, width: 500, height: 16, right: 600, bottom: 16 }) as DOMRect,
+    );
+    seekWrap.getBoundingClientRect = measure;
+
+    seekWrap.dispatchEvent(
+      new MouseEvent("pointermove", { clientX: 175, clientY: 8, bubbles: true }),
+    );
+    seekWrap.dispatchEvent(
+      new MouseEvent("pointermove", { clientX: 350, clientY: 8, bubbles: true }),
+    );
+
+    expect(measure).toHaveBeenCalledTimes(1);
+  });
+
   it("shows marker tooltips from keyboard seek focus and input", async () => {
     h.primary = makeVideo();
     toggleViewer("normal");
