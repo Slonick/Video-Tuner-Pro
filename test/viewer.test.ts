@@ -872,7 +872,7 @@ describe("control bar", () => {
     }
   });
 
-  it("a finite-duration live DVR stream uses the seekable window, not duration", async () => {
+  it("a finite-duration live stream ignores YouTube's seekable archive window at the live edge", async () => {
     document.documentElement.setAttribute("data-vtp-live", "1");
     const { v } = makeVideo(3922);
     v.currentTime = 368;
@@ -881,8 +881,9 @@ describe("control bar", () => {
     try {
       await openViewer("normal");
       const [seek] = barInputs();
-      expect((seek.parentElement as HTMLElement).style.display).toBe("flex");
-      expect(barTime()).toBe("6:08 / 8:00");
+      expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+      expect(seek.style.display).toBe("none");
+      expect(barTime()).toBe("LIVE");
     } finally {
       document.documentElement.removeAttribute("data-vtp-live");
     }
