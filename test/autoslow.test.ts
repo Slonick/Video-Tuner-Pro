@@ -80,6 +80,7 @@ beforeEach(() => {
   m.streamReads = 0;
   m.reapply.mockClear();
   m.graphs = new WeakMap();
+  m.ctx = { state: "running" };
 });
 
 afterEach(() => {
@@ -118,6 +119,18 @@ describe("autoSlowSample", () => {
     const { S } = await import("../src/content/state.js");
     S.autoSlowFactor = 0.5;
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
+
+    autoSlowSample();
+
+    expect(S.autoSlowFactor).toBe(1);
+    expect(m.reapply).toHaveBeenCalled();
+  });
+
+  it("releases the slowdown when the audio context is suspended", async () => {
+    const { autoSlowSample } = await loadAutoSlow();
+    const { S } = await import("../src/content/state.js");
+    S.autoSlowFactor = 0.5;
+    m.ctx = { state: "suspended" };
 
     autoSlowSample();
 

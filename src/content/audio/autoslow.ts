@@ -95,7 +95,10 @@ export function autoSlowSample(): void {
     return;
   }
   const ctx = audioContext();
-  if (!ctx || ctx.state !== "running") return;
+  if (!ctx || ctx.state !== "running") {
+    release();
+    return;
+  }
 
   const now = Date.now();
   const v = primaryForAutoSlow(now);

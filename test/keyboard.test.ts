@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   resetToSaved: vi.fn(),
   toggleViewer: vi.fn(),
   hasVideo: true,
+  viewerAnchor: null as HTMLElement | null,
   primaryCalls: 0,
   viewerFormat: null as string | null,
 }));
@@ -25,7 +26,7 @@ vi.mock("../src/content/viewer.js", () => ({
   toggleViewer: m.toggleViewer,
   exitViewer: vi.fn(),
   viewerFormat: () => m.viewerFormat,
-  viewerAnchorVideo: () => null,
+  viewerAnchorVideo: () => m.viewerAnchor,
 }));
 
 import { S } from "../src/content/state.js";
@@ -52,6 +53,7 @@ describe("keyboard shortcuts", () => {
     S.holdActive = false;
     S.holdPrev = 1.0;
     m.hasVideo = true;
+    m.viewerAnchor = null;
     m.primaryCalls = 0;
     m.viewerFormat = null;
     document.body.innerHTML = "";
@@ -128,6 +130,15 @@ describe("keyboard shortcuts", () => {
     m.hasVideo = false;
     press("KeyD");
     expect(m.setSpeed).not.toHaveBeenCalled();
+  });
+
+  it("keeps speed shortcuts alive for an adopted viewer video", () => {
+    m.hasVideo = false;
+    m.viewerAnchor = document.createElement("video");
+
+    press("KeyD");
+
+    expect(m.setSpeed).toHaveBeenCalledWith(expect.closeTo(1.05), false, true);
   });
 
   it("V pops the video out in the normal format", () => {

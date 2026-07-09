@@ -62,13 +62,21 @@ function reset(tabId?: number): void {
 
 function probeVideoFrame(): VideoFrameProbe {
   const videos = Array.from(document.querySelectorAll("video"));
-  let best = 0;
+  const candidates: Array<{ area: number; paused: boolean }> = [];
+  let largestArea = 0;
   for (const video of videos) {
     const rect = video.getBoundingClientRect();
-    const area = Math.max(0, rect.width) * Math.max(0, rect.height);
     const ready = video.readyState > 0 || !!video.currentSrc || !!video.src;
-    if (!ready && area <= 1) continue;
-    const score = area + (video.paused ? 0 : 1_000_000_000) + (ready ? 10_000 : 0);
+    if (!ready || rect.width < 40 || rect.height < 40) continue;
+    const area = rect.width * rect.height;
+    candidates.push({ area, paused: video.paused });
+    if (area > largestArea) largestArea = area;
+  }
+  const viableArea = largestArea * 0.25;
+  let best = 0;
+  for (const candidate of candidates) {
+    const score =
+      (candidate.area >= viableArea && !candidate.paused ? largestArea : 0) + candidate.area;
     if (score > best) best = score;
   }
   return { hasVideo: best > 0, score: best };
@@ -84,33 +92,42 @@ function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
     done(undefined);
     return;
   }
-  call(() =>
-    api.scripting.executeScript(
+  let settled = false;
+  const finish = (results?: Array<{ frameId?: number; result?: VideoFrameProbe }>) => {
+    if (settled) return;
+    settled = true;
+    void api.runtime.lastError;
+    let best: { frameId: number; score: number } | null = null;
+    for (const entry of results || []) {
+      const frameId = entry.frameId;
+      const score = entry.result?.score || 0;
+      if (!entry.result?.hasVideo || typeof frameId !== "number") continue;
+      if (!best || score > best.score) best = { frameId, score };
+    }
+    if (best) {
+      videoFrameOwners.set(tabId, {
+        frameId: best.frameId,
+        expires: Date.now() + VIDEO_FRAME_CACHE_MS,
+      });
+    } else {
+      videoFrameOwners.delete(tabId);
+    }
+    done(best?.frameId);
+  };
+  try {
+    const result = api.scripting.executeScript(
       {
         target: { tabId, allFrames: true },
         func: probeVideoFrame,
       },
-      (results?: Array<{ frameId?: number; result?: VideoFrameProbe }>) => {
-        void api.runtime.lastError;
-        let best: { frameId: number; score: number } | null = null;
-        for (const entry of results || []) {
-          const frameId = entry.frameId;
-          const score = entry.result?.score || 0;
-          if (!entry.result?.hasVideo || typeof frameId !== "number") continue;
-          if (!best || score > best.score) best = { frameId, score };
-        }
-        if (best) {
-          videoFrameOwners.set(tabId, {
-            frameId: best.frameId,
-            expires: Date.now() + VIDEO_FRAME_CACHE_MS,
-          });
-        } else {
-          videoFrameOwners.delete(tabId);
-        }
-        done(best?.frameId);
-      },
-    ),
-  );
+      finish,
+    ) as unknown as Promise<Array<{ frameId?: number; result?: VideoFrameProbe }>> | undefined;
+    if (result && typeof result.then === "function") {
+      void result.then(finish, () => finish());
+    }
+  } catch (e) {
+    finish();
+  }
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {

@@ -136,6 +136,13 @@ function replySaved(sendResponse: (response?: unknown) => void, extra?: Record<s
 
 api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "setSpeed") {
+    if (typeof request.speed !== "number" || !Number.isFinite(request.speed)) {
+      return replyFromVideoFrame(sendResponse, () => ({
+        success: false,
+        speed: S.currentSpeed,
+        live: onStreamPage(),
+      }));
+    }
     // Every frame applies it; only the video frame answers.
     setSpeed(request.speed, false, true);
     return replyFromVideoFrame(sendResponse, () => ({

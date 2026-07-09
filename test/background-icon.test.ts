@@ -14,7 +14,11 @@ const h = vi.hoisted(() => ({
   icons: [] as unknown[],
   tabMessages: [] as unknown[],
   scriptCalls: [] as unknown[],
-  probeResults: [] as Array<{ frameId?: number; result?: { hasVideo?: boolean; score?: number } }>,
+  probeResults: [] as Array<{
+    frameId?: number;
+    result?: { hasVideo?: boolean; score?: number };
+  }> | null,
+  promiseProbe: false,
 }));
 
 vi.mock("../src/shared/store.js", () => ({
@@ -56,6 +60,7 @@ describe("background toolbar badge frame ownership", () => {
     h.tabMessages = [];
     h.scriptCalls = [];
     h.probeResults = [{ frameId: 4, result: { hasVideo: true, score: 100 } }];
+    h.promiseProbe = false;
     (globalThis as unknown as { browser?: unknown }).browser = undefined;
     (globalThis as unknown as { chrome: unknown }).chrome = {
       runtime: {
@@ -110,7 +115,16 @@ describe("background toolbar badge frame ownership", () => {
       scripting: {
         executeScript(args: unknown, cb: (results?: typeof h.probeResults) => void) {
           h.scriptCalls.push(args);
-          cb(h.probeResults);
+          const results =
+            h.probeResults ??
+            ([
+              {
+                frameId: 4,
+                result: (args as { func: () => { hasVideo?: boolean; score?: number } }).func(),
+              },
+            ] as typeof h.probeResults);
+          if (h.promiseProbe) return Promise.resolve(results);
+          cb(results);
         },
       },
       alarms: {
@@ -186,6 +200,47 @@ describe("background toolbar badge frame ownership", () => {
     ]);
     expect(response).toEqual({ ok: true, action: "getMonitor", frameId: 7 });
     expect(h.scriptCalls).toHaveLength(1);
+  });
+
+  it("scores video frames like the content primary-video picker", async () => {
+    let response: unknown;
+    h.probeResults = null;
+    h.promiseProbe = true;
+    const tinyPlaying = {
+      readyState: 1,
+      paused: false,
+      currentSrc: "",
+      src: "",
+      getBoundingClientRect: () => ({ width: 20, height: 20 }),
+    };
+    const largePaused = {
+      readyState: 1,
+      paused: true,
+      currentSrc: "",
+      src: "",
+      getBoundingClientRect: () => ({ width: 1000, height: 600 }),
+    };
+    (globalThis as unknown as { document: unknown }).document = {
+      querySelectorAll: () => [tinyPlaying, largePaused],
+    };
+
+    try {
+      h.listener!(
+        { action: "relayToTab", tabId: 13, msg: { action: "getMonitor" }, route: "video" },
+        {},
+        (r) => {
+          response = r;
+        },
+      );
+      await Promise.resolve();
+
+      expect(h.tabMessages).toEqual([
+        { tabId: 13, msg: { action: "getMonitor" }, options: { frameId: 4 } },
+      ]);
+      expect(response).toEqual({ ok: true, action: "getMonitor", frameId: 4 });
+    } finally {
+      delete (globalThis as unknown as { document?: unknown }).document;
+    }
   });
 
   it("keeps using the badge owner for non-video relays", () => {

@@ -160,6 +160,16 @@ describe("setSpeed action", () => {
     expect(called).toBe(true);
     expect(resp).toEqual({ success: true, speed: 1.5, live: false });
   });
+
+  it("rejects invalid speed payloads without corrupting the current speed", () => {
+    S.currentSpeed = 1.25;
+    const { ret, resp, called } = send({ action: "setSpeed", speed: "fast" });
+
+    expect(speed.setSpeed).not.toHaveBeenCalled();
+    expect(ret).toBe(true);
+    expect(called).toBe(true);
+    expect(resp).toEqual({ success: false, speed: 1.25, live: false });
+  });
 });
 
 describe("remember / reset by scope", () => {

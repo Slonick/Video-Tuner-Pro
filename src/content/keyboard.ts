@@ -18,7 +18,7 @@ import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
-import { toggleViewer, viewerFormat } from "./viewer.js";
+import { toggleViewer, viewerAnchorVideo, viewerFormat } from "./viewer.js";
 import { listenerOptions } from "./lifecycle.js";
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
@@ -86,7 +86,7 @@ document.addEventListener(
     if (typingIn(target) || typingIn(deepActive())) return;
     const viewerAction = e.code === viewer || e.code === theater;
     if (viewerAction && !S.viewerAutoEnabled) return;
-    if (!primaryVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
+    if (!primaryVideo() && !viewerAnchorVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
 
     e.preventDefault();
     if (preset !== undefined) {
