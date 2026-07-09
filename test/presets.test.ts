@@ -17,6 +17,7 @@ import {
   formatChord,
   parseChord,
   eventChord,
+  eventMatchesChord,
   eventMatchesSpec,
   actionConflictsWithSpec,
   chordLabel,
@@ -211,6 +212,12 @@ describe("key chords", () => {
     expect(eventMatchesSpec("M+KeyG", ev("KeyG", { [SECONDARY]: true }))).toBe(false);
     expect(eventMatchesSpec("KeyG", ev("KeyG", { [SECONDARY]: true }))).toBe(false);
     expect(eventMatchesSpec(null, ev("KeyG"))).toBe(false);
+  });
+  it("eventMatchesChord reuses a parsed chord without reparsing the stored spec", () => {
+    const chord = parseChord("S+Digit1");
+    expect(eventMatchesChord(chord, ev("Digit1", { shiftKey: true }))).toBe(true);
+    expect(eventMatchesChord(chord, ev("Digit1"))).toBe(false);
+    expect(eventMatchesChord(null, ev("Digit1", { shiftKey: true }))).toBe(false);
   });
   it("detects preset/action conflicts without shadowing shifted speed-step chords", () => {
     expect(actionConflictsWithSpec("slower", "KeyA", "S+KeyA")).toBe(false);

@@ -129,18 +129,21 @@ export function eventChord(e: KeyboardEvent): KeyChord | null {
   return { code: e.code, shift: e.shiftKey, mod: primaryMod(e), alt: e.altKey };
 }
 
-// Does a stored spec match this event on the running platform (code + Shift + the
-// platform's primary modifier + Alt; the secondary modifier must be released)?
-export function eventMatchesSpec(spec: string | null, e: KeyboardEvent): boolean {
-  if (!spec || secondaryMod(e)) return false;
-  const c = parseChord(spec);
+export function eventMatchesChord(c: KeyChord | null, e: KeyboardEvent): boolean {
   return (
     !!c &&
+    !secondaryMod(e) &&
     c.code === e.code &&
     c.shift === e.shiftKey &&
     c.mod === primaryMod(e) &&
     c.alt === e.altKey
   );
+}
+
+// Does a stored spec match this event on the running platform (code + Shift + the
+// platform's primary modifier + Alt; the secondary modifier must be released)?
+export function eventMatchesSpec(spec: string | null, e: KeyboardEvent): boolean {
+  return eventMatchesChord(parseChord(spec), e);
 }
 
 export function actionConflictsWithChord(

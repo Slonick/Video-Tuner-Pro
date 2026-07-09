@@ -13,13 +13,29 @@
 // through setSpeed's `manual` flag, so a live stream at the live edge safely
 // ignores them.
 import { S } from "./state.js";
-import { eventMatchesSpec } from "../shared/keymap.js";
+import { eventMatchesChord, parseChord, type KeyChord } from "../shared/keymap.js";
 import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
 import { toggleViewer, viewerAnchorVideo, viewerFormat } from "./viewer.js";
 import { listenerOptions } from "./lifecycle.js";
+
+let cachedPresetKeys: (string | null)[] | null = null;
+let cachedPresetChords: (KeyChord | null)[] = [];
+
+function presetChords(): (KeyChord | null)[] {
+  if (
+    cachedPresetKeys &&
+    cachedPresetKeys.length === S.presetKeys.length &&
+    cachedPresetKeys.every((key, i) => key === S.presetKeys[i])
+  ) {
+    return cachedPresetChords;
+  }
+  cachedPresetKeys = [...S.presetKeys];
+  cachedPresetChords = S.presetKeys.map((key) => parseChord(key));
+  return cachedPresetChords;
+}
 
 // The focused element, piercing open shadow roots — some sites host inputs there.
 function deepActive(): Element | null {
@@ -58,8 +74,9 @@ document.addEventListener(
     if (oneShotRepeat) return;
     // A preset whose assigned chord matches this exact event (may use modifiers).
     let preset: number | undefined;
-    for (let i = 0; i < S.presetKeys.length; i++) {
-      if (eventMatchesSpec(S.presetKeys[i], e)) {
+    const chords = presetChords();
+    for (let i = 0; i < chords.length; i++) {
+      if (eventMatchesChord(chords[i], e)) {
         preset = S.presets[i];
         break;
       }
