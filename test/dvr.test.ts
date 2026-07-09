@@ -36,6 +36,7 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-vtp-live");
+    document.documentElement.removeAttribute("data-vtp-latency");
     document.body.innerHTML = "";
   });
 
@@ -70,6 +71,18 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     document.body.appendChild(video);
     trackDvr(setTime(video, 1000));
     expect(isLive(video)).toBe(true);
+  });
+
+  it("a low player latency clears a false DVR state after a MediaSource reset", () => {
+    const video = setBadge(false);
+    trackDvr(setTime(video, 3600));
+    trackDvr(setTime(video, 8));
+    expect(isLive(video)).toBe(false);
+
+    document.documentElement.setAttribute("data-vtp-latency", "1.7");
+
+    expect(isLive(video)).toBe(true);
+    expect(onStreamPage()).toBe(true);
   });
 
   it("a temporary mid-roll live-flag loss does not erase DVR mode", () => {

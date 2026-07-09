@@ -19,6 +19,15 @@ function makeYoutubePlayer(width: number, height: number, live: boolean): HTMLEl
   return player;
 }
 
+function setYoutubePlayerResponse(
+  player: HTMLElement,
+  details: { videoId: string; isLive?: boolean; isLiveContent?: boolean },
+): void {
+  (player as HTMLElement & { getPlayerResponse?: () => unknown }).getPlayerResponse = () => ({
+    videoDetails: details,
+  });
+}
+
 async function loadInject(): Promise<void> {
   (
     window as typeof window & { __vtpLatencyBridgeCleanup?: () => void }
@@ -42,6 +51,7 @@ beforeEach(() => {
   document.body.innerHTML = "";
   document.documentElement.removeAttribute("data-vtp-live");
   document.documentElement.removeAttribute("data-vtp-latency");
+  delete (window as typeof window & { ytInitialPlayerResponse?: unknown }).ytInitialPlayerResponse;
 });
 
 afterEach(() => {
@@ -65,6 +75,63 @@ describe("MAIN-world live probe", () => {
     await loadInject();
 
     expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("uses the current YouTube player response when getVideoData reports false", async () => {
+    const player = makeYoutubePlayer(640, 360, false);
+    (player as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "jCV9cOM77iE",
+    });
+    setYoutubePlayerResponse(player, {
+      videoId: "jCV9cOM77iE",
+      isLive: true,
+      isLiveContent: true,
+    });
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("uses a matching YouTube initial response when the player response API is absent", async () => {
+    const player = makeYoutubePlayer(640, 360, false);
+    (player as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "jCV9cOM77iE",
+    });
+    (
+      window as typeof window & {
+        ytInitialPlayerResponse?: unknown;
+      }
+    ).ytInitialPlayerResponse = {
+      videoDetails: {
+        videoId: "jCV9cOM77iE",
+        isLive: true,
+        isLiveContent: true,
+      },
+    };
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+  });
+
+  it("ignores a stale YouTube response from a different video", async () => {
+    const player = makeYoutubePlayer(640, 360, false);
+    (player as HTMLElement & { getVideoData: () => unknown }).getVideoData = () => ({
+      isLive: false,
+      video_id: "current-video",
+    });
+    setYoutubePlayerResponse(player, {
+      videoId: "stale-live-video",
+      isLive: true,
+      isLiveContent: true,
+    });
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("0");
   });
 
   it("does not publish YouTube live state outside YouTube hosts", async () => {

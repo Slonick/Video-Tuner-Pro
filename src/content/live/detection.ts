@@ -25,7 +25,22 @@ let dvrState = new WeakMap<HTMLVideoElement, DvrState>();
 
 function dvrActive(video: HTMLVideoElement): boolean {
   const state = dvrState.get(video);
+  if (state?.active && publishedAtLiveHead()) {
+    state.active = false;
+    dvrSeenAt = 0;
+  }
   return !!state && state.generation === dvrGeneration && state.active;
+}
+
+// YouTube's media timeline can jump backwards by about an hour while it replaces
+// the MediaSource at startup or after a quality change. The MAIN-world bridge
+// publishes the player's actual broadcaster latency, which distinguishes that
+// technical reset from a viewer who really scrubbed back into DVR.
+function publishedAtLiveHead(): boolean {
+  const raw = document.documentElement.getAttribute("data-vtp-latency");
+  if (raw == null) return false;
+  const latency = Number(raw);
+  return Number.isFinite(latency) && latency >= 0 && latency <= 15;
 }
 
 // Drive DVR detection from a live <video>'s timeupdate/seeking events. A backward
@@ -51,7 +66,7 @@ export function trackDvr(video: HTMLVideoElement): void {
     document.querySelector(".html5-video-player") ||
     document;
   const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
-  if (badge && badge.classList.contains("ytp-live-badge-is-livehead")) {
+  if (publishedAtLiveHead() || (badge && badge.classList.contains("ytp-live-badge-is-livehead"))) {
     state.active = false;
     dvrSeenAt = 0;
   } else if (state.lastMediaTime && t < state.lastMediaTime - 3) {

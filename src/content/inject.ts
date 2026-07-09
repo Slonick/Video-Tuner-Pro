@@ -12,11 +12,12 @@
 // internals, so we describe narrow shapes for exactly the fields we read.
 (function () {
   "use strict";
-  const BRIDGE_VERSION = "2026-07-07-active-bridge";
+  const BRIDGE_VERSION = "2026-07-09-youtube-live-response";
   const win = window as typeof window & {
     __vtpLatencyBridgeInstalled?: boolean | string;
     __vtpLatencyBridgeCleanup?: () => void;
     __vtpQualityHls?: Array<{ hls: HlsLike; video?: HTMLVideoElement | null }>;
+    ytInitialPlayerResponse?: YouTubePlayerResponse | null;
   };
   if (win.__vtpLatencyBridgeInstalled === BRIDGE_VERSION) return;
   try {
@@ -59,8 +60,21 @@
     attachMedia?: unknown;
     recoverMediaError?: unknown;
   }
+  interface YouTubeVideoDetails {
+    videoId?: unknown;
+    isLive?: unknown;
+    isLiveContent?: unknown;
+  }
+  interface YouTubePlayerResponse {
+    videoDetails?: YouTubeVideoDetails | null;
+  }
   interface YouTubePlayer extends HTMLElement {
-    getVideoData?: () => { isLive?: unknown } | null;
+    getVideoData?: () => {
+      isLive?: unknown;
+      video_id?: unknown;
+      videoId?: unknown;
+    } | null;
+    getPlayerResponse?: () => YouTubePlayerResponse | null;
     getStatsForNerds?: () => Record<string, unknown> | null;
     getProgressState?: () => { seekableEnd?: number; current?: number } | null;
     getPlayerState?: () => number;
@@ -322,6 +336,37 @@
     return null;
   }
 
+  function youtubeResponseLive(
+    yp: YouTubePlayer,
+    videoData: ReturnType<NonNullable<YouTubePlayer["getVideoData"]>>,
+  ): boolean | null {
+    let response: YouTubePlayerResponse | null = null;
+    let playerResponse = false;
+    try {
+      if (typeof yp.getPlayerResponse === "function") {
+        response = yp.getPlayerResponse();
+        playerResponse = !!response;
+      }
+    } catch (e) {
+      /* fall through to the page's current initial response */
+    }
+    if (!response) response = win.ytInitialPlayerResponse || null;
+    const details = response?.videoDetails;
+    if (!details) return null;
+
+    const playerId = videoData?.video_id ?? videoData?.videoId;
+    const responseId = details.videoId;
+    if (!playerResponse && (typeof playerId !== "string" || typeof responseId !== "string")) {
+      return null;
+    }
+    if (typeof playerId === "string" && typeof responseId === "string" && playerId !== responseId) {
+      return null;
+    }
+    if (details.isLive === true || details.isLiveContent === true) return true;
+    if (details.isLive === false || details.isLiveContent === false) return false;
+    return null;
+  }
+
   // The player's own live flag (getVideoData().isLive) — authoritative when
   // present, null when unknown. Published to LIVE_ATTR so the isolated script's
   // detection doesn't have to rely on CSS-class heuristics.
@@ -335,8 +380,9 @@
       if (yp.classList.contains("ad-showing") || yp.classList.contains("ad-interrupting"))
         return null;
       const vd = yp.getVideoData();
-      if (!vd || typeof vd.isLive !== "boolean") return null;
-      if (vd.isLive) return true;
+      const responseLive = youtubeResponseLive(yp, vd);
+      if (vd?.isLive === true || responseLive === true) return true;
+      if (vd?.isLive !== false && responseLive !== false) return null;
       const st = typeof yp.getPlayerState === "function" ? yp.getPlayerState() : null;
       return st === 1 || st === 2 || st === 3 ? false : null; // playing/paused/buffering
     } catch (e) {
