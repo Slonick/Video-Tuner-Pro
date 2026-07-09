@@ -8,6 +8,7 @@ import { listenerOptions } from "../lifecycle.js";
 
 let audioCtx: AudioContext | null = null;
 export const audioGraphs = new WeakMap<HTMLVideoElement, AudioGraph>();
+let audioGraphCount = 0;
 const audioSkipped = new WeakSet<HTMLVideoElement>(); // videos we must not route (CORS-risk / already wired)
 const audioSkipReasons = new WeakMap<HTMLVideoElement, string>();
 let audioGestureHooked = false;
@@ -16,6 +17,9 @@ let lastNotRoutableLog: string | null = null; // throttles the "not routable yet
 
 export function audioContext(): AudioContext | null {
   return audioCtx;
+}
+export function hasAudioGraphs(): boolean {
+  return audioGraphCount > 0;
 }
 export function lastSkip(video?: HTMLVideoElement | null): string | null {
   return video ? (audioSkipReasons.get(video) ?? null) : lastAudioSkip;
@@ -173,6 +177,7 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   source.connect(analyserIn);
   const g: AudioGraph = { source, comp, gain, analyserIn };
   audioGraphs.set(video, g);
+  audioGraphCount += 1;
   audioSkipReasons.delete(video);
   lastAudioSkip = null;
   // Routed audio goes silent if the context is suspended, so resume on play.

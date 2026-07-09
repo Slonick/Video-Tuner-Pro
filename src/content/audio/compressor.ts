@@ -8,6 +8,7 @@ import {
   audioContext,
   audioGraphs,
   graphForCurrentSource,
+  hasAudioGraphs,
   setupGraph,
   hookAudioGesture,
   resumeAudioCtx,
@@ -58,6 +59,9 @@ export function applyAudioComp(
   skipped: number;
   reason: string | null;
 } {
+  if (!S.audioCompEnabled && !S.autoSlowEnabled && !hasAudioGraphs()) {
+    return { engaged: 0, skipped: 0, reason: null };
+  }
   const list = videos || collectVideos();
   const main = primary !== undefined ? primary : primaryVideo();
   let engaged = 0,

@@ -10,6 +10,8 @@ const m = vi.hoisted(() => {
     primary: null as unknown,
     list: [] as unknown[],
     graphs: new Map<unknown, unknown>(),
+    collectVideos: vi.fn(),
+    primaryVideo: vi.fn(),
     setupGraph: vi.fn(),
     routable: true,
     lastSkipVal: null as string | null,
@@ -25,13 +27,14 @@ vi.mock("../src/content/live/detection.js", () => ({
   isLive: () => false,
 }));
 vi.mock("../src/content/videos.js", () => ({
-  collectVideos: () => m.list,
-  primaryVideo: () => m.primary,
+  collectVideos: m.collectVideos,
+  primaryVideo: m.primaryVideo,
 }));
 vi.mock("../src/content/audio/routing.js", () => ({
   audioContext: () => ({ currentTime: 0 }),
   audioGraphs: m.graphs,
   graphForCurrentSource: (v: unknown) => (m.routable ? (m.graphs.get(v) ?? null) : null),
+  hasAudioGraphs: () => m.graphs.size > 0,
   setupGraph: m.setupGraph,
   hookAudioGesture: vi.fn(),
   resumeAudioCtx: vi.fn(),
@@ -65,6 +68,8 @@ describe("applyAudioComp param mapping", () => {
     m.compOn = true;
     m.lastSkipVal = null;
     m.lastSkipByVideo.clear();
+    m.collectVideos.mockImplementation(() => m.list);
+    m.primaryVideo.mockImplementation(() => m.primary);
     m.routable = true;
     S.audioCompEnabled = true;
     S.audioCompThreshold = -40;
@@ -180,6 +185,8 @@ describe("applyAudioComp routing decisions", () => {
     m.compOn = true;
     m.lastSkipVal = null;
     m.lastSkipByVideo.clear();
+    m.collectVideos.mockImplementation(() => m.list);
+    m.primaryVideo.mockImplementation(() => m.primary);
     m.setupGraph.mockReset();
     m.routable = true;
     m.stream = false;
@@ -197,6 +204,20 @@ describe("applyAudioComp routing decisions", () => {
 
     const res = applyAudioComp();
     expect(res.engaged).toBe(0); // nothing engaged — no createMediaElementSource
+    expect(m.setupGraph).not.toHaveBeenCalled();
+  });
+
+  it("OFF with no existing graph: skips the idle video scan entirely", () => {
+    S.audioCompEnabled = false;
+    S.autoSlowEnabled = false;
+    m.collectVideos.mockClear();
+    m.primaryVideo.mockClear();
+
+    const res = applyAudioComp();
+
+    expect(res).toEqual({ engaged: 0, skipped: 0, reason: null });
+    expect(m.collectVideos).not.toHaveBeenCalled();
+    expect(m.primaryVideo).not.toHaveBeenCalled();
     expect(m.setupGraph).not.toHaveBeenCalled();
   });
 
