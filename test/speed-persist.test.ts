@@ -34,7 +34,7 @@ vi.mock("../src/content/live/detection.js", () => ({
   probeLive: vi.fn(),
   onStreamPage: () => h_onStream(),
   trackDvr: vi.fn(),
-  resetDvr: vi.fn(),
+  resetDvrFor: vi.fn(),
 }));
 vi.mock("../src/content/live/sync.js", () => ({ controlLive: vi.fn() }));
 vi.mock("../src/content/audio/compressor.js", () => ({ applyAudioComp: vi.fn() }));
@@ -57,7 +57,6 @@ import {
   resetToSaved,
   setSpeed,
   applyAll,
-  effectiveSpeed,
   reassertRate,
 } from "../src/content/speed.js";
 
@@ -394,20 +393,11 @@ describe("applyToVideo (via applyAll)", () => {
   });
 });
 
-describe("effectiveSpeed + reassertRate", () => {
+describe("reassertRate", () => {
   afterEach(() => {
     S.autoSlowEnabled = false;
     S.audioSpeedEnabled = false;
     h.live = false;
-  });
-
-  it("scales by the auto-slow factor only when the feature is on", () => {
-    S.currentSpeed = 2;
-    S.autoSlowEnabled = false;
-    expect(effectiveSpeed()).toBe(2);
-    S.autoSlowEnabled = true;
-    S.autoSlowFactor = 0.5;
-    expect(effectiveSpeed()).toBe(1);
   });
 
   it("reassertRate re-applies to a non-live <video> and skips a live one", () => {

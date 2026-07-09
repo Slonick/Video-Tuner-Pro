@@ -11,17 +11,6 @@ export function clampTarget(n: unknown): number {
   return Math.min(30, Math.max(1, Math.round(v)));
 }
 
-// The allowed-delay (seconds) for a domain: its per-site value if set, else the
-// legacy global value (kept as a migration fallback), else the 5s default.
-export function resolveTarget(
-  targets: Record<string, number> | undefined,
-  domain: string,
-  legacy?: unknown,
-): number {
-  const per = targets ? targets[domain] : undefined;
-  return clampTarget(per != null ? per : legacy);
-}
-
 export function clampNum(v: unknown, lo: number, hi: number, def: number): number {
   const n = Number(v);
   if (Number.isNaN(n)) return def;

@@ -213,12 +213,6 @@ function setNonLiveVideoRate(video: HTMLVideoElement, primaryLive = activePrimar
   setMediaRate(video, primaryLive ? S.userSpeed : S.currentSpeed);
 }
 
-// The speed actually written to playbackRate: the user's speed times the live
-// auto-slow factor. Ignored entirely when the feature is off.
-export function effectiveSpeed(): number {
-  return speedWithAutoSlow(S.currentSpeed);
-}
-
 // Re-assert the effective rate on the primary video right now — the autoslow
 // sampler calls this when the factor moves, so a slowdown takes effect without
 // waiting for the next 1s tick.

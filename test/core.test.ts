@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clamp, clampTarget, clampNum, resolveTarget } from "../src/content/core/clamp.js";
+import { clamp, clampTarget, clampNum } from "../src/content/core/clamp.js";
 import { normalizeHost } from "../src/content/core/domain.js";
 import { normalizeHost as popupNormalizeHost } from "../src/popup/core/domain.js";
 import { debounce } from "../src/popup/core/debounce.js";
@@ -22,15 +22,6 @@ describe("clamp", () => {
     expect(clampNum(5, 0, 10, 3)).toBe(5);
     expect(clampNum(-1, 0, 10, 3)).toBe(0);
     expect(clampNum("x", 0, 10, 3)).toBe(3);
-  });
-  it("resolveTarget → per-site value, else legacy, else 5 (all clamped)", () => {
-    expect(resolveTarget({ "a.com": 10 }, "a.com")).toBe(10); // per-site wins
-    expect(resolveTarget({ "a.com": 10 }, "b.com", 8)).toBe(8); // unset domain → legacy
-    expect(resolveTarget({}, "a.com", 8)).toBe(8); // empty map → legacy
-    expect(resolveTarget({}, "a.com")).toBe(5); // nothing → default
-    expect(resolveTarget(undefined, "a.com")).toBe(5); // no map at all
-    expect(resolveTarget({ "a.com": 99 }, "a.com")).toBe(30); // clamped to the cap
-    expect(resolveTarget({ "a.com": 0 }, "a.com")).toBe(1); // clamped to the floor
   });
 });
 

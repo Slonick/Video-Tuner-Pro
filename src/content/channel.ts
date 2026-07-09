@@ -165,11 +165,6 @@ const SITES: Site[] = [
 let cachedKeyUrl = "";
 let cachedKeys: string[] | null = null;
 
-export function clearChannelKeyCache(): void {
-  cachedKeyUrl = "";
-  cachedKeys = null;
-}
-
 function siteFor(host: string): Site | null {
   return SITES.find((s) => s.host.test(host)) ?? null;
 }

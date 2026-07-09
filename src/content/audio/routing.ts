@@ -180,7 +180,6 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   // the before/after difference exact and avoids two-analyser latency.
   const analyserIn = ctx.createAnalyser();
   analyserIn.fftSize = 1024;
-  analyserIn.smoothingTimeConstant = 0.5;
   source.connect(analyserIn);
   const g: AudioGraph = { source, comp, gain, limiter, analyserIn };
   audioGraphs.set(video, g);

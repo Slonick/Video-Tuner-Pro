@@ -18,7 +18,7 @@ vi.mock("../src/content/live/detection.js", () => ({
   probeLive: vi.fn(),
   onStreamPage: () => false,
   trackDvr: vi.fn(),
-  resetDvr: vi.fn(),
+  resetDvrFor: vi.fn(),
 }));
 vi.mock("../src/content/live/sync.js", () => ({ controlLive: vi.fn() }));
 vi.mock("../src/content/audio/compressor.js", () => ({ applyAudioComp: vi.fn() }));

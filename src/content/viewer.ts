@@ -860,10 +860,6 @@ const notice = (key: string, fallback: string, subs?: string | string[]) =>
   i18n(key, subs) || fallback;
 const qualityAutoLabel = () => i18n("viewerQualityAuto") || "Auto";
 
-export function viewerFitMode(): ViewerFitMode {
-  return S.viewerFit;
-}
-
 export function setViewerFitMode(mode: unknown, notify = false): ViewerFitMode {
   S.viewerFit = normalizeViewerFit(mode);
   sizeVideo();

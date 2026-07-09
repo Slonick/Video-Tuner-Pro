@@ -14,13 +14,11 @@ function isYouTube(): boolean {
 // the live edge (see trackDvr) and treat the page as a recording until they're
 // back at the live head.
 interface DvrState {
-  generation: number;
   active: boolean;
   lastMediaTime: number;
 }
 
 let dvrSeenAt = 0;
-let dvrGeneration = 0;
 let dvrState = new WeakMap<HTMLVideoElement, DvrState>();
 
 function dvrActive(video: HTMLVideoElement): boolean {
@@ -29,7 +27,7 @@ function dvrActive(video: HTMLVideoElement): boolean {
     state.active = false;
     dvrSeenAt = 0;
   }
-  return !!state && state.generation === dvrGeneration && state.active;
+  return !!state?.active;
 }
 
 // YouTube's media timeline can jump backwards by about an hour while it replaces
@@ -50,14 +48,13 @@ function publishedAtLiveHead(): boolean {
 // (it carries `ytp-live-badge-is-livehead` only when playback sits at the edge).
 export function trackDvr(video: HTMLVideoElement): void {
   if (!isYouTube()) {
-    dvrGeneration++;
     dvrSeenAt = 0;
     return;
   }
   if (document.documentElement.getAttribute("data-vtp-live") !== "1") return;
   let state = dvrState.get(video);
-  if (!state || state.generation !== dvrGeneration) {
-    state = { generation: dvrGeneration, active: false, lastMediaTime: 0 };
+  if (!state) {
+    state = { active: false, lastMediaTime: 0 };
     dvrState.set(video, state);
   }
   const t = video.currentTime;
@@ -74,12 +71,6 @@ export function trackDvr(video: HTMLVideoElement): void {
     dvrSeenAt = Date.now();
   }
   state.lastMediaTime = t;
-}
-
-// New content (SPA navigation, quality reload) starts at the live edge.
-export function resetDvr(): void {
-  dvrGeneration++;
-  dvrSeenAt = 0;
 }
 
 export function resetDvrFor(video: HTMLVideoElement): void {

@@ -1,12 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  isLive,
-  onStreamPage,
-  trackDvr,
-  resetDvr,
-  resetDvrFor,
-} from "../src/content/live/detection.js";
+import { isLive, onStreamPage, trackDvr, resetDvrFor } from "../src/content/live/detection.js";
+
+let createdVideos: HTMLVideoElement[] = [];
 
 // YouTube's control-bar LIVE badge — carries ytp-live-badge-is-livehead only when
 // playback sits at the live edge (verified against the real player). A bare
@@ -16,6 +12,7 @@ function setBadge(atLiveHead: boolean): HTMLVideoElement {
     `<button class="ytp-live-badge ytp-button${atLiveHead ? " ytp-live-badge-is-livehead" : ""}"></button>` +
     `<video></video>`;
   const video = document.querySelector("video") as HTMLVideoElement;
+  createdVideos.push(video);
   Object.defineProperty(video, "duration", { value: 7200, configurable: true });
   Object.defineProperty(video, "paused", { value: false, configurable: true });
   video.getBoundingClientRect = () => ({ width: 640, height: 360 }) as DOMRect;
@@ -29,11 +26,12 @@ function setTime(video: HTMLVideoElement, currentTime: number): HTMLVideoElement
 
 describe("YouTube DVR (scrubbed back from a live stream)", () => {
   beforeEach(() => {
+    createdVideos = [];
     vi.stubGlobal("location", { hostname: "www.youtube.com" });
     document.documentElement.setAttribute("data-vtp-live", "1"); // player says isLive
-    resetDvr();
   });
   afterEach(() => {
+    for (const video of createdVideos) resetDvrFor(video);
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-vtp-live");
     document.documentElement.removeAttribute("data-vtp-latency");
@@ -113,12 +111,11 @@ describe("YouTube DVR (scrubbed back from a live stream)", () => {
     expect(isLive(video)).toBe(false);
   });
 
-  it("new content loading (resetDvr) starts at the live edge", () => {
+  it("a new video element starts at the live edge", () => {
     const oldVideo = setBadge(false);
     trackDvr(setTime(oldVideo, 1000));
     trackDvr(setTime(oldVideo, 400)); // in DVR
     expect(isLive(oldVideo)).toBe(false);
-    resetDvr(); // SPA navigation to a fresh stream
     const newVideo = setBadge(false);
     trackDvr(setTime(newVideo, 50)); // first sample of the new video — no false backward jump
     expect(isLive(newVideo)).toBe(true);

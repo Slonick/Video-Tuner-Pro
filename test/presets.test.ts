@@ -5,7 +5,6 @@ import {
   normalizeSpeedMax,
   normalizeSpeedStep,
   normalizeHoldSpeed,
-  presetFractions,
   quickPresetIndices,
   DEFAULT_PRESETS,
   MAX_PRESETS,
@@ -62,10 +61,6 @@ describe("normalizePresets", () => {
   it("keeps the provided count, clamped to [1, MAX_PRESETS]", () => {
     expect(normalizePresets([60])).toEqual([60]); // one in, one out
     expect(normalizePresets(new Array(20).fill(100))).toHaveLength(MAX_PRESETS);
-  });
-  it("presetFractions divides by 100", () => {
-    expect(presetFractions([100, 200])).toContain(1);
-    expect(presetFractions([100, 200])).toContain(2);
   });
 });
 

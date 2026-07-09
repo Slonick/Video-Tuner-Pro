@@ -3,19 +3,19 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   currentChannel,
   channelKeys,
-  clearChannelKeyCache,
   currentChannelName,
   sameChannelIdentity,
   sameChannelKeys,
 } from "../src/content/channel.js";
 
+let visit = 0;
 function at(hostname: string, pathname: string, search = ""): void {
-  clearChannelKeyCache();
-  vi.stubGlobal("location", { hostname, pathname, search });
+  visit++;
+  const uniqueSearch = `${search}${search ? "&" : "?"}vtp-test=${visit}`;
+  vi.stubGlobal("location", { hostname, pathname, search: uniqueSearch });
 }
 
 afterEach(() => {
-  clearChannelKeyCache();
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });

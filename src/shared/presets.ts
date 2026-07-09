@@ -162,8 +162,3 @@ export function quickPresetIndices(pinned: boolean[]): number[] {
   const pick = pinnedIdx.concat(all.filter((i) => !pinned[i]));
   return pick.slice(0, count).sort((a, b) => a - b);
 }
-
-// As playback-rate fractions (e.g. 1.5), for the content script.
-export function presetFractions(raw: unknown): number[] {
-  return normalizePresets(raw).map((p) => p / 100);
-}
