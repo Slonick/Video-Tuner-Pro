@@ -2,7 +2,7 @@ import { MIN_FORWARD_BUFFER } from "../core/constants.js";
 import { S } from "../state.js";
 import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
-import { STORE } from "../platform/storage.js";
+import { mutateStoredMap } from "../../shared/map-mutation.js";
 import { ctxValid } from "../platform/browser.js";
 import { i18n } from "../platform/i18n.js";
 import { fullscreenOverlayHost } from "../platform/fullscreen.js";
@@ -58,6 +58,7 @@ let badgeNoticeEl: HTMLSpanElement | null = null;
 let timeBadgeHideTimer: Timer | undefined;
 let badgeNoticeTimer: Timer | undefined;
 let badgeVideo: HTMLElement | null = null; // cached video frame/anchor so mousemove stays cheap
+let badgeMedia: HTMLVideoElement | null = null;
 let badgeMoveHooked = false;
 let badgeUpdateFrame: number | null = null;
 let dragging = false;
@@ -89,8 +90,8 @@ function removeStaleBadgeHosts(): void {
 
 // Place the badge at its saved per-site fraction of the video, or the default
 // top-left corner when it's never been moved.
-function positionBadge(el: HTMLElement, v: HTMLElement): void {
-  const r = v.getBoundingClientRect();
+function positionBadge(el: HTMLElement, v: HTMLElement, rect?: DOMRect): void {
+  const r = rect ?? v.getBoundingClientRect();
   const b = el.getBoundingClientRect();
   const maxLeft = r.left + Math.max(0, r.width - b.width);
   const maxTop = r.top + Math.max(0, r.height - b.height);
@@ -107,33 +108,18 @@ function positionBadge(el: HTMLElement, v: HTMLElement): void {
 
 function saveBadgePos(fx: number, fy: number): void {
   if (!ctxValid()) return;
-  STORE.get(["badgePos"], (r) => {
-    const map = { ...((r.badgePos || {}) as Record<string, { fx: number; fy: number }>) };
-    map[getDomain()] = { fx, fy };
-    STORE.set({ badgePos: map });
-  });
+  mutateStoredMap("badgePos", { [getDomain()]: { fx, fy } }, []);
 }
 
 // Double-click clears the saved position → back to the default corner.
 function resetBadgePos(): void {
   if (!ctxValid()) return;
-  STORE.get(["badgePos"], (r) => {
-    const map = { ...((r.badgePos || {}) as Record<string, { fx: number; fy: number }>) };
-    delete map[getDomain()];
-    if (Object.keys(map).length) STORE.set({ badgePos: map });
-    else STORE.remove("badgePos");
-  });
+  mutateStoredMap("badgePos", {}, [getDomain()]);
 }
 
 function saveBadgePinned(on: boolean): void {
   if (!ctxValid()) return;
-  STORE.get(["badgePinned"], (r) => {
-    const map = { ...((r.badgePinned || {}) as Record<string, boolean>) };
-    if (on) map[getDomain()] = true;
-    else delete map[getDomain()];
-    if (Object.keys(map).length) STORE.set({ badgePinned: map });
-    else STORE.remove("badgePinned");
-  });
+  mutateStoredMap("badgePinned", on ? { [getDomain()]: true } : {}, on ? [] : [getDomain()]);
 }
 
 // Reflect the pinned state on the pin: upright + bright when pinned, tilted +
@@ -261,11 +247,11 @@ function hookBadgeDrag(el: HTMLElement): void {
   });
 }
 
-function renderBadge(v: HTMLVideoElement, anchor: HTMLElement): void {
+function renderBadge(v: HTMLVideoElement, anchor: HTMLElement, anchorRect?: DOMRect): void {
   const el = timeBadgeEl;
   const txt = badgeTextEl;
   if (!el || !txt) return;
-  if (!dragging) positionBadge(el, anchor);
+  if (!dragging) positionBadge(el, anchor, anchorRect);
   const speed = v.playbackRate || S.currentSpeed || 1;
   const sp = Math.round(speed * 100) / 100;
   const stream = onStreamPage();
@@ -332,9 +318,7 @@ function hookBadgeMouse(): void {
     if (!enabled || !timeBadgeEl || !bv) return;
     const r = bv.getBoundingClientRect();
     if (x < r.left || x > r.right || y < r.top || y > r.bottom) return;
-    // Only reveal the badge here — content is re-rendered by the 1s tick
-    // (updateTimeBadge). Rendering per mousemove made the continuous buffer
-    // value flicker at pointer-event rate.
+    if (badgeMedia) renderBadge(badgeMedia, bv, r);
     flashBadge();
   });
 }
@@ -362,6 +346,7 @@ export function updateTimeBadge(
   if (!S.streamBadge && !S.showRemaining) {
     if (timeBadgeEl) timeBadgeEl.style.display = "none";
     badgeVideo = null;
+    badgeMedia = null;
     return;
   }
   const v = snapshot.video !== undefined ? snapshot.video : primaryVideo();
@@ -374,11 +359,14 @@ export function updateTimeBadge(
   if (!enabled || !v || !anchor || (!stream && (!isFinite(v.duration) || v.duration <= 0))) {
     if (timeBadgeEl) timeBadgeEl.style.display = "none";
     badgeVideo = null;
+    badgeMedia = null;
     return;
   }
   badgeVideo = anchor;
+  badgeMedia = v;
   hookBadgeMouse();
   let el = timeBadgeEl;
+  let created = false;
   if (!el) {
     removeStaleBadgeHosts();
     const refs = mountBadge(); // React renders the badge into a shadow root
@@ -390,6 +378,7 @@ export function updateTimeBadge(
     badgePinEl = refs.pinEl;
     badgeNoticeEl = refs.noticeEl;
     timeBadgeEl = el;
+    created = true;
     setPinVisual(S.badgePinned);
     hookBadgeDrag(el);
     hookPin(badgePinEl);
@@ -400,7 +389,7 @@ export function updateTimeBadge(
   const host = fullscreenOverlayHost();
   if (badgeHost && badgeHost.parentNode !== host) host.appendChild(badgeHost);
   el.style.display = "flex";
-  renderBadge(v, anchor);
+  if (created || S.badgePinned || el.style.opacity !== "0") renderBadge(v, anchor);
   // Pinned: keep it shown regardless of mouse movement, and reflect the state on
   // the pin (covers cross-tab changes pushed in via onChanged → updateTimeBadge).
   setPinVisual(S.badgePinned);

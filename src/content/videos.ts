@@ -18,14 +18,13 @@ const drmVideos = new WeakSet<HTMLVideoElement>();
 const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
 interface ShadowHostCandidate {
   ref: WeakRef<Element>;
-  seenAt: number;
   active: boolean;
 }
 const shadowHostCandidates: ShadowHostCandidate[] = [];
 const shadowHostCandidateRefs = new WeakMap<Element, ShadowHostCandidate>();
 const ADOPTED_VIEWER_VIDEO = "data-vtp-viewer-adopted-video";
 const MAX_SHADOW_HOST_CANDIDATES = 1024;
-const SHADOW_HOST_CANDIDATE_TTL_MS = 60_000;
+let shadowHostCandidateCursor = 0;
 let observer: MutationObserver | null = null;
 let tracking = false;
 
@@ -75,13 +74,17 @@ function handleShadow(el: Element): boolean {
 function rememberShadowHostCandidate(el: Element): void {
   if (isOwnNode(el)) return;
   const existing = shadowHostCandidateRefs.get(el);
-  if (existing?.active) {
-    existing.seenAt = Date.now();
+  if (existing?.active) return;
+  const candidate = { ref: new WeakRef(el), active: true };
+  shadowHostCandidateRefs.set(el, candidate);
+  if (shadowHostCandidates.length < MAX_SHADOW_HOST_CANDIDATES) {
+    shadowHostCandidates.push(candidate);
     return;
   }
-  const candidate = { ref: new WeakRef(el), seenAt: Date.now(), active: true };
-  shadowHostCandidateRefs.set(el, candidate);
-  shadowHostCandidates.push(candidate);
+  const replaced = shadowHostCandidates[shadowHostCandidateCursor];
+  replaced.active = false;
+  shadowHostCandidates[shadowHostCandidateCursor] = candidate;
+  shadowHostCandidateCursor = (shadowHostCandidateCursor + 1) % MAX_SHADOW_HOST_CANDIDATES;
 }
 
 // Walk `root` once, registering any media and recursing through open shadow roots
@@ -144,7 +147,6 @@ function scanDirectMedia(root: ParentNode): boolean {
 
 function scanKnownShadowHosts(): boolean {
   let added = false;
-  const now = Date.now();
   let write = 0;
   for (const candidate of shadowHostCandidates) {
     const host = candidate.ref.deref();
@@ -152,18 +154,11 @@ function scanKnownShadowHosts(): boolean {
       candidate.active = false;
       continue;
     }
-    if (
-      shadowHostCandidates.length > MAX_SHADOW_HOST_CANDIDATES &&
-      !host.shadowRoot &&
-      now - candidate.seenAt > SHADOW_HOST_CANDIDATE_TTL_MS
-    ) {
-      candidate.active = false;
-      continue;
-    }
     if (handleShadow(host)) added = true;
     shadowHostCandidates[write++] = candidate;
   }
   shadowHostCandidates.length = write;
+  shadowHostCandidateCursor = write % MAX_SHADOW_HOST_CANDIDATES;
   return added;
 }
 
@@ -216,6 +211,7 @@ export function stopTracking(): void {
   }
   for (const candidate of shadowHostCandidates) candidate.active = false;
   shadowHostCandidates.length = 0;
+  shadowHostCandidateCursor = 0;
 }
 
 // Cheap backstop for the cases the observer can miss: direct media added without a

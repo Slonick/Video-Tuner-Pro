@@ -11,6 +11,11 @@ export const audioLevelHist: { in: number; out: number }[] = [];
 export const A_HIST_MS = 150;
 const A_HIST_MAX = 48;
 
+export function audioSamplingReady(): boolean {
+  const ctx = audioContext();
+  return !!ctx && ctx.state === "running";
+}
+
 // Only capture failures that make audio features currently unusable become a popup
 // warning. Loading/VOT are transient; a suspended context needs a user gesture.
 function blockReason(skip: string | null): {
@@ -74,8 +79,7 @@ export function recordAudioSample(): void {
   if (!ctxValid()) return;
   // No running AudioContext means no media has been routed yet — skip the
   // full-document walk that primaryVideo() does until there's actually a graph.
-  const ctx = audioContext();
-  if (!ctx || ctx.state !== "running") return;
+  if (!audioSamplingReady()) return;
   const v = primaryVideo();
   const g = v ? graphForCurrentSource(v) : null;
   if (!g || !g.analyserIn) return;

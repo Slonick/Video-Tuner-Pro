@@ -130,7 +130,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
         applyPageState(resp, true);
       });
     },
-    [hasTab, send, setMode, applyPageState],
+    [hasTab, send, applyPageState],
   );
 
   const fallbackFromStorage = useCallback(() => {

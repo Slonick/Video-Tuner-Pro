@@ -81,12 +81,16 @@ export function captureOnPlay(media: unknown): void {
     media.addEventListener("play", reapply);
     media.addEventListener("loadeddata", reapply);
     media.addEventListener("ratechange", reapply);
-    trackedCleanup.set(media, () => {
+    const release = () => {
       media.removeEventListener("play", reapply);
       media.removeEventListener("loadeddata", reapply);
       media.removeEventListener("ratechange", reapply);
+      media.removeEventListener("ended", release);
+      tracked.delete(media);
       trackedCleanup.delete(media);
-    });
+    };
+    media.addEventListener("ended", release);
+    trackedCleanup.set(media, release);
   }
   const rate = desiredRate();
   if (rate != null) applyRate(media, rate);
@@ -101,7 +105,6 @@ export function refreshTracked(): void {
   for (const media of tracked) {
     if (media.isConnected) {
       trackedCleanup.get(media)?.();
-      tracked.delete(media);
       continue;
     }
     applyRate(media, rate == null ? 1 : rate);
@@ -166,7 +169,6 @@ export function install(): void {
     for (const fn of cleanup.splice(0)) fn();
     for (const media of Array.from(tracked)) {
       trackedCleanup.get(media)?.();
-      tracked.delete(media);
     }
     if (win.__vtpAudioBridgeInstalled === BRIDGE_VERSION) {
       win.__vtpAudioBridgeInstalled = undefined;

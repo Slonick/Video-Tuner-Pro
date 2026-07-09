@@ -433,7 +433,7 @@
     }
   }
 
-  let rootsCache = new WeakMap<HTMLVideoElement, { local?: unknown[]; full?: unknown[] }>();
+  const rootsCache = new WeakMap<HTMLVideoElement, { local?: unknown[]; full?: unknown[] }>();
   let rootSearchMode: "local" | "full" = "full";
   const adapterCache = new WeakMap<
     HTMLVideoElement,

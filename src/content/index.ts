@@ -22,18 +22,22 @@ import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
-import { ownsViewerNode, refreshViewerBackdrop } from "./viewer.js";
+import { exitViewer, ownsViewerNode, refreshViewerBackdrop } from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
-import { recordAudioSample, A_HIST_MS } from "./audio/metering.js";
+import { audioSamplingReady, recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
 import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
 import { applyResolvedViewerAutoFromStore } from "./viewer-auto.js";
 import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
 import { recordBufferSample, BUF_HIST_MS } from "./bitrate.js";
-import { LAUNCHER_TOP_LAYER_ATTR, abortContentListeners, listenerOptions } from "./lifecycle.js";
+import {
+  LAUNCHER_TOP_LAYER_ATTR,
+  abortContentListeners,
+  contentSignal,
+  listenerOptions,
+} from "./lifecycle.js";
 import {
   collectVideos,
-  hasVideos,
   primaryVideoFrom,
   startTracking,
   stopTracking,
@@ -112,8 +116,17 @@ function stopTimers() {
   }
 }
 
-function syncBufferSampler(hasVideo = hasVideos()) {
-  if (hasVideo) {
+function syncAudioSampler(): void {
+  if (audioSamplingReady() && !document.hidden) {
+    if (audioSampler == null) audioSampler = setInterval(recordAudioSample, A_HIST_MS);
+  } else if (audioSampler != null) {
+    clearInterval(audioSampler);
+    audioSampler = null;
+  }
+}
+
+function syncBufferSampler(stream = onStreamPage()) {
+  if (stream && !document.hidden) {
     if (bufferSampler == null) bufferSampler = setInterval(recordBufferSample, BUF_HIST_MS);
   } else if (bufferSampler != null) {
     clearInterval(bufferSampler);
@@ -257,6 +270,7 @@ function loadSpeed() {
       S.viewerFitScope = vf.scope;
       applyResolved(domains, channels, result.globalSpeed as number | undefined, keys);
       applyAll();
+      syncAudioSampler();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
       updateTimeBadge();
@@ -331,11 +345,12 @@ function tick() {
   controlLive({ live, onStream: stream });
   updateTimeBadge({ video: primary, stream });
   updateLauncher({ primary });
+  syncAudioSampler();
   const keys = channelKeys();
   if (keys.length && !sameChannelKeys(lastChannelKeys, keys))
     reresolve(preferKnownChannelKeys(keys));
   const videoCount = videos.length;
-  syncBufferSampler(videoCount > 0);
+  syncBufferSampler(stream);
   // Back off the cadence when the page has no video (collectVideos reads the tracked
   // set — cheap). Any video keeps it at TICK_MIN; a media event or focus regain
   // resets it via wake().
@@ -349,8 +364,7 @@ function tick() {
 // modules (unit-tested), only the scheduling lives here in the browser-wired entry.
 function startTimers(immediate = false) {
   if (liveTick == null) liveTick = setTimeout(tick, immediate ? 0 : tickInterval);
-  if (audioSampler == null) audioSampler = setInterval(recordAudioSample, A_HIST_MS);
-  syncBufferSampler();
+  syncAudioSampler();
   syncAutoSlowSampler();
 }
 
@@ -379,7 +393,8 @@ function scheduleMediaPass(flashBadgeAfterApply: boolean): void {
     }
     applyAll();
     controlLive();
-    syncBufferSampler();
+    syncAudioSampler();
+    syncBufferSampler(onStreamPage());
     if (shouldFlash) {
       updateTimeBadge();
       flashBadge();
@@ -472,6 +487,7 @@ function scheduleReapply() {
     }
     applyAll();
     controlLive();
+    syncAudioSampler();
   });
 }
 
@@ -486,6 +502,7 @@ function startObserver() {
     onContextDead: teardown,
     isOwnNode: (n) => ownsBadgeNode(n) || ownsLauncherNode(n) || ownsViewerNode(n),
   });
+  lastReconcileAt = Date.now();
 }
 if (document.documentElement) {
   startObserver();
@@ -494,7 +511,10 @@ if (document.documentElement) {
 }
 
 // React instantly when settings change in the popup.
-api.storage.onChanged.addListener((changes, area) => {
+function handleStorageChange(
+  changes: Record<string, chrome.storage.StorageChange>,
+  area: string,
+): void {
   if (!OUR_AREAS.has(area)) return;
   if (changes.liveSync) S.liveSyncEnabled = !!changes.liveSync.newValue;
   // Any allowed-delay scope key changed → re-resolve the chain (also re-runs
@@ -513,6 +533,7 @@ api.storage.onChanged.addListener((changes, area) => {
   // audio-speed re-applies/resets, the overlay button re-evaluates) come from the
   // registry in one pass.
   applyRegistryChanges(changes);
+  if (changes.viewerAutoEnabled && !S.viewerAutoEnabled) exitViewer();
   if (changes.autoSlowEnabled) syncAutoSlowSampler();
   if (changes.domains || changes.channels || changes.globalSpeed) {
     reresolve();
@@ -582,4 +603,11 @@ api.storage.onChanged.addListener((changes, area) => {
       S.presetKeys = ps.keys;
     });
   }
-});
+}
+
+api.storage.onChanged.addListener(handleStorageChange);
+contentSignal.addEventListener(
+  "abort",
+  () => api.storage.onChanged.removeListener?.(handleStorageChange),
+  { once: true },
+);

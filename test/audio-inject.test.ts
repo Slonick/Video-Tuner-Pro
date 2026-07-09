@@ -149,6 +149,21 @@ describe("refreshTracked (mid-playback bridge changes)", () => {
     expect(a.playbackRate).toBe(2);
   });
 
+  it("releases a finished detached audio element until it plays again", () => {
+    publish("2");
+    const a = new Audio();
+    captureOnPlay(a);
+    expect(a.playbackRate).toBe(2);
+
+    a.dispatchEvent(new Event("ended"));
+    publish("3");
+    refreshTracked();
+    expect(a.playbackRate).toBe(2);
+
+    captureOnPlay(a);
+    expect(a.playbackRate).toBe(3);
+  });
+
   it("stops refreshing tracked audio after a newer bridge version takes ownership", () => {
     publish("2");
     const a = new Audio();

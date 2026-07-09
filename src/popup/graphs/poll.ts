@@ -63,6 +63,7 @@ export function startPoll(
       return;
     }
     void sendToTab<MonitorResp>(tabId, { action: "getMonitor" }).then((resp) => {
+      if (stopped) return;
       if (!resp) {
         g.audioActive = false;
         onTranslating(false);
@@ -103,6 +104,7 @@ export function startPoll(
       if (!g.histSeeded && (g.audioActive || g.bufLive || g.asActive)) {
         g.histSeeded = true;
         void sendToTab<HistoryResp>(tabId, { action: "getHistory" }).then((r) => {
+          if (stopped) return;
           if (!r) return;
           const t0 = now();
           if (r.autoSlow && r.autoSlow.length) {

@@ -7,7 +7,7 @@
 import { S } from "../state.js";
 import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
-import { STORE } from "../platform/storage.js";
+import { mutateStoredMap } from "../../shared/map-mutation.js";
 import { api, ctxValid } from "../platform/browser.js";
 import {
   addFullscreenChangeListener,
@@ -141,14 +141,15 @@ function eligible(): boolean {
 function positionFab(v: HTMLElement): void {
   if (!fab) return;
   const r = v.getBoundingClientRect();
-  const b = fab.getBoundingClientRect();
-  const bw = b.width || FAB_SIZE;
-  const bh = b.height || FAB_SIZE;
+  const bw = FAB_SIZE;
+  const bh = FAB_SIZE;
   const maxLeft = r.left + Math.max(0, r.width - bw);
   const maxTop = r.top + Math.max(0, r.height - bh);
   const place = (left: number, top: number) => {
-    fab!.style.left = Math.round(Math.min(Math.max(left, r.left), maxLeft)) + "px";
-    fab!.style.top = Math.round(Math.min(Math.max(top, r.top), maxTop)) + "px";
+    const nextLeft = Math.round(Math.min(Math.max(left, r.left), maxLeft)) + "px";
+    const nextTop = Math.round(Math.min(Math.max(top, r.top), maxTop)) + "px";
+    if (fab!.style.left !== nextLeft) fab!.style.left = nextLeft;
+    if (fab!.style.top !== nextTop) fab!.style.top = nextTop;
   };
   if (S.overlayBtnPos) {
     place(r.left + S.overlayBtnPos.fx * r.width, r.top + S.overlayBtnPos.fy * r.height);
@@ -400,21 +401,12 @@ function ownsRadialEvent(e: Event): boolean {
 
 function saveFabPos(fx: number, fy: number): void {
   if (!ctxValid()) return;
-  STORE.get(["overlayBtnPos"], (r) => {
-    const map = { ...((r.overlayBtnPos || {}) as Record<string, { fx: number; fy: number }>) };
-    map[getDomain()] = { fx, fy };
-    STORE.set({ overlayBtnPos: map });
-  });
+  mutateStoredMap("overlayBtnPos", { [getDomain()]: { fx, fy } }, []);
 }
 
 function resetFabPos(): void {
   if (!ctxValid()) return;
-  STORE.get(["overlayBtnPos"], (r) => {
-    const map = { ...((r.overlayBtnPos || {}) as Record<string, { fx: number; fy: number }>) };
-    delete map[getDomain()];
-    if (Object.keys(map).length) STORE.set({ overlayBtnPos: map });
-    else STORE.remove("overlayBtnPos");
-  });
+  mutateStoredMap("overlayBtnPos", {}, [getDomain()]);
 }
 
 function flashFab(): void {
@@ -457,23 +449,14 @@ function positionPanel(): void {
 
 function savePanelPos(fx: number, fy: number): void {
   if (!ctxValid()) return;
-  STORE.get(["overlayPanelPos"], (r) => {
-    const map = { ...((r.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>) };
-    map[getDomain()] = { fx, fy };
-    STORE.set({ overlayPanelPos: map });
-  });
+  mutateStoredMap("overlayPanelPos", { [getDomain()]: { fx, fy } }, []);
 }
 
 function resetPanelPos(): void {
   S.overlayPanelPos = null;
   positionPanel();
   if (!ctxValid()) return;
-  STORE.get(["overlayPanelPos"], (r) => {
-    const map = { ...((r.overlayPanelPos || {}) as Record<string, { fx: number; fy: number }>) };
-    delete map[getDomain()];
-    if (Object.keys(map).length) STORE.set({ overlayPanelPos: map });
-    else STORE.remove("overlayPanelPos");
-  });
+  mutateStoredMap("overlayPanelPos", {}, [getDomain()]);
 }
 
 // Drag the panel by its header. The embedded popup captures the pointer (so the

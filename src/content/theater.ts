@@ -6,8 +6,10 @@
 import { api } from "./platform/browser.js";
 import { STORE, OUR_AREAS } from "./platform/storage.js";
 import { onStreamPage } from "./live/detection.js";
+import { contentSignal } from "./lifecycle.js";
 
 const ATTR = "vtp-super-theater";
+const STYLE_ID = "vtp-super-theater-style";
 
 const CSS = `
 html[${ATTR}] #masthead-container.ytd-app:has(> [theater][is-watch-page]) #masthead {
@@ -51,7 +53,13 @@ function isYouTube(): boolean {
 let styleEl: HTMLStyleElement | null = null;
 function ensureStyle(): void {
   if (styleEl) return;
+  const existing = document.getElementById(STYLE_ID);
+  if (existing instanceof HTMLStyleElement) {
+    styleEl = existing;
+    return;
+  }
   styleEl = document.createElement("style");
+  styleEl.id = STYLE_ID;
   styleEl.textContent = CSS;
   (document.head || document.documentElement).appendChild(styleEl);
 }
@@ -78,12 +86,22 @@ if (isYouTube()) {
   // The live-state flag (data-vtp-live, set by the MAIN-world probe) lands a beat
   // after load and flips on SPA navigation between a video and a live page — so
   // re-pick the setting whenever it changes.
-  new MutationObserver(reapply).observe(document.documentElement, {
+  const observer = new MutationObserver(reapply);
+  observer.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["data-vtp-live"],
   });
-  api.storage.onChanged.addListener((changes, area) => {
+  const onStorageChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
     if (!OUR_AREAS.has(area)) return;
     if (changes.superTheater || changes.superTheaterStream) reapply();
-  });
+  };
+  api.storage.onChanged.addListener(onStorageChange);
+  contentSignal.addEventListener(
+    "abort",
+    () => {
+      observer.disconnect();
+      api.storage.onChanged.removeListener?.(onStorageChange);
+    },
+    { once: true },
+  );
 }

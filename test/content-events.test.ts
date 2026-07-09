@@ -12,7 +12,10 @@ const fx = vi.hoisted(() => ({
   stopTracking: vi.fn(),
   reconcile: vi.fn(),
   markDrmVideo: vi.fn(),
+  exitViewer: vi.fn(),
   recordBufferSample: vi.fn(),
+  audioSamplingReady: false,
+  recordAudioSample: vi.fn(),
   autoSlowSample: vi.fn(),
   addStorageListener: vi.fn(),
   storageListener: null as
@@ -95,6 +98,7 @@ vi.mock("../src/content/overlay/launcher.js", () => ({
   ownsLauncherNode: () => false,
 }));
 vi.mock("../src/content/viewer.js", () => ({
+  exitViewer: fx.exitViewer,
   ownsViewerNode: () => false,
   refreshViewerBackdrop: vi.fn(),
 }));
@@ -104,7 +108,8 @@ vi.mock("../src/content/settings/registry.js", () => ({
   applyRegistryChanges: vi.fn(),
 }));
 vi.mock("../src/content/audio/metering.js", () => ({
-  recordAudioSample: vi.fn(),
+  audioSamplingReady: () => fx.audioSamplingReady,
+  recordAudioSample: fx.recordAudioSample,
   A_HIST_MS: 1000,
 }));
 vi.mock("../src/content/audio/autoslow.js", () => ({
@@ -170,6 +175,7 @@ beforeEach(() => {
   teardownIndex = null;
   document.documentElement.removeAttribute("data-vtp-quality-bridge-url");
   fx.onStream = false;
+  fx.audioSamplingReady = false;
   fx.live = null;
   fx.keys = [];
   fx.videos = [];
@@ -271,6 +277,16 @@ describe("content media events", () => {
 
     expect(fx.showBadgeNotice).not.toHaveBeenCalled();
   });
+
+  it("closes an active viewer when the viewer feature is disabled", async () => {
+    await loadIndex();
+    const { S } = await import("../src/content/state.js");
+    S.viewerAutoEnabled = false;
+
+    fx.storageListener?.({ viewerAutoEnabled: { newValue: false } }, "sync");
+
+    expect(fx.exitViewer).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("content graph samplers", () => {
@@ -278,9 +294,11 @@ describe("content graph samplers", () => {
     const v = media(false);
     fx.videos = [v];
     fx.live = v;
+    fx.onStream = true;
+    fx.onStream = true;
     await loadIndex();
 
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(2000);
 
     expect(fx.applyAll).toHaveBeenCalledWith({ videos: [v], primary: v, primaryLive: true });
     expect(fx.controlLive).toHaveBeenCalledWith({ live: v, onStream: true });
@@ -296,33 +314,68 @@ describe("content graph samplers", () => {
     expect(fx.recordBufferSample).not.toHaveBeenCalled();
   });
 
-  it("starts the buffer sampler after video appears", async () => {
+  it("does not repeat the initial full reconcile on the first background tick", async () => {
+    await loadIndex();
+
+    await vi.advanceTimersByTimeAsync(7000);
+    expect(fx.reconcile).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fx.reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts the buffer sampler only after the video is identified as live", async () => {
     await loadIndex();
     const v = media(false);
     fx.videos = [v];
+    fx.live = v;
 
     v.dispatchEvent(new Event("play"));
     await nextFrame();
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(2000);
 
     expect(fx.recordBufferSample).toHaveBeenCalled();
   });
 
-  it("stops the buffer sampler when the page no longer has video", async () => {
+  it("stops the buffer sampler when the page is no longer live", async () => {
     await loadIndex();
     const v = media(false);
     fx.videos = [v];
+    fx.live = v;
     v.dispatchEvent(new Event("play"));
     await vi.advanceTimersByTimeAsync(1001);
     fx.recordBufferSample.mockClear();
 
-    fx.videos = [];
+    fx.live = null;
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(fx.recordBufferSample).toHaveBeenCalled();
     const callsAfterStop = fx.recordBufferSample.mock.calls.length;
     await vi.advanceTimersByTimeAsync(3000);
     expect(fx.recordBufferSample).toHaveBeenCalledTimes(callsAfterStop);
+  });
+
+  it("runs the audio sampler only while a running audio graph exists", async () => {
+    await loadIndex();
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fx.recordAudioSample).not.toHaveBeenCalled();
+
+    fx.audioSamplingReady = true;
+    const v = media(false);
+    fx.videos = [v];
+    v.dispatchEvent(new Event("play"));
+    await nextFrame();
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(fx.recordAudioSample).toHaveBeenCalled();
+    const calls = fx.recordAudioSample.mock.calls.length;
+
+    fx.audioSamplingReady = false;
+    await vi.advanceTimersByTimeAsync(1100);
+    const callsAfterStop = fx.recordAudioSample.mock.calls.length;
+    expect(callsAfterStop).toBeGreaterThanOrEqual(calls);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fx.recordAudioSample).toHaveBeenCalledTimes(callsAfterStop);
   });
 
   it("runs the auto-slow sampler only while auto-slow is enabled", async () => {
