@@ -340,7 +340,10 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
         }
       });
     }, 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      missesRef.current = 0;
+    };
   }, [hasTab, live, send, applyChannel, apply]);
 
   useEffect(() => {
@@ -357,7 +360,10 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
         }
       });
     }, 1500);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      missesRef.current = 0;
+    };
   }, [hasTab, live, send, applyChannel, apply]);
 
   return useMemo(

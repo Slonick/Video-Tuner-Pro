@@ -109,4 +109,32 @@ describe("Switch", () => {
     expect(changes).toEqual([true]);
     expect(sw.getAttribute("aria-checked")).toBe("true");
   });
+
+  it("does not keep swallowing clicks when a committed drag produces no click", async () => {
+    const changes: boolean[] = [];
+    function Harness() {
+      const [checked, setChecked] = useState(false);
+      return createElement(Switch, {
+        checked,
+        onChange: (next: boolean) => {
+          changes.push(next);
+          setChecked(next);
+        },
+      });
+    }
+    act(() => root!.render(createElement(Harness)));
+    const sw = document.querySelector<HTMLElement>('[role="switch"]')!;
+
+    act(() => {
+      sw.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 0 }));
+      sw.dispatchEvent(pointer("pointermove", { pointerId: 1, clientX: 20 }));
+      sw.dispatchEvent(pointer("pointerup", { pointerId: 1, clientX: 20 }));
+      sw.dispatchEvent(pointer("lostpointercapture", { pointerId: 1, clientX: 20 }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    act(() => sw.click());
+
+    expect(changes).toEqual([true, false]);
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+  });
 });

@@ -41,6 +41,7 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
   const suppressClick = useRef(false); // a drag-release already toggled; swallow the synthesized click
   const prevChecked = useRef(checked);
   const settleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const suppressTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const setRatio = (v: number) => {
     ratioRef.current = v;
@@ -61,7 +62,13 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
     settleTimer.current = setTimeout(() => setActive(false), SETTLE_MS);
   }, [checked]);
 
-  useEffect(() => () => clearTimeout(settleTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(settleTimer.current);
+      clearTimeout(suppressTimer.current);
+    },
+    [],
+  );
 
   const ratioFromClientX = (clientX: number): number => {
     const raw = startRatio.current + (clientX - startX.current) / TRAVEL;
@@ -98,6 +105,10 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
     if (commit && moved.current) {
       const shouldBeChecked = ratioRef.current > 0.5;
       suppressClick.current = true; // the browser still synthesizes a click after pointerup
+      clearTimeout(suppressTimer.current);
+      suppressTimer.current = setTimeout(() => {
+        suppressClick.current = false;
+      }, 0);
       prevChecked.current = shouldBeChecked;
       setRatio(shouldBeChecked ? 1 : 0);
       if (shouldBeChecked !== checked) onChange(shouldBeChecked);
@@ -107,6 +118,7 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
   };
   const cancelDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
     suppressClick.current = false;
+    clearTimeout(suppressTimer.current);
     endDrag(e, false);
   };
   const onLostPointerCapture = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -117,6 +129,7 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
   const onClick = () => {
     if (suppressClick.current) {
       suppressClick.current = false;
+      clearTimeout(suppressTimer.current);
       return;
     }
     onChange(!checked);
