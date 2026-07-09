@@ -8,6 +8,14 @@ export const api = typeof browser !== "undefined" ? browser : chrome;
 // host tab from sender.tab. (Chrome works either way; this keeps one path for both.)
 export const EMBEDDED = typeof window !== "undefined" && window.top !== window;
 
+const FRAME_STABLE_ACTIONS = new Set([
+  "getMonitor",
+  "getHistory",
+  "getViewerState",
+  "setViewerState",
+  "setViewerFit",
+]);
+
 function runtimeSend<T = unknown>(msg: Record<string, unknown>): Promise<T | null> {
   return new Promise((resolve) => {
     try {
@@ -39,13 +47,18 @@ export function sendToTab<T = unknown>(
   msg: Record<string, unknown>,
 ): Promise<T | null> {
   if (EMBEDDED) return runtimeSend<T>({ action: "relayToTab", tabId, msg });
-  return new Promise((resolve) => {
-    try {
-      api.tabs.sendMessage(tabId, msg, (resp: unknown) =>
-        resolve(api.runtime.lastError || !resp ? null : (resp as T)),
-      );
-    } catch {
-      resolve(null);
-    }
-  });
+  const direct = () =>
+    new Promise<T | null>((resolve) => {
+      try {
+        api.tabs.sendMessage(tabId, msg, (resp: unknown) =>
+          resolve(api.runtime.lastError || !resp ? null : (resp as T)),
+        );
+      } catch {
+        resolve(null);
+      }
+    });
+  if (FRAME_STABLE_ACTIONS.has(String(msg.action))) {
+    return runtimeSend<T>({ action: "relayToTab", tabId, msg }).then((resp) => resp ?? direct());
+  }
+  return direct();
 }

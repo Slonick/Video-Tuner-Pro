@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-type Listener = (msg: Record<string, unknown>, sender: Record<string, unknown>) => void;
+type Listener = (
+  msg: Record<string, unknown>,
+  sender: Record<string, unknown>,
+  sendResponse?: (resp?: unknown) => void,
+) => void;
 type TabRemovedListener = (tabId: number) => void;
 
 const h = vi.hoisted(() => ({
@@ -8,6 +12,7 @@ const h = vi.hoisted(() => ({
   tabRemoved: null as TabRemovedListener | null,
   badgeText: [] as unknown[],
   icons: [] as unknown[],
+  tabMessages: [] as unknown[],
 }));
 
 vi.mock("../src/shared/store.js", () => ({
@@ -46,6 +51,7 @@ describe("background toolbar badge frame ownership", () => {
     h.tabRemoved = null;
     h.badgeText = [];
     h.icons = [];
+    h.tabMessages = [];
     (globalThis as unknown as { browser?: unknown }).browser = undefined;
     (globalThis as unknown as { chrome: unknown }).chrome = {
       runtime: {
@@ -71,6 +77,25 @@ describe("background toolbar badge frame ownership", () => {
         },
       },
       tabs: {
+        sendMessage(
+          tabId: number,
+          msg: Record<string, unknown>,
+          optionsOrCb?: { frameId?: number } | ((resp?: unknown) => void),
+          cbArg?: (resp?: unknown) => void,
+        ) {
+          const options = typeof optionsOrCb === "function" ? undefined : optionsOrCb;
+          const cb = typeof optionsOrCb === "function" ? optionsOrCb : cbArg;
+          h.tabMessages.push({ tabId, msg, options });
+          if (options?.frameId === 4 && msg.action === "stale") {
+            (globalThis.chrome.runtime as { lastError: unknown }).lastError = {
+              message: "No receiver",
+            };
+            cb?.(undefined);
+            (globalThis.chrome.runtime as { lastError: unknown }).lastError = null;
+            return;
+          }
+          cb?.({ ok: true, action: msg.action, frameId: options?.frameId ?? null });
+        },
         onUpdated: { addListener() {} },
         onRemoved: {
           addListener(fn: TabRemovedListener) {
@@ -129,5 +154,32 @@ describe("background toolbar badge frame ownership", () => {
       { text: "", tabId: 10 },
       { text: "1.5", tabId: 10 },
     ]);
+  });
+
+  it("relays popup messages to the current badge owner frame first", () => {
+    let response: unknown;
+    h.listener!({ action: "icon", text: "1.25", live: false }, sender(11, 4));
+    h.listener!({ action: "relayToTab", tabId: 11, msg: { action: "getMonitor" } }, {}, (r) => {
+      response = r;
+    });
+
+    expect(h.tabMessages).toEqual([
+      { tabId: 11, msg: { action: "getMonitor" }, options: { frameId: 4 } },
+    ]);
+    expect(response).toEqual({ ok: true, action: "getMonitor", frameId: 4 });
+  });
+
+  it("falls back to a tab-wide relay when the remembered frame is stale", () => {
+    let response: unknown;
+    h.listener!({ action: "icon", text: "1.25", live: false }, sender(12, 4));
+    h.listener!({ action: "relayToTab", tabId: 12, msg: { action: "stale" } }, {}, (r) => {
+      response = r;
+    });
+
+    expect(h.tabMessages).toEqual([
+      { tabId: 12, msg: { action: "stale" }, options: { frameId: 4 } },
+      { tabId: 12, msg: { action: "stale" }, options: undefined },
+    ]);
+    expect(response).toEqual({ ok: true, action: "stale", frameId: null });
   });
 });

@@ -114,8 +114,10 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
   const sendSpy = vi.spyOn(chrome.tabs, "sendMessage").mockImplementation(((
     _id: number,
     msg: { action: string; speed?: number; mode?: string },
-    cb?: (r?: unknown) => void,
+    optionsOrCb?: { frameId?: number } | ((r?: unknown) => void),
+    cbArg?: (r?: unknown) => void,
   ) => {
+    const cb = typeof optionsOrCb === "function" ? optionsOrCb : cbArg;
     const raw = replies[msg.action];
     const base =
       typeof raw === "function"
@@ -138,6 +140,20 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
       cb?.(resp);
     }
   }) as unknown as typeof chrome.tabs.sendMessage) as unknown as ReturnType<typeof vi.fn>;
+  vi.spyOn(chrome.runtime, "sendMessage").mockImplementation(((
+    msg: Record<string, unknown>,
+    cb?: (r?: unknown) => void,
+  ) => {
+    if (msg.action === "whoami") {
+      cb?.({ tab: opts.tab });
+      return;
+    }
+    if (msg.action === "relayToTab" && typeof msg.tabId === "number" && msg.msg) {
+      chrome.tabs.sendMessage(msg.tabId, msg.msg as Record<string, unknown>, cb);
+      return;
+    }
+    cb?.(undefined);
+  }) as unknown as typeof chrome.runtime.sendMessage);
 
   // Re-import the popup graph fresh so platform/browser's `api` binds to this mock.
   vi.resetModules();
