@@ -202,6 +202,42 @@ describe("background toolbar badge frame ownership", () => {
     expect(h.scriptCalls).toHaveLength(1);
   });
 
+  it("keeps a probed video frame cached across idle monitor polls", () => {
+    vi.useFakeTimers();
+    try {
+      let first: unknown;
+      let second: unknown;
+      vi.setSystemTime(0);
+      h.probeResults = [{ frameId: 4, result: { hasVideo: true, score: 100 } }];
+
+      h.listener!(
+        { action: "relayToTab", tabId: 11, msg: { action: "getMonitor" }, route: "video" },
+        {},
+        (r) => {
+          first = r;
+        },
+      );
+      vi.setSystemTime(4000);
+      h.listener!(
+        { action: "relayToTab", tabId: 11, msg: { action: "getMonitor" }, route: "video" },
+        {},
+        (r) => {
+          second = r;
+        },
+      );
+
+      expect(h.scriptCalls).toHaveLength(1);
+      expect(h.tabMessages).toEqual([
+        { tabId: 11, msg: { action: "getMonitor" }, options: { frameId: 4 } },
+        { tabId: 11, msg: { action: "getMonitor" }, options: { frameId: 4 } },
+      ]);
+      expect(first).toEqual({ ok: true, action: "getMonitor", frameId: 4 });
+      expect(second).toEqual({ ok: true, action: "getMonitor", frameId: 4 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("scores video frames like the content primary-video picker", async () => {
     let response: unknown;
     h.probeResults = null;

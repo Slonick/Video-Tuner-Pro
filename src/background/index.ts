@@ -32,7 +32,7 @@ const RED_ICON = {
 };
 const badgeOwners = new Map<number, number>();
 const videoFrameOwners = new Map<number, { frameId: number; expires: number }>();
-const VIDEO_FRAME_CACHE_MS = 1000;
+const VIDEO_FRAME_CACHE_MS = 5000;
 
 interface VideoFrameProbe {
   hasVideo?: boolean;
