@@ -16,8 +16,8 @@ async function loadLoader(): Promise<void> {
   await import("../src/content/quality-loader.js");
 }
 
-async function flush(): Promise<void> {
-  for (let i = 0; i < 4; i++) await Promise.resolve();
+async function flushUntil(done: () => boolean, maxTurns = 20): Promise<void> {
+  for (let i = 0; i < maxTurns && !done(); i++) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -121,7 +121,7 @@ describe("quality loader", () => {
       window as typeof window & { __vtpQualityBridgeInstalled?: unknown }
     ).__vtpQualityBridgeInstalled = QUALITY_BRIDGE_VERSION;
     script.onload?.(new Event("load"));
-    await flush();
+    await flushUntil(() => replayed.length > 0);
 
     expect(replayed).toEqual([{ requestId: "q1", videoId: "v1" }]);
 
@@ -226,7 +226,7 @@ describe("quality loader", () => {
         detail: { requestId: "q1", videoId: "v1" },
       }),
     );
-    await flush();
+    await flushUntil(() => bridgeScripts().length === 0);
 
     expect(bridgeScripts()).toHaveLength(0);
     expect(
@@ -243,7 +243,7 @@ describe("quality loader", () => {
         detail: { requestId: "q1", videoId: "v1" },
       }),
     );
-    await flush();
+    await flushUntil(() => bridgeScripts().length === 0);
 
     expect(bridgeScripts()).toHaveLength(0);
     expect(document.querySelectorAll('script[src^="https://example.com/"]')).toHaveLength(0);
@@ -259,7 +259,7 @@ describe("quality loader", () => {
         detail: { requestId: "q1", videoId: "v1" },
       }),
     );
-    await flush();
+    await flushUntil(() => bridgeScripts().length > 0);
 
     const [script] = bridgeScripts();
     expect(script.src).toBe(BRIDGE_URL);

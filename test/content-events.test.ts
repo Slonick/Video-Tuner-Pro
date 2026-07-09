@@ -27,6 +27,9 @@ const fx = vi.hoisted(() => ({
 
 vi.mock("../src/content/platform/browser.js", () => ({
   api: {
+    runtime: {
+      getURL: (path: string) => `chrome-extension://vtp/${path}`,
+    },
     storage: {
       onChanged: {
         addListener: (
@@ -140,8 +143,11 @@ import { STORE } from "../src/content/platform/storage.js";
 
 async function loadIndex(): Promise<void> {
   vi.resetModules();
-  await import("../src/content/index.js");
+  const mod = await import("../src/content/index.js");
+  teardownIndex = mod.teardown;
 }
+
+let teardownIndex: (() => void) | null = null;
 
 function media(paused: boolean): HTMLVideoElement {
   const v = document.createElement("video");
@@ -161,6 +167,8 @@ async function nextFrame(): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  teardownIndex = null;
+  document.documentElement.removeAttribute("data-vtp-quality-bridge-url");
   fx.onStream = false;
   fx.live = null;
   fx.keys = [];
@@ -182,10 +190,19 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  teardownIndex?.();
   vi.useRealTimers();
 });
 
 describe("content media events", () => {
+  it("publishes the MAIN-world quality bridge URL for the lazy loader", async () => {
+    await loadIndex();
+
+    expect(document.documentElement.getAttribute("data-vtp-quality-bridge-url")).toBe(
+      "chrome-extension://vtp/quality-inject.js",
+    );
+  });
+
   it("coalesces a burst of media events into one apply pass", async () => {
     await loadIndex();
     const v = media(false);

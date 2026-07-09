@@ -46,6 +46,32 @@ function responseWithin(requestId: string, ms: number): Promise<QualityResponse 
   ]);
 }
 
+function videoWithRoot(root: HTMLElement): HTMLVideoElement {
+  const video = document.createElement("video");
+  video.setAttribute("data-vtp-quality-id", "v1");
+  root.append(video);
+  document.body.append(root);
+  return video;
+}
+
+async function requestQuality(requestId = "r1"): Promise<QualityResponse> {
+  const response = waitForResponse(requestId);
+  document.dispatchEvent(
+    new CustomEvent("vtp-quality-request", { detail: { requestId, videoId: "v1" } }),
+  );
+  return response;
+}
+
+async function setQuality(qualityId: string, requestId = "set"): Promise<QualityResponse> {
+  const response = waitForResponse(requestId);
+  document.dispatchEvent(
+    new CustomEvent("vtp-quality-set", {
+      detail: { requestId, videoId: "v1", qualityId },
+    }),
+  );
+  return response;
+}
+
 describe("quality-inject request cost", () => {
   it("calls the previous bridge cleanup before taking ownership", async () => {
     const cleanup = vi.fn();
@@ -653,5 +679,141 @@ describe("quality-inject React-hosted player adapter", () => {
 
     const detail = await response;
     expect(detail.options.map((opt) => opt.label)).toEqual(["Auto", "480p", "1080p"]);
+  });
+});
+
+describe("quality-inject generic player adapters", () => {
+  it("reads and sets DASH quality levels", async () => {
+    await import("../src/content/quality-inject.js");
+    const dash = {
+      getBitrateInfoListFor: vi.fn(() => [
+        { height: 360, bitrate: 800_000 },
+        { height: 720, bitrate: 2_400_000 },
+      ]),
+      getQualityFor: vi.fn(() => 0),
+      updateSettings: vi.fn(),
+      setQualityFor: vi.fn(),
+    };
+    const root = document.createElement("div") as HTMLDivElement & { __reactFiber$vtp?: unknown };
+    root.__reactFiber$vtp = { memoizedProps: { dashPlayer: dash } };
+    videoWithRoot(root);
+
+    const detail = await requestQuality();
+    expect(detail.options.map((opt) => opt.id)).toEqual(["auto", "0", "1"]);
+
+    await setQuality("1");
+    expect(dash.updateSettings).toHaveBeenCalledWith({
+      streaming: { abr: { autoSwitchBitrate: { video: false } } },
+    });
+    expect(dash.setQualityFor).toHaveBeenCalledWith("video", 1);
+  });
+
+  it("reads and sets Shaka variant tracks", async () => {
+    await import("../src/content/quality-inject.js");
+    const tracks = [
+      { id: 1, height: 360, bandwidth: 800_000, active: true },
+      { id: 2, height: 1080, bandwidth: 4_000_000 },
+      { id: 99, type: "audio" },
+    ];
+    const shaka = {
+      getVariantTracks: vi.fn(() => tracks),
+      configure: vi.fn(),
+      selectVariantTrack: vi.fn(),
+    };
+    const root = document.createElement("div") as HTMLDivElement & { __reactFiber$vtp?: unknown };
+    root.__reactFiber$vtp = { memoizedProps: { shakaPlayer: shaka } };
+    videoWithRoot(root);
+
+    const detail = await requestQuality();
+    expect(detail.options.map((opt) => opt.id)).toEqual(["auto", "1", "2"]);
+    expect(detail.current).toBe("1");
+
+    await setQuality("2");
+    expect(shaka.configure).toHaveBeenCalledWith({ abr: { enabled: false } });
+    expect(shaka.selectVariantTrack).toHaveBeenCalledWith(tracks[1], true);
+  });
+
+  it("reads and sets Vidstack qualities", async () => {
+    await import("../src/content/quality-inject.js");
+    const qualities = [
+      { height: 360, label: "360p", selected: true },
+      { height: 720, label: "720p" },
+    ] as Array<{ height: number; label: string; selected?: boolean }> & {
+      auto?: boolean;
+      autoSelect?: () => void;
+    };
+    qualities.auto = false;
+    qualities.autoSelect = vi.fn();
+    const root = document.createElement("media-player") as HTMLElement & {
+      qualities?: typeof qualities;
+    };
+    root.qualities = qualities;
+    videoWithRoot(root);
+
+    const detail = await requestQuality();
+    expect(detail.options.map((opt) => opt.id)).toEqual(["auto", "h360", "h720"]);
+    expect(detail.current).toBe("h360");
+
+    await setQuality("h720");
+    expect(qualities.auto).toBe(false);
+    expect(qualities[1].selected).toBe(true);
+  });
+
+  it("reads and sets Video.js quality levels", async () => {
+    await import("../src/content/quality-inject.js");
+    const levels = [
+      { height: 360, enabled: vi.fn() },
+      { height: 720, enabled: vi.fn() },
+    ] as Array<{ height: number; enabled: ReturnType<typeof vi.fn> }> & {
+      length: number;
+      selectedIndex?: number;
+    };
+    levels.selectedIndex = 0;
+    const player = {
+      qualityLevels: vi.fn(() => levels),
+    };
+    const root = document.createElement("div") as HTMLDivElement & { __reactFiber$vtp?: unknown };
+    root.__reactFiber$vtp = { memoizedProps: { videoJsPlayer: player } };
+    videoWithRoot(root);
+
+    const detail = await requestQuality();
+    expect(detail.options.map((opt) => opt.id)).toEqual(["auto", "0", "1"]);
+    expect(detail.current).toBe("0");
+
+    await setQuality("1");
+    expect(levels[0].enabled).toHaveBeenCalledWith(false);
+    expect(levels[1].enabled).toHaveBeenCalledWith(true);
+  });
+
+  it("reads and sets VK video-player quality", async () => {
+    await import("../src/content/quality-inject.js");
+    const store = <T>(value: T) => ({
+      subscribe(fn: (next: T) => void) {
+        fn(value);
+        return () => {};
+      },
+    });
+    const player = {
+      info: {
+        availableQualities$: store(["360p", "720p"]),
+        currentQuality$: store("360p"),
+        isAutoQualityEnabled$: store(false),
+      },
+      setQuality: vi.fn(),
+      setAutoQuality: vi.fn(),
+    };
+    const root = document.createElement("vk-video-player") as HTMLElement & {
+      store?: { getPlayer: () => typeof player };
+    };
+    root.store = { getPlayer: () => player };
+    videoWithRoot(root);
+
+    const detail = await requestQuality();
+    expect(detail.options.map((opt) => opt.id)).toEqual(["auto", "360p", "720p"]);
+    expect(detail.current).toBe("360p");
+
+    await setQuality("720p");
+    expect(player.setAutoQuality).toHaveBeenCalledWith(false);
+    expect(player.setQuality).toHaveBeenCalledWith("720p");
   });
 });
