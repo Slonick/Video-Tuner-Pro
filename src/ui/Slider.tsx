@@ -39,6 +39,12 @@ interface Props {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const THUMB = 18; // px — keep in sync with .slider-thumb width
+const precisionOf = (n: number): number => {
+  const s = String(n);
+  const exp = /e-(\d+)$/i.exec(s);
+  if (exp) return Number(exp[1]);
+  return s.includes(".") ? s.split(".")[1].length : 0;
+};
 
 export function Slider({
   id,
@@ -82,7 +88,11 @@ export function Slider({
     tween.current = null;
   };
 
-  const snap = (v: number) => clamp(Math.round(v / step) * step, min, max);
+  const snap = (v: number) => {
+    const snapped = min + Math.round((v - min) / step) * step;
+    const precision = Math.max(precisionOf(step), precisionOf(min));
+    return clamp(Number(snapped.toFixed(precision)), min, max);
+  };
 
   const valueFromClientX = (clientX: number): number => {
     const el = trackRef.current;
@@ -136,7 +146,24 @@ export function Slider({
     if (!dragging.current) return;
     dragging.current = false;
     setActive(false);
-    if (e.pointerId != null) e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (e.pointerId != null && e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    }
+    onCommit?.(displayRef.current);
+  };
+  const onPointerCancel = (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    setActive(false);
+    if (e.pointerId != null && e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    }
+    onCommit?.(displayRef.current);
+  };
+  const onLostPointerCapture = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    setActive(false);
     onCommit?.(displayRef.current);
   };
 
@@ -204,6 +231,8 @@ export function Slider({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onLostPointerCapture={onLostPointerCapture}
     >
       <span
         ref={trackRef}
@@ -226,7 +255,7 @@ export function Slider({
         aria-orientation="horizontal"
         aria-valuemin={min}
         aria-valuemax={max}
-        aria-valuenow={Math.round(display)}
+        aria-valuenow={display}
         aria-valuetext={ariaValueText}
         aria-disabled={disabled || undefined}
         onKeyDown={onKeyDown}

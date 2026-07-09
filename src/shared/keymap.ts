@@ -149,7 +149,6 @@ export function actionConflictsWithChord(
   chord: KeyChord | null,
 ): boolean {
   if (!actionCode || !chord || chord.code !== actionCode) return false;
-  if (action === "slower" || action === "faster") return !chord.mod && !chord.alt;
   return !chord.shift && !chord.mod && !chord.alt;
 }
 

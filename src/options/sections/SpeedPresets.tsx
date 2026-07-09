@@ -157,6 +157,11 @@ export function SpeedPresets() {
 
   const pinnedCount = rows.filter((r) => r.pin).length;
 
+  const previewMax = (raw: number) => {
+    const next = normalizeSpeedMax(raw);
+    setSpeedMax(next);
+    setHoldSpeed((h) => Math.min(h, next));
+  };
   const setMax = (raw: number) => {
     const next = normalizeSpeedMax(raw);
     setSpeedMax(next);
@@ -167,12 +172,14 @@ export function SpeedPresets() {
     STORE.set({ speedMax: next, holdSpeed: hold });
   };
 
+  const previewStep = (raw: number) => setSpeedStep(normalizeSpeedStep(raw));
   const setStep = (raw: number) => {
     const v = normalizeSpeedStep(raw);
     setSpeedStep(v);
     STORE.set({ speedStep: v });
   };
 
+  const previewHold = (raw: number) => setHoldSpeed(Math.min(speedMax, normalizeHoldSpeed(raw)));
   const setHold = (raw: number) => {
     const v = Math.min(speedMax, normalizeHoldSpeed(raw));
     setHoldSpeed(v);
@@ -235,7 +242,8 @@ export function SpeedPresets() {
             step={SPEED_MAX_STEP}
             value={speedMax}
             ariaLabel={msg("optMaxSpeed") || "Maximum speed"}
-            onChange={setMax}
+            onChange={previewMax}
+            onCommit={setMax}
           />
         </div>
 
@@ -251,7 +259,8 @@ export function SpeedPresets() {
             step={1}
             value={speedStep}
             ariaLabel={msg("optStepLabel") || "Speed step"}
-            onChange={setStep}
+            onChange={previewStep}
+            onCommit={setStep}
           />
         </div>
 
@@ -267,7 +276,8 @@ export function SpeedPresets() {
             step={5}
             value={holdSpeed}
             ariaLabel={msg("optHoldSpeed") || "Hold speed"}
-            onChange={setHold}
+            onChange={previewHold}
+            onCommit={setHold}
           />
         </div>
 

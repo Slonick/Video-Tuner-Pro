@@ -104,11 +104,22 @@ export function Presets() {
 
   const setName = (i: number, raw: string) => {
     setNames(names.map((n, j) => (j === i ? raw : n)));
+  };
+
+  const commitName = (i: number, raw: string) => {
     persist(presets.map((p, j) => (j === i ? { ...p, name: raw.trim() || undefined } : p)));
+  };
+
+  const setParamLocal = (i: number, key: keyof CompParams, v: number) => {
+    setPresets(presets.map((p, j) => (j === i ? { ...p, [key]: v } : p)));
   };
 
   const setParam = (i: number, key: keyof CompParams, v: number) => {
     persist(presets.map((p, j) => (j === i ? { ...p, [key]: v } : p)));
+  };
+
+  const setGlobalLocal = (v: number) => {
+    setGlobalGain(v);
   };
 
   const setGlobal = (v: number) => {
@@ -125,6 +136,9 @@ export function Presets() {
   const setPresetGain = (i: number, v: number) => {
     persist(presets.map((p, j) => (j === i ? { ...p, gain: v } : p)));
   };
+  const setPresetGainLocal = (i: number, v: number) => {
+    setPresets(presets.map((p, j) => (j === i ? { ...p, gain: v } : p)));
+  };
 
   const togglePin = (i: number) => {
     if (!presets[i].pin && pinnedCount >= COMP_QUICK_COUNT) return; // only this many fit the popup row
@@ -140,6 +154,7 @@ export function Presets() {
   const removePreset = (i: number) => {
     if (presets.length <= COMP_MIN_PRESETS) return;
     setNames(names.filter((_, j) => j !== i));
+    setSel((s) => (s === i ? Math.min(i, presets.length - 2) : s > i ? s - 1 : s));
     persist(presets.filter((_, j) => j !== i));
   };
 
@@ -183,7 +198,8 @@ export function Presets() {
           step={GAIN_STEP}
           value={globalGain}
           ariaLabel={msg("optGlobalGain") || "Global gain"}
-          onChange={setGlobal}
+          onChange={setGlobalLocal}
+          onCommit={setGlobal}
         />
       </div>
 
@@ -271,6 +287,10 @@ export function Presets() {
             placeholder={fallbackLabel(selP, si)}
             value={names[si] ?? ""}
             onChange={(e) => setName(si, e.target.value)}
+            onBlur={(e) => commitName(si, e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
           />
           {PARAMS.map((p) => (
             <div className="opt-param" key={p.key}>
@@ -285,7 +305,8 @@ export function Presets() {
                 step={p.step}
                 value={selP[p.key]}
                 ariaLabel={msg(p.label)}
-                onChange={(v) => setParam(si, p.key, v)}
+                onChange={(v) => setParamLocal(si, p.key, v)}
+                onCommit={(v) => setParam(si, p.key, v)}
               />
             </div>
           ))}
@@ -309,7 +330,8 @@ export function Presets() {
                 step={GAIN_STEP}
                 value={selP.gain}
                 ariaLabel={msg("audioGain") || "Make-up gain"}
-                onChange={(v) => setPresetGain(si, v)}
+                onChange={(v) => setPresetGainLocal(si, v)}
+                onCommit={(v) => setPresetGain(si, v)}
               />
             )}
           </div>

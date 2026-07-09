@@ -205,6 +205,14 @@ export const STORE = {
     if (local.length) calls.push((d) => areaRemove(LOCAL, local, d));
     fanDone(calls, cb);
   },
+
+  removeEverywhere(keys: string | string[], cb?: DoneCb): void {
+    const list = Array.from(new Set(typeof keys === "string" ? [keys] : keys));
+    const calls: Array<(done: ResultCb) => void> = [];
+    if (list.length) calls.push((d) => areaRemove(LOCAL, list, d));
+    if (HAS_SYNC && list.length) calls.push((d) => areaRemove(SYNC, list, d));
+    fanDone(calls, cb);
+  },
 };
 
 // --- Migrating keys between the two areas as preferences change --------------

@@ -207,6 +207,18 @@ describe("routed STORE", () => {
     expect(env.backing.sync.globalSpeed).toBe(1.5);
   });
 
+  it("can remove imported keys from both routed and stale storage areas", async () => {
+    env.backing.local.syncCategories = { speeds: false };
+    env.backing.local.globalSpeed = 2;
+    env.backing.sync.globalSpeed = 1.5;
+    const { STORE } = await freshStore(env.chrome);
+
+    STORE.removeEverywhere("globalSpeed");
+
+    expect(env.backing.local.globalSpeed).toBeUndefined();
+    expect(env.backing.sync.globalSpeed).toBeUndefined();
+  });
+
   it("drops a failed routed read from the merged result", async () => {
     env.backing.sync.audioComp = true;
     env.backing.local.syncCategories = { speeds: false };

@@ -121,6 +121,20 @@ describe("Options · General", () => {
     expect(restored.syncMaster).toBeUndefined();
   });
 
+  it("rejects backup imports with mismatched speed preset arrays", async () => {
+    const { get } = await mountOptions({ globalSpeed: 1.25 });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const file = new File([JSON.stringify({ speedPresets: [100, 150], presetKeys: ["KeyG"] })], {
+      type: "application/json",
+    });
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+
+    await settle();
+
+    expect(get(["speedPresets", "presetKeys", "globalSpeed"])).toEqual({ globalSpeed: 1.25 });
+  });
+
   it("export omits sync routing metadata", async () => {
     const blobs: Blob[] = [];
     const create = vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
@@ -176,13 +190,13 @@ describe("Options · Keys", () => {
     expect((get(["keymap"]).keymap as Record<string, string> | undefined)?.reset).not.toBe("KeyG");
   });
 
-  it("rejects a speed-step action key already used by a shifted preset", async () => {
+  it("allows a speed-step action key already used only by a shifted preset", async () => {
     const { get } = await mountOptions({ presetKeys: ["S+KeyG"] });
     byId("keySlower").click();
     await flush();
     pressDoc({ code: "KeyG" });
     await flush();
-    expect((get(["keymap"]).keymap as Record<string, string> | undefined)?.slower).not.toBe("KeyG");
+    expect((get(["keymap"]).keymap as Record<string, string> | undefined)?.slower).toBe("KeyG");
   });
 
   it("Escape cancels capture without changing the binding", async () => {
@@ -296,14 +310,14 @@ describe("Options · Speed presets", () => {
     expect(keyBtn().textContent).toBe("G");
   });
 
-  it("rejects a shifted preset hotkey that shadows a speed-step action", async () => {
+  it("allows a shifted preset hotkey on the same key as a speed-step action", async () => {
     const { get } = await mountOptions({});
     const keyBtn = () => sp().querySelector<HTMLElement>(".preset-row .preset-key")!;
     keyBtn().click();
     await flush();
     pressDoc({ code: "KeyA", shiftKey: true });
     await flush();
-    expect(get(["presetKeys"]).presetKeys).toBeUndefined();
+    expect((get(["presetKeys"]).presetKeys as (string | null)[])[0]).toBe("S+KeyA");
   });
 
   it("uses the current action keymap when rejecting preset hotkeys", async () => {
@@ -362,6 +376,11 @@ describe("Options · Compressor presets", () => {
     const { get } = await mountOptions({});
     typeInput(cp().querySelector<HTMLInputElement>(".preset-name-input")!, "My Voice", false);
     await flush();
+    expect(get(["compPresets"]).compPresets).toBeUndefined();
+    cp()
+      .querySelector<HTMLInputElement>(".preset-name-input")!
+      .dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    await flush();
     expect((get(["compPresets"]).compPresets as Array<{ name?: string }>)[0].name).toBe("My Voice");
   });
 
@@ -397,6 +416,31 @@ describe("Options · Compressor presets", () => {
     expect((get(["compPresets"]).compPresets as Array<{ threshold: number }>)[1].threshold).toBe(
       -100,
     );
+  });
+
+  it("keeps the same compressor preset selected after removing a row above it", async () => {
+    const presets = ["A", "B", "C"].map((name, i) => ({
+      name,
+      threshold: -10 - i,
+      knee: 0,
+      ratio: 2,
+      attack: 0,
+      release: 0.5,
+      pin: false,
+    }));
+    const { get } = await mountOptions({ compPresets: presets });
+    cp().querySelectorAll<HTMLElement>(".comp-list-name")[1].click(); // B
+    await flush();
+    await confirmSplit(cp().querySelector(".comp-list-row")!, ".preset-remove"); // remove A
+    sliderKey(thumbsIn(cp(), ".comp-detail .opt-param")[0], "Home"); // selected preset → -100
+    await flush();
+
+    expect(
+      get(["compPresets"]).compPresets as Array<{ name: string; threshold: number }>,
+    ).toMatchObject([
+      { name: "B", threshold: -100 },
+      { name: "C", threshold: -12 },
+    ]);
   });
 
   it("the per-preset gain slider sets a custom gain", async () => {

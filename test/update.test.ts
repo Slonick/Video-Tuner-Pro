@@ -19,7 +19,17 @@ describe("cmpVersion", () => {
 describe("hasUpdateApi", () => {
   afterEach(() => {
     vi.resetModules();
+    (globalThis as unknown as { chrome?: unknown }).chrome = undefined;
     (globalThis as unknown as { chrome?: unknown; browser?: unknown }).browser = undefined;
+  });
+
+  it("does not throw when imported without extension globals", async () => {
+    (globalThis as unknown as { chrome?: unknown; browser?: unknown }).chrome = undefined;
+    (globalThis as unknown as { chrome?: unknown; browser?: unknown }).browser = undefined;
+    vi.resetModules();
+    const { currentVersion, hasUpdateApi } = await import("../src/shared/update.js");
+    expect(hasUpdateApi()).toBe(false);
+    expect(currentVersion()).toBe("0");
   });
 
   it("is true when runtime.requestUpdateCheck exists (Chrome)", async () => {

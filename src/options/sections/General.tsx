@@ -28,6 +28,15 @@ const THEME_LABEL: Record<Theme, string> = {
 };
 const FILE = "video-tuner-pro-settings.json";
 
+function hasPresetArrayMismatch(data: Record<string, unknown>): boolean {
+  const presets = data.speedPresets;
+  if (!Array.isArray(presets)) return false;
+  return (
+    (Array.isArray(data.presetKeys) && data.presetKeys.length !== presets.length) ||
+    (Array.isArray(data.presetPins) && data.presetPins.length !== presets.length)
+  );
+}
+
 function ThemeSeg() {
   const [theme, setThemeState] = useState<Theme>("system");
   useEffect(() => {
@@ -225,6 +234,10 @@ export function Backup() {
       const data = { ...(parsed as Record<string, unknown>) };
       delete data[SYNC_META_KEY]; // never import another device's sync choices
       delete data[SYNC_MASTER_KEY];
+      if (hasPresetArrayMismatch(data)) {
+        flash(setImp, "optImportError", false);
+        return;
+      }
       STORE.get(null, (current) => {
         const stale = Object.keys(current).filter(
           (key) => key !== SYNC_META_KEY && key !== SYNC_MASTER_KEY && !(key in data),
@@ -239,11 +252,13 @@ export function Backup() {
             setTimeout(() => location.reload(), 1000);
           });
         };
-        if (!stale.length) {
+        const replaceKeys = Array.from(new Set([...stale, ...Object.keys(data)]));
+        const removeEverywhere = STORE.removeEverywhere?.bind(STORE) ?? STORE.remove.bind(STORE);
+        if (!replaceKeys.length) {
           write();
           return;
         }
-        STORE.remove(stale, (ok) => {
+        removeEverywhere(replaceKeys, (ok) => {
           if (ok === false) {
             flash(setImp, "optImportError", false);
             return;

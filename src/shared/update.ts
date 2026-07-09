@@ -2,7 +2,8 @@
 // this only surfaces a "new version available" marker in the popup header.
 // Chrome reports it via requestUpdateCheck/onUpdateAvailable; Firefox has neither,
 // so we detect a newer version by comparing the manifest against the public AMO API.
-const api = typeof browser !== "undefined" ? browser : chrome;
+const api =
+  typeof browser !== "undefined" ? browser : typeof chrome !== "undefined" ? chrome : undefined;
 
 // Persisted by the background check, read by the popup header.
 export const UPDATE_AVAILABLE_KEY = "updateAvailable";
@@ -19,7 +20,7 @@ const AMO_API_URL = `https://addons.mozilla.org/api/v5/addons/addon/${AMO_ADDON_
 // Chrome ships requestUpdateCheck/onUpdateAvailable; Firefox ships neither.
 export function hasUpdateApi(): boolean {
   try {
-    return typeof api.runtime.requestUpdateCheck === "function";
+    return typeof api?.runtime?.requestUpdateCheck === "function";
   } catch {
     return false;
   }
@@ -41,7 +42,7 @@ export function cmpVersion(a: string, b: string): number {
 
 export function currentVersion(): string {
   try {
-    return api.runtime.getManifest().version;
+    return api?.runtime?.getManifest().version ?? "0";
   } catch {
     return "0";
   }

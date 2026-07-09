@@ -88,12 +88,14 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
     setRatio(ratioFromClientX(e.clientX));
   };
 
-  const endDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const endDrag = (e: React.PointerEvent<HTMLButtonElement>, commit = true) => {
     if (!dragging.current) return;
     dragging.current = false;
-    if (e.pointerId != null) trackRef.current?.releasePointerCapture?.(e.pointerId);
+    if (e.pointerId != null && trackRef.current?.hasPointerCapture?.(e.pointerId)) {
+      trackRef.current.releasePointerCapture(e.pointerId);
+    }
     setActive(false);
-    if (moved.current) {
+    if (commit && moved.current) {
       const shouldBeChecked = ratioRef.current > 0.5;
       suppressClick.current = true; // the browser still synthesizes a click after pointerup
       prevChecked.current = shouldBeChecked;
@@ -102,6 +104,14 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
     } else {
       setRatio(checked ? 1 : 0); // snap back — the click handler below does the actual toggle
     }
+  };
+  const cancelDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    suppressClick.current = false;
+    endDrag(e, false);
+  };
+  const onLostPointerCapture = (e: React.PointerEvent<HTMLButtonElement>) => {
+    suppressClick.current = false;
+    endDrag(e, false);
   };
 
   const onClick = () => {
@@ -123,10 +133,12 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
       disabled={disabled}
       data-state={checked ? "checked" : "unchecked"}
       className="switch switch-track"
+      style={{ touchAction: "none" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
-      onPointerCancel={endDrag}
+      onPointerCancel={cancelDrag}
+      onLostPointerCapture={onLostPointerCapture}
       onClick={onClick}
     >
       <span
