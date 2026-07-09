@@ -9,13 +9,17 @@ const m = vi.hoisted(() => ({
   primary: null as unknown,
   graphs: new Map<unknown, unknown>(),
   translation: false,
+  translationCalls: 0,
   ctx: null as { state: string } | null,
   skip: null as string | null,
 }));
 
 vi.mock("../src/content/videos.js", () => ({ primaryVideo: () => m.primary }));
 vi.mock("../src/content/audio/translation.js", () => ({
-  translationActive: () => m.translation,
+  translationActive: () => {
+    m.translationCalls++;
+    return m.translation;
+  },
   compOn: () => S.audioCompEnabled && !m.translation,
 }));
 vi.mock("../src/content/audio/routing.js", () => ({
@@ -50,6 +54,7 @@ beforeEach(() => {
   m.graphs.clear();
   m.primary = null;
   m.translation = false;
+  m.translationCalls = 0;
   m.ctx = null;
   m.skip = null;
   audioLevelHist.length = 0;
@@ -70,7 +75,8 @@ describe("audioLevels", () => {
 
   it("reflects the disabled flag while still inactive", () => {
     S.audioCompEnabled = false;
-    expect(audioLevels().enabled).toBe(false);
+    expect(audioLevels()).toMatchObject({ enabled: false, translation: false });
+    expect(m.translationCalls).toBe(0);
   });
 
   it("flags a capture failure (inuse / cors / noctx / suspended) as blocked", () => {
@@ -139,6 +145,8 @@ describe("audioLevels", () => {
     const r = audioLevels();
     expect(r.active).toBe(true);
     expect(r.enabled).toBe(false);
+    expect(r.translation).toBe(false);
+    expect(m.translationCalls).toBe(0);
   });
 
   it("history step is 150 ms", () => {

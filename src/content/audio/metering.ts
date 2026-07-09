@@ -32,6 +32,10 @@ function audioOutDb(g: AudioGraph, inDb: number): number {
   return deriveOutDb(inDb, reduction, compOn() ? S.audioCompGain : 0);
 }
 
+function translationStatus(): boolean {
+  return S.audioCompEnabled && translationActive();
+}
+
 export function audioLevels(): AudioLevels {
   const v = primaryVideo();
   const g = v ? graphForCurrentSource(v) : null;
@@ -41,7 +45,7 @@ export function audioLevels(): AudioLevels {
     return {
       active: false,
       enabled: S.audioCompEnabled,
-      translation: translationActive(),
+      translation: translationStatus(),
       // Surface a hard capture failure so the popup can warn + lock the audio cards
       // (monitor.ts runs applyAudioComp() right before this, so the skip is current).
       // Transient reasons (loading/VOT) are left off.
@@ -56,7 +60,7 @@ export function audioLevels(): AudioLevels {
     out: audioOutDb(g, inDb),
     threshold: S.audioCompThreshold,
     knee: S.audioCompKnee, // the meter draws the soft-knee band; popup no longer has the slider
-    translation: translationActive(), // a voice-over translator is playing → compression is paused
+    translation: translationStatus(), // a voice-over translator is playing → compression is paused
   };
 }
 
