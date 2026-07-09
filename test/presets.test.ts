@@ -143,6 +143,11 @@ describe("normalizeKeymap", () => {
     expect(km.slower).toBe("KeyA");
     expect(km.faster).toBe("KeyD");
   });
+  it("keeps later core actions bound when a corrupt blob duplicates their default key", () => {
+    const km = normalizeKeymap({ reset: "KeyV", viewer: "KeyV" });
+    expect(km.reset).toBe("KeyR");
+    expect(km.viewer).toBe("KeyV");
+  });
   it("keeps a later core action bound when a partial blob takes its default key", () => {
     const km = normalizeKeymap({ slower: "KeyD" });
     expect(km.slower).toBe("KeyA");

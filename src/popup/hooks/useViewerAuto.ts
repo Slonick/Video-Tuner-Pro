@@ -265,7 +265,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
         return;
       }
       if (tabId !== tab.tabId) return;
-      applyPageState({ mode: normalize(msg.mode) }, true);
+      applyPageState({ mode: normalize(msg.mode) });
     };
     api.runtime.onMessage.addListener(onMessage);
     return () => api.runtime.onMessage.removeListener?.(onMessage);

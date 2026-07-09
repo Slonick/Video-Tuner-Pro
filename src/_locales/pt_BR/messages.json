@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "Tela cheia" },
   "overlayBtnAlways": { "message": "Sempre" },
   "overlayBtnAria": { "message": "Abrir Video Tuner" },
+  "overlayBtnClose": { "message": "Fechar Video Tuner" },
   "kbdLabel": { "message": "Atalhos de teclado" },
   "kbdFaster": { "message": "aumentar" },
   "kbdSlower": { "message": "diminuir" },

@@ -1240,7 +1240,15 @@ describe("control bar", () => {
     expect(shadowActive(qualityMenu)).toBe(qualityItems[0]);
     key(qualityItems[0], "ArrowDown");
     expect(shadowActive(qualityMenu)).toBe(qualityItems[1]);
-    key(qualityItems[1], "Escape");
+    key(qualityItems[1], "Tab");
+    expect(qualityBtn.getAttribute("aria-expanded")).toBe("false");
+
+    qualityBtn.click();
+    await flush();
+    const reopenedQualityItems = Array.from(
+      qualityMenu.querySelectorAll(".qitem"),
+    ) as HTMLButtonElement[];
+    key(reopenedQualityItems[1], "Escape");
 
     expect(viewerFormat()).toBe("theater");
     expect(qualityBtn.getAttribute("aria-expanded")).toBe("false");

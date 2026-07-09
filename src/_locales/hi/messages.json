@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "पूर्ण स्क्रीन" },
   "overlayBtnAlways": { "message": "हमेशा" },
   "overlayBtnAria": { "message": "Video Tuner खोलें" },
+  "overlayBtnClose": { "message": "Video Tuner बंद करें" },
   "kbdLabel": { "message": "कीबोर्ड शॉर्टकट" },
   "kbdFaster": { "message": "बढ़ाएँ" },
   "kbdSlower": { "message": "घटाएँ" },

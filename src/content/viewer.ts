@@ -188,6 +188,7 @@ document.addEventListener(
       return;
     }
     if (e.key === "Tab") {
+      closeViewerMenus();
       trapViewerFocus(e);
       return;
     }
@@ -1279,6 +1280,10 @@ function handleMenuKey(
     e.stopPropagation();
     setMenuOpen(menu, trigger, false);
     trigger?.focus();
+    return;
+  }
+  if (e.key === "Tab") {
+    setMenuOpen(menu, trigger, false);
     return;
   }
   if (e.key === "ArrowDown" || e.key === "ArrowRight") {

@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "Повний екран" },
   "overlayBtnAlways": { "message": "Завжди" },
   "overlayBtnAria": { "message": "Відкрити Video Tuner" },
+  "overlayBtnClose": { "message": "Закрити Video Tuner" },
   "kbdLabel": { "message": "Гарячі клавіші" },
   "kbdFaster": { "message": "збільшити" },
   "kbdSlower": { "message": "зменшити" },

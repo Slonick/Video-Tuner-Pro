@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "全画面" },
   "overlayBtnAlways": { "message": "常に" },
   "overlayBtnAria": { "message": "Video Tuner を開く" },
+  "overlayBtnClose": { "message": "Video Tuner を閉じる" },
   "kbdLabel": { "message": "キーボードショートカット" },
   "kbdFaster": { "message": "上げる" },
   "kbdSlower": { "message": "下げる" },

@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "全屏" },
   "overlayBtnAlways": { "message": "始终" },
   "overlayBtnAria": { "message": "打开 Video Tuner" },
+  "overlayBtnClose": { "message": "关闭 Video Tuner" },
   "kbdLabel": { "message": "键盘快捷键" },
   "kbdFaster": { "message": "提高" },
   "kbdSlower": { "message": "降低" },

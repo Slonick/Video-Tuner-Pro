@@ -92,6 +92,7 @@
   "overlayBtnFullscreen": { "message": "Fullscreen" },
   "overlayBtnAlways": { "message": "Always" },
   "overlayBtnAria": { "message": "Open Video Tuner" },
+  "overlayBtnClose": { "message": "Close Video Tuner" },
   "autoSlowLabel": { "message": "Auto-slow dense speech" },
   "autoSlowHint": { "message": "When someone talks too fast to keep up, the video eases off the speed for a moment, then picks back up on its own. Works best on videos of people talking." },
   "autoSlowSubtitle": { "message": "Ease off when speech gets too fast" },

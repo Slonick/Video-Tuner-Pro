@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "Pantalla completa" },
   "overlayBtnAlways": { "message": "Siempre" },
   "overlayBtnAria": { "message": "Abrir Video Tuner" },
+  "overlayBtnClose": { "message": "Cerrar Video Tuner" },
   "kbdLabel": { "message": "Atajos de teclado" },
   "kbdFaster": { "message": "aumentar" },
   "kbdSlower": { "message": "reducir" },

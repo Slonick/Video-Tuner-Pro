@@ -366,10 +366,12 @@ describe("launcher — open / close", () => {
     updateLauncher();
     const fab = fabEl()!;
     expect(frameEl()).toBeNull();
+    expect(fab.getAttribute("aria-label")).toBe("Open Video Tuner");
     fire(fab, "pointerdown", 580, 158);
     fire(fab, "pointerup", 580, 158);
     const frame = frameEl();
     expect(frame).not.toBeNull();
+    expect(fab.getAttribute("aria-label")).toBe("Close Video Tuner");
     // src carries the host + OS schemes in the hash, so the popup can match the host's
     // color-scheme (transparency) and theme the glass to the OS.
     expect(frame!.src).toMatch(
@@ -380,6 +382,7 @@ describe("launcher — open / close", () => {
     const backdrop = host()!.shadowRoot!.querySelector("div") as HTMLElement;
     fire(backdrop, "pointerdown");
     expect(frameEl()!.style.display).toBe("none");
+    expect(fab.getAttribute("aria-label")).toBe("Open Video Tuner");
   });
 
   it("recreates the iframe on each open so it loads the current popup", () => {

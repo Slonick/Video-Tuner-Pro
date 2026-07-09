@@ -610,6 +610,7 @@ describe("viewer auto-open scope control", () => {
     expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
       "Theater",
     );
+    await wait(1300);
     emitRuntimeMessage({ action: "viewerStateChanged", mode: "off" }, { tab: { id: YT.id } });
     await flush();
     expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
@@ -658,7 +659,7 @@ describe("viewer auto-open scope control", () => {
     );
   });
 
-  it("still accepts page viewer events while a picked mode is waiting out stale replies", async () => {
+  it("ignores page viewer events while a picked mode is waiting out stale replies", async () => {
     const { emitRuntimeMessage } = await mountApp({
       tab: YT,
       replies: {
@@ -673,7 +674,7 @@ describe("viewer auto-open scope control", () => {
     await wait(120);
 
     expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
-      "Off",
+      "Theater",
     );
   });
 

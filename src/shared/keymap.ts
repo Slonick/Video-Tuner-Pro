@@ -191,15 +191,16 @@ export function normalizeKeymap(raw: unknown): Keymap {
         ? ACTIONS.find((action) => DEFAULT_KEYMAP[action] === code)
         : null;
     const laterOwnerRaw = defaultOwner ? src[defaultOwner] : undefined;
-    const laterDefaultOwnerNeedsCode =
-      !!defaultOwner &&
-      a === "slower" &&
-      defaultOwner === "faster" &&
-      ACTIONS.indexOf(defaultOwner) > i &&
+    const laterOwnerNeedsOwnDefault =
       laterOwnerRaw !== "" &&
       (typeof laterOwnerRaw !== "string" ||
         !isBindableCode(laterOwnerRaw) ||
         laterOwnerRaw === code);
+    const laterDefaultOwnerNeedsCode =
+      !!defaultOwner &&
+      ACTIONS.indexOf(defaultOwner) > i &&
+      laterOwnerNeedsOwnDefault &&
+      (laterOwnerRaw !== undefined || (a === "slower" && defaultOwner === "faster"));
     if (code === "") {
       out[a] = ""; // explicitly unbound — the action does nothing
     } else if (

@@ -82,6 +82,7 @@
   "overlayBtnFullscreen": { "message": "Полный экран" },
   "overlayBtnAlways": { "message": "Всегда" },
   "overlayBtnAria": { "message": "Открыть Video Tuner" },
+  "overlayBtnClose": { "message": "Закрыть Video Tuner" },
   "kbdLabel": { "message": "Горячие клавиши" },
   "kbdFaster": { "message": "увеличить" },
   "kbdSlower": { "message": "уменьшить" },

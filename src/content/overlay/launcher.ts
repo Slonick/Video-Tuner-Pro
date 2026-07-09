@@ -99,8 +99,15 @@ function syncTopLayerAttr(): void {
   else document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
 }
 
+function fabLabel(): string {
+  return open
+    ? i18n("overlayBtnClose") || "Close Video Tuner"
+    : i18n("overlayBtnAria") || "Open Video Tuner";
+}
+
 function syncFabExpanded(): void {
   fab?.setAttribute("aria-expanded", open || radialOpen ? "true" : "false");
+  fab?.setAttribute("aria-label", fabLabel());
 }
 
 // True if a node belongs to our launcher — the media observer ignores our own
@@ -739,7 +746,7 @@ function mount(): void {
   ensureGlassFilter(shadow); // our liquid-glass displacement filter, scoped to this shadow
   fab = document.createElement("button");
   fab.type = "button";
-  fab.setAttribute("aria-label", i18n("overlayBtnAria") || "Open Video Tuner");
+  fab.setAttribute("aria-label", fabLabel());
   fab.setAttribute("aria-haspopup", "menu");
   fab.setAttribute("aria-expanded", "false");
   fab.setAttribute("data-popup-open", "false");
