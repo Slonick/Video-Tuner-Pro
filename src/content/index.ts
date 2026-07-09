@@ -213,10 +213,11 @@ function loadSpeed() {
       S.presets = ps.presets.map((p) => p / 100);
       S.presetKeys = ps.keys;
       S.liveSyncEnabled = result.liveSync !== false;
+      const keys = channelKeys();
       // Allowed delay resolves by scope: channel > site > global > 5s. The legacy
       // `liveSyncTarget` acts as the old global fallback.
       const rt = resolveSyncTarget(
-        channelKeys(),
+        keys,
         getDomain(),
         (result.syncTargets || {}) as Record<string, number>,
         (result.syncTargetChannels || {}) as Record<string, number>,
@@ -228,7 +229,7 @@ function loadSpeed() {
       // enable is a GLOBAL flag (loaded by the registry above), not per-scope; the
       // floor and response dynamics are registry-loaded too.
       const rs = resolveAutoSlow(
-        channelKeys(),
+        keys,
         getDomain(),
         (result.autoSlowSites || {}) as Record<string, AutoSlowSettings>,
         (result.autoSlowChannels || {}) as Record<string, AutoSlowSettings>,
@@ -237,7 +238,7 @@ function loadSpeed() {
       S.autoSlowScope = rs.scope;
       S.autoSlowTarget = rs.target;
       const va = resolveViewerAuto(
-        channelKeys(),
+        keys,
         getDomain(),
         (result.viewerAutoSites || {}) as Record<string, "off" | "normal" | "theater">,
         (result.viewerAutoChannels || {}) as Record<string, "off" | "normal" | "theater">,
@@ -246,7 +247,7 @@ function loadSpeed() {
       S.viewerAuto = va.mode;
       S.viewerAutoScope = va.scope;
       const vf = resolveViewerFit(
-        channelKeys(),
+        keys,
         getDomain(),
         (result.viewerFitSites || {}) as Record<string, "contain" | "cover" | "fill">,
         (result.viewerFitChannels || {}) as Record<string, "contain" | "cover" | "fill">,
@@ -254,7 +255,7 @@ function loadSpeed() {
       );
       S.viewerFit = vf.mode;
       S.viewerFitScope = vf.scope;
-      applyResolved(domains, channels, result.globalSpeed as number | undefined);
+      applyResolved(domains, channels, result.globalSpeed as number | undefined, keys);
       applyAll();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
