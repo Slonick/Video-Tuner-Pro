@@ -56,6 +56,7 @@ let backdropVideo: HTMLVideoElement | HTMLCanvasElement | null = null;
 let backdropCanvasTimer: ReturnType<typeof setTimeout> | null = null;
 let surfaceShell: HTMLDivElement | null = null;
 let loadingEl: HTMLDivElement | null = null;
+let loadingShown = false;
 let holder: Comment | null = null; // marks the video's original DOM spot
 let sourceParent: Node | null = null;
 let sourceNextSibling: Node | null = null;
@@ -941,6 +942,8 @@ function syncPlay(): void {
 function setViewerLoading(on: boolean): void {
   if (!loadingEl) return;
   const show = on && !!video && !video.paused;
+  if (loadingShown === show) return;
+  loadingShown = show;
   if (show) showBar();
   loadingEl.style.opacity = show ? "1" : "0";
   loadingEl.style.transform = show
@@ -1735,6 +1738,7 @@ async function enter(
   loadingEl = document.createElement("div");
   loadingEl.setAttribute("data-vtp-viewer-loading", "");
   loadingEl.appendChild(document.createElement("i"));
+  loadingShown = false;
   surfaceShell.append(loadingStyle, loadingEl);
   hookGlobal();
   // Chapters depend on the SITE player's UI, so read them before the video
@@ -1869,6 +1873,7 @@ export function exitViewer(): void {
     backdropVideo = null;
     surfaceShell = null;
     loadingEl = null;
+    loadingShown = false;
     bar = null;
     playBtn = muteBtn = fmtBtn = null;
     seekEl = seekWrapEl = volEl = null;

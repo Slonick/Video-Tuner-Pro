@@ -18,9 +18,26 @@ import { controlLive } from "./live/sync.js";
 import { applyAudioComp } from "./audio/compressor.js";
 import { updateBadge } from "./badge/icon.js";
 import { updateTimeBadge, flashBadge } from "./badge/overlay.js";
-import { listenerOptions } from "./lifecycle.js";
+import { contentSignal, listenerOptions } from "./lifecycle.js";
 
 type Done = (ok?: boolean) => void;
+const LIVE_REEVAL_THROTTLE_MS = 250;
+let liveReevalTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleLiveReevaluation(): void {
+  if (liveReevalTimer != null) return;
+  liveReevalTimer = setTimeout(() => {
+    liveReevalTimer = null;
+    controlLive();
+  }, LIVE_REEVAL_THROTTLE_MS);
+}
+
+contentSignal.addEventListener("abort", () => {
+  if (liveReevalTimer != null) {
+    clearTimeout(liveReevalTimer);
+    liveReevalTimer = null;
+  }
+});
 
 export function persistDomainSpeed(speed: number, done?: Done): void {
   if (!ctxValid()) {
@@ -240,7 +257,7 @@ function applyToVideo(video: HTMLVideoElement, primaryLive: boolean): void {
   const reevaluateLive = () => controlLive();
   video.addEventListener("durationchange", reevaluateLive, listenerOptions());
   video.addEventListener("loadedmetadata", reevaluateLive, listenerOptions());
-  video.addEventListener("timeupdate", reevaluateLive, listenerOptions());
+  video.addEventListener("timeupdate", scheduleLiveReevaluation, listenerOptions());
 }
 
 // <audio> never gets a badge, live-sync, or the compressor — just the rate.
