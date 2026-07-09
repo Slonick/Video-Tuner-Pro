@@ -136,12 +136,28 @@
   }
 
   let twitchPlayer: TwitchPlayer | null = null;
+  let nextTwitchScanAt = 0;
+  let twitchScanDelay = 5000;
+  const TWITCH_SCAN_INITIAL_MS = 5000;
+  const TWITCH_SCAN_MAX_MS = 60000;
+  function resetTwitchScanBackoff(): void {
+    nextTwitchScanAt = 0;
+    twitchScanDelay = TWITCH_SCAN_INITIAL_MS;
+  }
   function twitchLatency(): number | null {
     if (!IS_TWITCH) return null;
     let lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
     if (lat == null) {
+      const now = Date.now();
+      if (now < nextTwitchScanAt) return null;
       twitchPlayer = findTwitchPlayer();
-      lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
+      if (twitchPlayer) {
+        resetTwitchScanBackoff();
+        lat = twitchLatencyOf(twitchPlayer);
+      } else {
+        nextTwitchScanAt = now + twitchScanDelay;
+        twitchScanDelay = Math.min(twitchScanDelay * 2, TWITCH_SCAN_MAX_MS);
+      }
     }
     return lat;
   }
@@ -388,7 +404,7 @@
       const tw = twitchLatency();
       const yt = tw == null ? youtubeLatency() : null;
       const live = youtubeIsLive();
-      const lat = tw != null ? tw : (yt ?? (IS_YOUTUBE && live === false ? null : hlsLatency()));
+      const lat = tw != null ? tw : (yt ?? (IS_YOUTUBE ? null : hlsLatency()));
       const root = document.documentElement;
       if (!root) return;
       setAttrIfChanged(root, ATTR, lat != null ? (Math.round(lat * 10) / 10).toFixed(1) : null);

@@ -29,7 +29,9 @@ function analyserDb(an: AnalyserNode): number {
 
 function audioOutDb(g: AudioGraph, inDb: number): number {
   const reduction = g.comp && typeof g.comp.reduction === "number" ? g.comp.reduction : 0;
-  return deriveOutDb(inDb, reduction, compOn() ? S.audioCompGain : 0);
+  const limiterReduction =
+    g.limiter && typeof g.limiter.reduction === "number" ? g.limiter.reduction : 0;
+  return deriveOutDb(inDb, reduction + limiterReduction, compOn() ? S.audioCompGain : 0);
 }
 
 function translationStatus(): boolean {

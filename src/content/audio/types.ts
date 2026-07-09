@@ -2,6 +2,7 @@ export interface AudioGraph {
   source: MediaElementAudioSourceNode;
   comp: DynamicsCompressorNode;
   gain: GainNode;
+  limiter?: DynamicsCompressorNode;
   analyserIn: AnalyserNode;
   _key?: string;
 }

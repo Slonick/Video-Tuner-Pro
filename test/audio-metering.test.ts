@@ -38,9 +38,10 @@ import {
 } from "../src/content/audio/metering.js";
 
 // rms 0.5 over the buffer → ~-6.02 dB (matches levels.test.ts).
-function makeGraph(reduction: number) {
+function makeGraph(reduction: number, limiterReduction = 0) {
   return {
     comp: { reduction },
+    limiter: { reduction: limiterReduction },
     analyserIn: {
       fftSize: 8,
       getFloatTimeDomainData(buf: Float32Array) {
@@ -117,6 +118,15 @@ describe("audioLevels", () => {
     m.graphs.set(v, makeGraph(-3));
     const r = audioLevels();
     expect(r.out).toBeCloseTo(2.98, 1);
+  });
+
+  it("includes limiter reduction in the reported output level", () => {
+    S.audioCompGain = 24;
+    const v = {} as HTMLVideoElement;
+    m.primary = v;
+    m.graphs.set(v, makeGraph(-3, -8));
+    const r = audioLevels();
+    expect(r.out).toBeCloseTo(6.98, 1);
   });
 
   it("flags an active translation (compression yields to VOT)", () => {

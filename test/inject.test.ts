@@ -90,6 +90,23 @@ describe("MAIN-world live probe", () => {
     expect(hlsReads).not.toHaveBeenCalled();
   });
 
+  it("does not scan generic HLS internals on YouTube while live state is unknown", async () => {
+    const player = document.createElement("div");
+    player.className = "html5-video-player";
+    defineBox(player, 640, 360);
+    document.body.append(player);
+    const video = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    const hlsReads = vi.fn(() => null);
+    Object.defineProperty(video, "hls", { get: hlsReads, configurable: true, enumerable: true });
+    document.body.append(video);
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBeNull();
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
+    expect(hlsReads).not.toHaveBeenCalled();
+  });
+
   it("does not scan Twitch fiber players outside Twitch hosts", async () => {
     vi.stubGlobal("location", { hostname: "example.com" });
     const getLiveLatency = vi.fn(() => 2.5);
@@ -120,6 +137,34 @@ describe("MAIN-world live probe", () => {
     await loadInject();
 
     expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("2.5");
+  });
+
+  it("backs off repeated Twitch fiber scans when no player instance is found", async () => {
+    vi.stubGlobal("location", { hostname: "www.twitch.tv" });
+    const fiberReads = vi.fn(() => null);
+    const video = document.createElement("video") as HTMLVideoElement & {
+      __reactFiber$vtp?: unknown;
+    };
+    Object.defineProperty(video, "__reactFiber$vtp", {
+      get: fiberReads,
+      configurable: true,
+      enumerable: true,
+    });
+    document.body.append(video);
+
+    await loadInject();
+    const firstScanReads = fiberReads.mock.calls.length;
+    expect(firstScanReads).toBeGreaterThan(0);
+
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(fiberReads).toHaveBeenCalledTimes(firstScanReads);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const secondScanReads = fiberReads.mock.calls.length;
+    expect(secondScanReads).toBeGreaterThan(firstScanReads);
+
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(fiberReads).toHaveBeenCalledTimes(secondScanReads);
   });
 
   it("stops publishing after a newer bridge version takes ownership", async () => {
@@ -190,6 +235,7 @@ describe("MAIN-world live probe", () => {
   });
 
   it("skips detached HLS candidates and clears latency when the cached one detaches", async () => {
+    vi.stubGlobal("location", { hostname: "kick.com" });
     const staleVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
     const liveVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
     staleVideo.hls = { latency: 99, attachMedia() {} };
@@ -207,6 +253,7 @@ describe("MAIN-world live probe", () => {
   });
 
   it("does not rewrite unchanged live probe attributes on every tick", async () => {
+    vi.stubGlobal("location", { hostname: "kick.com" });
     const liveVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
     liveVideo.hls = { latency: 4.04, media: liveVideo };
     document.body.append(liveVideo);
@@ -221,6 +268,7 @@ describe("MAIN-world live probe", () => {
   });
 
   it("uses the quality bridge HLS registry while full HLS scans are backed off", async () => {
+    vi.stubGlobal("location", { hostname: "kick.com" });
     const liveVideo = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
     liveVideo.hls = { latency: 4, media: liveVideo };
     document.body.append(liveVideo);
@@ -246,6 +294,7 @@ describe("MAIN-world live probe", () => {
   });
 
   it("backs off repeated full HLS scans when no active instance is found", async () => {
+    vi.stubGlobal("location", { hostname: "kick.com" });
     const video = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
     const hlsReads = vi.fn(() => null);
     Object.defineProperty(video, "hls", { get: hlsReads, configurable: true, enumerable: true });

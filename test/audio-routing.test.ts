@@ -13,6 +13,7 @@ class FakeParam {
 }
 let lastCtx: FakeAudioContext | null = null;
 let createSourceCalls = 0;
+const connections: Array<[string, string]> = [];
 class FakeAudioContext {
   state = "running";
   currentTime = 0;
@@ -28,24 +29,41 @@ class FakeAudioContext {
   createMediaElementSource() {
     createSourceCalls++;
     if (this.throwOnSource) throw new Error("already captured");
-    return { connect() {} };
+    return {
+      connect: (node: { _kind?: string }) => connections.push(["source", node._kind || "?"]),
+    };
   }
   createDynamicsCompressor() {
     return {
+      _kind: "comp",
       threshold: new FakeParam(),
       knee: new FakeParam(),
       ratio: new FakeParam(),
       attack: new FakeParam(),
       release: new FakeParam(),
       reduction: 0,
-      connect() {},
+      connect(node: { _kind?: string }) {
+        connections.push(["comp", node._kind || "?"]);
+      },
     };
   }
   createGain() {
-    return { gain: new FakeParam(), connect() {} };
+    return {
+      _kind: "gain",
+      gain: new FakeParam(),
+      connect(node: { _kind?: string }) {
+        connections.push(["gain", node._kind || "?"]);
+      },
+    };
   }
   createAnalyser() {
-    return { fftSize: 0, smoothingTimeConstant: 0, connect() {}, getFloatTimeDomainData() {} };
+    return {
+      _kind: "analyser",
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      connect() {},
+      getFloatTimeDomainData() {},
+    };
   }
 }
 
@@ -76,6 +94,7 @@ async function load() {
 beforeEach(() => {
   lastCtx = null;
   createSourceCalls = 0;
+  connections.length = 0;
   document.body.innerHTML = "";
 });
 afterEach(() => {
@@ -217,13 +236,17 @@ describe("setupGraph context & exclusivity", () => {
     expect(lastSkip()).toBe("inuse");
   });
 
-  it("builds the full source→comp→gain→destination chain on success", async () => {
+  it("builds the full source→comp→gain→limiter→destination chain on success", async () => {
     const { setupGraph } = await load();
     const g = setupGraph(vid({ srcObject: {} }))!;
     expect(g.source).toBeDefined();
     expect(g.comp).toBeDefined();
     expect(g.gain).toBeDefined();
+    expect(g.limiter).toBeDefined();
     expect(g.analyserIn).toBeDefined();
+    expect(connections).toContainEqual(["source", "comp"]);
+    expect(connections).toContainEqual(["comp", "gain"]);
+    expect(connections).toContainEqual(["gain", "comp"]);
   });
 
   it("treats an existing graph as inactive after the element switches to an unsafe URL", async () => {

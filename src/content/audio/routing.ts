@@ -165,9 +165,16 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   }
   const comp = ctx.createDynamicsCompressor();
   const gain = ctx.createGain();
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -1;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.003;
+  limiter.release.value = 0.08;
   source.connect(comp);
   comp.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(limiter);
+  limiter.connect(ctx.destination);
   // We meter only the INPUT level; the output is derived as input + the
   // compressor's exact gain reduction (comp.reduction) + make-up gain, which keeps
   // the before/after difference exact and avoids two-analyser latency.
@@ -175,7 +182,7 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   analyserIn.fftSize = 1024;
   analyserIn.smoothingTimeConstant = 0.5;
   source.connect(analyserIn);
-  const g: AudioGraph = { source, comp, gain, analyserIn };
+  const g: AudioGraph = { source, comp, gain, limiter, analyserIn };
   audioGraphs.set(video, g);
   audioGraphCount += 1;
   audioSkipReasons.delete(video);
