@@ -205,6 +205,23 @@ describe("probeLive (generic real-time-edge detection)", () => {
     expect(isLive(v)).toBe(false);
   });
 
+  it("does not read buffered/seekable ranges for a stable finite VOD", () => {
+    const badRanges = {
+      length: 1,
+      start: () => 0,
+      end: () => {
+        throw new Error("finite VOD should not read media ranges");
+      },
+    } as unknown as TimeRanges;
+    const v = vid({ duration: 600, buffered: badRanges, seekable: badRanges });
+
+    probeLive(v);
+    vi.setSystemTime(1000);
+    probeLive(v);
+
+    expect(isLive(v)).toBe(false);
+  });
+
   it("clears a temporary live probe once a finite VOD duration appears", () => {
     let edge = 10;
     let duration = NaN;

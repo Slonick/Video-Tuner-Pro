@@ -135,6 +135,7 @@ export function isLive(video: HTMLVideoElement): boolean {
 // furthest known media position and call it live when it advances at roughly 1x.
 interface LiveProbe {
   lastEnd: number;
+  lastDuration: number;
   lastT: number;
   lastGrow: number;
   hits: number;
@@ -163,20 +164,44 @@ export function probeLive(v: HTMLVideoElement): void {
   if (!v) return;
   const t = Date.now();
   if (unboundedDuration(v.duration)) {
-    liveProbe.set(v, { lastEnd: 0, lastT: t, lastGrow: t, hits: 0, live: true });
+    liveProbe.set(v, {
+      lastEnd: 0,
+      lastDuration: v.duration,
+      lastT: t,
+      lastGrow: t,
+      hits: 0,
+      live: true,
+    });
     return;
   }
   const finite = finiteVodDuration(v.duration);
-  const end = streamEnd(v);
   const s = liveProbe.get(v);
   if (!s) {
-    liveProbe.set(v, { lastEnd: end, lastT: t, lastGrow: 0, hits: 0, live: false });
+    const end = finite ? v.duration : streamEnd(v);
+    liveProbe.set(v, {
+      lastEnd: end,
+      lastDuration: v.duration,
+      lastT: t,
+      lastGrow: 0,
+      hits: 0,
+      live: false,
+    });
     return;
   }
   const dT = (t - s.lastT) / 1000;
   if (dT < 0.4) return; // need spacing between samples for a stable rate
+  if (finite && v.duration === s.lastDuration) {
+    s.lastEnd = v.duration;
+    s.lastT = t;
+    s.hits = 0;
+    s.lastGrow = 0;
+    s.live = false;
+    return;
+  }
+  const end = finite ? v.duration : streamEnd(v);
   const rate = (end - s.lastEnd) / dT;
   s.lastEnd = end;
+  s.lastDuration = v.duration;
   s.lastT = t;
   // Real-time growth (~1x) = a live edge; VOD is either flat (~0) or bursty (>>1).
   if (rate > 0.3 && rate < 1.7) {
