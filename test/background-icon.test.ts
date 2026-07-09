@@ -13,6 +13,8 @@ const h = vi.hoisted(() => ({
   badgeText: [] as unknown[],
   icons: [] as unknown[],
   tabMessages: [] as unknown[],
+  scriptCalls: [] as unknown[],
+  probeResults: [] as Array<{ frameId?: number; result?: { hasVideo?: boolean; score?: number } }>,
 }));
 
 vi.mock("../src/shared/store.js", () => ({
@@ -52,6 +54,8 @@ describe("background toolbar badge frame ownership", () => {
     h.badgeText = [];
     h.icons = [];
     h.tabMessages = [];
+    h.scriptCalls = [];
+    h.probeResults = [{ frameId: 4, result: { hasVideo: true, score: 100 } }];
     (globalThis as unknown as { browser?: unknown }).browser = undefined;
     (globalThis as unknown as { chrome: unknown }).chrome = {
       runtime: {
@@ -101,6 +105,12 @@ describe("background toolbar badge frame ownership", () => {
           addListener(fn: TabRemovedListener) {
             h.tabRemoved = fn;
           },
+        },
+      },
+      scripting: {
+        executeScript(args: unknown, cb: (results?: typeof h.probeResults) => void) {
+          h.scriptCalls.push(args);
+          cb(h.probeResults);
         },
       },
       alarms: {
@@ -156,25 +166,52 @@ describe("background toolbar badge frame ownership", () => {
     ]);
   });
 
-  it("relays popup messages to the current badge owner frame first", () => {
+  it("routes video-frame popup messages to the probed video frame", () => {
+    let response: unknown;
+    h.probeResults = [
+      { frameId: 4, result: { hasVideo: true, score: 100 } },
+      { frameId: 7, result: { hasVideo: true, score: 500 } },
+    ];
+    h.listener!({ action: "icon", text: "1.25", live: false }, sender(11, 4));
+    h.listener!(
+      { action: "relayToTab", tabId: 11, msg: { action: "getMonitor" }, route: "video" },
+      {},
+      (r) => {
+        response = r;
+      },
+    );
+
+    expect(h.tabMessages).toEqual([
+      { tabId: 11, msg: { action: "getMonitor" }, options: { frameId: 7 } },
+    ]);
+    expect(response).toEqual({ ok: true, action: "getMonitor", frameId: 7 });
+    expect(h.scriptCalls).toHaveLength(1);
+  });
+
+  it("keeps using the badge owner for non-video relays", () => {
     let response: unknown;
     h.listener!({ action: "icon", text: "1.25", live: false }, sender(11, 4));
-    h.listener!({ action: "relayToTab", tabId: 11, msg: { action: "getMonitor" } }, {}, (r) => {
+    h.listener!({ action: "relayToTab", tabId: 11, msg: { action: "setSpeed" } }, {}, (r) => {
       response = r;
     });
 
     expect(h.tabMessages).toEqual([
-      { tabId: 11, msg: { action: "getMonitor" }, options: { frameId: 4 } },
+      { tabId: 11, msg: { action: "setSpeed" }, options: { frameId: 4 } },
     ]);
-    expect(response).toEqual({ ok: true, action: "getMonitor", frameId: 4 });
+    expect(response).toEqual({ ok: true, action: "setSpeed", frameId: 4 });
+    expect(h.scriptCalls).toHaveLength(0);
   });
 
   it("falls back to a tab-wide relay when the remembered frame is stale", () => {
     let response: unknown;
     h.listener!({ action: "icon", text: "1.25", live: false }, sender(12, 4));
-    h.listener!({ action: "relayToTab", tabId: 12, msg: { action: "stale" } }, {}, (r) => {
-      response = r;
-    });
+    h.listener!(
+      { action: "relayToTab", tabId: 12, msg: { action: "stale" }, route: "video" },
+      {},
+      (r) => {
+        response = r;
+      },
+    );
 
     expect(h.tabMessages).toEqual([
       { tabId: 12, msg: { action: "stale" }, options: { frameId: 4 } },

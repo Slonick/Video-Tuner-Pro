@@ -31,6 +31,13 @@ const RED_ICON = {
   128: "icons/icon-red-128.png",
 };
 const badgeOwners = new Map<number, number>();
+const videoFrameOwners = new Map<number, { frameId: number; expires: number }>();
+const VIDEO_FRAME_CACHE_MS = 1000;
+
+interface VideoFrameProbe {
+  hasVideo?: boolean;
+  score?: number;
+}
 
 // On Chrome MV3 these action APIs return a Promise that rejects asynchronously
 // when the tab is already gone ("No tab with id …"); a plain try/catch only
@@ -45,9 +52,65 @@ function call(fn: () => unknown): void {
 }
 
 function reset(tabId?: number): void {
-  if (typeof tabId === "number") badgeOwners.delete(tabId);
+  if (typeof tabId === "number") {
+    badgeOwners.delete(tabId);
+    videoFrameOwners.delete(tabId);
+  }
   call(() => api.action.setBadgeText({ text: "", tabId }));
   call(() => api.action.setIcon({ path: DEFAULT_ICON, tabId }));
+}
+
+function probeVideoFrame(): VideoFrameProbe {
+  const videos = Array.from(document.querySelectorAll("video"));
+  let best = 0;
+  for (const video of videos) {
+    const rect = video.getBoundingClientRect();
+    const area = Math.max(0, rect.width) * Math.max(0, rect.height);
+    const ready = video.readyState > 0 || !!video.currentSrc || !!video.src;
+    if (!ready && area <= 1) continue;
+    const score = area + (video.paused ? 0 : 1_000_000_000) + (ready ? 10_000 : 0);
+    if (score > best) best = score;
+  }
+  return { hasVideo: best > 0, score: best };
+}
+
+function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
+  const cached = videoFrameOwners.get(tabId);
+  if (cached && cached.expires > Date.now()) {
+    done(cached.frameId);
+    return;
+  }
+  if (!api.scripting?.executeScript) {
+    done(undefined);
+    return;
+  }
+  call(() =>
+    api.scripting.executeScript(
+      {
+        target: { tabId, allFrames: true },
+        func: probeVideoFrame,
+      },
+      (results?: Array<{ frameId?: number; result?: VideoFrameProbe }>) => {
+        void api.runtime.lastError;
+        let best: { frameId: number; score: number } | null = null;
+        for (const entry of results || []) {
+          const frameId = entry.frameId;
+          const score = entry.result?.score || 0;
+          if (!entry.result?.hasVideo || typeof frameId !== "number") continue;
+          if (!best || score > best.score) best = { frameId, score };
+        }
+        if (best) {
+          videoFrameOwners.set(tabId, {
+            frameId: best.frameId,
+            expires: Date.now() + VIDEO_FRAME_CACHE_MS,
+          });
+        } else {
+          videoFrameOwners.delete(tabId);
+        }
+        done(best?.frameId);
+      },
+    ),
+  );
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -70,6 +133,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.action === "relayToTab" && typeof msg.tabId === "number") {
     const tabId = msg.tabId;
     const owner = badgeOwners.get(tabId);
+    const routeVideo = msg.route === "video";
     const finish = (resp: unknown) => {
       try {
         sendResponse(resp);
@@ -83,6 +147,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         api.tabs.sendMessage(tabId, msg.msg, options, (resp: unknown) => {
           const failed = !!api.runtime.lastError || !resp;
           if (failed && typeof frameId === "number") {
+            if (routeVideo) videoFrameOwners.delete(tabId);
             relay();
             return;
           }
@@ -99,7 +164,8 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     };
     try {
-      relay(owner);
+      if (routeVideo) findVideoFrame(tabId, (frameId) => relay(frameId ?? owner));
+      else relay(owner);
     } catch (e) {
       try {
         sendResponse(undefined);

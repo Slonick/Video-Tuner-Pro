@@ -60,4 +60,18 @@ describe("popup embedded (overlay) routing", () => {
       msg: { action: "setSpeed", speed: 1.5 },
     });
   });
+
+  it("marks embedded viewer state messages for video-frame routing", async () => {
+    const sent = embed({ relayToTab: { mode: "normal" } });
+    vi.resetModules();
+    const { sendToTab } = await import("../src/popup/platform/browser.js");
+
+    expect(await sendToTab(42, { action: "getViewerState" })).toEqual({ mode: "normal" });
+    expect(sent).toContainEqual({
+      action: "relayToTab",
+      tabId: 42,
+      msg: { action: "getViewerState" },
+      route: "video",
+    });
+  });
 });

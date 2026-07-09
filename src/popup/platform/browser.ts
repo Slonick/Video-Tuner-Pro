@@ -8,13 +8,13 @@ export const api = typeof browser !== "undefined" ? browser : chrome;
 // host tab from sender.tab. (Chrome works either way; this keeps one path for both.)
 export const EMBEDDED = typeof window !== "undefined" && window.top !== window;
 
-const FRAME_STABLE_ACTIONS = new Set([
-  "getMonitor",
+const VIDEO_FRAME_ACTIONS = new Set([
   "getHistory",
   "getViewerState",
   "setViewerState",
   "setViewerFit",
 ]);
+const EMBEDDED_VIDEO_FRAME_ACTIONS = new Set(["getMonitor", ...VIDEO_FRAME_ACTIONS]);
 
 function runtimeSend<T = unknown>(msg: Record<string, unknown>): Promise<T | null> {
   return new Promise((resolve) => {
@@ -46,7 +46,10 @@ export function sendToTab<T = unknown>(
   tabId: number,
   msg: Record<string, unknown>,
 ): Promise<T | null> {
-  if (EMBEDDED) return runtimeSend<T>({ action: "relayToTab", tabId, msg });
+  if (EMBEDDED) {
+    const route = EMBEDDED_VIDEO_FRAME_ACTIONS.has(String(msg.action)) ? "video" : undefined;
+    return runtimeSend<T>({ action: "relayToTab", tabId, msg, ...(route ? { route } : {}) });
+  }
   const direct = () =>
     new Promise<T | null>((resolve) => {
       try {
@@ -57,8 +60,10 @@ export function sendToTab<T = unknown>(
         resolve(null);
       }
     });
-  if (FRAME_STABLE_ACTIONS.has(String(msg.action))) {
-    return runtimeSend<T>({ action: "relayToTab", tabId, msg }).then((resp) => resp ?? direct());
+  if (VIDEO_FRAME_ACTIONS.has(String(msg.action))) {
+    return runtimeSend<T>({ action: "relayToTab", tabId, msg, route: "video" }).then(
+      (resp) => resp ?? direct(),
+    );
   }
   return direct();
 }

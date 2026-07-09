@@ -76,6 +76,7 @@ describe("graph polling under the Firefox overlay", () => {
       action: "relayToTab",
       tabId: 42,
       msg: { action: "getMonitor" },
+      route: "video",
     });
     expect(g.audioActive).toBe(true);
     expect(g.tgt.in).toBe(-20);
@@ -129,6 +130,7 @@ describe("graph polling under the Firefox overlay", () => {
       action: "relayToTab",
       tabId: 7,
       msg: { action: "getHistory" },
+      route: "video",
     });
     expect(g.histSeeded).toBe(true);
     expect(g.audioHist.length).toBeGreaterThan(0);
