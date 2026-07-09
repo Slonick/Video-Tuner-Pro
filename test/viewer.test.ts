@@ -1144,6 +1144,37 @@ describe("control bar", () => {
     expect(btn.textContent).toContain("720p");
   });
 
+  it("exposes viewer menus to assistive tech and closes them with Escape", async () => {
+    installQualityBridge();
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater");
+    await flush();
+
+    const quality = qwraps()[0];
+    const qualityBtn = quality.querySelector("button") as HTMLButtonElement;
+    expect(qualityBtn.getAttribute("aria-haspopup")).toBe("menu");
+    expect(qualityBtn.getAttribute("aria-expanded")).toBe("false");
+    qualityBtn.click();
+    await flush();
+    const qualityMenu = quality.querySelector(".qmenu") as HTMLElement;
+    expect(qualityBtn.getAttribute("aria-expanded")).toBe("true");
+    expect(qualityMenu.getAttribute("role")).toBe("menu");
+    expect(qualityMenu.querySelector(".qitem")?.getAttribute("role")).toBe("menuitemradio");
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    expect(viewerFormat()).toBe("theater");
+    expect(qualityBtn.getAttribute("aria-expanded")).toBe("false");
+
+    const fit = qwraps()[1];
+    const fitBtn = fit.querySelector("button") as HTMLButtonElement;
+    fitBtn.click();
+    const fitMenu = fit.querySelector(".qmenu") as HTMLElement;
+    expect(fitBtn.getAttribute("aria-expanded")).toBe("true");
+    expect(fitMenu.getAttribute("role")).toBe("menu");
+    expect(fitMenu.querySelector(".qitem")?.getAttribute("role")).toBe("menuitemradio");
+  });
+
   it("ignores a quality response that arrives after the viewer closed", async () => {
     vi.useFakeTimers();
     installDelayedQualityBridge();

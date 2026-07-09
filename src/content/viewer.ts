@@ -173,6 +173,11 @@ document.addEventListener(
     )
       return;
     if (e.key === "Escape") {
+      if (closeViewerMenus()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       if (document.documentElement.hasAttribute(LAUNCHER_TOP_LAYER_ATTR)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -1150,6 +1155,7 @@ function qualityRequest(
 
 function setQualityVisible(visible: boolean): void {
   if (!qualityWrap) return;
+  if (!visible) setMenuOpen(qualityMenu, qualityBtn, false);
   qualityWrap.style.display = visible ? "block" : "none";
   layoutBar();
 }
@@ -1190,11 +1196,17 @@ function renderQuality(state: QualityState): void {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "qitem";
+    item.setAttribute("role", "menuitemradio");
     item.textContent = opt.label;
-    if (opt.current || opt.id === state.current) item.setAttribute("aria-current", "true");
+    if (opt.current || opt.id === state.current) {
+      item.setAttribute("aria-current", "true");
+      item.setAttribute("aria-checked", "true");
+    } else {
+      item.setAttribute("aria-checked", "false");
+    }
     item.addEventListener("click", async () => {
       const session = viewerSession;
-      qualityMenu?.classList.remove("open");
+      setMenuOpen(qualityMenu, qualityBtn, false);
       pendingQuality = opt;
       pendingQualityUntil = Date.now() + 12_000;
       if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(opt.label);
@@ -1229,6 +1241,29 @@ function sessionTimeout(fn: () => void, ms: number, session = viewerSession): vo
     if (session === viewerSession && fmt) fn();
   }, ms);
   media?.signal.addEventListener("abort", () => window.clearTimeout(timer), { once: true });
+}
+
+function setMenuOpen(
+  menu: HTMLDivElement | null,
+  trigger: HTMLButtonElement | null,
+  open: boolean,
+) {
+  if (!menu || !trigger) return;
+  menu.classList.toggle("open", open);
+  trigger.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function closeViewerMenus(): boolean {
+  let closed = false;
+  if (fitMenu?.classList.contains("open")) {
+    setMenuOpen(fitMenu, fitMenu.previousElementSibling as HTMLButtonElement | null, false);
+    closed = true;
+  }
+  if (qualityMenu?.classList.contains("open")) {
+    setMenuOpen(qualityMenu, qualityBtn, false);
+    closed = true;
+  }
+  return closed;
 }
 
 // Our control bar, inside a shadow-rooted host that spans the overlay (the
@@ -1382,28 +1417,34 @@ function mountBar(): void {
   const fwrap = document.createElement("span");
   fwrap.className = "qwrap";
   const fitBtn = barButton(I_FIT, null, i18n("viewerFitAria") || "Fill mode");
+  fitBtn.setAttribute("aria-haspopup", "menu");
+  fitBtn.setAttribute("aria-expanded", "false");
   fitMenu = document.createElement("div");
   fitMenu.className = "qmenu";
+  fitMenu.setAttribute("role", "menu");
   fitBtn.addEventListener("click", () => {
     if (!fitMenu) return;
     if (fitMenu.classList.contains("open")) {
-      fitMenu.classList.remove("open");
+      setMenuOpen(fitMenu, fitBtn, false);
       return;
     }
+    closeViewerMenus();
     fitMenu.textContent = "";
     for (const m of FIT_MODES) {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "qitem";
+      item.setAttribute("role", "menuitemradio");
+      item.setAttribute("aria-checked", m === S.viewerFit ? "true" : "false");
       item.textContent = fitLabel(m);
       if (m === S.viewerFit) item.setAttribute("aria-current", "true");
       item.addEventListener("click", () => {
         setViewerFitMode(m, true);
-        fitMenu?.classList.remove("open");
+        setMenuOpen(fitMenu, fitBtn, false);
       });
       fitMenu.appendChild(item);
     }
-    fitMenu.classList.add("open");
+    setMenuOpen(fitMenu, fitBtn, true);
   });
   fwrap.append(fitBtn, fitMenu);
   qualityWrap = document.createElement("span");
@@ -1411,21 +1452,25 @@ function mountBar(): void {
   qualityWrap.style.display = "none";
   qualityBtn = barButton(I_QUALITY, null, i18n("viewerQualityAria") || "Quality");
   qualityBtn.classList.add("qbtn");
+  qualityBtn.setAttribute("aria-haspopup", "menu");
+  qualityBtn.setAttribute("aria-expanded", "false");
   qualityLabelEl = document.createElement("span");
   qualityLabelEl.className = "qbtn-label";
   qualityLabelEl.textContent = "Auto";
   qualityBtn.appendChild(qualityLabelEl);
   qualityMenu = document.createElement("div");
   qualityMenu.className = "qmenu";
+  qualityMenu.setAttribute("role", "menu");
   qualityBtn.addEventListener("click", async () => {
     if (!qualityMenu) return;
     if (qualityMenu.classList.contains("open")) {
-      qualityMenu.classList.remove("open");
+      setMenuOpen(qualityMenu, qualityBtn, false);
       return;
     }
+    closeViewerMenus();
     const state = await qualityRequest("vtp-quality-request");
     renderQuality(state);
-    if (state.options.length >= 2) qualityMenu.classList.add("open");
+    if (state.options.length >= 2) setMenuOpen(qualityMenu, qualityBtn, true);
   });
   qualityWrap.append(qualityBtn, qualityMenu);
   fmtBtn = barButton(I_GROW, I_SHRINK, i18n("viewerTheaterAria") || "Pop out in theater format");
