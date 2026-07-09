@@ -110,7 +110,7 @@ export function Switch({ checked, onChange, disabled, id, ariaLabel }: Props) {
     endDrag(e, false);
   };
   const onLostPointerCapture = (e: React.PointerEvent<HTMLButtonElement>) => {
-    suppressClick.current = false;
+    if (!dragging.current) return;
     endDrag(e, false);
   };
 

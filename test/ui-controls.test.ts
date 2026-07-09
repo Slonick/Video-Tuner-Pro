@@ -82,4 +82,31 @@ describe("Switch", () => {
     expect(changes).toEqual([true]);
     expect(sw.getAttribute("aria-checked")).toBe("true");
   });
+
+  it("swallows the synthesized click after a committed drag loses pointer capture", () => {
+    const changes: boolean[] = [];
+    function Harness() {
+      const [checked, setChecked] = useState(false);
+      return createElement(Switch, {
+        checked,
+        onChange: (next: boolean) => {
+          changes.push(next);
+          setChecked(next);
+        },
+      });
+    }
+    act(() => root!.render(createElement(Harness)));
+    const sw = document.querySelector<HTMLElement>('[role="switch"]')!;
+
+    act(() => {
+      sw.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 0 }));
+      sw.dispatchEvent(pointer("pointermove", { pointerId: 1, clientX: 20 }));
+      sw.dispatchEvent(pointer("pointerup", { pointerId: 1, clientX: 20 }));
+      sw.dispatchEvent(pointer("lostpointercapture", { pointerId: 1, clientX: 20 }));
+      sw.click();
+    });
+
+    expect(changes).toEqual([true]);
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+  });
 });
