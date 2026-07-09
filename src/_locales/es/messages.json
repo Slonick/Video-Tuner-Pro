@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "Silenciar" },
   "viewerVolumeAria": { "message": "Volumen" },
   "viewerQualityAria": { "message": "Calidad" },
+  "viewerQualityAuto": { "message": "Auto" },
+  "viewerLiveLabel": { "message": "EN VIVO" },
   "viewerModesLabel": { "message": "Modos de visor" },
   "viewerModesHint": { "message": "Saca el vídeo al modo visor o teatro." },
   "optViewerAutoLabel": { "message": "Abrir automáticamente el modo elegido" },

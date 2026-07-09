@@ -130,6 +130,8 @@
   "viewerMuteAria": { "message": "Без звука" },
   "viewerVolumeAria": { "message": "Громкость" },
   "viewerQualityAria": { "message": "Качество" },
+  "viewerQualityAuto": { "message": "Авто" },
+  "viewerLiveLabel": { "message": "ЭФИР" },
   "viewerModesLabel": { "message": "Режимы просмотра" },
   "viewerModesHint": { "message": "Выносить видео в режим просмотра или театра." },
   "optViewerAutoLabel": { "message": "Автоматически открывать выбранный режим" },

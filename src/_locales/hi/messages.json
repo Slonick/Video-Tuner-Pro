@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "म्यूट करें" },
   "viewerVolumeAria": { "message": "आवाज़" },
   "viewerQualityAria": { "message": "गुणवत्ता" },
+  "viewerQualityAuto": { "message": "ऑटो" },
+  "viewerLiveLabel": { "message": "लाइव" },
   "viewerModesLabel": { "message": "व्यूअर मोड" },
   "viewerModesHint": { "message": "वीडियो को व्यूअर या थिएटर मोड में खोलें।" },
   "optViewerAutoLabel": { "message": "चुना गया मोड अपने आप खोलें" },

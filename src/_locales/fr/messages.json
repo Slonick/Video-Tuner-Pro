@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "Couper le son" },
   "viewerVolumeAria": { "message": "Volume" },
   "viewerQualityAria": { "message": "Qualité" },
+  "viewerQualityAuto": { "message": "Auto" },
+  "viewerLiveLabel": { "message": "DIRECT" },
   "viewerModesLabel": { "message": "Modes de visionneuse" },
   "viewerModesHint": { "message": "Afficher la vidéo en mode visionneuse ou théâtre." },
   "optViewerAutoLabel": { "message": "Ouvrir automatiquement le mode choisi" },

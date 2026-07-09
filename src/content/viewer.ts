@@ -849,6 +849,7 @@ const FIT_LABEL: Record<ViewerFitMode, [string, string]> = {
 const fitLabel = (m: ViewerFitMode) => i18n(FIT_LABEL[m][0]) || FIT_LABEL[m][1];
 const notice = (key: string, fallback: string, subs?: string | string[]) =>
   i18n(key, subs) || fallback;
+const qualityAutoLabel = () => i18n("viewerQualityAuto") || "Auto";
 
 export function viewerFitMode(): ViewerFitMode {
   return S.viewerFit;
@@ -1048,7 +1049,7 @@ function syncTime(): void {
   if (timeEl) {
     timeEl.textContent =
       timeline.kind === "live"
-        ? "LIVE"
+        ? i18n("viewerLiveLabel") || "LIVE"
         : timeline.kind === "loading"
           ? fmtTime(timeline.pos)
           : `${fmtTime(timeline.pos)} / ${fmtTime(timeline.len)}`;
@@ -1162,6 +1163,7 @@ function setQualityVisible(visible: boolean): void {
 
 function qualityButtonLabel(label: string): string {
   const clean = label.trim();
+  if (/^auto$/i.test(clean)) return qualityAutoLabel();
   const paren = clean.match(/\((\d{3,4})p(?:\d+)?\)/i);
   const direct = clean.match(/(\d{3,4})p(?:\d+)?/i);
   const height = paren?.[1] || direct?.[1];
@@ -1189,7 +1191,8 @@ function renderQuality(state: QualityState): void {
   }
   if (confirmed && confirmed.id !== "auto" && !pending) pendingQuality = confirmed;
   setQualityVisible(true);
-  if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(selected?.label || "Auto");
+  if (qualityLabelEl)
+    qualityLabelEl.textContent = qualityButtonLabel(selected?.label || qualityAutoLabel());
   if (!qualityMenu) return;
   qualityMenu.textContent = "";
   for (const opt of options) {
@@ -1197,7 +1200,7 @@ function renderQuality(state: QualityState): void {
     item.type = "button";
     item.className = "qitem";
     item.setAttribute("role", "menuitemradio");
-    item.textContent = opt.label;
+    item.textContent = opt.id === "auto" ? qualityAutoLabel() : opt.label;
     if (opt.current || opt.id === state.current) {
       item.setAttribute("aria-current", "true");
       item.setAttribute("aria-checked", "true");
@@ -1209,8 +1212,9 @@ function renderQuality(state: QualityState): void {
       setMenuOpen(qualityMenu, qualityBtn, false);
       pendingQuality = opt;
       pendingQualityUntil = Date.now() + 12_000;
-      if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(opt.label);
-      showBadgeNotice(notice("viewerNoticeQuality", `Quality: ${opt.label}`, opt.label));
+      const label = opt.id === "auto" ? qualityAutoLabel() : opt.label;
+      if (qualityLabelEl) qualityLabelEl.textContent = qualityButtonLabel(label);
+      showBadgeNotice(notice("viewerNoticeQuality", `Quality: ${label}`, label));
       const next = await qualityRequest("vtp-quality-set", opt.id);
       if (session !== viewerSession || !fmt) return;
       pendingQuality = null;
@@ -1456,7 +1460,7 @@ function mountBar(): void {
   qualityBtn.setAttribute("aria-expanded", "false");
   qualityLabelEl = document.createElement("span");
   qualityLabelEl.className = "qbtn-label";
-  qualityLabelEl.textContent = "Auto";
+  qualityLabelEl.textContent = qualityAutoLabel();
   qualityBtn.appendChild(qualityLabelEl);
   qualityMenu = document.createElement("div");
   qualityMenu.className = "qmenu";

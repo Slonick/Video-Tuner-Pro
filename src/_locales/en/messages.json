@@ -177,6 +177,8 @@
   "viewerMuteAria": { "message": "Mute" },
   "viewerVolumeAria": { "message": "Volume" },
   "viewerQualityAria": { "message": "Quality" },
+  "viewerQualityAuto": { "message": "Auto" },
+  "viewerLiveLabel": { "message": "LIVE" },
   "viewerModesLabel": { "message": "Viewer modes" },
   "viewerModesHint": { "message": "Pop video out into Viewer or Theater mode." },
   "optViewerAutoLabel": { "message": "Auto-open selected mode" },

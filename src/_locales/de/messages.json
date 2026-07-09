@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "Stummschalten" },
   "viewerVolumeAria": { "message": "Lautstärke" },
   "viewerQualityAria": { "message": "Qualität" },
+  "viewerQualityAuto": { "message": "Auto" },
+  "viewerLiveLabel": { "message": "LIVE" },
   "viewerModesLabel": { "message": "Anzeigemodi" },
   "viewerModesHint": { "message": "Video im Viewer- oder Theatermodus öffnen." },
   "optViewerAutoLabel": { "message": "Ausgewählten Modus automatisch öffnen" },

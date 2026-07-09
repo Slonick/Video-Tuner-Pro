@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "静音" },
   "viewerVolumeAria": { "message": "音量" },
   "viewerQualityAria": { "message": "画质" },
+  "viewerQualityAuto": { "message": "自动" },
+  "viewerLiveLabel": { "message": "直播" },
   "viewerModesLabel": { "message": "观看模式" },
   "viewerModesHint": { "message": "将视频切换到观看器或剧场模式。" },
   "optViewerAutoLabel": { "message": "自动打开所选模式" },

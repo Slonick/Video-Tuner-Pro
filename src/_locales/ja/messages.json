@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "ミュート" },
   "viewerVolumeAria": { "message": "音量" },
   "viewerQualityAria": { "message": "画質" },
+  "viewerQualityAuto": { "message": "自動" },
+  "viewerLiveLabel": { "message": "ライブ" },
   "viewerModesLabel": { "message": "表示モード" },
   "viewerModesHint": { "message": "動画をビューアまたはシアターモードで表示します。" },
   "optViewerAutoLabel": { "message": "選択したモードを自動で開く" },

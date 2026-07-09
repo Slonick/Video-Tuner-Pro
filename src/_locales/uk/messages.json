@@ -152,6 +152,8 @@
   "viewerMuteAria": { "message": "Без звуку" },
   "viewerVolumeAria": { "message": "Гучність" },
   "viewerQualityAria": { "message": "Якість" },
+  "viewerQualityAuto": { "message": "Авто" },
+  "viewerLiveLabel": { "message": "ЕФІР" },
   "viewerModesLabel": { "message": "Режими перегляду" },
   "viewerModesHint": { "message": "Виносити відео в режим перегляду або театру." },
   "optViewerAutoLabel": { "message": "Автоматично відкривати вибраний режим" },
