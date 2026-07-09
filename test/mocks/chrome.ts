@@ -32,7 +32,26 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
     id: "mock",
     lastError: null as unknown,
     onMessage: { addListener() {} },
-    sendMessage() {},
+    sendMessage(
+      msg?: {
+        action?: string;
+        map?: "domains" | "channels";
+        set?: Record<string, number>;
+        remove?: string[];
+      },
+      cb?: (response?: unknown) => void,
+    ) {
+      if (msg?.action !== "mutateSpeedMap" || !msg.map) {
+        cb?.(undefined);
+        return;
+      }
+      const current = { ...((store[msg.map] || {}) as Record<string, number>) };
+      for (const key of msg.remove || []) delete current[key];
+      Object.assign(current, msg.set || {});
+      if (Object.keys(current).length) store[msg.map] = current;
+      else delete store[msg.map];
+      cb?.({ success: true });
+    },
     getManifest: () => ({ version: data.version ?? "0.0.0" }),
   };
 

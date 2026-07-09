@@ -40,6 +40,72 @@ interface VideoFrameProbe {
   score?: number;
 }
 
+type SpeedMapName = "domains" | "channels";
+interface SpeedMapMutation {
+  map: SpeedMapName;
+  set?: Record<string, number>;
+  remove?: string[];
+}
+
+let speedMapQueue: Promise<void> = Promise.resolve();
+
+function validSpeedMapMutation(msg: unknown): SpeedMapMutation | null {
+  if (!msg || typeof msg !== "object") return null;
+  const raw = msg as Record<string, unknown>;
+  if (raw.map !== "domains" && raw.map !== "channels") return null;
+  const set: Record<string, number> = {};
+  if (raw.set && typeof raw.set === "object") {
+    for (const [key, value] of Object.entries(raw.set as Record<string, unknown>)) {
+      if (
+        key &&
+        key !== "__proto__" &&
+        key !== "constructor" &&
+        key !== "prototype" &&
+        typeof value === "number" &&
+        Number.isFinite(value)
+      ) {
+        set[key] = value;
+      }
+    }
+  }
+  const remove = Array.isArray(raw.remove)
+    ? raw.remove.filter(
+        (key): key is string =>
+          typeof key === "string" &&
+          !!key &&
+          key !== "__proto__" &&
+          key !== "constructor" &&
+          key !== "prototype",
+      )
+    : [];
+  if (!Object.keys(set).length && !remove.length) return null;
+  return { map: raw.map, set, remove };
+}
+
+function mutateSpeedMap(mutation: SpeedMapMutation): Promise<boolean> {
+  const run = () =>
+    new Promise<boolean>((resolve) => {
+      whenReady(() => {
+        STORE.get([mutation.map], (result) => {
+          const current = {
+            ...((result[mutation.map] || {}) as Record<string, number>),
+          };
+          for (const key of mutation.remove || []) delete current[key];
+          Object.assign(current, mutation.set || {});
+          const finish = (ok?: boolean) => resolve(ok !== false);
+          if (Object.keys(current).length) STORE.set({ [mutation.map]: current }, finish);
+          else STORE.remove(mutation.map, finish);
+        });
+      });
+    });
+  const result = speedMapQueue.then(run, run);
+  speedMapQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 // On Chrome MV3 these action APIs return a Promise that rejects asynchronously
 // when the tab is already gone ("No tab with id …"); a plain try/catch only
 // swallows a synchronous throw, so also absorb the async rejection.
@@ -132,6 +198,22 @@ function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.action === "mutateSpeedMap") {
+    const mutation = validSpeedMapMutation(msg);
+    if (!mutation) {
+      sendResponse({ success: false });
+      return;
+    }
+    const reply = (success: boolean) => {
+      try {
+        sendResponse({ success });
+      } catch (e) {
+        /* sender disappeared before the write completed */
+      }
+    };
+    void mutateSpeedMap(mutation).then(reply, () => reply(false));
+    return true;
+  }
   // The gear opens the options page. The popup runs as an in-page iframe behind the
   // on-video overlay, and openOptionsPage() from that embedded extension frame is a
   // no-op on Firefox — so the popup asks the background (which always can) instead.

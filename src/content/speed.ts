@@ -2,7 +2,7 @@ import { clamp } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { resolveSpeed, type SpeedScope } from "./core/resolve.js";
 import { channelKeys } from "./channel.js";
-import { ctxValid } from "./platform/browser.js";
+import { api, ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
 import { S } from "./state.js";
 import {
@@ -52,11 +52,7 @@ export function persistDomainSpeed(speed: number, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["domains"], (result) => {
-    const domains = { ...((result.domains || {}) as Record<string, number>) };
-    domains[getDomain()] = speed;
-    STORE.set({ domains }, done);
-  });
+  mutateSpeedMap("domains", { [getDomain()]: speed }, [], done);
 }
 
 export function persistChannelSpeed(speed: number, done?: Done): void {
@@ -73,12 +69,36 @@ export function persistChannelSpeed(speed: number, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["channels"], (result) => {
-    const channels = { ...((result.channels || {}) as Record<string, number>) };
-    for (const k of keys) delete channels[k];
-    channels[keys[0]] = speed;
-    STORE.set({ channels }, done);
-  });
+  mutateSpeedMap("channels", { [keys[0]]: speed }, keys.slice(1), done);
+}
+
+function mutateSpeedMap(
+  map: "domains" | "channels",
+  set: Record<string, number>,
+  remove: string[],
+  done?: Done,
+): void {
+  let settled = false;
+  const finish = (response?: { success?: boolean } | null) => {
+    if (settled) return;
+    settled = true;
+    void api.runtime.lastError;
+    done?.(response?.success === true);
+  };
+  try {
+    const result = api.runtime.sendMessage(
+      { action: "mutateSpeedMap", map, set, remove },
+      finish,
+    ) as unknown as Promise<{ success?: boolean } | undefined> | undefined;
+    if (result && typeof result.then === "function") {
+      void result.then(
+        (response) => finish(response),
+        () => finish(null),
+      );
+    }
+  } catch (e) {
+    finish(null);
+  }
 }
 
 export function persistGlobalSpeed(speed: number, done?: Done): void {
@@ -115,12 +135,17 @@ function applyResolvedNow(
 // nothing. Backs the R hotkey and the reset button by the readout.
 export function resetToSaved(): void {
   if (!ctxValid()) return;
+  applyStoredResolved();
+}
+
+function applyStoredResolved(done?: Done): void {
   STORE.get(["channels", "domains", "globalSpeed"], (result) => {
     applyResolvedNow(
       (result.channels || {}) as Record<string, number>,
       (result.domains || {}) as Record<string, number>,
       result.globalSpeed as number | undefined,
     );
+    done?.(true);
   });
 }
 
@@ -131,39 +156,27 @@ export function resetScope(scope: SpeedScope, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["channels", "domains", "globalSpeed"], (result) => {
-    const channels = { ...((result.channels || {}) as Record<string, number>) };
-    const domains = { ...((result.domains || {}) as Record<string, number>) };
-    let globalSpeed = result.globalSpeed as number | undefined;
-    const finish = (ok?: boolean) => {
-      if (ok === false) {
-        done?.(false);
-        return;
-      }
-      applyResolvedNow(channels, domains, globalSpeed);
-      done?.(true);
-    };
-    if (scope === "channel") {
-      const keys = channelKeys();
-      if (!keys.length) {
-        done?.(false);
-        return;
-      }
-      for (const k of keys) delete channels[k];
-      if (Object.keys(channels).length) STORE.set({ channels }, finish);
-      else STORE.remove("channels", finish);
-    } else if (scope === "site") {
-      delete domains[getDomain()];
-      if (Object.keys(domains).length) STORE.set({ domains }, finish);
-      else STORE.remove("domains", finish);
-    } else if (scope === "global") {
-      globalSpeed = undefined;
-      STORE.remove("globalSpeed", finish);
-    } else {
+  const finish = (ok?: boolean) => {
+    if (ok === false) {
       done?.(false);
       return;
     }
-  });
+    applyStoredResolved(done);
+  };
+  if (scope === "channel") {
+    const keys = channelKeys();
+    if (!keys.length) {
+      done?.(false);
+      return;
+    }
+    mutateSpeedMap("channels", {}, keys, finish);
+  } else if (scope === "site") {
+    mutateSpeedMap("domains", {}, [getDomain()], finish);
+  } else if (scope === "global") {
+    STORE.remove("globalSpeed", finish);
+  } else {
+    done?.(false);
+  }
 }
 
 // Apply the current speed to one media element. Keeps pitch natural and seeds
