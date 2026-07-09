@@ -857,6 +857,21 @@ describe("control bar", () => {
     expect(barTime()).toBe("LIVE");
   });
 
+  it("a finite-duration YouTube live stream still shows the live layout", async () => {
+    document.documentElement.setAttribute("data-vtp-live", "1");
+    const { v } = makeVideo(3922);
+    h.primary = v;
+    try {
+      await openViewer("normal");
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+      expect(seek.style.display).toBe("none");
+      expect(barTime()).toBe("LIVE");
+    } finally {
+      document.documentElement.removeAttribute("data-vtp-live");
+    }
+  });
+
   it("does not measure control children when switching to live layout", async () => {
     const { v } = makeVideo(100);
     h.primary = v;

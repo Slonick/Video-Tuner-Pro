@@ -810,6 +810,9 @@ const MAX_REAL_DURATION = 60 * 60 * 24 * 30;
 
 function mediaTimeline(v: HTMLVideoElement): Timeline {
   const dur = v.duration;
+  if (isLive(v) && Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
+    return { kind: "live" };
+  }
   if (Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
     return { kind: "vod", start: 0, pos: v.currentTime, len: dur };
   }
