@@ -54,6 +54,7 @@ let backdropEl: HTMLDivElement | null = null;
 let backdropVideo: HTMLVideoElement | HTMLCanvasElement | null = null;
 let backdropCanvasTimer: ReturnType<typeof setTimeout> | null = null;
 let surfaceShell: HTMLDivElement | null = null;
+let loadingEl: HTMLDivElement | null = null;
 let holder: Comment | null = null; // marks the video's original DOM spot
 let sourceParent: Node | null = null;
 let sourceNextSibling: Node | null = null;
@@ -916,9 +917,22 @@ function showBar(): void {
 // Keep the bar's widgets honest against the media element's state.
 function syncPlay(): void {
   playBtn?.setAttribute("aria-pressed", video && !video.paused ? "true" : "false");
-  if (video?.paused) showBar();
-  else scheduleBackdropCanvas();
+  if (video?.paused) {
+    showBar();
+    setViewerLoading(false);
+  } else scheduleBackdropCanvas();
 }
+
+function setViewerLoading(on: boolean): void {
+  if (!loadingEl) return;
+  const show = on && !!video && !video.paused;
+  if (show) showBar();
+  loadingEl.style.opacity = show ? "1" : "0";
+  loadingEl.style.transform = show
+    ? "translate(-50%, -50%) scale(1)"
+    : "translate(-50%, -50%) scale(.92)";
+}
+
 function syncVolume(): void {
   if (!video) return;
   muteBtn?.setAttribute("aria-pressed", video.muted ? "true" : "false");
@@ -1518,6 +1532,12 @@ function wireVideo(v: HTMLVideoElement): void {
     () => (v.paused ? v.play()?.catch(() => {}) : v.pause()),
     opt,
   );
+  for (const ev of ["waiting", "stalled"]) {
+    v.addEventListener(ev, () => setViewerLoading(true), opt);
+  }
+  for (const ev of ["playing", "canplay", "canplaythrough", "timeupdate", "pause"]) {
+    v.addEventListener(ev, () => setViewerLoading(false), opt);
+  }
   // Sites (YouTube) keep restyling their video — snap ours back on sight.
   // Disconnect while writing rather than trust a string comparison to converge:
   // the browser doesn't guarantee re-serializing an already-normalized cssText
@@ -1682,6 +1702,23 @@ async function enter(
     background: "#000",
   } as Partial<CSSStyleDeclaration>);
   overlay.appendChild(surfaceShell);
+  const loadingStyle = document.createElement("style");
+  loadingStyle.textContent =
+    `@keyframes vtp-viewer-spin{to{transform:rotate(360deg)}}` +
+    `[data-vtp-viewer-loading]{position:absolute;left:50%;top:50%;width:54px;height:54px;` +
+    `border-radius:999px;display:grid;place-items:center;pointer-events:none;z-index:4;` +
+    `opacity:0;transform:translate(-50%,-50%) scale(.92);transition:opacity .18s ease,` +
+    `transform .18s ease;background:rgb(20 20 22 / calc(0.34 * var(--glass-opacity,1)));` +
+    `box-shadow:0 0 0 1px rgba(255,255,255,.16),0 14px 36px rgba(0,0,0,.28);` +
+    `-webkit-backdrop-filter:${GLASS_REFRACTION}blur(8px) saturate(180%) brightness(1.04);` +
+    `backdrop-filter:${GLASS_REFRACTION}blur(8px) saturate(180%) brightness(1.04)}` +
+    `[data-vtp-viewer-loading]>i{width:24px;height:24px;border-radius:999px;` +
+    `border:3px solid rgba(255,255,255,.34);border-top-color:#fff;` +
+    `animation:vtp-viewer-spin .72s linear infinite}`;
+  loadingEl = document.createElement("div");
+  loadingEl.setAttribute("data-vtp-viewer-loading", "");
+  loadingEl.appendChild(document.createElement("i"));
+  surfaceShell.append(loadingStyle, loadingEl);
   hookGlobal();
   // Chapters depend on the SITE player's UI, so read them before the video
   // leaves it.
@@ -1814,6 +1851,7 @@ export function exitViewer(): void {
     backdropEl = null;
     backdropVideo = null;
     surfaceShell = null;
+    loadingEl = null;
     bar = null;
     playBtn = muteBtn = fmtBtn = null;
     seekEl = seekWrapEl = volEl = null;

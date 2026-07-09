@@ -124,6 +124,8 @@ const viewerBackdropVisual = () =>
 const viewerBackdropVideo = () =>
   overlayEl()?.querySelector("[data-vtp-viewer-backdrop-video]") as HTMLVideoElement | null;
 const chapterMarks = () => Array.from(barEl()?.querySelectorAll(".mark-chapter") ?? []);
+const loadingEl = () =>
+  overlayEl()?.querySelector("[data-vtp-viewer-loading]") as HTMLElement | null;
 
 function setFullscreen(el: Element | null): void {
   Object.defineProperty(document, "fullscreenElement", { value: el, configurable: true });
@@ -622,6 +624,25 @@ describe("control bar", () => {
 
     expect(v.currentTime).toBe(0);
     expect(e.defaultPrevented).toBe(false);
+  });
+
+  it("shows the control bar and spinner while the viewer video is buffering", async () => {
+    const { v } = makeVideo(100);
+    h.primary = v;
+    await openViewer("normal");
+    await v.play();
+    barEl()!.style.visibility = "hidden";
+    barEl()!.style.opacity = "0";
+
+    v.dispatchEvent(new Event("waiting"));
+
+    expect(barEl()!.style.visibility).toBe("visible");
+    expect(barEl()!.style.opacity).toBe("1");
+    expect(loadingEl()?.style.opacity).toBe("1");
+
+    v.dispatchEvent(new Event("playing"));
+
+    expect(loadingEl()?.style.opacity).toBe("0");
   });
 
   it("reloads seek markers when a SPA swaps the source on the same video", async () => {
