@@ -872,6 +872,22 @@ describe("control bar", () => {
     }
   });
 
+  it("a finite-duration live DVR stream uses the seekable window, not duration", async () => {
+    document.documentElement.setAttribute("data-vtp-live", "1");
+    const { v } = makeVideo(3922);
+    v.currentTime = 368;
+    setSeekable(v, 0, 480);
+    h.primary = v;
+    try {
+      await openViewer("normal");
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("flex");
+      expect(barTime()).toBe("6:08 / 8:00");
+    } finally {
+      document.documentElement.removeAttribute("data-vtp-live");
+    }
+  });
+
   it("does not measure control children when switching to live layout", async () => {
     const { v } = makeVideo(100);
     h.primary = v;

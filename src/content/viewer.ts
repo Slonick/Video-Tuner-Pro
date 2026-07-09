@@ -810,12 +810,7 @@ const MAX_REAL_DURATION = 60 * 60 * 24 * 30;
 
 function mediaTimeline(v: HTMLVideoElement): Timeline {
   const dur = v.duration;
-  if (isLive(v) && Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
-    return { kind: "live" };
-  }
-  if (Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
-    return { kind: "vod", start: 0, pos: v.currentTime, len: dur };
-  }
+  const live = isLive(v);
   const ranges = v.seekable;
   if (ranges && ranges.length > 0) {
     const start = ranges.start(ranges.length - 1);
@@ -826,7 +821,10 @@ function mediaTimeline(v: HTMLVideoElement): Timeline {
       return { kind: "dvr", start, pos, len };
     }
   }
-  if (isLive(v)) return { kind: "live" };
+  if (live) return { kind: "live" };
+  if (Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
+    return { kind: "vod", start: 0, pos: v.currentTime, len: dur };
+  }
   return { kind: "loading", pos: v.currentTime };
 }
 
