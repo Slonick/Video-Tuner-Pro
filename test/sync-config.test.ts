@@ -18,6 +18,7 @@ describe("categoryOf", () => {
     expect(categoryOf("globalSpeed")).toBe("speeds");
     expect(categoryOf("syncTargets")).toBe("delays");
     expect(categoryOf("audioCompRatio")).toBe("audio");
+    expect(categoryOf("compPresets")).toBe("audio");
     expect(categoryOf("keymap")).toBe("shortcuts");
     expect(categoryOf("theme")).toBe("general");
     expect(categoryOf("speedPresets")).toBe("speeds");

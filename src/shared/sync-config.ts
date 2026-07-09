@@ -54,6 +54,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   audioCompRelease: "audio",
   audioCompGain: "audio",
   audioCompBaseGain: "audio", // global make-up gain a no-gain preset falls back to
+  compPresets: "audio",
   // Keyboard shortcuts: the on/off toggle and the key map.
   keyboard: "shortcuts",
   keymap: "shortcuts",

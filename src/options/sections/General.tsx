@@ -242,28 +242,30 @@ export function Backup() {
         const stale = Object.keys(current).filter(
           (key) => key !== SYNC_META_KEY && key !== SYNC_MASTER_KEY && !(key in data),
         );
-        const write = () => {
-          STORE.set(data, (ok) => {
+        const done = () => {
+          flash(setImp, "optImportDone", true);
+          setTimeout(() => location.reload(), 1000);
+        };
+        const removeStale = () => {
+          if (!stale.length) {
+            done();
+            return;
+          }
+          const removeEverywhere = STORE.removeEverywhere?.bind(STORE) ?? STORE.remove.bind(STORE);
+          removeEverywhere(stale, (ok) => {
             if (ok === false) {
               flash(setImp, "optImportError", false);
               return;
             }
-            flash(setImp, "optImportDone", true);
-            setTimeout(() => location.reload(), 1000);
+            done();
           });
         };
-        const replaceKeys = Array.from(new Set([...stale, ...Object.keys(data)]));
-        const removeEverywhere = STORE.removeEverywhere?.bind(STORE) ?? STORE.remove.bind(STORE);
-        if (!replaceKeys.length) {
-          write();
-          return;
-        }
-        removeEverywhere(replaceKeys, (ok) => {
+        STORE.set(data, (ok) => {
           if (ok === false) {
             flash(setImp, "optImportError", false);
             return;
           }
-          write();
+          removeStale();
         });
       });
     };

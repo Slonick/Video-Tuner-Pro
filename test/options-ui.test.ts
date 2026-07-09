@@ -135,6 +135,24 @@ describe("Options · General", () => {
     expect(get(["speedPresets", "presetKeys", "globalSpeed"])).toEqual({ globalSpeed: 1.25 });
   });
 
+  it("keeps existing settings when backup import write fails", async () => {
+    const { get } = await mountOptions(
+      { domains: { "old.example": 1.25 }, globalSpeed: 1.25 },
+      { failSetKeys: ["globalSpeed"] },
+    );
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const file = new File([JSON.stringify({ globalSpeed: 1.9 })], { type: "application/json" });
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+
+    await settle();
+
+    expect(get(["domains", "globalSpeed"])).toEqual({
+      domains: { "old.example": 1.25 },
+      globalSpeed: 1.25,
+    });
+  });
+
   it("export omits sync routing metadata", async () => {
     const blobs: Blob[] = [];
     const create = vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
