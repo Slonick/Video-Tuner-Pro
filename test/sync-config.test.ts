@@ -36,6 +36,12 @@ describe("KEYS_BY_CATEGORY", () => {
     const flat = CATEGORIES.flatMap((c) => KEYS_BY_CATEGORY[c]);
     expect(flat.sort()).toEqual(Object.keys(KEY_CATEGORY).sort());
   });
+
+  it("includes general settings that category migration must carry between areas", () => {
+    expect(KEYS_BY_CATEGORY.general).toEqual(
+      expect.arrayContaining(["glassOpacity", "sponsorMarks", "overlayPanelPos"]),
+    );
+  });
 });
 
 describe("effectiveConfig", () => {

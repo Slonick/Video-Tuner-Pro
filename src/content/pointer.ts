@@ -1,4 +1,4 @@
-import { listenerOptions } from "./lifecycle.js";
+import { contentSignal, listenerOptions } from "./lifecycle.js";
 
 type PointerSample = { x: number; y: number };
 type PointerSubscriber = (sample: PointerSample) => void;
@@ -7,6 +7,12 @@ const subscribers = new Set<PointerSubscriber>();
 let hooked = false;
 let frame = 0;
 let last: PointerSample = { x: 0, y: 0 };
+
+contentSignal.addEventListener("abort", () => {
+  if (!frame) return;
+  cancelAnimationFrame(frame);
+  frame = 0;
+});
 
 function hook(): void {
   if (hooked) return;

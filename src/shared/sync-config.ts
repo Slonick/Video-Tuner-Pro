@@ -68,10 +68,13 @@ export const KEY_CATEGORY: Record<string, Category> = {
   forceRate: "general",
   badgePos: "general",
   badgePinned: "general",
+  glassOpacity: "general",
+  sponsorMarks: "general",
   // On-video launcher button (opens the popup as an in-page overlay): when to
   // show it, and its dragged per-site position.
   overlayButton: "general",
   overlayBtnPos: "general",
+  overlayPanelPos: "general",
   viewerAutoEnabled: "general",
   viewerAuto: "general", // legacy global fallback
   viewerAutoGlobal: "general",
