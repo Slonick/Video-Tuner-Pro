@@ -49,6 +49,8 @@
   const MAX_CAPTURED_PLAYERS = 8;
   const MAX_CAPTURED_HLS = 8;
   const VIDEOLESS_PLAYER_TTL_MS = 30_000;
+  const HLS_SELECTION_TTL_MS = 3000;
+  const hlsSelections = new WeakMap<object, { id: string; expires: number }>();
 
   interface QualityOption {
     id: string;
@@ -597,6 +599,8 @@
         ];
       },
       current() {
+        const picked = hlsSelections.get(hls);
+        if (picked && picked.expires > Date.now()) return picked.id;
         if (
           hls.autoLevelEnabled === true ||
           hls.manualLevel === -1 ||
@@ -615,6 +619,10 @@
       set(id: string) {
         const n = id === "auto" ? -1 : Number(id);
         if (!Number.isFinite(n)) return;
+        hlsSelections.set(hls, {
+          id: n < 0 ? "auto" : String(n),
+          expires: Date.now() + HLS_SELECTION_TTL_MS,
+        });
         hls.currentLevel = n;
         hls.nextLevel = n;
         hls.loadLevel = n;

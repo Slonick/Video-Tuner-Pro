@@ -578,6 +578,36 @@ describe("quality-inject HLS adapter", () => {
     expect(detail.current).toBe("auto");
     expect(detail.options.find((opt) => opt.id === "auto")?.current).toBe(true);
   });
+
+  it("keeps a manual HLS selection current while auto-level flags settle", async () => {
+    class FakeHls {
+      levels = [{ height: 720 }, { height: 1080 }];
+      autoLevelEnabled = true;
+      currentLevel = -1;
+      nextLevel = -1;
+      loadLevel = -1;
+      media: HTMLMediaElement | null = null;
+
+      attachMedia(media: HTMLMediaElement) {
+        this.media = media;
+      }
+    }
+
+    (window as typeof window & { Hls?: unknown }).Hls = FakeHls;
+    await import("../src/content/quality-inject.js");
+
+    const video = document.createElement("video");
+    video.setAttribute("data-vtp-quality-id", "v1");
+    document.body.append(video);
+
+    const hls = new (window as typeof window & { Hls: typeof FakeHls }).Hls();
+    hls.attachMedia(video);
+
+    const detail = await setQuality("1");
+
+    expect(detail.current).toBe("1");
+    expect(detail.options.find((opt) => opt.id === "1")?.current).toBe(true);
+  });
 });
 
 describe("quality-inject React-hosted player adapter", () => {
