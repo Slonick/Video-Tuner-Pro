@@ -191,7 +191,9 @@ test.describe("Options · Compressor presets", () => {
     serviceWorker,
   }) => {
     const page = await openAudio(context, extensionId);
-    await compSection(page).locator(".preset-name-input").fill("My Voice");
+    const nameInput = compSection(page).locator(".preset-name-input");
+    await nameInput.fill("My Voice");
+    await nameInput.blur();
     await expect
       .poll(
         async () =>
