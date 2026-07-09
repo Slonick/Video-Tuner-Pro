@@ -227,12 +227,16 @@ export function reassertRate(media: HTMLMediaElement): void {
   }
 }
 
-function applyToVideo(video: HTMLVideoElement, primaryLive: boolean): void {
+function applyToVideo(
+  video: HTMLVideoElement,
+  primaryLive: boolean,
+  videoLive: boolean = isLive(video),
+): void {
   // A live video's rate is owned by controlLive (live/sync.ts). applyAll runs
   // per mutation pass (≈frame rate on chat-heavy pages), so countering the
   // player's own rate writes here flips the rate twice within a frame — every
   // flip restarts the audio time-stretcher with an audible click.
-  if (!isLive(video)) setNonLiveVideoRate(video, primaryLive);
+  if (!videoLive) setNonLiveVideoRate(video, primaryLive);
 
   if (seenVideos.has(video)) return;
   seenVideos.add(video);
@@ -314,7 +318,7 @@ export function applyAll(
   const primary = snapshot.primary !== undefined ? snapshot.primary : primaryVideoFrom(videos);
   const primaryLive =
     snapshot.primaryLive !== undefined ? snapshot.primaryLive : primary ? isLive(primary) : false;
-  videos.forEach((v) => applyToVideo(v, primaryLive));
+  videos.forEach((v) => applyToVideo(v, primaryLive, v === primary ? primaryLive : undefined));
   videos.forEach(probeLive); // sample media edge for generic live detection
   applyAudioComp(videos, primary);
   if (S.audioSpeedEnabled) collectAudios().forEach(applyToAudio);

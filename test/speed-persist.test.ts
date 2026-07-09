@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   videos: [] as HTMLVideoElement[],
   live: false,
   liveVideos: new WeakSet<HTMLVideoElement>(),
+  liveReads: 0,
   primaryReads: 0,
   primaryFromReads: 0,
 }));
@@ -26,7 +27,10 @@ vi.mock("../src/content/videos.js", () => ({
   seenVideos: new WeakSet(),
 }));
 vi.mock("../src/content/live/detection.js", () => ({
-  isLive: (v: HTMLVideoElement) => h.live || h.liveVideos.has(v),
+  isLive: (v: HTMLVideoElement) => {
+    h.liveReads++;
+    return h.live || h.liveVideos.has(v);
+  },
   probeLive: vi.fn(),
   onStreamPage: () => h_onStream(),
   trackDvr: vi.fn(),
@@ -72,6 +76,7 @@ beforeEach(() => {
   h.videos = [];
   h.live = false;
   h.liveVideos = new WeakSet<HTMLVideoElement>();
+  h.liveReads = 0;
   h.primaryReads = 0;
   h.primaryFromReads = 0;
   onStream = false;
@@ -300,6 +305,15 @@ describe("applyAll", () => {
 
     expect(h.primaryFromReads).toBe(0);
     expect(h.primaryReads).toBe(0);
+  });
+
+  it("reuses the primary live snapshot when applying video rates", () => {
+    const primary = fakeVideo(1);
+    h.videos = [primary, fakeVideo(1), fakeVideo(1)];
+
+    applyAll({ videos: h.videos, primary, primaryLive: false });
+
+    expect(h.liveReads).toBe(2);
   });
 });
 
