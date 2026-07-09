@@ -131,6 +131,10 @@ html .btn-speed,
 html .btn-preset {
   position: relative;
   z-index: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: transparent;
   border: none;
   /* cells are framed by the capsule + pill, never their own border */
@@ -195,6 +199,7 @@ html .lang-grid,
 html .buttons-grid,
 html .preset-grid {
   position: relative;
+  min-width: 0;
   background: var(--glass-l1);
   /* group capsule = recessed glass layer below its cells */
   border: 1px solid var(--track);
