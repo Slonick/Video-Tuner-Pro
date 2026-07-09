@@ -304,16 +304,16 @@ export function resetAudios(): void {
 }
 
 export function applyAll(
-  snapshot: { videos?: HTMLVideoElement[]; primaryLive?: boolean } = {},
+  snapshot: {
+    videos?: HTMLVideoElement[];
+    primary?: HTMLVideoElement | null;
+    primaryLive?: boolean;
+  } = {},
 ): void {
   const videos = snapshot.videos ?? collectVideos();
+  const primary = snapshot.primary !== undefined ? snapshot.primary : primaryVideoFrom(videos);
   const primaryLive =
-    snapshot.primaryLive !== undefined
-      ? snapshot.primaryLive
-      : videos.length
-        ? activePrimaryIsLive()
-        : false;
-  const primary = primaryVideoFrom(videos);
+    snapshot.primaryLive !== undefined ? snapshot.primaryLive : primary ? isLive(primary) : false;
   videos.forEach((v) => applyToVideo(v, primaryLive));
   videos.forEach(probeLive); // sample media edge for generic live detection
   applyAudioComp(videos, primary);

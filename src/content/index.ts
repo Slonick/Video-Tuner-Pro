@@ -326,7 +326,7 @@ function tick() {
   const live = liveVideoFrom(videos);
   const stream = onStreamPage(live);
   const primaryLive = primary ? isLive(primary) : stream;
-  applyAll({ videos, primaryLive });
+  applyAll({ videos, primary, primaryLive });
   controlLive({ live, onStream: stream });
   updateTimeBadge({ video: primary, stream });
   updateLauncher({ primary });

@@ -282,7 +282,7 @@ describe("content graph samplers", () => {
 
     await vi.advanceTimersByTimeAsync(1000);
 
-    expect(fx.applyAll).toHaveBeenCalledWith({ videos: [v], primaryLive: true });
+    expect(fx.applyAll).toHaveBeenCalledWith({ videos: [v], primary: v, primaryLive: true });
     expect(fx.controlLive).toHaveBeenCalledWith({ live: v, onStream: true });
     expect(fx.updateTimeBadge).toHaveBeenCalledWith({ video: v, stream: true });
     expect(fx.updateLauncher).toHaveBeenCalledWith({ primary: v });

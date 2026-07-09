@@ -10,11 +10,15 @@ const h = vi.hoisted(() => ({
   live: false,
   liveVideos: new WeakSet<HTMLVideoElement>(),
   primaryReads: 0,
+  primaryFromReads: 0,
 }));
 vi.mock("../src/content/channel.js", () => ({ channelKeys: () => h.keys }));
 vi.mock("../src/content/videos.js", () => ({
   collectVideos: () => h.videos,
-  primaryVideoFrom: (videos: HTMLVideoElement[]) => videos[0] ?? null,
+  primaryVideoFrom: (videos: HTMLVideoElement[]) => {
+    h.primaryFromReads++;
+    return videos[0] ?? null;
+  },
   primaryVideo: () => {
     h.primaryReads++;
     return h.videos[0] ?? null;
@@ -69,6 +73,7 @@ beforeEach(() => {
   h.live = false;
   h.liveVideos = new WeakSet<HTMLVideoElement>();
   h.primaryReads = 0;
+  h.primaryFromReads = 0;
   onStream = false;
   S.currentSpeed = 1.0;
   S.userSpeed = 1.0;
@@ -283,7 +288,18 @@ describe("applyAll", () => {
 
     applyAll();
 
-    expect(h.primaryReads).toBe(1);
+    expect(h.primaryFromReads).toBe(1);
+    expect(h.primaryReads).toBe(0);
+  });
+
+  it("uses a provided primary snapshot instead of resolving it again", () => {
+    const primary = fakeVideo(1);
+    h.videos = [primary, fakeVideo(1), fakeVideo(1)];
+
+    applyAll({ videos: h.videos, primary, primaryLive: false });
+
+    expect(h.primaryFromReads).toBe(0);
+    expect(h.primaryReads).toBe(0);
   });
 });
 
