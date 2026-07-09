@@ -314,14 +314,44 @@ describe("content graph samplers", () => {
     expect(fx.recordBufferSample).not.toHaveBeenCalled();
   });
 
-  it("does not repeat the initial full reconcile on the first background tick", async () => {
+  it("backs the full reconcile off in an idle frame", async () => {
     await loadIndex();
 
-    await vi.advanceTimersByTimeAsync(7000);
+    await vi.advanceTimersByTimeAsync(29_000);
     expect(fx.reconcile).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2000);
     expect(fx.reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconciles once after page startup to discover late shadow roots", async () => {
+    await loadIndex();
+    fx.reconcile.mockReturnValueOnce(true);
+
+    window.dispatchEvent(new Event("load"));
+    await nextFrame();
+
+    expect(fx.reconcile).toHaveBeenCalledTimes(1);
+    expect(fx.applyAll).toHaveBeenCalled();
+    expect(fx.updateTimeBadge).toHaveBeenCalled();
+    expect(fx.updateLauncher).toHaveBeenCalled();
+  });
+
+  it("wakes an idle frame immediately when its observer finds media", async () => {
+    await loadIndex();
+    await vi.advanceTimersByTimeAsync(20_000);
+    fx.applyAll.mockClear();
+
+    const options = fx.startTracking.mock.calls[0]?.[0] as
+      | { onMediaChange?: () => void }
+      | undefined;
+    options?.onMediaChange?.();
+    await nextFrame();
+    expect(fx.applyAll).toHaveBeenCalled();
+
+    fx.applyAll.mockClear();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fx.applyAll).toHaveBeenCalled();
   });
 
   it("starts the buffer sampler only after the video is identified as live", async () => {

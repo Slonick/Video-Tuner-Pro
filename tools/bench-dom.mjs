@@ -7,7 +7,7 @@
 //                                (~6×/tick + once per mutation burst + in the two
 //                                samplers). querySelectorAll("*") piercing shadow.
 //   new · reconcile (per tick)   the SAME full walk — it didn't disappear, it just
-//                                runs once per eight-second backstop now, as the
+//                                runs once per media/idle backstop now, as the
 //                                shadow-DOM backstop. Shown so the residual cost is
 //                                honest, not hidden.
 //   new · read set (per call)    what the hot consumers now cost (iterate the Set).
@@ -156,7 +156,7 @@ for (const r of results) {
 console.log(
   "\n  Before: the full walk (col 1) was paid on every consumer call — ~6×/tick,\n" +
     "  once per mutation burst, and in the audio/buffer samplers (~9×/s total).\n" +
-    "  After: the full walk survives only as reconcile (col 2), once per eight-second\n" +
-    "  backstop; all other calls are a Set read (col 3) or an incremental ingest (col 4),\n" +
+    "  After: the full walk survives only as reconcile (col 2), every eight seconds with\n" +
+    "  media or thirty seconds while idle; all other calls are a Set read (col 3) or an incremental ingest (col 4),\n" +
     "  which stay flat as the DOM grows.\n",
 );

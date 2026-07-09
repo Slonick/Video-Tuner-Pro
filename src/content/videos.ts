@@ -121,14 +121,17 @@ function scanAddedElement(root: Element): boolean {
   if (addMedia(root)) added = true;
   if (handleShadow(root)) added = true;
   try {
-    if (!root.querySelector("video,audio")) return added;
+    // Light-DOM selectors cannot see media inside a descendant's shadow root.
+    // Inspect each element in this newly-added subtree once so a pre-populated
+    // web-component player is registered immediately instead of waiting for the
+    // periodic reconcile backstop.
+    for (const el of root.querySelectorAll("*")) {
+      rememberShadowHostCandidate(el);
+      if (addMedia(el)) added = true;
+      if (handleShadow(el)) added = true;
+    }
   } catch (e) {
-    return added;
-  }
-  for (const el of root.querySelectorAll("*")) {
-    rememberShadowHostCandidate(el);
-    if (addMedia(el)) added = true;
-    if (handleShadow(el)) added = true;
+    /* inaccessible subtree */
   }
   return added;
 }

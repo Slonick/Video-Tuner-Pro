@@ -79,23 +79,6 @@ describe("media registry — incremental tracking", () => {
     expect(onMediaChange).not.toHaveBeenCalled();
   });
 
-  it("does not deep-scan unrelated added subtrees", async () => {
-    track();
-    const queryAll = vi.spyOn(Element.prototype, "querySelectorAll");
-    try {
-      const row = document.createElement("div");
-      for (let i = 0; i < 20; i++) row.appendChild(document.createElement("span"));
-
-      document.body.appendChild(row);
-      await flush();
-
-      expect(onMediaChange).not.toHaveBeenCalled();
-      expect(queryAll).not.toHaveBeenCalledWith("*");
-    } finally {
-      queryAll.mockRestore();
-    }
-  });
-
   it("still deep-scans added subtrees that contain media", async () => {
     track();
     const row = document.createElement("div");
@@ -119,6 +102,21 @@ describe("media registry — incremental tracking", () => {
     document.body.appendChild(host); // host added WITH its shadow already populated
     await flush();
     expect(collectVideos()).toContain(v);
+    expect(onMediaChange).toHaveBeenCalled();
+  });
+
+  it("catches a shadow player nested in a subtree with no light-DOM media", async () => {
+    track();
+    const wrapper = document.createElement("section");
+    const host = document.createElement("div");
+    const video = document.createElement("video");
+    host.attachShadow({ mode: "open" }).appendChild(video);
+    wrapper.appendChild(host);
+
+    document.body.appendChild(wrapper);
+    await flush();
+
+    expect(collectVideos()).toContain(video);
     expect(onMediaChange).toHaveBeenCalled();
   });
 

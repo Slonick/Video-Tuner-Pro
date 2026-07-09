@@ -70,17 +70,18 @@ let mediaScheduled = false;
 let mediaShouldFlashBadge = false;
 let lastChannelKeys: string[] = []; // re-resolve speed when the channel identity changes
 
-// Background-tick cadence: 1s while the page has a video, backing off toward 5s on
+// Background-tick cadence: 1s while the page has a video, backing off toward 30s on
 // pages with none so idle tabs stop walking the DOM every second. Media events and
 // the tab regaining focus snap it back to TICK_MIN.
 const TICK_MIN = 1000;
-const TICK_MAX = 5000;
+const TICK_MAX = 30_000;
 let tickInterval = TICK_MIN;
 
 // reconcile() is a full shadow-piercing walk; the observer already tracks media
 // incrementally, so this only needs to run as a rare backstop (the one case the
 // observer can't see: a shadow root attached to an already-present element).
-const RECONCILE_MS = 8000;
+const RECONCILE_MEDIA_MS = 8000;
+const RECONCILE_IDLE_MS = 30_000;
 let lastReconcileAt = 0;
 
 // After an extension reload this script is re-injected into the already-open tab
@@ -325,18 +326,19 @@ whenReady(loadSpeed);
 
 // Steady background tick: re-assert speed and drive live-sync (a backstop — most
 // re-applies are now event-driven). Self-reschedules so the cadence can back off on
-// pages with no media. A full reconcile() runs only every RECONCILE_MS, not per tick.
+// pages with no media. A full reconcile() runs on the media/idle backstop, not per tick.
 function tick() {
   if (!ctxValid()) {
     teardown();
     return;
   } // orphaned after a reload — stop the dead instance
   const now = Date.now();
-  if (now - lastReconcileAt >= RECONCILE_MS) {
+  let videos = collectVideos();
+  const reconcileMs = videos.length ? RECONCILE_MEDIA_MS : RECONCILE_IDLE_MS;
+  if (now - lastReconcileAt >= reconcileMs) {
     lastReconcileAt = now;
-    reconcile(); // rare backstop for shadow roots attached to pre-existing elements
+    if (reconcile()) videos = collectVideos();
   }
-  const videos = collectVideos();
   const primary = primaryVideoFrom(videos);
   const live = liveVideoFrom(videos);
   const stream = onStreamPage(live);
@@ -488,6 +490,9 @@ function scheduleReapply() {
     applyAll();
     controlLive();
     syncAudioSampler();
+    updateTimeBadge();
+    updateLauncher();
+    wake(TICK_MIN);
   });
 }
 
@@ -509,6 +514,22 @@ if (document.documentElement) {
 } else {
   document.addEventListener("DOMContentLoaded", startObserver, listenerOptions());
 }
+
+// attachShadow() itself emits no DOM mutation. A page can therefore add a host,
+// let our observer see it, and only then attach/populate its root from a startup
+// script. Reconcile once after those scripts finish so such players are available
+// immediately while truly idle pages still retain the 30-second backstop.
+window.addEventListener(
+  "load",
+  () => {
+    if (!ctxValid()) {
+      teardown();
+      return;
+    }
+    if (reconcile()) scheduleReapply();
+  },
+  listenerOptions({ once: true }),
+);
 
 // React instantly when settings change in the popup.
 function handleStorageChange(
