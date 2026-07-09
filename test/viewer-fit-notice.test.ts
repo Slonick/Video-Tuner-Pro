@@ -26,5 +26,6 @@ describe("viewer fit notices", () => {
     applyResolvedViewerFitFromStore();
 
     expect(h.setViewerFitMode).toHaveBeenCalledWith("cover");
+    expect(h.setViewerFitMode.mock.calls[0]).toEqual(["cover"]);
   });
 });

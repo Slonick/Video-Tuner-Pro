@@ -1,4 +1,4 @@
-import { test, expect, clearAll } from "./fixtures/extension.js";
+import { test, expect, clearAll, setStorage, sendToContent } from "./fixtures/extension.js";
 
 // The pop-out viewer against a Boosty-shaped page (viewer.html): sticky
 // header, fixed modal, player guts in an open shadow root. In modern Chromium
@@ -153,7 +153,9 @@ test("live viewer keeps a compact bar and compact quality label", async ({ page 
     const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
       el.shadowRoot?.querySelector(".bar"),
     )?.shadowRoot;
-    return (shadow?.querySelector(".bar") as HTMLElement | null)?.getBoundingClientRect().width ?? 0;
+    return (
+      (shadow?.querySelector(".bar") as HTMLElement | null)?.getBoundingClientRect().width ?? 0
+    );
   });
   expect(barWidth).toBeLessThanOrEqual(460);
 });
@@ -169,4 +171,117 @@ test("switching formats keeps a single overlay, T again exits", async ({ page })
   await expect
     .poll(() => state(page))
     .toMatchObject({ attr: null, overlay: false, videoInShadow: true });
+});
+
+test("viewer arrow keys seek and adjust volume on the real media element", async ({ page }) => {
+  await ready(page);
+  await page.waitForFunction(() => {
+    const video = document.getElementById("host")?.shadowRoot?.querySelector("video");
+    return !!video && Number.isFinite(video.duration) && video.duration > 1;
+  });
+  await page.keyboard.press("KeyV");
+  await expect.poll(() => state(page)).toMatchObject({ attr: "normal" });
+  await page.evaluate(async () => {
+    const video = document.getElementById("host")?.shadowRoot?.querySelector("video");
+    if (!video) throw new Error("fixture video missing");
+    video.pause();
+    video.volume = 0.5;
+    const seeked = new Promise<void>((resolve) =>
+      video.addEventListener("seeked", () => resolve(), { once: true }),
+    );
+    video.currentTime = video.duration / 2;
+    await seeked;
+  });
+
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowUp");
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const video = document.getElementById("host")?.shadowRoot?.querySelector("video");
+        return { currentTime: video?.currentTime ?? 0, volume: video?.volume ?? 0 };
+      }),
+    )
+    .toMatchObject({ currentTime: expect.any(Number), volume: 0.55 });
+  expect(
+    await page.evaluate(
+      () => document.getElementById("host")?.shadowRoot?.querySelector("video")?.currentTime ?? 0,
+    ),
+  ).toBeLessThan(0.01);
+});
+
+test("buffering forces the hidden viewer bar and spinner back on", async ({ page }) => {
+  await ready(page);
+  await page.keyboard.press("KeyV");
+  await expect.poll(() => state(page)).toMatchObject({ attr: "normal" });
+
+  await page.evaluate(async () => {
+    const overlay = document.querySelector("[data-vtp-viewer-overlay]");
+    const host = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+      el.shadowRoot?.querySelector(".bar"),
+    );
+    const bar = host?.shadowRoot?.querySelector<HTMLElement>(".bar");
+    if (bar) {
+      bar.style.visibility = "hidden";
+      bar.style.opacity = "0";
+    }
+    const video = document.getElementById("host")?.shadowRoot?.querySelector("video");
+    if (!video) throw new Error("fixture video missing");
+    await video.play();
+    video.dispatchEvent(new Event("waiting"));
+  });
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const overlay = document.querySelector("[data-vtp-viewer-overlay]");
+        const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+          el.shadowRoot?.querySelector(".bar"),
+        )?.shadowRoot;
+        const bar = shadow?.querySelector<HTMLElement>(".bar");
+        const spinner = overlay?.querySelector<HTMLElement>("[data-vtp-viewer-loading]");
+        return {
+          visibility: bar?.style.visibility,
+          barOpacity: bar?.style.opacity,
+          spinnerOpacity: spinner?.style.opacity,
+        };
+      }),
+    )
+    .toEqual({ visibility: "visible", barOpacity: "1", spinnerOpacity: "1" });
+});
+
+test("live catch-up changes playbackRate through the built extension", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { liveSync: true, syncTargetGlobal: 1 });
+  await ready(page);
+  await page.evaluate(async () => {
+    const video = document.getElementById("host")?.shadowRoot?.querySelector("video");
+    if (!video) throw new Error("fixture video missing");
+    document.documentElement.setAttribute("data-vtp-live", "1");
+    document.documentElement.setAttribute("data-vtp-latency", "12");
+    video.currentTime = 0;
+    await video.play();
+    video.dispatchEvent(new Event("durationchange"));
+    video.dispatchEvent(new Event("timeupdate"));
+  });
+  await page.waitForFunction(() => {
+    const video = document.getElementById("host")?.shadowRoot?.querySelector("video");
+    return !!video && !video.paused && video.buffered.length > 0 && video.buffered.end(0) > 2;
+  });
+
+  await expect
+    .poll(async () => (await sendToContent(serviceWorker, "getSpeed")) as { live?: boolean })
+    .toMatchObject({ live: true });
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.getElementById("host")?.shadowRoot?.querySelector("video")?.playbackRate ?? 1,
+      ),
+    )
+    .toBeGreaterThan(1);
 });
