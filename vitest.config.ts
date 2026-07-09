@@ -29,6 +29,7 @@ export default defineConfig({
         // Entry points / bootstrap glue — wired by the browser, not unit-tested.
         "src/background/**",
         "src/content/main.ts",
+        "src/content/page-bridge.ts",
         "src/content/index.ts",
         "src/content/inject.ts",
         "src/content/quality-inject.ts",
