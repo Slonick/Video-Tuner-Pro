@@ -2,7 +2,7 @@
 // classes/ids the CSS keys off) and drives the readout/slider tween via refs
 // (React can't animate a range thumb). The readout has no JSX text child so a
 // re-render can't clobber the tweened value.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { tweenNumber } from "../core/tween-number.js";
 import { SliderRow } from "./SliderRow.js";
 import { msg } from "../i18n.js";
@@ -27,7 +27,7 @@ interface Props {
   forceOpen?: boolean;
 }
 
-export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
+export const SpeedCard = memo(function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const readoutRef = useRef<HTMLSpanElement>(null);
@@ -227,4 +227,4 @@ export function SpeedCard({ speed: s, domain, live, forceOpen }: Props) {
       </div>
     </div>
   );
-}
+});

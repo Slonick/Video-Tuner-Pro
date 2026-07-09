@@ -3,7 +3,7 @@
 // graph, an always-visible target-rate row, and an expanded body with Save (the
 // target is still saved per scope: channel > site > global) plus the global response
 // knobs (Slowest speed + Soft knee; Reaction / Hold / Ease-back stay options-only).
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { msg } from "../i18n.js";
 import { SliderRow } from "./SliderRow.js";
 import { ParamSlider } from "./ParamSlider.js";
@@ -27,7 +27,12 @@ interface Props {
   forceOpen?: boolean;
 }
 
-export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
+export const AutoSlowCard = memo(function AutoSlowCard({
+  autoSlow: a,
+  live,
+  blocked,
+  forceOpen,
+}: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const k = useAutoSlowKnobs();
@@ -171,4 +176,4 @@ export function AutoSlowCard({ autoSlow: a, live, blocked, forceOpen }: Props) {
       </div>
     </div>
   );
-}
+});

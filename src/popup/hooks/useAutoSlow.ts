@@ -3,7 +3,7 @@
 // no persist); Save commits the target to the chosen scope, Reset clears it. The
 // master ON/OFF is a separate global flag (autoSlowEnabled, a StoredToggle in the
 // card header), and the response dynamics live on the options page — neither here.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { debounce } from "../core/debounce.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
@@ -232,17 +232,32 @@ export function useAutoSlow(tab: ActiveTab | null, send: SendToTab): UseAutoSlow
     fromStorage,
   ]);
 
-  return {
-    target,
-    channel: sc.channel,
-    scope,
-    saved: sc.saved,
-    savedValues: sc.savedValues,
-    setTarget,
-    nudge,
-    save,
-    resetManual,
-    resetScope,
-    pickScope: sc.pickScope,
-  };
+  return useMemo(
+    () => ({
+      target,
+      channel: sc.channel,
+      scope,
+      saved: sc.saved,
+      savedValues: sc.savedValues,
+      setTarget,
+      nudge,
+      save,
+      resetManual,
+      resetScope,
+      pickScope: sc.pickScope,
+    }),
+    [
+      target,
+      sc.channel,
+      scope,
+      sc.saved,
+      sc.savedValues,
+      setTarget,
+      nudge,
+      save,
+      resetManual,
+      resetScope,
+      sc.pickScope,
+    ],
+  );
 }

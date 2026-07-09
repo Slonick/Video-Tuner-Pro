@@ -165,7 +165,20 @@ export function useAudioCompressor(): UseAudioCompressor {
     STORE.get(["compPresets"], (r) => setPresets(normalizeCompPresets(r.compPresets)));
   }, []);
 
-  return { enabled, setEnabled, comp, gain, presets, activePreset, setParam, setGain, applyPreset };
+  return useMemo(
+    () => ({
+      enabled,
+      setEnabled,
+      comp,
+      gain,
+      presets,
+      activePreset,
+      setParam,
+      setGain,
+      applyPreset,
+    }),
+    [enabled, setEnabled, comp, gain, presets, activePreset, setParam, setGain, applyPreset],
+  );
 }
 
 function storageKey(key: keyof CompParams): string {

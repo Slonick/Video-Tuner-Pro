@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { useStored } from "./useStored.js";
 import { api } from "../platform/browser.js";
@@ -56,7 +56,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
 
   const [mode, setModeState] = useState<ViewerAutoMode>("off");
   const [pageMode, setPageModeState] = useState<ViewerAutoMode>("off");
-  const [enabled, setEnabledState] = useState(true);
+  const [enabled, setEnabledState] = useState(false);
   const modeRef = useRef<ViewerAutoMode>("off");
   const pageModeRef = useRef<ViewerAutoMode>("off");
   const modeHoldUntil = useRef(0);
@@ -252,31 +252,54 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
   useEffect(() => {
     if (!hasTab || tab?.tabId == null) return;
     const onMessage = (
-      msg: { action?: string; mode?: unknown },
+      msg: { action?: string; mode?: unknown; tabId?: unknown },
       sender?: { tab?: { id?: number } },
     ) => {
       if (msg?.action !== "viewerStateChanged") return;
-      if (sender?.tab?.id != null && sender.tab.id !== tab.tabId) return;
+      const tabId = typeof msg.tabId === "number" ? msg.tabId : sender?.tab?.id;
+      if (tabId == null) {
+        refreshPageState();
+        return;
+      }
+      if (tabId !== tab.tabId) return;
       applyPageState({ mode: normalize(msg.mode) }, true);
     };
     api.runtime.onMessage.addListener(onMessage);
     return () => api.runtime.onMessage.removeListener?.(onMessage);
-  }, [hasTab, tab?.tabId, applyPageState]);
+  }, [hasTab, tab?.tabId, applyPageState, refreshPageState]);
 
-  return {
-    enabled,
-    mode,
-    pageMode,
-    channel,
-    channelName,
-    scope,
-    saved,
-    savedValues,
-    setEnabled,
-    setMode: setPickedMode,
-    setPageMode,
-    save,
-    resetScope,
-    pickScope,
-  };
+  return useMemo(
+    () => ({
+      enabled,
+      mode,
+      pageMode,
+      channel,
+      channelName,
+      scope,
+      saved,
+      savedValues,
+      setEnabled,
+      setMode: setPickedMode,
+      setPageMode,
+      save,
+      resetScope,
+      pickScope,
+    }),
+    [
+      enabled,
+      mode,
+      pageMode,
+      channel,
+      channelName,
+      scope,
+      saved,
+      savedValues,
+      setEnabled,
+      setPickedMode,
+      setPageMode,
+      save,
+      resetScope,
+      pickScope,
+    ],
+  );
 }

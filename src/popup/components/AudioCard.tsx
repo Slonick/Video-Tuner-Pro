@@ -2,7 +2,7 @@
 // row is a self-contained ParamSlider (owns its thumb tween). The audio canvas
 // (#audioMeter) is driven by useGraphs at the app level; `translating` (VOT active)
 // locks the card.
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { STORE } from "../platform/storage.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
@@ -69,7 +69,12 @@ interface Props {
   forceOpen?: boolean;
 }
 
-export function AudioCard({ audio: a, translating, blocked, forceOpen }: Props) {
+export const AudioCard = memo(function AudioCard({
+  audio: a,
+  translating,
+  blocked,
+  forceOpen,
+}: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   // Openable even when off — there are presets to view/edit; only a locked card
@@ -211,4 +216,4 @@ export function AudioCard({ audio: a, translating, blocked, forceOpen }: Props) 
       </div>
     </div>
   );
-}
+});

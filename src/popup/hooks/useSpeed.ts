@@ -2,7 +2,7 @@
 // lock and the editable presets; scope selection + saved dots + storage fallbacks
 // come from useScopeSelection. Talks to the content script via `send`, falling back
 // to storage on pages with no content script.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { clamp } from "../core/clamp.js";
 import {
@@ -24,6 +24,8 @@ const STORAGE: ScopeStorage = {
   siteMap: "domains",
   channelMap: "channels",
 };
+const sameArray = <T>(a: T[], b: T[]): boolean =>
+  a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 
 // `v` is the speed fraction; `animate` says whether the readout/slider should
 // glide to it (preset / ± / reset) or snap (drag / poll / load).
@@ -93,7 +95,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
 
   const apply = useCallback((v: number, animate: boolean) => {
     speedRef.current = v;
-    setSpeedState({ v, animate });
+    setSpeedState((prev) => (prev.v === v && prev.animate === animate ? prev : { v, animate }));
   }, []);
 
   const touchUserSpeed = useCallback(() => {
@@ -275,11 +277,13 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   // without a reopen. Not tab-gated — they don't depend on the page.
   useStored(["speedPresets", "presetKeys", "presetPins", "speedMax", "speedStep"], (r) => {
     const set = normalizePresetSet(r.speedPresets, r.presetKeys, r.presetPins);
-    setPresets(set.presets);
-    setPresetKeys(set.keys);
-    setPinned(set.pinned);
-    setSpeedMax(normalizeSpeedMax(r.speedMax));
-    setSpeedStep(normalizeSpeedStep(r.speedStep) / 100);
+    setPresets((prev) => (sameArray(prev, set.presets) ? prev : set.presets));
+    setPresetKeys((prev) => (sameArray(prev, set.keys) ? prev : set.keys));
+    setPinned((prev) => (sameArray(prev, set.pinned) ? prev : set.pinned));
+    const nextMax = normalizeSpeedMax(r.speedMax);
+    const nextStep = normalizeSpeedStep(r.speedStep) / 100;
+    setSpeedMax((prev) => (prev === nextMax ? prev : nextMax));
+    setSpeedStep((prev) => (prev === nextStep ? prev : nextStep));
   });
 
   // Initial load: the page's resolved speed (or storage fallback).
@@ -356,28 +360,54 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
     return () => clearInterval(id);
   }, [hasTab, live, send, applyChannel, apply]);
 
-  return {
-    speed,
-    presets,
-    presetKeys,
-    pinned,
-    speedMax,
-    speedStep,
-    live,
-    drm,
-    channel: sc.channel,
-    channelName: sc.channelName,
-    scope,
-    saved: sc.saved,
-    savedValues: sc.savedValues,
-    isYouTube,
-    setSpeed,
-    nudge,
-    resetManual,
-    resetScope,
-    save,
-    pickScope: sc.pickScope,
-    sliderInput,
-    sliderCommit,
-  };
+  return useMemo(
+    () => ({
+      speed,
+      presets,
+      presetKeys,
+      pinned,
+      speedMax,
+      speedStep,
+      live,
+      drm,
+      channel: sc.channel,
+      channelName: sc.channelName,
+      scope,
+      saved: sc.saved,
+      savedValues: sc.savedValues,
+      isYouTube,
+      setSpeed,
+      nudge,
+      resetManual,
+      resetScope,
+      save,
+      pickScope: sc.pickScope,
+      sliderInput,
+      sliderCommit,
+    }),
+    [
+      speed,
+      presets,
+      presetKeys,
+      pinned,
+      speedMax,
+      speedStep,
+      live,
+      drm,
+      sc.channel,
+      sc.channelName,
+      scope,
+      sc.saved,
+      sc.savedValues,
+      isYouTube,
+      setSpeed,
+      nudge,
+      resetManual,
+      resetScope,
+      save,
+      sc.pickScope,
+      sliderInput,
+      sliderCommit,
+    ],
+  );
 }

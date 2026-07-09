@@ -1,7 +1,7 @@
 // Live-sync card. State/behaviour from useLiveSync; the allowed-delay slider +
 // readout are plain controlled state (no tween). The buffer canvas (#bufferMeter)
 // is driven by useGraphs at the app level.
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { STORE } from "../platform/storage.js";
 import { msg } from "../i18n.js";
 import { Switch } from "../../ui/Switch.js";
@@ -22,7 +22,7 @@ interface Props {
   forceOpen?: boolean;
 }
 
-export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
+export const LiveSyncCard = memo(function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, ls.enabled && live);
@@ -162,4 +162,4 @@ export function LiveSyncCard({ sync: ls, live, forceOpen }: Props) {
       </div>
     </div>
   );
-}
+});

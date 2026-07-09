@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
@@ -202,16 +202,19 @@ export function useViewerFit(tab: ActiveTab | null, send: SendToTab): UseViewerF
     fallbackFromStorage,
   ]);
 
-  return {
-    mode,
-    channel,
-    channelName,
-    scope,
-    saved,
-    savedValues,
-    setMode,
-    save,
-    resetScope,
-    pickScope,
-  };
+  return useMemo(
+    () => ({
+      mode,
+      channel,
+      channelName,
+      scope,
+      saved,
+      savedValues,
+      setMode,
+      save,
+      resetScope,
+      pickScope,
+    }),
+    [mode, channel, channelName, scope, saved, savedValues, setMode, save, resetScope, pickScope],
+  );
 }

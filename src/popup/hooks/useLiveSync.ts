@@ -1,7 +1,7 @@
 // Live-sync card state + behaviour. Owns the on/off toggle and the allowed delay
 // (seconds); scope selection + saved dots + storage fallbacks come from
 // useScopeSelection. Dragging previews live (setTarget); Save commits (rememberTarget).
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORE } from "../platform/storage.js";
 import { debounce } from "../core/debounce.js";
 import type { ActiveTab, SendToTab } from "./tab.js";
@@ -232,19 +232,36 @@ export function useLiveSync(tab: ActiveTab | null, send: SendToTab): UseLiveSync
     };
   }, [tab, hasTab, send, setTarget, applyChannel, defaultScope, refreshSaved, fromStorage]);
 
-  return {
-    enabled,
-    setEnabled,
-    target,
-    channel: sc.channel,
-    scope,
-    saved: sc.saved,
-    savedValues: sc.savedValues,
-    previewTarget,
-    nudge,
-    save,
-    resetManual,
-    resetScope,
-    pickScope: sc.pickScope,
-  };
+  return useMemo(
+    () => ({
+      enabled,
+      setEnabled,
+      target,
+      channel: sc.channel,
+      scope,
+      saved: sc.saved,
+      savedValues: sc.savedValues,
+      previewTarget,
+      nudge,
+      save,
+      resetManual,
+      resetScope,
+      pickScope: sc.pickScope,
+    }),
+    [
+      enabled,
+      setEnabled,
+      target,
+      sc.channel,
+      scope,
+      sc.saved,
+      sc.savedValues,
+      previewTarget,
+      nudge,
+      save,
+      resetManual,
+      resetScope,
+      sc.pickScope,
+    ],
+  );
 }

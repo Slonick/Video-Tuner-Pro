@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { Segmented } from "../../ui/Segmented.js";
 import { Switch } from "../../ui/Switch.js";
 import { Button } from "../../ui/Button.js";
@@ -29,11 +29,15 @@ const VIEWER_FIT_LABEL: Record<ViewerFitMode, string> = {
   fill: "viewerFitFill",
 };
 
-export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = false }: Props) {
+export const ViewerAutoControl = memo(function ViewerAutoControl({
+  viewerAuto: va,
+  viewerFit: fit,
+  blocked = false,
+}: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [backdropVideo, setBackdropVideoState] = useState(false);
-  const { open, toggle } = useCardOverlay(sectionRef, slotRef, true);
+  const { open, toggle } = useCardOverlay(sectionRef, slotRef, !blocked && va.enabled);
   const label = msg("viewerModesLabel") || "Viewer modes";
   const autoLabel = msg("optViewerAutoLabel") || "Auto-open selected mode";
   const backdropLabel = msg("viewerBackdropVideo") || "Background video";
@@ -50,8 +54,11 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
 
   const setBackdropVideo = (on: boolean) => {
     if (blocked) return;
+    const prev = backdropVideo;
     setBackdropVideoState(on);
-    STORE.set({ viewerBackdropVideo: on });
+    STORE.set({ viewerBackdropVideo: on }, (ok) => {
+      if (ok === false) setBackdropVideoState(prev);
+    });
   };
   const selectedAutoMode = (): ViewerAutoMode =>
     va.pageMode === "normal" || va.pageMode === "theater" ? va.pageMode : "normal";
@@ -259,4 +266,4 @@ export function ViewerAutoControl({ viewerAuto: va, viewerFit: fit, blocked = fa
       </div>
     </div>
   );
-}
+});

@@ -634,6 +634,23 @@ describe("viewer auto-open scope control", () => {
     );
   });
 
+  it("refreshes page viewer state instead of applying unidentified runtime events", async () => {
+    const { emitRuntimeMessage, replies } = await mountApp({
+      tab: YT,
+      replies: {
+        getViewerState: { mode: "normal" },
+      },
+    });
+    replies.getViewerState = { mode: "theater" };
+
+    emitRuntimeMessage({ action: "viewerStateChanged", mode: "off" }, {});
+    await flush();
+
+    expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
+      "Theater",
+    );
+  });
+
   it("does not poll stale page state after a just-picked mode", async () => {
     const { replies } = await mountApp({
       tab: YT,
@@ -666,6 +683,30 @@ describe("viewer auto-open scope control", () => {
     expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
       "Off",
     );
+  });
+
+  it("does not expand viewer-mode settings while the feature is disabled", async () => {
+    await mountApp({
+      tab: YT,
+      settings: { viewerAutoEnabled: false },
+    });
+    document.querySelector<HTMLElement>(".viewer-auto-section .sec-main")!.click();
+    await flush();
+    expect(document.querySelector(".viewer-auto-section")?.className).not.toContain("is-overlay");
+  });
+
+  it("rolls back the background-video toggle when storage rejects it", async () => {
+    const { saved } = await mountApp({
+      tab: YT,
+      failSetKeys: ["viewerBackdropVideo"],
+    });
+    document.querySelector<HTMLElement>(".viewer-auto-section .sec-main")!.click();
+    await flush();
+    byId("viewerBackdropVideoToggle").click();
+    await flush();
+
+    expect(saved().viewerBackdropVideo).toBeUndefined();
+    expect(byId("viewerBackdropVideoToggle").getAttribute("aria-checked")).toBe("false");
   });
 
   it("uses the switch as a global master toggle without changing page state", async () => {
