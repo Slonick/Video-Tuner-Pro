@@ -31,8 +31,9 @@ const RED_ICON = {
   128: "icons/icon-red-128.png",
 };
 const badgeOwners = new Map<number, number>();
-const videoFrameOwners = new Map<number, { frameId: number; expires: number }>();
+const videoFrameOwners = new Map<number, { frameId?: number; expires: number }>();
 const VIDEO_FRAME_CACHE_MS = 5000;
+const VIDEO_FRAME_MISS_CACHE_MS = 1500;
 
 interface VideoFrameProbe {
   hasVideo?: boolean;
@@ -110,7 +111,7 @@ function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
         expires: Date.now() + VIDEO_FRAME_CACHE_MS,
       });
     } else {
-      videoFrameOwners.delete(tabId);
+      videoFrameOwners.set(tabId, { expires: Date.now() + VIDEO_FRAME_MISS_CACHE_MS });
     }
     done(best?.frameId);
   };

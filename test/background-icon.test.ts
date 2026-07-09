@@ -238,6 +238,54 @@ describe("background toolbar badge frame ownership", () => {
     }
   });
 
+  it("briefly caches a no-video probe miss across idle monitor polls", () => {
+    vi.useFakeTimers();
+    try {
+      let first: unknown;
+      let second: unknown;
+      let third: unknown;
+      vi.setSystemTime(0);
+      h.probeResults = [{ frameId: 4, result: { hasVideo: false, score: 0 } }];
+
+      h.listener!(
+        { action: "relayToTab", tabId: 11, msg: { action: "getMonitor" }, route: "video" },
+        {},
+        (r) => {
+          first = r;
+        },
+      );
+      vi.setSystemTime(1000);
+      h.listener!(
+        { action: "relayToTab", tabId: 11, msg: { action: "getMonitor" }, route: "video" },
+        {},
+        (r) => {
+          second = r;
+        },
+      );
+      vi.setSystemTime(1600);
+      h.probeResults = [{ frameId: 7, result: { hasVideo: true, score: 200 } }];
+      h.listener!(
+        { action: "relayToTab", tabId: 11, msg: { action: "getMonitor" }, route: "video" },
+        {},
+        (r) => {
+          third = r;
+        },
+      );
+
+      expect(h.scriptCalls).toHaveLength(2);
+      expect(h.tabMessages).toEqual([
+        { tabId: 11, msg: { action: "getMonitor" }, options: undefined },
+        { tabId: 11, msg: { action: "getMonitor" }, options: undefined },
+        { tabId: 11, msg: { action: "getMonitor" }, options: { frameId: 7 } },
+      ]);
+      expect(first).toEqual({ ok: true, action: "getMonitor", frameId: null });
+      expect(second).toEqual({ ok: true, action: "getMonitor", frameId: null });
+      expect(third).toEqual({ ok: true, action: "getMonitor", frameId: 7 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("scores video frames like the content primary-video picker", async () => {
     let response: unknown;
     h.probeResults = null;
