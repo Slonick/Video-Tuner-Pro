@@ -68,8 +68,12 @@ export function cornerReadout(
   cx.save();
   cx.font = `600 ${FS}px -apple-system, sans-serif`;
   cx.textBaseline = "middle";
-  const labelW = Math.max(...rows.map((r) => cx.measureText(r.label).width));
-  const valW = Math.max(...rows.map((r) => cx.measureText(r.value).width));
+  let labelW = 0,
+    valW = 0;
+  for (const r of rows) {
+    labelW = Math.max(labelW, cx.measureText(r.label).width);
+    valW = Math.max(valW, cx.measureText(r.value).width);
+  }
   const boxW = PADX * 2 + labelW + GAP + valW;
   const boxH = PADY * 2 + LH * rows.length;
   // Near-opaque solid backdrop (the card surface, like the Save menu) so the
@@ -105,9 +109,10 @@ export function fitCanvas(
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth || 290,
     h = canvas.clientHeight || 50;
-  if (canvas._w !== w || canvas._h !== h) {
+  if (canvas._w !== w || canvas._h !== h || canvas._dpr !== dpr) {
     canvas._w = w;
     canvas._h = h;
+    canvas._dpr = dpr;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);

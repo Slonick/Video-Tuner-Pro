@@ -34,7 +34,7 @@ export function drawBuffer(g: GraphState, t: number): void {
   // latency both are shown; otherwise the single series IS the buffer (green).
   const LAT_COL = col("--accent", "#0a84ff");
   const BUF_COL = "#30d158";
-  const hasAhead = g.bufAheadShown != null;
+  const hasAhead = g.bufAhead != null;
   const padT = 7,
     padB = 11,
     gh = h - padT - padB;
@@ -143,9 +143,11 @@ export function drawBuffer(g: GraphState, t: number): void {
       color: string,
       fill: string,
     ): void => {
-      const pts = g.bufHist
-        .filter((p) => get(p) != null)
-        .map((p) => ({ x: xFor(p.t), y: mid + dir * amp(get(p) as number) }));
+      const pts: { x: number; y: number }[] = [];
+      for (const p of g.bufHist) {
+        const value = get(p);
+        if (value != null) pts.push({ x: xFor(p.t), y: mid + dir * amp(value) });
+      }
       if (pts.length < 2) return;
       bcx.beginPath();
       smoothLine(bcx, pts);
@@ -188,7 +190,8 @@ export function drawBuffer(g: GraphState, t: number): void {
     // One series (buffer only) → fill the FULL height from the bottom (0 = bottom),
     // with one big green value.
     if (g.bufHist.length) {
-      const pts = g.bufHist.map((p) => ({ x: xFor(p.t), y: bottom - ampFull(p.v) }));
+      const pts: { x: number; y: number }[] = [];
+      for (const p of g.bufHist) pts.push({ x: xFor(p.t), y: bottom - ampFull(p.v) });
       bcx.beginPath();
       smoothLine(bcx, pts);
       bcx.lineTo(pts[pts.length - 1].x, bottom);

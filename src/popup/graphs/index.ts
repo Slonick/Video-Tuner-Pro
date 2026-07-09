@@ -22,16 +22,38 @@ export function setupGraphs(
   if (!aCanvas || !acx || !bCanvas || !bcx) return () => {};
   const g = createGraphState(aCanvas, acx, bCanvas, bcx, asCanvas, ascx);
   let raf = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let audioSampleAt = 0;
+  let bufferSampleAt = 0;
+  let autoSlowSampleAt = 0;
+  const SAMPLE_MS = 80;
+
+  const graphActive = (): boolean =>
+    g.audioActive ||
+    g.bufLive ||
+    g.asActive ||
+    Math.abs(g.cur.in - g.tgt.in) > 0.5 ||
+    Math.abs(g.cur.out - g.tgt.out) > 0.5 ||
+    Math.abs(g.compAnim - (g.audioEnabled ? 1 : 0)) > 0.01;
+
+  const schedule = (active: boolean): void => {
+    if (active) raf = requestAnimationFrame(frame);
+    else timer = setTimeout(frame, 250);
+  };
 
   function frame(): void {
     const t = now();
+    const active = graphActive();
     g.cur.in += (g.tgt.in - g.cur.in) * 0.3;
     g.cur.out += (g.tgt.out - g.cur.out) * 0.3;
     g.compAnim += ((g.audioEnabled ? 1 : 0) - g.compAnim) * 0.12; // morph readout/ghost on toggle
     // Record the eased level each frame so the waveform scrolls smoothly.
     if (g.audioActive) {
-      g.audioHist.push({ t, in: g.cur.in, out: g.cur.out });
-      while (g.audioHist.length && t - g.audioHist[0].t > A_WINDOW + 200) g.audioHist.shift();
+      if (t - audioSampleAt >= SAMPLE_MS) {
+        audioSampleAt = t;
+        g.audioHist.push({ t, in: g.cur.in, out: g.cur.out });
+        while (g.audioHist.length && t - g.audioHist[0].t > A_WINDOW + 200) g.audioHist.shift();
+      }
     } else if (g.audioHist.length) {
       g.audioHist.length = 0;
       g.audioInShown = g.audioOutShown = null;
@@ -47,8 +69,11 @@ export function setupGraphs(
           : g.bufCurAhead == null
             ? g.bufAheadSmooth
             : g.bufCurAhead + (g.bufAheadSmooth - g.bufCurAhead) * 0.3;
-      g.bufHist.push({ t, v: g.bufCur, a: g.bufCurAhead });
-      while (g.bufHist.length && t - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
+      if (t - bufferSampleAt >= SAMPLE_MS) {
+        bufferSampleAt = t;
+        g.bufHist.push({ t, v: g.bufCur, a: g.bufCurAhead });
+        while (g.bufHist.length && t - g.bufHist[0].t > BUF_WINDOW + 1000) g.bufHist.shift();
+      }
     } else {
       g.bufCur = g.bufCurAhead = null;
     }
@@ -57,21 +82,25 @@ export function setupGraphs(
     if (g.asActive) {
       g.asRateCur += (g.asRate - g.asRateCur) * 0.3;
       g.asSpeedCur += (g.asSpeed - g.asSpeedCur) * 0.3;
-      g.asHist.push({ t, rate: g.asRateCur, speed: g.asSpeedCur });
-      while (g.asHist.length && t - g.asHist[0].t > AS_WINDOW + 200) g.asHist.shift();
+      if (t - autoSlowSampleAt >= SAMPLE_MS) {
+        autoSlowSampleAt = t;
+        g.asHist.push({ t, rate: g.asRateCur, speed: g.asSpeedCur });
+        while (g.asHist.length && t - g.asHist[0].t > AS_WINDOW + 200) g.asHist.shift();
+      }
     } else if (g.asHist.length) {
       g.asHist.length = 0;
     }
     drawAudio(g, t);
     drawBuffer(g, t);
     drawAutoSlow(g, t);
-    raf = requestAnimationFrame(frame);
+    schedule(active);
   }
 
   const stopPoll = startPoll(g, getTabId, onTranslating, onBlocked);
   raf = requestAnimationFrame(frame);
   return () => {
     cancelAnimationFrame(raf);
+    if (timer != null) clearTimeout(timer);
     stopPoll();
   };
 }

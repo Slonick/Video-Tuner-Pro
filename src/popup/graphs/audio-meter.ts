@@ -50,7 +50,8 @@ export function drawAudio(g: GraphState, t: number): void {
 
   if (g.audioHist.length >= 2) {
     // Input area (always): baseline → input level (muted).
-    const ip = g.audioHist.map((p) => ({ x: xFor(p.t), y: inY(p.in) }));
+    const ip: { x: number; y: number }[] = [];
+    for (const p of g.audioHist) ip.push({ x: xFor(p.t), y: inY(p.in) });
     acx.beginPath();
     acx.moveTo(ip[0].x, baseY);
     for (const p of ip) acx.lineTo(p.x, p.y);
@@ -99,7 +100,8 @@ export function drawAudio(g: GraphState, t: number): void {
     // Output area (top, accent): centre → output level. Fades in with the
     // compressor — off, output == input, so there's nothing to show.
     if (c > 0.01) {
-      const op = g.audioHist.map((p) => ({ x: xFor(p.t), y: center - halfAmp * frac(p.out) }));
+      const op: { x: number; y: number }[] = [];
+      for (const p of g.audioHist) op.push({ x: xFor(p.t), y: center - halfAmp * frac(p.out) });
       acx.globalAlpha = 0.55 * c;
       acx.fillStyle = accent;
       acx.beginPath();
@@ -121,11 +123,14 @@ export function drawAudio(g: GraphState, t: number): void {
       // to the actual output is how much the compressor pulled the level off — the
       // before/after difference. Fades in with the compressor; off, output == input
       // so it vanishes.
-      const gp = g.audioHist.map((p) => ({
-        x: xFor(p.t),
-        gi: center - halfAmp * frac(p.in),
-        go: center - halfAmp * frac(p.out),
-      }));
+      const gp: { x: number; gi: number; go: number }[] = [];
+      for (const p of g.audioHist) {
+        gp.push({
+          x: xFor(p.t),
+          gi: center - halfAmp * frac(p.in),
+          go: center - halfAmp * frac(p.out),
+        });
+      }
       acx.save();
       acx.globalAlpha = 0.18 * c; // "removed" band
       acx.fillStyle = A_OVER;

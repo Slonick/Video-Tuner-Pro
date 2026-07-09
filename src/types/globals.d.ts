@@ -24,4 +24,5 @@ interface AnalyserNode {
 interface HTMLCanvasElement {
   _w?: number;
   _h?: number;
+  _dpr?: number;
 }
