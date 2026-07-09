@@ -5,6 +5,7 @@
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
 import { STORE } from "../platform/storage.js";
 import type { Scope, ScopeFlags, ScopeStorage } from "../lib/scope.js";
+import { mutateStoredMap, type StoredMapName } from "../../shared/map-mutation.js";
 
 export type ScopeValues = Record<Scope, unknown>;
 
@@ -126,11 +127,7 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
         return;
       }
       if (s === "site" && domain) {
-        STORE.get([storage.siteMap], (r) => {
-          const map = { ...((r[storage.siteMap] || {}) as Record<string, unknown>) };
-          map[domain] = value;
-          STORE.set({ [storage.siteMap]: map }, done);
-        });
+        mutateStoredMap(storage.siteMap as StoredMapName, { [domain]: value }, [], done);
         return;
       }
       done?.(false);
@@ -145,12 +142,7 @@ export function useScopeSelection(domain: string, storage: ScopeStorage): ScopeS
         return;
       }
       if (s === "site" && domain) {
-        STORE.get([storage.siteMap], (r) => {
-          const map = { ...((r[storage.siteMap] || {}) as Record<string, unknown>) };
-          delete map[domain];
-          if (Object.keys(map).length) STORE.set({ [storage.siteMap]: map }, done);
-          else STORE.remove(storage.siteMap, done);
-        });
+        mutateStoredMap(storage.siteMap as StoredMapName, {}, [domain], done);
         return;
       }
       done(true);

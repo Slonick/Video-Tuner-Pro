@@ -197,7 +197,11 @@ async function fetchSponsorSegmentsUncached(
     const cats = encodeURIComponent(JSON.stringify(Object.keys(SPONSOR_COLORS)));
     const resp = await fetchFn(
       `https://sponsor.ajay.app/api/skipSegments?videoID=${encodeURIComponent(videoId)}&categories=${cats}`,
-      controller ? { signal: controller.signal } : undefined,
+      {
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        ...(controller ? { signal: controller.signal } : {}),
+      },
     );
     if (!resp.ok) return [];
     const data = (await resp.json()) as Array<{ segment?: [number, number]; category?: string }>;

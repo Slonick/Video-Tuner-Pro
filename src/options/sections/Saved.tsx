@@ -8,6 +8,12 @@ import { msg } from "../../popup/i18n.js";
 import { Group as SettingsGroup } from "../Group.js";
 import { Button } from "../../ui/Button.js";
 import { ConfirmButton } from "../../ui/ConfirmButton.js";
+import {
+  clearStoredMap,
+  mutateStoredMap,
+  STORED_MAP_NAMES,
+  type StoredMapName,
+} from "../../shared/map-mutation.js";
 
 type NumMap = Record<string, number>;
 type StrMap = Record<string, string>;
@@ -173,15 +179,25 @@ export function Saved() {
   if (!data) return null;
 
   // Remove one key from a stored map (or clear a scalar) then re-render.
-  const deleteFromMap = (storeKey: string, mapKey: string) => {
-    STORE.get([storeKey], (r) => {
-      const map = { ...(r[storeKey] as Record<string, unknown> | undefined) };
-      delete map[mapKey];
-      if (Object.keys(map).length) STORE.set({ [storeKey]: map }, load);
-      else STORE.remove(storeKey, load);
-    });
+  const deleteFromMap = (storeKey: StoredMapName, mapKey: string) =>
+    mutateStoredMap(storeKey, {}, [mapKey], load);
+  const removeKeys = (keys: string | string[]) => {
+    const list = Array.isArray(keys) ? keys : [keys];
+    const maps = list.filter((key): key is StoredMapName =>
+      (STORED_MAP_NAMES as readonly string[]).includes(key),
+    );
+    const scalars = list.filter((key) => !maps.includes(key as StoredMapName));
+    let pending = maps.length + (scalars.length ? 1 : 0);
+    if (!pending) {
+      load();
+      return;
+    }
+    const done = () => {
+      if (--pending === 0) load();
+    };
+    for (const map of maps) clearStoredMap(map, done);
+    if (scalars.length) STORE.remove(scalars, done);
   };
-  const removeKeys = (keys: string | string[]) => STORE.remove(keys, load);
 
   const globalName = msg("scopeGlobal") || "Global";
   const byName = (a: Row, b: Row) => a.name.localeCompare(b.name);

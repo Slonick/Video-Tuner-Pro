@@ -7,6 +7,7 @@ import { resolveSyncTarget, type TargetScope } from "../core/resolve.js";
 import { channelKeys } from "../channel.js";
 import { ctxValid } from "../platform/browser.js";
 import { STORE } from "../platform/storage.js";
+import { mutateStoredMap } from "../../shared/map-mutation.js";
 import { S } from "../state.js";
 import { controlLive } from "./sync.js";
 
@@ -17,11 +18,7 @@ export function persistSiteTarget(target: number, done?: Done): void {
     done?.(false);
     return;
   } // top frame only — see speed.ts
-  STORE.get(["syncTargets"], (r) => {
-    const t = { ...((r.syncTargets || {}) as Record<string, number>) };
-    t[getDomain()] = target;
-    STORE.set({ syncTargets: t }, done);
-  });
+  mutateStoredMap("syncTargets", { [getDomain()]: target }, [], done);
 }
 
 export function persistChannelTarget(target: number, done?: Done): void {
@@ -34,12 +31,7 @@ export function persistChannelTarget(target: number, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["syncTargetChannels"], (r) => {
-    const t = { ...((r.syncTargetChannels || {}) as Record<string, number>) };
-    for (const k of keys) delete t[k];
-    t[keys[0]] = target;
-    STORE.set({ syncTargetChannels: t }, done);
-  });
+  mutateStoredMap("syncTargetChannels", { [keys[0]]: target }, keys.slice(1), done);
 }
 
 export function persistGlobalTarget(target: number, done?: Done): void {
@@ -75,14 +67,18 @@ function applyResolvedTarget(
 }
 
 // Resolve + apply from storage. Used on channel change and storage updates.
-export function applyResolvedTargetFromStore(): void {
-  if (!ctxValid()) return;
+export function applyResolvedTargetFromStore(done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   STORE.get(["syncTargets", "syncTargetChannels", "syncTargetGlobal", "liveSyncTarget"], (r) => {
     applyResolvedTarget(
       (r.syncTargets || {}) as Record<string, number>,
       (r.syncTargetChannels || {}) as Record<string, number>,
       (r.syncTargetGlobal ?? r.liveSyncTarget) as number | undefined,
     ); // legacy liveSyncTarget = old global
+    done?.(true);
   });
 }
 
@@ -92,39 +88,22 @@ export function resetTargetScope(scope: TargetScope, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["syncTargets", "syncTargetChannels", "syncTargetGlobal", "liveSyncTarget"], (r) => {
-    const site = { ...((r.syncTargets || {}) as Record<string, number>) };
-    const channels = { ...((r.syncTargetChannels || {}) as Record<string, number>) };
-    let global = (r.syncTargetGlobal ?? r.liveSyncTarget) as number | undefined;
-    const finish = (ok?: boolean) => {
-      if (ok === false) {
-        done?.(false);
-        return;
-      }
-      applyResolvedTarget(site, channels, global);
-      done?.(true);
-    };
-    if (scope === "channel") {
-      const keys = channelKeys();
-      if (!keys.length) {
-        done?.(false);
-        return;
-      }
-      for (const k of keys) delete channels[k];
-      if (Object.keys(channels).length) STORE.set({ syncTargetChannels: channels }, finish);
-      else STORE.remove("syncTargetChannels", finish);
-    } else if (scope === "site") {
-      delete site[getDomain()];
-      if (Object.keys(site).length) STORE.set({ syncTargets: site }, finish);
-      else STORE.remove("syncTargets", finish);
-    } else if (scope === "global") {
-      global = undefined;
-      STORE.remove(["syncTargetGlobal", "liveSyncTarget"], finish); // clear the new + legacy global
-    } else {
+  const finish = (ok?: boolean) => {
+    if (ok === false) done?.(false);
+    else applyResolvedTargetFromStore(done);
+  };
+  if (scope === "channel") {
+    const keys = channelKeys();
+    if (!keys.length) {
       done?.(false);
       return;
     }
-  });
+    mutateStoredMap("syncTargetChannels", {}, keys, finish);
+  } else if (scope === "site") {
+    mutateStoredMap("syncTargets", {}, [getDomain()], finish);
+  } else if (scope === "global") {
+    STORE.remove(["syncTargetGlobal", "liveSyncTarget"], finish);
+  } else done?.(false);
 }
 
 // Preview a target live without persisting (the slider drag). Mirrors the manual

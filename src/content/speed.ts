@@ -2,8 +2,9 @@ import { clamp } from "./core/clamp.js";
 import { getDomain } from "./core/domain.js";
 import { resolveSpeed, type SpeedScope } from "./core/resolve.js";
 import { channelKeys } from "./channel.js";
-import { api, ctxValid } from "./platform/browser.js";
+import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
+import { mutateStoredMap } from "../shared/map-mutation.js";
 import { S } from "./state.js";
 import {
   collectVideos,
@@ -52,7 +53,7 @@ export function persistDomainSpeed(speed: number, done?: Done): void {
     done?.(false);
     return;
   }
-  mutateSpeedMap("domains", { [getDomain()]: speed }, [], done);
+  mutateStoredMap("domains", { [getDomain()]: speed }, [], done);
 }
 
 export function persistChannelSpeed(speed: number, done?: Done): void {
@@ -69,36 +70,7 @@ export function persistChannelSpeed(speed: number, done?: Done): void {
     done?.(false);
     return;
   }
-  mutateSpeedMap("channels", { [keys[0]]: speed }, keys.slice(1), done);
-}
-
-function mutateSpeedMap(
-  map: "domains" | "channels",
-  set: Record<string, number>,
-  remove: string[],
-  done?: Done,
-): void {
-  let settled = false;
-  const finish = (response?: { success?: boolean } | null) => {
-    if (settled) return;
-    settled = true;
-    void api.runtime.lastError;
-    done?.(response?.success === true);
-  };
-  try {
-    const result = api.runtime.sendMessage(
-      { action: "mutateSpeedMap", map, set, remove },
-      finish,
-    ) as unknown as Promise<{ success?: boolean } | undefined> | undefined;
-    if (result && typeof result.then === "function") {
-      void result.then(
-        (response) => finish(response),
-        () => finish(null),
-      );
-    }
-  } catch (e) {
-    finish(null);
-  }
+  mutateStoredMap("channels", { [keys[0]]: speed }, keys.slice(1), done);
 }
 
 export function persistGlobalSpeed(speed: number, done?: Done): void {
@@ -133,9 +105,12 @@ function applyResolvedNow(
 
 // Reset just the manual change: re-take the saved speed by priority, deleting
 // nothing. Backs the R hotkey and the reset button by the readout.
-export function resetToSaved(): void {
-  if (!ctxValid()) return;
-  applyStoredResolved();
+export function resetToSaved(done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
+  applyStoredResolved(done);
 }
 
 function applyStoredResolved(done?: Done): void {
@@ -169,9 +144,9 @@ export function resetScope(scope: SpeedScope, done?: Done): void {
       done?.(false);
       return;
     }
-    mutateSpeedMap("channels", {}, keys, finish);
+    mutateStoredMap("channels", {}, keys, finish);
   } else if (scope === "site") {
-    mutateSpeedMap("domains", {}, [getDomain()], finish);
+    mutateStoredMap("domains", {}, [getDomain()], finish);
   } else if (scope === "global") {
     STORE.remove("globalSpeed", finish);
   } else {

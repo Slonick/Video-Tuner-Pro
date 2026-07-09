@@ -19,7 +19,7 @@ interface DvrState {
 }
 
 let dvrSeenAt = 0;
-let dvrState = new WeakMap<HTMLVideoElement, DvrState>();
+const dvrState = new WeakMap<HTMLVideoElement, DvrState>();
 
 function dvrActive(video: HTMLVideoElement): boolean {
   const state = dvrState.get(video);
@@ -253,6 +253,10 @@ export function liveVideo(): HTMLVideoElement | null {
 // flickers (quality switches momentarily report a finite duration on Twitch).
 export function onStreamPage(live?: HTMLVideoElement | null): boolean {
   if (live === undefined ? liveVideo() : live) return true;
+  if (document.documentElement.getAttribute("data-vtp-live") === "0") {
+    liveSeenAt = 0;
+    return false;
+  }
   if (Date.now() - dvrSeenAt < 6000) return false; // scrubbed back into the DVR buffer
   return Date.now() - liveSeenAt < 6000;
 }

@@ -140,6 +140,7 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
       cb?.(resp);
     }
   }) as unknown as typeof chrome.tabs.sendMessage) as unknown as ReturnType<typeof vi.fn>;
+  const nativeRuntimeSend = chrome.runtime.sendMessage.bind(chrome.runtime);
   vi.spyOn(chrome.runtime, "sendMessage").mockImplementation(((
     msg: Record<string, unknown>,
     cb?: (r?: unknown) => void,
@@ -150,6 +151,10 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
     }
     if (msg.action === "relayToTab" && typeof msg.tabId === "number" && msg.msg) {
       chrome.tabs.sendMessage(msg.tabId, msg.msg as Record<string, unknown>, cb);
+      return;
+    }
+    if (msg.action === "mutateStoredMap") {
+      nativeRuntimeSend(msg, cb);
       return;
     }
     cb?.(undefined);

@@ -8,7 +8,7 @@ type Listener = (
 
 const h = vi.hoisted(() => ({
   listener: null as Listener | null,
-  values: { domains: { existing: 1 } } as Record<string, Record<string, number>>,
+  values: { domains: { existing: 1 } } as Record<string, Record<string, unknown>>,
   pendingGets: [] as Array<{
     key: string;
     callback: (items: Record<string, unknown>) => void;
@@ -19,11 +19,7 @@ vi.mock("../src/shared/store.js", () => ({
   STORE: {
     get(keys: string[], callback: (items: Record<string, unknown>) => void) {
       const key = keys[0];
-      if (key === "domains" || key === "channels") {
-        h.pendingGets.push({ key, callback });
-        return;
-      }
-      callback({ globalSpeed: 1, syncTargetGlobal: 5 });
+      h.pendingGets.push({ key, callback });
     },
     set(obj: Record<string, Record<string, number>>, callback?: (ok?: boolean) => void) {
       Object.assign(h.values, obj);
@@ -55,7 +51,7 @@ const flush = async () => {
   await Promise.resolve();
 };
 
-describe("background speed-map mutations", () => {
+describe("background stored-map mutations", () => {
   beforeEach(async () => {
     vi.resetModules();
     h.listener = null;
@@ -87,14 +83,14 @@ describe("background speed-map mutations", () => {
     const responses: unknown[] = [];
     expect(
       h.listener?.(
-        { action: "mutateSpeedMap", map: "domains", set: { "one.example": 1.25 } },
+        { action: "mutateStoredMap", map: "domains", set: { "one.example": 1.25 } },
         {},
         (response) => responses.push(response),
       ),
     ).toBe(true);
     expect(
       h.listener?.(
-        { action: "mutateSpeedMap", map: "domains", set: { "two.example": 1.5 } },
+        { action: "mutateStoredMap", map: "domains", set: { "two.example": 1.5 } },
         {},
         (response) => responses.push(response),
       ),
@@ -113,6 +109,53 @@ describe("background speed-map mutations", () => {
       "one.example": 1.25,
       "two.example": 1.5,
     });
+    expect(responses).toEqual([{ success: true }, { success: true }]);
+  });
+
+  it("serializes scoped viewer settings without accepting invalid values", async () => {
+    const responses: unknown[] = [];
+    expect(
+      h.listener?.(
+        { action: "mutateStoredMap", map: "viewerAutoSites", set: { "one.example": "normal" } },
+        {},
+        (response) => responses.push(response),
+      ),
+    ).toBe(true);
+    h.listener?.(
+      { action: "mutateStoredMap", map: "viewerAutoSites", set: { "two.example": "broken" } },
+      {},
+      (response) => responses.push(response),
+    );
+
+    await flush();
+    expect(h.pendingGets).toHaveLength(1);
+    h.pendingGets.shift()!.callback({ viewerAutoSites: {} });
+    await flush();
+
+    expect(h.values.viewerAutoSites).toEqual({ "one.example": "normal" });
+    expect(responses).toEqual([{ success: false }, { success: true }]);
+  });
+
+  it("serializes clearing a whole map with adjacent writes", async () => {
+    h.values.domains = { old: 1 };
+    const responses: unknown[] = [];
+    h.listener?.({ action: "mutateStoredMap", map: "domains", clear: true }, {}, (response) =>
+      responses.push(response),
+    );
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", set: { fresh: 1.5 } },
+      {},
+      (response) => responses.push(response),
+    );
+
+    await flush();
+    expect(h.values.domains).toBeUndefined();
+    await flush();
+    expect(h.pendingGets).toHaveLength(1);
+    h.pendingGets.shift()!.callback({});
+    await flush();
+
+    expect(h.values.domains).toEqual({ fresh: 1.5 });
     expect(responses).toEqual([{ success: true }, { success: true }]);
   });
 });

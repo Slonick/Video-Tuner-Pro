@@ -8,6 +8,7 @@ import {
 } from "./core/resolve.js";
 import { ctxValid } from "./platform/browser.js";
 import { STORE } from "./platform/storage.js";
+import { mutateStoredMap } from "../shared/map-mutation.js";
 import { S } from "./state.js";
 import { setViewerFitMode } from "./viewer.js";
 
@@ -20,14 +21,18 @@ function applyResolvedViewerFit(sites: Map, channels: Map, global: unknown): voi
   setViewerFitMode(r.mode);
 }
 
-export function applyResolvedViewerFitFromStore(): void {
-  if (!ctxValid()) return;
+export function applyResolvedViewerFitFromStore(done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   STORE.get(["viewerFitGlobal", "viewerFitSites", "viewerFitChannels"], (r) => {
     applyResolvedViewerFit(
       (r.viewerFitSites || {}) as Map,
       (r.viewerFitChannels || {}) as Map,
       r.viewerFitGlobal,
     );
+    done?.(true);
   });
 }
 
@@ -36,11 +41,7 @@ export function persistSiteViewerFit(mode: ViewerFitMode, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["viewerFitSites"], (r) => {
-    const map = { ...((r.viewerFitSites || {}) as Map) };
-    map[getDomain()] = normalizeViewerFit(mode);
-    STORE.set({ viewerFitSites: map }, done);
-  });
+  mutateStoredMap("viewerFitSites", { [getDomain()]: normalizeViewerFit(mode) }, [], done);
 }
 
 export function persistChannelViewerFit(mode: ViewerFitMode, done?: Done): void {
@@ -53,12 +54,12 @@ export function persistChannelViewerFit(mode: ViewerFitMode, done?: Done): void 
     done?.(false);
     return;
   }
-  STORE.get(["viewerFitChannels"], (r) => {
-    const map = { ...((r.viewerFitChannels || {}) as Map) };
-    for (const key of keys) delete map[key];
-    map[keys[0]] = normalizeViewerFit(mode);
-    STORE.set({ viewerFitChannels: map }, done);
-  });
+  mutateStoredMap(
+    "viewerFitChannels",
+    { [keys[0]]: normalizeViewerFit(mode) },
+    keys.slice(1),
+    done,
+  );
 }
 
 export function persistGlobalViewerFit(mode: ViewerFitMode, done?: Done): void {
@@ -74,37 +75,19 @@ export function resetViewerFitScope(scope: ViewerFitScope, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["viewerFitGlobal", "viewerFitSites", "viewerFitChannels"], (r) => {
-    const sites = { ...((r.viewerFitSites || {}) as Map) };
-    const channels = { ...((r.viewerFitChannels || {}) as Map) };
-    let global = r.viewerFitGlobal;
-    const finish = (ok?: boolean) => {
-      if (ok === false) {
-        done?.(false);
-        return;
-      }
-      applyResolvedViewerFit(sites, channels, global);
-      done?.(true);
-    };
-    if (scope === "channel") {
-      const keys = channelKeys();
-      if (!keys.length) {
-        done?.(false);
-        return;
-      }
-      for (const key of keys) delete channels[key];
-      if (Object.keys(channels).length) STORE.set({ viewerFitChannels: channels }, finish);
-      else STORE.remove("viewerFitChannels", finish);
-    } else if (scope === "site") {
-      delete sites[getDomain()];
-      if (Object.keys(sites).length) STORE.set({ viewerFitSites: sites }, finish);
-      else STORE.remove("viewerFitSites", finish);
-    } else if (scope === "global") {
-      global = undefined;
-      STORE.remove(["viewerFitGlobal"], finish);
-    } else {
+  const finish = (ok?: boolean) => {
+    if (ok === false) done?.(false);
+    else applyResolvedViewerFitFromStore(done);
+  };
+  if (scope === "channel") {
+    const keys = channelKeys();
+    if (!keys.length) {
       done?.(false);
       return;
     }
-  });
+    mutateStoredMap("viewerFitChannels", {}, keys, finish);
+  } else if (scope === "site") {
+    mutateStoredMap("viewerFitSites", {}, [getDomain()], finish);
+  } else if (scope === "global") STORE.remove(["viewerFitGlobal"], finish);
+  else done?.(false);
 }

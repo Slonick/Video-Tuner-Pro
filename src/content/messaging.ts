@@ -153,7 +153,10 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.action === "remember") {
     if (!topFrame()) return false;
-    const speed = typeof request.speed === "number" ? clamp(request.speed) : S.currentSpeed;
+    const speed =
+      typeof request.speed === "number" && Number.isFinite(request.speed)
+        ? clamp(request.speed)
+        : S.currentSpeed;
     const done = replySaved(sendResponse, { speed });
     if (request.scope === "channel") persistChannelSpeed(speed, done);
     else if (request.scope === "global") persistGlobalSpeed(speed, done);
@@ -169,8 +172,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "resetToSaved") {
-    resetToSaved();
-    sendResponse({ success: true });
+    resetToSaved(replySaved(sendResponse));
     return true;
   }
   if (request.action === "getSpeed") {
@@ -206,8 +208,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "resetTargetToSaved") {
-    applyResolvedTargetFromStore(); // discard the live preview, re-apply the saved delay
-    sendResponse({ success: true });
+    applyResolvedTargetFromStore(replySaved(sendResponse));
     return true;
   }
   if (request.action === "getTarget") {
@@ -241,8 +242,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "resetAutoSlowToSaved") {
-    applyResolvedAutoSlowFromStore(); // discard the live preview, re-apply the saved target
-    sendResponse({ success: true });
+    applyResolvedAutoSlowFromStore(replySaved(sendResponse));
     return true;
   }
   if (request.action === "getAutoSlow") {
@@ -271,8 +271,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "resetViewerAutoToSaved") {
-    applyResolvedViewerAutoFromStore();
-    sendResponse({ success: true });
+    applyResolvedViewerAutoFromStore(replySaved(sendResponse));
     return true;
   }
   if (request.action === "getViewerAuto") {
@@ -324,8 +323,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "resetViewerFitToSaved") {
-    applyResolvedViewerFitFromStore();
-    sendResponse({ success: true });
+    applyResolvedViewerFitFromStore(replySaved(sendResponse));
     return true;
   }
   if (request.action === "getViewerFit") {

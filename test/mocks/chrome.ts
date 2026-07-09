@@ -35,17 +35,27 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
     sendMessage(
       msg?: {
         action?: string;
-        map?: "domains" | "channels";
-        set?: Record<string, number>;
+        map?: string;
+        set?: Record<string, unknown>;
         remove?: string[];
+        clear?: boolean;
       },
       cb?: (response?: unknown) => void,
     ) {
-      if (msg?.action !== "mutateSpeedMap" || !msg.map) {
+      if (msg?.action !== "mutateStoredMap" || !msg.map) {
         cb?.(undefined);
         return;
       }
-      const current = { ...((store[msg.map] || {}) as Record<string, number>) };
+      if (data.failSetKeys?.includes(msg.map)) {
+        cb?.({ success: false });
+        return;
+      }
+      const current = { ...((store[msg.map] || {}) as Record<string, unknown>) };
+      if (msg.clear) {
+        delete store[msg.map];
+        cb?.({ success: true });
+        return;
+      }
       for (const key of msg.remove || []) delete current[key];
       Object.assign(current, msg.set || {});
       if (Object.keys(current).length) store[msg.map] = current;

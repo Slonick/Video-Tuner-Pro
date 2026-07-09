@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isLive, liveVideo, probeLive } from "../src/content/live/detection.js";
+import { isLive, liveVideo, onStreamPage, probeLive } from "../src/content/live/detection.js";
 
 function vid(over: Partial<HTMLVideoElement> = {}): HTMLVideoElement {
   return {
@@ -112,6 +112,20 @@ describe("isLive (player-published data-vtp-live flag)", () => {
   it("flag '0' overrides the duration heuristic", () => {
     document.documentElement.setAttribute("data-vtp-live", "0");
     expect(isLive(vid({ duration: Infinity }))).toBe(false);
+  });
+  it("flag '0' immediately clears a sticky live-page result after SPA navigation", () => {
+    const video = document.createElement("video");
+    Object.defineProperty(video, "duration", { value: 600, configurable: true });
+    Object.defineProperty(video, "paused", { value: false, configurable: true });
+    video.getBoundingClientRect = () =>
+      ({ width: 640, height: 360, left: 0, top: 0, right: 640, bottom: 360 }) as DOMRect;
+    document.body.append(video);
+    document.documentElement.setAttribute("data-vtp-live", "1");
+    expect(onStreamPage()).toBe(true);
+
+    document.documentElement.setAttribute("data-vtp-live", "0");
+    expect(onStreamPage()).toBe(false);
+    video.remove();
   });
 });
 

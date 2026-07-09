@@ -6,6 +6,11 @@
 //   • no video / navigation -> default icon, no badge.
 import { STORE, whenReady } from "../shared/store.js";
 import {
+  STORED_MAP_NAMES,
+  type StoredMapMutation,
+  type StoredMapName,
+} from "../shared/map-mutation.js";
+import {
   UPDATE_AVAILABLE_KEY,
   UPDATE_LATEST_KEY,
   UPDATE_ALARM,
@@ -40,52 +45,78 @@ interface VideoFrameProbe {
   score?: number;
 }
 
-type SpeedMapName = "domains" | "channels";
-interface SpeedMapMutation {
-  map: SpeedMapName;
-  set?: Record<string, number>;
-  remove?: string[];
+const storedMapNames = new Set<string>(STORED_MAP_NAMES);
+const storedMapQueues = new Map<StoredMapName, Promise<void>>();
+
+function safeKey(key: string): boolean {
+  return !!key && key !== "__proto__" && key !== "constructor" && key !== "prototype";
 }
 
-let speedMapQueue: Promise<void> = Promise.resolve();
+function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
 
-function validSpeedMapMutation(msg: unknown): SpeedMapMutation | null {
+function validPosition(value: unknown): value is { fx: number; fy: number } {
+  if (!value || typeof value !== "object") return false;
+  const position = value as Record<string, unknown>;
+  return (
+    finite(position.fx) &&
+    finite(position.fy) &&
+    position.fx >= 0 &&
+    position.fx <= 1 &&
+    position.fy >= 0 &&
+    position.fy <= 1
+  );
+}
+
+function validStoredMapValue(map: StoredMapName, value: unknown): boolean {
+  if (map === "domains" || map === "channels") return finite(value) && value >= 0.07 && value <= 16;
+  if (map === "syncTargets" || map === "syncTargetChannels")
+    return finite(value) && value >= 1 && value <= 30;
+  if (map === "autoSlowSites" || map === "autoSlowChannels") {
+    if (!value || typeof value !== "object") return false;
+    const target = (value as Record<string, unknown>).target;
+    return finite(target) && target >= 3 && target <= 12;
+  }
+  if (map === "viewerAutoSites" || map === "viewerAutoChannels") {
+    return value === "off" || value === "normal" || value === "theater";
+  }
+  if (map === "viewerFitSites" || map === "viewerFitChannels") {
+    return value === "contain" || value === "cover" || value === "fill";
+  }
+  if (map === "badgePinned") return typeof value === "boolean";
+  return validPosition(value);
+}
+
+function validStoredMapMutation(msg: unknown): StoredMapMutation | null {
   if (!msg || typeof msg !== "object") return null;
   const raw = msg as Record<string, unknown>;
-  if (raw.map !== "domains" && raw.map !== "channels") return null;
-  const set: Record<string, number> = {};
+  if (typeof raw.map !== "string" || !storedMapNames.has(raw.map)) return null;
+  const map = raw.map as StoredMapName;
+  const set: Record<string, unknown> = {};
   if (raw.set && typeof raw.set === "object") {
     for (const [key, value] of Object.entries(raw.set as Record<string, unknown>)) {
-      if (
-        key &&
-        key !== "__proto__" &&
-        key !== "constructor" &&
-        key !== "prototype" &&
-        typeof value === "number" &&
-        Number.isFinite(value)
-      ) {
+      if (safeKey(key) && validStoredMapValue(map, value)) {
         set[key] = value;
       }
     }
   }
   const remove = Array.isArray(raw.remove)
-    ? raw.remove.filter(
-        (key): key is string =>
-          typeof key === "string" &&
-          !!key &&
-          key !== "__proto__" &&
-          key !== "constructor" &&
-          key !== "prototype",
-      )
+    ? raw.remove.filter((key): key is string => typeof key === "string" && safeKey(key))
     : [];
-  if (!Object.keys(set).length && !remove.length) return null;
-  return { map: raw.map, set, remove };
+  const clear = raw.clear === true;
+  if (!clear && !Object.keys(set).length && !remove.length) return null;
+  return { map, set, remove, clear };
 }
 
-function mutateSpeedMap(mutation: SpeedMapMutation): Promise<boolean> {
+function mutateStoredMap(mutation: StoredMapMutation): Promise<boolean> {
   const run = () =>
     new Promise<boolean>((resolve) => {
       whenReady(() => {
+        if (mutation.clear) {
+          STORE.remove(mutation.map, (ok) => resolve(ok !== false));
+          return;
+        }
         STORE.get([mutation.map], (result) => {
           const current = {
             ...((result[mutation.map] || {}) as Record<string, number>),
@@ -98,10 +129,14 @@ function mutateSpeedMap(mutation: SpeedMapMutation): Promise<boolean> {
         });
       });
     });
-  const result = speedMapQueue.then(run, run);
-  speedMapQueue = result.then(
-    () => undefined,
-    () => undefined,
+  const queue = storedMapQueues.get(mutation.map) || Promise.resolve();
+  const result = queue.then(run, run);
+  storedMapQueues.set(
+    mutation.map,
+    result.then(
+      () => undefined,
+      () => undefined,
+    ),
   );
   return result;
 }
@@ -198,8 +233,8 @@ function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.action === "mutateSpeedMap") {
-    const mutation = validSpeedMapMutation(msg);
+  if (msg && msg.action === "mutateStoredMap") {
+    const mutation = validStoredMapMutation(msg);
     if (!mutation) {
       sendResponse({ success: false });
       return;
@@ -211,7 +246,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         /* sender disappeared before the write completed */
       }
     };
-    void mutateSpeedMap(mutation).then(reply, () => reply(false));
+    void mutateStoredMap(mutation).then(reply, () => reply(false));
     return true;
   }
   // The gear opens the options page. The popup runs as an in-page iframe behind the

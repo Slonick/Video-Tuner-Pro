@@ -5,6 +5,7 @@ import { resolveAutoSlow, type AutoSlowSettings } from "../core/resolve.js";
 import { channelKeys } from "../channel.js";
 import { ctxValid } from "../platform/browser.js";
 import { STORE } from "../platform/storage.js";
+import { mutateStoredMap } from "../../shared/map-mutation.js";
 import { S } from "../state.js";
 
 type Map = Record<string, AutoSlowSettings>;
@@ -15,11 +16,7 @@ export function persistSiteAutoSlow(s: AutoSlowSettings, done?: Done): void {
     done?.(false);
     return;
   } // top frame only — see speed.ts
-  STORE.get(["autoSlowSites"], (r) => {
-    const m = { ...((r.autoSlowSites || {}) as Map) };
-    m[getDomain()] = s;
-    STORE.set({ autoSlowSites: m }, done);
-  });
+  mutateStoredMap("autoSlowSites", { [getDomain()]: s }, [], done);
 }
 
 export function persistChannelAutoSlow(s: AutoSlowSettings, done?: Done): void {
@@ -32,12 +29,7 @@ export function persistChannelAutoSlow(s: AutoSlowSettings, done?: Done): void {
     done?.(false);
     return;
   }
-  STORE.get(["autoSlowChannels"], (r) => {
-    const m = { ...((r.autoSlowChannels || {}) as Map) };
-    for (const k of keys) delete m[k];
-    m[keys[0]] = s;
-    STORE.set({ autoSlowChannels: m }, done);
-  });
+  mutateStoredMap("autoSlowChannels", { [keys[0]]: s }, keys.slice(1), done);
 }
 
 export function persistGlobalAutoSlow(s: AutoSlowSettings, done?: Done): void {
@@ -71,14 +63,18 @@ function applyResolvedAutoSlow(
   applySettings(r.target);
 }
 
-export function applyResolvedAutoSlowFromStore(): void {
-  if (!ctxValid()) return;
+export function applyResolvedAutoSlowFromStore(done?: Done): void {
+  if (!ctxValid()) {
+    done?.(false);
+    return;
+  }
   STORE.get(["autoSlowSites", "autoSlowChannels", "autoSlowGlobal"], (r) => {
     applyResolvedAutoSlow(
       (r.autoSlowSites || {}) as Map,
       (r.autoSlowChannels || {}) as Map,
       r.autoSlowGlobal as AutoSlowSettings | undefined,
     );
+    done?.(true);
   });
 }
 
@@ -88,34 +84,18 @@ export function resetAutoSlowScope(scope: "channel" | "site" | "global", done?: 
     done?.(false);
     return;
   }
-  STORE.get(["autoSlowSites", "autoSlowChannels", "autoSlowGlobal"], (r) => {
-    const site = { ...((r.autoSlowSites || {}) as Map) };
-    const channels = { ...((r.autoSlowChannels || {}) as Map) };
-    let global = r.autoSlowGlobal as AutoSlowSettings | undefined;
-    const finish = (ok?: boolean) => {
-      if (ok === false) {
-        done?.(false);
-        return;
-      }
-      applyResolvedAutoSlow(site, channels, global);
-      done?.(true);
-    };
-    if (scope === "channel") {
-      const keys = channelKeys();
-      if (!keys.length) {
-        done?.(false);
-        return;
-      }
-      for (const k of keys) delete channels[k];
-      if (Object.keys(channels).length) STORE.set({ autoSlowChannels: channels }, finish);
-      else STORE.remove("autoSlowChannels", finish);
-    } else if (scope === "site") {
-      delete site[getDomain()];
-      if (Object.keys(site).length) STORE.set({ autoSlowSites: site }, finish);
-      else STORE.remove("autoSlowSites", finish);
-    } else {
-      global = undefined;
-      STORE.remove("autoSlowGlobal", finish);
+  const finish = (ok?: boolean) => {
+    if (ok === false) done?.(false);
+    else applyResolvedAutoSlowFromStore(done);
+  };
+  if (scope === "channel") {
+    const keys = channelKeys();
+    if (!keys.length) {
+      done?.(false);
+      return;
     }
-  });
+    mutateStoredMap("autoSlowChannels", {}, keys, finish);
+  } else if (scope === "site") {
+    mutateStoredMap("autoSlowSites", {}, [getDomain()], finish);
+  } else STORE.remove("autoSlowGlobal", finish);
 }
