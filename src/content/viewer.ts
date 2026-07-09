@@ -94,6 +94,7 @@ let pendingChapters: { start: number; title: string }[] = [];
 // Sites (YouTube) keep rewriting their video's inline style, clobbering ours —
 // a plain style write drops even !important declarations. Re-assert on sight.
 let styleGuard: MutationObserver | null = null;
+let styleGuardFrame: ReturnType<typeof requestAnimationFrame> | null = null;
 let desiredCss = "";
 let desiredShellCss = "";
 let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boolean } | null =
@@ -1774,23 +1775,27 @@ function wireVideo(v: HTMLVideoElement): void {
   for (const ev of ["playing", "canplay", "canplaythrough", "timeupdate", "pause"]) {
     v.addEventListener(ev, () => setViewerLoading(false), opt);
   }
-  // Sites (YouTube) keep restyling their video — snap ours back on sight.
-  // Disconnect while writing rather than trust a string comparison to converge:
-  // the browser doesn't guarantee re-serializing an already-normalized cssText
-  // yields byte-identical output every time, and a callback that reasserts a
-  // style on the very node it's observing can otherwise re-trigger itself
-  // indefinitely.
   styleGuard?.disconnect();
+  if (styleGuardFrame != null) {
+    cancelAnimationFrame(styleGuardFrame);
+    styleGuardFrame = null;
+  }
+  // Sites (YouTube) keep restyling their video; batch the snap-back to one
+  // frame so repeated inline writes do not turn into a mutation/write loop.
   styleGuard = new MutationObserver(() => {
     const surface = surfaceVideo ?? video;
-    if (!fmt || !surface || surface.style.cssText === desiredCss) return;
-    styleGuard?.disconnect();
-    surface.style.cssText = desiredCss;
-    if (surfaceVideo)
-      styleGuard?.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
+    if (!fmt || !surface || surface.style.cssText === desiredCss || styleGuardFrame != null) return;
+    styleGuardFrame = requestAnimationFrame(() => {
+      styleGuardFrame = null;
+      const current = surfaceVideo ?? video;
+      if (!fmt || !current || current.style.cssText === desiredCss) return;
+      styleGuard?.disconnect();
+      current.style.cssText = desiredCss;
+      styleGuard?.observe(current, { attributes: true, attributeFilter: ["style"] });
+    });
   });
-  if (surfaceVideo)
-    styleGuard.observe(surfaceVideo, { attributes: true, attributeFilter: ["style"] });
+  const surface = surfaceVideo ?? video;
+  if (surface) styleGuard.observe(surface, { attributes: true, attributeFilter: ["style"] });
 }
 
 type CaptureVideo = HTMLVideoElement & {
@@ -2047,6 +2052,10 @@ export function exitViewer(): void {
     media = null;
     styleGuard?.disconnect();
     styleGuard = null;
+    if (styleGuardFrame != null) {
+      cancelAnimationFrame(styleGuardFrame);
+      styleGuardFrame = null;
+    }
     pendingChapters = [];
     marksLoaded = false;
     marksSourceKey = "";

@@ -109,6 +109,7 @@ async function openViewer(f: "normal" | "theater") {
 async function flush() {
   for (let i = 0; i < 8; i++) await Promise.resolve();
 }
+const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 const overlayEl = () => document.querySelector("[data-vtp-viewer-overlay]") as HTMLElement | null;
 const barEl = () => {
@@ -340,6 +341,20 @@ describe("toggleViewer — lifecycle", () => {
     await openViewer("theater");
     expect(v.style.width).toBe("100%");
     expect(v.style.objectFit).toBe("contain");
+  });
+
+  it("restores adopted video styles on the next frame", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    const cssBefore = v.style.cssText;
+
+    v.style.width = "12px";
+    await flush();
+    expect(v.style.cssText).not.toBe(cssBefore);
+
+    await frame();
+    expect(v.style.cssText).toBe(cssBefore);
   });
 
   it("switching formats keeps a single overlay", async () => {
