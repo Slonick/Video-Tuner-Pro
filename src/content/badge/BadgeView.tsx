@@ -100,7 +100,7 @@ function Badge({ divRef, dotRef, textRef, pinRef, noticeRef }: Props) {
     <div ref={divRef} style={BADGE_STYLE}>
       <i ref={dotRef} style={DOT_STYLE} aria-hidden="true"></i>
       <span ref={textRef}></span>
-      <span ref={pinRef} role="button" style={PIN_STYLE}>
+      <span ref={pinRef} role="button" tabIndex={0} style={PIN_STYLE}>
         <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
           <path d="M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z" />
         </svg>

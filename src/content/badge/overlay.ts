@@ -4,6 +4,7 @@ import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
 import { STORE } from "../platform/storage.js";
 import { ctxValid } from "../platform/browser.js";
+import { i18n } from "../platform/i18n.js";
 import { fullscreenOverlayHost } from "../platform/fullscreen.js";
 import { primaryVideo } from "../videos.js";
 import { VIEWER_LAYOUT_EVENT, viewerAnchorVideo } from "../viewer.js";
@@ -139,6 +140,7 @@ function saveBadgePinned(on: boolean): void {
 // dimmed when loose.
 function setPinVisual(on: boolean): void {
   if (!badgePinEl) return;
+  badgePinEl.setAttribute("aria-pressed", on ? "true" : "false");
   badgePinEl.style.opacity = on ? "1" : "0.5";
   badgePinEl.style.transform = on ? "none" : "rotate(40deg)";
 }
@@ -172,8 +174,17 @@ function togglePin(): void {
 // otherwise start a drag / trigger the position-reset dblclick. Wired as native
 // listeners (not React handlers) so they fire before the badge's own listeners.
 function hookPin(pin: HTMLElement): void {
+  pin.setAttribute("aria-label", i18n("badgePinAria") || "Keep speed badge visible");
+  pin.setAttribute("aria-pressed", S.badgePinned ? "true" : "false");
+  pin.title = i18n("badgePinAria") || "Keep speed badge visible";
   pin.addEventListener("pointerdown", (e) => e.stopPropagation());
   pin.addEventListener("dblclick", (e) => e.stopPropagation());
+  pin.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.stopPropagation();
+    togglePin();
+  });
   pin.addEventListener("click", (e) => {
     e.stopPropagation();
     togglePin();

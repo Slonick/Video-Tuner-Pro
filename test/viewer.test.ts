@@ -509,6 +509,21 @@ describe("toggleViewer — lifecycle", () => {
     expect(viewerFormat()).toBeNull();
   });
 
+  it("exposes the viewer as a dialog and traps Tab into its controls", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal");
+    const overlay = overlayEl()!;
+
+    expect(overlay.getAttribute("role")).toBe("dialog");
+    expect(overlay.getAttribute("aria-modal")).toBe("true");
+    expect(overlay.getAttribute("aria-label")).toBeTruthy();
+
+    overlay.focus();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true }));
+    expect(barButtons()[0].matches(":focus")).toBe(true);
+  });
+
   it("lets the launcher top layer handle Escape before the viewer", async () => {
     const { v } = makeVideo();
     h.primary = v;

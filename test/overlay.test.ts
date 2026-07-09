@@ -80,6 +80,8 @@ const badgeEl = () =>
     .querySelector("[data-vtp-badge]")
     ?.shadowRoot?.querySelector("div") as HTMLElement | null) ?? null;
 const badgeText = () => badgeEl()?.querySelector("span")?.textContent;
+const badgePin = () =>
+  Array.from(badgeEl()?.querySelectorAll("span") ?? []).at(1) as HTMLSpanElement | undefined;
 const badgeNotice = () =>
   Array.from(badgeEl()?.querySelectorAll("span") ?? []).at(2) as HTMLSpanElement | undefined;
 // "Shown" = the badge element exists AND isn't display:none. (Absent counts as
@@ -147,6 +149,22 @@ describe("updateTimeBadge — visibility", () => {
 
     expect(document.querySelector("[data-vtp-badge]")).not.toBe(stale);
     expect(query).not.toHaveBeenCalledWith("[data-vtp-badge]");
+  });
+
+  it("makes the pin keyboard accessible and reflects pressed state", () => {
+    h.primary = fakeVideo();
+    updateTimeBadge();
+    const pin = badgePin()!;
+
+    expect(pin.getAttribute("role")).toBe("button");
+    expect(pin.tabIndex).toBe(0);
+    expect(pin.getAttribute("aria-label")).toBeTruthy();
+    expect(pin.getAttribute("aria-pressed")).toBe("false");
+
+    pin.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    expect(S.badgePinned).toBe(true);
+    expect(pin.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("hides when the badge is disabled for this context", () => {

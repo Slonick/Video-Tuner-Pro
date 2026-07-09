@@ -178,6 +178,10 @@ document.addEventListener(
       exitViewer();
       return;
     }
+    if (e.key === "Tab") {
+      trapViewerFocus(e);
+      return;
+    }
     if (!S.keyboardEnabled) return;
     if (!video) return;
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -218,6 +222,55 @@ document.addEventListener(
   },
   listenerOptions(true),
 );
+
+function viewerFocusable(): HTMLElement[] {
+  if (!overlay) return [];
+  const roots: Array<Document | ShadowRoot | HTMLElement> = [overlay];
+  overlay.querySelectorAll<HTMLElement>("*").forEach((el) => {
+    if (el.shadowRoot) roots.push(el.shadowRoot);
+  });
+  const nodes: HTMLElement[] = [];
+  for (const root of roots) {
+    nodes.push(
+      ...Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',
+        ),
+      ),
+    );
+  }
+  return nodes.filter((el) => {
+    if (el.tabIndex < 0 || el.getAttribute("aria-hidden") === "true") return false;
+    const style = getComputedStyle(el);
+    return style.visibility !== "hidden" && style.display !== "none";
+  });
+}
+
+function trapViewerFocus(e: KeyboardEvent): void {
+  if (!overlay) return;
+  const items = viewerFocusable();
+  if (!items.length) {
+    e.preventDefault();
+    overlay.focus({ preventScroll: true });
+    return;
+  }
+  const shadowActive = Array.from(overlay.querySelectorAll<HTMLElement>("*"))
+    .map((el) => el.shadowRoot?.activeElement)
+    .find((el): el is Element => !!el);
+  const active = shadowActive ?? document.activeElement;
+  const current = items.findIndex((el) => el === active);
+  const next =
+    current < 0
+      ? e.shiftKey
+        ? items.length - 1
+        : 0
+      : e.shiftKey
+        ? (current - 1 + items.length) % items.length
+        : (current + 1) % items.length;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  items[next].focus({ preventScroll: true });
+}
 
 export function viewerFormat(): ViewerFormat | null {
   const dom = document.documentElement.getAttribute(ATTR);
@@ -1195,6 +1248,7 @@ function mountBar(): void {
     `transition:background .15s}` +
     `button:hover{background:rgba(255,255,255,0.12)}` +
     `button:active{background:rgba(255,255,255,0.2)}` +
+    `button:focus-visible{outline:0;box-shadow:0 0 0 3px rgba(10,132,255,0.72)}` +
     `.ico{position:absolute;inset:0;display:grid;place-items:center}` +
     `.ico svg{display:block}` +
     `.qbtn{width:auto;min-width:32px;max-width:104px;padding:0 9px;gap:5px}` +
@@ -1710,6 +1764,9 @@ async function enter(
   prevControls = v.controls;
   overlay = document.createElement("div");
   overlay.setAttribute(OVERLAY, "");
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", i18n("viewerDialogLabel") || "Pop-out video viewer");
   Object.assign(overlay.style, {
     position: "fixed",
     inset: "0",
