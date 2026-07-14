@@ -116,6 +116,7 @@ let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boo
   null;
 let surfaceTransition: Animation | null = null;
 let surfaceTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+let postRestoreLayoutTimer: ReturnType<typeof setTimeout> | null = null;
 let surfaceTransitionToken = 0;
 let mirrored = false;
 let mirrorStream: MediaStream | null = null;
@@ -349,6 +350,12 @@ function dispatchViewerLayout(): void {
 function notifyViewerLayout(): void {
   if (layoutPaused) return;
   dispatchViewerLayout();
+}
+
+function cancelPostRestoreLayout(): void {
+  if (postRestoreLayoutTimer == null) return;
+  clearTimeout(postRestoreLayoutTimer);
+  postRestoreLayoutTimer = null;
 }
 
 function applyOverlayBackdrop(): void {
@@ -1944,6 +1951,10 @@ async function enter(
   if (window.top !== window) return;
   const v = target ?? primaryVideo();
   if (!v || currentFullscreenElement() || fmt || exiting || overlay || isDrmVideo(v)) return;
+  // A previous close schedules one delayed pass for site players that settle
+  // asynchronously. Once a new viewer session starts that pass is stale: it
+  // must not re-layout the launcher against the new surface.
+  cancelPostRestoreLayout();
   // Read this before createMirror()/DOM adoption: the site's player can clear
   // its MSE timeline as soon as capture begins even though the page is still a
   // confirmed live stream.
@@ -2207,7 +2218,13 @@ export function exitViewer(): void {
     // returned video out in the same tick — a launcher position measured right
     // now can grab a transitional rect and stick there. One more pass shortly
     // after catches it once the page has actually settled.
-    setTimeout(notifyViewerLayout, 300);
+    cancelPostRestoreLayout();
+    const restoredSession = viewerSession;
+    postRestoreLayoutTimer = setTimeout(() => {
+      postRestoreLayoutTimer = null;
+      if (viewerSession !== restoredSession || fmt || overlay) return;
+      notifyViewerLayout();
+    }, 300);
   };
 
   if (animated)

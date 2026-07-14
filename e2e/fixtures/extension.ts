@@ -32,6 +32,27 @@ export const test = base.extend<{
   serviceWorker: async ({ context }, use) => {
     let [sw] = context.serviceWorkers();
     if (!sw) sw = await context.waitForEvent("serviceworker");
+    // Wait for the first-install seed before a test clears or overrides storage.
+    // Without this barrier, the async onInstalled callback can write the shipped
+    // globalSpeed=1 after a test has already seeded 1.75/2, producing a genuine
+    // race that only appears on a loaded CI runner.
+    await sw.evaluate(async () => {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        const [sync, local] = await Promise.all([
+          chrome.storage.sync.get(["globalSpeed", "syncTargetGlobal", "liveSyncTarget"]),
+          chrome.storage.local.get(["globalSpeed", "syncTargetGlobal", "liveSyncTarget"]),
+        ]);
+        const stored = { ...sync, ...local };
+        if (
+          stored.globalSpeed !== undefined &&
+          (stored.syncTargetGlobal !== undefined || stored.liveSyncTarget !== undefined)
+        )
+          return;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      throw new Error("extension first-install storage seed timed out");
+    });
     await use(sw);
   },
   extensionId: async ({ serviceWorker }, use) => {

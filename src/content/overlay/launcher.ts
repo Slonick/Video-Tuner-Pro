@@ -743,6 +743,18 @@ function mount(): void {
   host = document.createElement("div");
   host.id = HOST_ID;
   host.setAttribute("data-vtp-launcher", "");
+  // Give the shadow tree its own top-level stacking context. A z-index on the
+  // fixed descendants alone is not enough when Viewer is appended later: the
+  // viewer surface can otherwise win hit-testing and swallow radial-menu clicks.
+  // A zero-sized host keeps the page beneath clickable outside our own controls.
+  Object.assign(host.style, {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    width: "0",
+    height: "0",
+    zIndex: "2147483647",
+  } as Partial<CSSStyleDeclaration>);
   host.style.setProperty("--glass-opacity", String(S.glassOpacity)); // scales the FAB glass
   shadow = host.attachShadow({ mode: "open" });
   ensureGlassFilter(shadow); // our liquid-glass displacement filter, scoped to this shadow

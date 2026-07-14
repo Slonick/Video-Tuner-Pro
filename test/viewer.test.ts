@@ -471,6 +471,32 @@ describe("toggleViewer — lifecycle", () => {
     }
   });
 
+  it("cancels a previous close's delayed layout pass when reopening", async () => {
+    vi.useFakeTimers();
+    const onLayout = vi.fn();
+    document.addEventListener(VIEWER_LAYOUT_EVENT, onLayout);
+
+    try {
+      const first = makeVideo();
+      h.primary = first.v;
+      await openViewer("normal");
+      exitViewer();
+      await flush();
+
+      const second = makeVideo();
+      h.primary = second.v;
+      await openViewer("normal");
+      const afterReopen = onLayout.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(300);
+      expect(onLayout).toHaveBeenCalledTimes(afterReopen);
+    } finally {
+      document.removeEventListener(VIEWER_LAYOUT_EVENT, onLayout);
+      exitViewer();
+      vi.useRealTimers();
+    }
+  });
+
   it("re-toggling the active format exits and restores the video exactly", async () => {
     const { wrap, v } = makeVideo();
     v.controls = true;

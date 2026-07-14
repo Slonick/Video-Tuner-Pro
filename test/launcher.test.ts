@@ -184,6 +184,18 @@ describe("updateLauncher — eligibility", () => {
     expect(fabEl()).not.toBeNull();
   });
 
+  it("keeps launcher controls in a top-level stacking context above Viewer", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+
+    const launcher = host() as HTMLElement;
+    expect(launcher.style.position).toBe("fixed");
+    expect(launcher.style.zIndex).toBe("2147483647");
+    expect(launcher.style.width).toBe("0px");
+    expect(launcher.style.height).toBe("0px");
+  });
+
   it("removes a stale launcher host left by a previous content script", () => {
     S.overlayButton = "always";
     const stale = document.createElement("div");

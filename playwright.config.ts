@@ -11,6 +11,9 @@ export default defineConfig({
   workers: 1,
   // Retry once on CI so a failing test re-runs WITH a trace captured.
   retries: process.env.CI ? 1 : 0,
+  // A retry is diagnostic, not permission to merge a race. Keep the trace from
+  // the second attempt but leave the CI gate red whenever the first one failed.
+  failOnFlakyTests: !!process.env.CI,
   timeout: 30_000,
   // Generous on purpose: each value-poll waits for the extension to load, read
   // chrome.storage and apply the rate — under contention on the shared CI runner
