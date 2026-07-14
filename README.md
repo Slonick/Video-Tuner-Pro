@@ -27,7 +27,7 @@ themes, in 10 languages, with no accounts and no tracking.
 - **Super theater (YouTube)** — one toggle makes theater mode fill the whole window; the header hides itself.
 - **On-video readout** — optional badge showing the current speed and how much time is really left at that speed.
 - **Live graphs** — see the audio levels and the live-stream buffer in real time.
-- **Light & dark themes**, 10 languages, and **no tracking**. SponsorBlock markers (when enabled or detected from a compatible extension) query SponsorBlock with the current YouTube video ID; all other processing stays in the browser.
+- **Light & dark themes**, 10 languages, and **no tracking**. SponsorBlock markers, when explicitly enabled, query SponsorBlock with the current YouTube video ID; all other processing stays in the browser.
 
 ## How to use
 
