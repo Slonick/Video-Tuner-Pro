@@ -951,7 +951,7 @@ button {
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: center;
   -moz-appearance: textfield;
   appearance: textfield;
 

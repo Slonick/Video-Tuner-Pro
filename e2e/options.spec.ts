@@ -192,9 +192,10 @@ test.describe("Options · Speed presets", () => {
         (input as HTMLInputElement).clientWidth -
         Number.parseFloat(style.paddingLeft) -
         Number.parseFloat(style.paddingRight);
-      return { textWidth, available };
+      return { textWidth, available, textAlign: style.textAlign };
     });
     expect(fit.available).toBeGreaterThan(fit.textWidth + 2);
+    expect(fit.textAlign).toBe("center");
   });
 });
 
