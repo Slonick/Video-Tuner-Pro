@@ -878,6 +878,12 @@ button {
   margin-top: 14px;
 }
 
+@media (max-width: 1120px) {
+  .preset-rows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .preset-rows {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -893,8 +899,8 @@ button {
 .preset-row {
   display: flex;
   align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-1-5) var(--space-2);
+  gap: 4px;
+  padding: 6px;
   background: var(--glass-l1);
   border: 1px solid var(--track);
   border-radius: var(--radius-md);
@@ -906,8 +912,8 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   background: none;
@@ -931,9 +937,12 @@ button {
 }
 
 .preset-row input {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 5px 6px;
+  /* PRESET_MAX is 1600: reserve enough space for all four digits at every
+     supported viewport instead of letting flexbox squeeze the field. */
+  flex: 0 0 58px;
+  width: 58px;
+  min-width: 58px;
+  padding: 5px 4px;
   border: 1px solid var(--track);
   border-radius: var(--radius-sm);
   background: var(--glass-l3);
@@ -967,16 +976,16 @@ button {
    wide to sit next to the value field. */
 .preset-row .preset-key {
   flex: 0 0 auto;
-  min-width: 52px;
-  padding: 5px 8px;
+  min-width: 46px;
+  padding: 5px;
   font-size: 12px;
   text-align: center;
 }
 
 .preset-remove {
   flex: 0 0 auto;
-  width: 26px;
-  padding: var(--space-1);
+  width: 22px;
+  padding: 2px;
   border: none;
   background: none;
   color: var(--muted);

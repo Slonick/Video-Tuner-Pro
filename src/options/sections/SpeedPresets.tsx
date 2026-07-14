@@ -311,6 +311,7 @@ export function SpeedPresets() {
             </Button>
             <input
               type="number"
+              aria-label={`${msg("optPresetValue") || "Preset speed"} ${i + 1}`}
               inputMode="numeric"
               min={PRESET_MIN}
               max={PRESET_MAX}

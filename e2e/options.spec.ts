@@ -167,6 +167,37 @@ test.describe("Options · General", () => {
   });
 });
 
+test.describe("Options · Speed presets", () => {
+  test("four-digit preset values remain fully visible", async ({ context, extensionId }) => {
+    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-speed").click();
+
+    const grid = page.locator(".preset-rows");
+    const maxPreset = page.locator('.preset-row input[value="1600"]');
+    await expect(maxPreset).toBeVisible();
+    await expect(maxPreset).toHaveValue("1600");
+
+    const columns = await grid.evaluate((element) =>
+      getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean),
+    );
+    expect(columns).toHaveLength(4);
+
+    const fit = await maxPreset.evaluate((input) => {
+      const style = getComputedStyle(input);
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d")!;
+      context.font = style.font;
+      const textWidth = context.measureText((input as HTMLInputElement).value).width;
+      const available =
+        (input as HTMLInputElement).clientWidth -
+        Number.parseFloat(style.paddingLeft) -
+        Number.parseFloat(style.paddingRight);
+      return { textWidth, available };
+    });
+    expect(fit.available).toBeGreaterThan(fit.textWidth + 2);
+  });
+});
+
 test.describe("Options · Keys", () => {
   test("remapping an action persists and takes effect on a live video", async ({
     context,
