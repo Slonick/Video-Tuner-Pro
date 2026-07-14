@@ -95,13 +95,14 @@ build and diff `dist/firefox/` against the package under review.
 - `npm test` — unit tests (Vitest). `npm run test:coverage` enforces the coverage
   thresholds; `npm run test:e2e` builds and runs the Playwright end-to-end suite.
 - `npm run screenshot [scenario]` — render the popup with mocked data to a PNG
-  (`.screenshots/`) via headless Chrome. Scenarios: audio, live, vot, idle.
+  (`.screenshots/`) via headless Chrome. Scenarios: audio, live, vot, idle, promo.
 - `npm run bench` — micro-benchmark the media-collection strategies in real
   Chromium (full DOM walk vs. the maintained set / incremental ingest) across
   growing synthetic DOMs.
 - `npm run promo` / `npm run promo:gif` — generate the localized store assets and
-  the README animation. All test/lint/screenshot/promo scripts are dev-only and
-  not needed to build the add-on.
+  the README animation; `npm run promo:verify` checks their complete file set,
+  formats, dimensions, and raster integrity. All test/lint/screenshot/promo scripts
+  are dev-only and not needed to build the add-on.
 
 ## Source layout
 

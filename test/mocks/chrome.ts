@@ -10,6 +10,12 @@ export interface MockData {
   tab?: { id: number; url: string };
   version?: string; // manifest version the popup header shows (screenshots pass the real one)
   failSetKeys?: string[];
+  viewer?: {
+    autoMode?: "off" | "normal" | "theater";
+    pageMode?: "off" | "normal" | "theater";
+    fitMode?: "contain" | "cover" | "fill";
+    scope?: "global" | "site" | "channel" | null;
+  };
 }
 
 type Cb = (arg?: unknown) => void;
@@ -180,6 +186,33 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
             break;
           case "getHistory":
             cb?.(data.history ?? null);
+            break;
+          case "getViewerAuto":
+            cb?.(
+              data.viewer
+                ? {
+                    mode: data.viewer.autoMode ?? "off",
+                    scope: data.viewer.scope ?? null,
+                    channel: data.speed?.channel ?? null,
+                    channelName: data.speed?.channelName,
+                  }
+                : undefined,
+            );
+            break;
+          case "getViewerState":
+            cb?.(data.viewer ? { mode: data.viewer.pageMode ?? "off" } : undefined);
+            break;
+          case "getViewerFit":
+            cb?.(
+              data.viewer
+                ? {
+                    mode: data.viewer.fitMode ?? "contain",
+                    scope: data.viewer.scope ?? null,
+                    channel: data.speed?.channel ?? null,
+                    channelName: data.speed?.channelName,
+                  }
+                : undefined,
+            );
             break;
           default:
             cb?.(undefined);

@@ -56,6 +56,7 @@ jobs:
           node tools/promo-capture.mjs # drive the live popup → per-locale captures
           npm run promo                # localized store screenshots + tiles
           npm run promo:gif            # README animation
+          npm run promo:verify         # file set, formats, and exact store dimensions
 
       - name: Open/update a PR with the promo images
         env:

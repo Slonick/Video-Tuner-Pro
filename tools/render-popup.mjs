@@ -72,7 +72,10 @@ async function buildMock() {
 // aborts with SIGTRAP when it runs out — which the larger CJK composites
 // (ja/zh_CN/hi) do. This routes that shared memory to /tmp instead.
 export async function runChrome(args) {
-  args = ["--disable-dev-shm-usage", ...args];
+  // Force every raster/compositor stage to finish before headless Chrome writes
+  // the PNG. Without this, large 2× promo canvases occasionally contain solid
+  // black 256/512px tiles even though the page itself has finished loading.
+  args = ["--disable-dev-shm-usage", "--run-all-compositor-stages-before-draw", ...args];
   for (let attempt = 0; ; attempt++) {
     try {
       return await execFile(CHROME, args, {

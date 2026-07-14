@@ -133,14 +133,20 @@ export function scenario(name: ScenarioName = "audio"): MockData {
         history: { audio: [], audioStep: 150, buffer: [] },
       };
     case "promo": {
-      // Every graph populated for the store assets. The lock states (Speed/Auto-
-      // slow dim on a stream, Live-sync off one) are neutralised in CSS by the
-      // promo renderer, so all four cards read as live with data.
+      // Every graph and Viewer control populated for the store assets. The lock
+      // states (Speed/Auto-slow dim on a stream, Live-sync off one) are neutralised
+      // in CSS by the promo renderer, so every card reads as live with data.
       const lat = latencyHistory();
       return {
         // threshold matches the Voice preset so it reads as selected.
-        settings: { ...SETTINGS, audioCompThreshold: -60 },
+        settings: {
+          ...SETTINGS,
+          audioCompThreshold: -60,
+          viewerAutoEnabled: true,
+          viewerBackdropVideo: true,
+        },
         speed: { speed: 1.3, live: true, channel: "slooonick", channelName: "slooonick" },
+        viewer: { autoMode: "normal", pageMode: "normal", fitMode: "cover", scope: "site" },
         monitor: {
           audio: audioLevels(false),
           autoSlow: autoSlow(true),

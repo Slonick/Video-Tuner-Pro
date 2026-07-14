@@ -12,6 +12,17 @@ import { join } from "node:path";
 export const ROOT = fileURLToPath(new URL("..", import.meta.url));
 export const LOCALES = ["en", "ru", "uk", "de", "es", "fr", "pt_BR", "ja", "zh_CN", "hi"];
 export const TMP = join(ROOT, ".screenshots/promo");
+// One source of truth for every promo stage. Keeping capture, composition, GIF,
+// and verification on this list prevents a new popup card from being rendered in
+// the overview but silently omitted from the dedicated store screens.
+export const PROMO_CARDS = [
+  { key: "speed", selector: ".speed-section" },
+  { key: "sync", selector: ".live-sync-section" },
+  { key: "viewer", selector: ".viewer-auto-section" },
+  { key: "auto", selector: ".autoslow-section" },
+  { key: "audio", selector: ".audio-section" },
+];
+export const PROMO_SCREENS = ["overview", ...PROMO_CARDS.map(({ key }) => key)];
 
 export const esc = (s) =>
   String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
@@ -25,8 +36,8 @@ const SUB = "#6e6e73"; // Apple secondary grey for subtext
 
 // Localized store copy: the hero headline + lead, plus each card's title/desc. Card
 // titles/descs come from the extension's own messages (already translated,
-// authoritative); the hero headline comes from promo-strings.json. The four card
-// screens mirror the four popup cards.
+// authoritative); the hero headline comes from promo-strings.json. The card
+// screens mirror every expandable popup card.
 export async function storeCopy(locale) {
   const STR = JSON.parse(await readFile(join(ROOT, "tools/promo-strings.json"), "utf8"))[locale];
   const MSG = JSON.parse(
@@ -39,6 +50,7 @@ export async function storeCopy(locale) {
     cards: {
       speed: { title: STR.video.title, desc: m("guideSpeedDesc") },
       sync: { title: m("syncTitle"), desc: m("syncSubtitle") },
+      viewer: { title: m("viewerModesLabel"), desc: m("viewerModesHint") },
       auto: { title: m("autoSlowLabel"), desc: m("autoSlowSubtitle") },
       audio: { title: m("audioTitle"), desc: STR.audioLead },
     },
@@ -110,9 +122,9 @@ export function screenHTML({ kind, popImg, popImgDark, copy, W = 1280, H = 800 }
     `<p class="lead" style="font-size:${g.lead}px;margin-top:${Math.round(g.lead * 0.95)}px">${esc(sub)}</p></div>`;
   const stage = popImgDark
     ? `<div class="stage">` +
-      `<div class="pop d" style="top:${g.dT}px;right:${g.dR}px;width:${g.dW ?? g.popW}px;border-radius:${g.popR}px"><img src="${popImgDark}"></div>` +
-      `<div class="pop l" style="top:${g.lT}px;right:${g.lR}px;width:${g.lW ?? g.popW}px;border-radius:${g.popR}px"><img src="${popImg}"></div></div>`
-    : `<div class="stage"><div class="pop l" style="top:${g.lT}px;right:${g.dR}px;width:${g.popW}px;border-radius:${g.popR}px"><img src="${popImg}"></div></div>`;
+      `<div class="pop d" style="top:${g.dT}px;right:${g.dR}px;width:${g.dW ?? g.popW}px;border-radius:${g.popR}px"><img loading="eager" decoding="sync" src="${popImgDark}"></div>` +
+      `<div class="pop l" style="top:${g.lT}px;right:${g.lR}px;width:${g.lW ?? g.popW}px;border-radius:${g.popR}px"><img loading="eager" decoding="sync" src="${popImg}"></div></div>`
+    : `<div class="stage"><div class="pop l" style="top:${g.lT}px;right:${g.dR}px;width:${g.popW}px;border-radius:${g.popR}px"><img loading="eager" decoding="sync" src="${popImg}"></div></div>`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css(W, H)}</style></head><body>${col}${stage}</body></html>`;
 }
 
@@ -120,7 +132,7 @@ export function screenHTML({ kind, popImg, popImgDark, copy, W = 1280, H = 800 }
 // cramped at this size).
 export function tileHTML({ copy, popImg }) {
   const col = `<div class="col" style="left:26px;width:164px"><h1 style="font-size:21px">${esc(copy.head)}</h1></div>`;
-  const stage = `<div class="stage"><div class="pop l" style="top:50%;transform:translateY(-50%);right:22px;width:200px;border-radius:9px"><img src="${popImg}"></div></div>`;
+  const stage = `<div class="stage"><div class="pop l" style="top:50%;transform:translateY(-50%);right:22px;width:200px;border-radius:9px"><img loading="eager" decoding="sync" src="${popImg}"></div></div>`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css(440, 280)}</style></head><body>${col}${stage}</body></html>`;
 }
 
@@ -156,7 +168,8 @@ async function downscale(src, w, h, out) {
   const dsPath = `${out}.ds.html`;
   const html = `<!DOCTYPE html><html><head><style>*{margin:0;padding:0}canvas{display:block}</style></head><body><canvas id="c" width="${w}" height="${h}"></canvas><script>
 const img=new Image();
-img.onload=()=>{const x=document.getElementById("c").getContext("2d");x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.drawImage(img,0,0,${w},${h});};
+img.decoding="sync";
+img.onload=async()=>{await img.decode();const x=document.getElementById("c").getContext("2d");x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.drawImage(img,0,0,${w},${h});document.body.dataset.ready="true";};
 img.src="file://${src}";
 </script></body></html>`;
   await writeFile(dsPath, html);

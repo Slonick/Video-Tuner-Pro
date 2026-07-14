@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Segmented } from "../../ui/Segmented.js";
 import { Switch } from "../../ui/Switch.js";
 import { Button } from "../../ui/Button.js";
@@ -16,6 +16,7 @@ interface Props {
   viewerFit: UseViewerFit;
   blocked?: boolean;
   blockedMessage?: string;
+  forceOpen?: boolean;
 }
 
 const VIEWER_AUTO_LABEL: Record<ViewerAutoMode, string> = {
@@ -35,11 +36,15 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
   viewerFit: fit,
   blocked = false,
   blockedMessage,
+  forceOpen,
 }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [backdropVideo, setBackdropVideoState] = useState(false);
-  const { open, toggle } = useCardOverlay(sectionRef, slotRef, !blocked && va.enabled);
+  const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !blocked && va.enabled);
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen);
+  }, [forceOpen, setOpen]);
   const label = msg("viewerModesLabel") || "Viewer modes";
   const autoLabel = msg("optViewerAutoLabel") || "Auto-open selected mode";
   const backdropLabel = msg("viewerBackdropVideo") || "Background video";

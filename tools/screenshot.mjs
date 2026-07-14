@@ -1,7 +1,7 @@
 // Capture a single popup screenshot with mocked data.
 //
 //   node tools/screenshot.mjs [scenario] [locale] [theme]
-//   scenario: audio (default) | live | vot | idle
+//   scenario: audio (default) | live | vot | idle | promo
 //   theme:    light (default) | dark | auto
 import { renderPopup } from "./render-popup.mjs";
 import { fileURLToPath } from "node:url";

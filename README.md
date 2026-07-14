@@ -1,11 +1,11 @@
 # Video Tuner Pro
 
-Take control of any video on the web. Set the playback speed, keep live streams
-on the live edge, and even out loud and quiet sounds — all from one little popup.
-Works on virtually any site, in light and dark themes, in 10 languages, with no
-accounts and no tracking.
+Take control of any video on the web. Set the playback speed, pop it into Viewer
+or Theater mode, keep live streams on the live edge, and even out loud and quiet
+sounds — all from one little popup. Works on virtually any site, in light and dark
+themes, in 10 languages, with no accounts and no tracking.
 
-![Video Tuner Pro — playback speed, live-stream sync and audio compression in one popup](.promo/github/promo.gif)
+![Video Tuner Pro — playback speed, Viewer modes, live-stream sync and audio controls in one popup](.promo/github/promo.gif)
 
 ## Install
 

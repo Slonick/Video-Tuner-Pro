@@ -25,6 +25,7 @@
     "screenshot": "node tools/screenshot.mjs",
     "promo": "node tools/promo.mjs",
     "promo:gif": "node tools/promo-gif.mjs",
+    "promo:verify": "node tools/verify-promo.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

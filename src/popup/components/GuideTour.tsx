@@ -1,4 +1,5 @@
-// First-open walkthrough. For each of the four cards it runs three steps:
+// First-open walkthrough. For each popup card it runs an overview step; the first
+// card also demonstrates expansion and its hidden settings:
 //   1. overview  — spotlight the card, say what it does
 //   2. expand    — spotlight the header, point out it opens the full settings
 //   3. settings  — actually open the card (via onExpand → forceOpen) and describe
@@ -9,6 +10,7 @@ import { msg } from "../i18n.js";
 import { Button } from "../../ui/Button.js";
 
 interface Card {
+  selector: string;
   titleKey: string;
   title: string;
   overviewKey: string;
@@ -17,9 +19,11 @@ interface Card {
   hidden: string;
 }
 
-// Index = card-slot order: Speed, Live-sync, Auto-slow, Audio.
+// Keep selectors explicit: the Viewer card spans both columns, so relying on DOM
+// slot order lets a newly inserted card silently shift every later spotlight.
 const CARDS: Card[] = [
   {
+    selector: ".speed-section",
     titleKey: "guideSpeedTitle",
     title: "Playback speed",
     overviewKey: "guideSpeedDesc",
@@ -29,6 +33,7 @@ const CARDS: Card[] = [
       "Inside: save per Site or Channel, the on-video badge, keyboard shortcuts, theater mode, and speeding up plain audio.",
   },
   {
+    selector: ".live-sync-section",
     titleKey: "syncTitle",
     title: "Keep stream live",
     overviewKey: "guideSyncDesc",
@@ -38,6 +43,16 @@ const CARDS: Card[] = [
       "Inside: the allowed delay saved per Site or Channel, the on-video badge, and theater mode.",
   },
   {
+    selector: ".viewer-auto-section",
+    titleKey: "viewerModesLabel",
+    title: "Viewer modes",
+    overviewKey: "viewerModesHint",
+    overview: "Pop video out into Viewer or Theater mode.",
+    hiddenKey: "optViewerAutoHint",
+    hidden: "Automatically open the selected mode when a video starts playing.",
+  },
+  {
+    selector: ".autoslow-section",
     titleKey: "autoSlowLabel",
     title: "Auto-slow dense speech",
     overviewKey: "guideAutoDesc",
@@ -46,6 +61,7 @@ const CARDS: Card[] = [
     hidden: "Inside: save the target speech rate per Site or Channel.",
   },
   {
+    selector: ".audio-section",
     titleKey: "audioTitle",
     title: "Audio compression",
     overviewKey: "guideAudioDesc",
@@ -91,8 +107,9 @@ export function GuideTour({
     // Drive the real card expansion for the settings step.
     onExpand(phase === "settings" ? card : null);
     if (phase === "settings") return setRect(null); // card fills the popup — no spotlight
-    const slots = document.querySelectorAll<HTMLElement>(".popup-grid .card-slot");
-    const slot = slots[card];
+    const slot = document
+      .querySelector<HTMLElement>(c.selector)
+      ?.closest<HTMLElement>(".card-slot");
     if (!slot) return setRect(null);
     const el = phase === "expand" ? (slot.querySelector<HTMLElement>(".sec-head") ?? slot) : slot;
     const r = el.getBoundingClientRect();
@@ -102,7 +119,7 @@ export function GuideTour({
       width: r.width + SPOT_PAD * 2,
       height: r.height + SPOT_PAD * 2,
     });
-  }, [card, phase, onExpand]);
+  }, [c.selector, card, phase, onExpand]);
 
   const last = step === STEPS.length - 1;
   const next = () => (last ? onClose() : setStep((p) => p + 1));
@@ -125,7 +142,7 @@ export function GuideTour({
     const cx = rect.left + rect.width / 2;
     const left = Math.max(8, Math.min(cx - CAP_W / 2, window.innerWidth - CAP_W - 8));
     cap =
-      card < 2
+      card < 3
         ? { top: rect.top + rect.height + PAD, left }
         : { bottom: window.innerHeight - rect.top + PAD, left };
   }

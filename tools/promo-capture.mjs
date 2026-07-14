@@ -1,12 +1,12 @@
 // Capture the real popup states for the store assets, per locale, by driving the
 // live popup in Playwright. The popup is a fixed 2-col grid that opens each card
-// into a full-grid overlay — so the assets are 5 states: the collapsed overview
-// plus each card opened. We element-screenshot the popup-grid (overview) and the
-// opened card (.is-overlay) so every shot is the popup at its natural size; the
+// into a full-grid overlay — so the assets are the collapsed overview plus every
+// card opened. We screenshot the body for the overview and each opened state so
+// every shot is the popup at its natural size; the opened card (.is-overlay) is
 // opened card is freed to its content height so long locales aren't clipped.
 //   node tools/promo-capture.mjs            # all locales (light) + en dark
 //   node tools/promo-capture.mjs en         # one locale (quick)
-// Output → .screenshots/explore/anim/<locale>/{overview,speed,sync,auto,audio}.png
+// Output → .screenshots/explore/anim/<locale>/{overview,speed,sync,viewer,auto,audio}.png
 //        → .screenshots/explore/anim/en/*-dark.png  (dark set, for README/dark store)
 import { chromium } from "playwright";
 import { build } from "esbuild";
@@ -14,7 +14,7 @@ import { readFile, writeFile, mkdir, rm, copyFile, access } from "node:fs/promis
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { LOCALES } from "./promo-lib.mjs";
+import { LOCALES, PROMO_CARDS, PROMO_SCREENS } from "./promo-lib.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DIST = join(ROOT, "dist/chrome/popup");
@@ -106,15 +106,24 @@ async function pageHtml(theme, locale) {
   return f;
 }
 
-const CARDS = [
-  { key: "speed", sel: ".speed-section" },
-  { key: "sync", sel: ".live-sync-section" },
-  { key: "auto", sel: ".autoslow-section" },
-  { key: "audio", sel: ".audio-section" },
-];
-
 const browser = await chromium.launch(
-  process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: "chrome" },
+  process.env.CHROME
+    ? {
+        executablePath: process.env.CHROME,
+        args: [
+          "--disable-gpu",
+          "--disable-dev-shm-usage",
+          "--run-all-compositor-stages-before-draw",
+        ],
+      }
+    : {
+        channel: "chrome",
+        args: [
+          "--disable-gpu",
+          "--disable-dev-shm-usage",
+          "--run-all-compositor-stages-before-draw",
+        ],
+      },
 );
 
 // Capture one locale/theme: the collapsed overview (the whole grid) + each card
@@ -128,17 +137,24 @@ async function captureSet(theme, locale, suffix) {
   });
   await page.goto("file://" + (await pageHtml(theme, locale)));
   await page.waitForSelector(".popup-grid");
+  await page.evaluate(() => document.fonts.ready);
   await sleep(450);
   // Screenshot the whole popup (body = the 684px window: header + padding + grid).
   // The grid box stays the collapsed size (slots preserve their height while a card
   // lifts into the inset:0 overlay, which sits BELOW the header), so every state —
   // overview and each opened card — keeps the header and comes out the SAME size.
-  await page.locator("body").screenshot({ path: join(dir, `overview${suffix}.png`) });
-  for (const c of CARDS) {
-    await page.locator(`${c.sel} .sec-head`).first().click();
+  await page.locator("body").screenshot({
+    path: join(dir, `overview${suffix}.png`),
+    animations: "disabled",
+  });
+  for (const c of PROMO_CARDS) {
+    await page.locator(`${c.selector} .sec-head`).first().click();
     await sleep(550);
-    await page.locator("body").screenshot({ path: join(dir, `${c.key}${suffix}.png`) });
-    await page.locator(`${c.sel} .sec-head`).first().click();
+    await page.locator("body").screenshot({
+      path: join(dir, `${c.key}${suffix}.png`),
+      animations: "disabled",
+    });
+    await page.locator(`${c.selector} .sec-head`).first().click();
     await sleep(450);
   }
   await page.close();
@@ -153,4 +169,6 @@ for (const locale of locales) {
 }
 
 await browser.close();
-console.log(`✓ ${locales.length} locale(s) × 5 states × 2 themes → ${OUT}/<locale>/`);
+console.log(
+  `✓ ${locales.length} locale(s) × ${PROMO_SCREENS.length} states × 2 themes → ${OUT}/<locale>/`,
+);

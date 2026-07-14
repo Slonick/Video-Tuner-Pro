@@ -1,8 +1,8 @@
 // Expand a card into a full-popup overlay and back, with a FLIP transform so the
 // growth/shrink is GPU-smooth. The card's grid slot is frozen to its collapsed
 // height while expanded, so the rest of the grid doesn't reflow underneath the
-// overlay. Shared by all four cards (only one can be open — the overlay covers
-// the others). setOpen is for the cards that auto-expand on first enable.
+// overlay. Shared by all expandable cards (only one can be open — the overlay covers
+// the others). setOpen is for cards that auto-expand or are driven by the tour.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { prefersReducedMotion } from "../../ui/anim.js";
 

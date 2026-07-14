@@ -1,5 +1,5 @@
 {
-  "_note": "Promo-only copy for the store screenshots (not shipped). Only three fields per locale are consumed by tools/promo-lib.mjs (storeCopy): `head` (hero headline), `video.title` (speed card title) and `audioLead` (audio card description). Every other card title/description comes from the extension's own messages.json. Verify ru/uk/en; de/es/fr/pt_BR/ja/zh_CN/hi are best-effort machine translations.",
+  "_note": "Promo-only copy for the store screenshots (not shipped). Only three fields per locale are consumed by tools/promo-lib.mjs (storeCopy): `head` (hero headline), `video.title` (speed card title) and `audioLead` (audio card description). Every other card title/description, including Viewer modes, comes from the extension's own messages.json. Verify ru/uk/en; de/es/fr/pt_BR/ja/zh_CN/hi are best-effort machine translations.",
   "en": {
     "head": "Tune any video",
     "video": { "title": "Playback speed" },

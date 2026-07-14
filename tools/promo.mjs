@@ -5,11 +5,19 @@
 //
 // Layout (per locale → .promo/store/chrome/<locale>/):
 //   screenshot-overview.png  1280×800   collapsed 2×2 grid
-//   screenshot-{speed,sync,auto,audio}.png  1280×800   each card opened
+//   screenshot-{speed,sync,viewer,auto,audio}.png  1280×800   each card opened
 //   tile-small.png           440×280    CWS promo tile
 //   tile-marquee.png         1400×560   CWS marquee
-// Firefox (AMO, no localization / tiles): one en set of the 5 screenshots.
-import { LOCALES, ROOT, storeCopy, screenHTML, tileHTML, shoot } from "./promo-lib.mjs";
+// Firefox (AMO, no localization / tiles): one en set of all screenshots.
+import {
+  LOCALES,
+  PROMO_SCREENS,
+  ROOT,
+  storeCopy,
+  screenHTML,
+  tileHTML,
+  shoot,
+} from "./promo-lib.mjs";
 import { mkdir, rm, access } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -17,7 +25,6 @@ const ANIM = join(ROOT, ".screenshots/explore/anim");
 const STORE = join(ROOT, ".promo/store");
 const only = process.argv[2];
 const locales = only ? [only] : LOCALES;
-const SCREENS = ["overview", "speed", "sync", "auto", "audio"];
 const pop = (locale, kind) => `file://${join(ANIM, locale, kind + ".png")}`;
 const popDark = (locale, kind) => `file://${join(ANIM, locale, kind + "-dark.png")}`;
 const exists = (p) =>
@@ -29,7 +36,7 @@ const exists = (p) =>
 if (!only) await rm(STORE, { recursive: true, force: true });
 
 async function composeScreens(copy, locale, dir) {
-  for (const kind of SCREENS) {
+  for (const kind of PROMO_SCREENS) {
     await shoot(
       screenHTML({ kind, popImg: pop(locale, kind), popImgDark: popDark(locale, kind), copy }),
       1280,
@@ -73,7 +80,7 @@ for (const locale of locales) {
   console.log("✓ chrome/" + locale);
 }
 
-// Firefox (AMO): en only, the five screenshots, no tiles.
+// Firefox (AMO): en only, all screenshots, no tiles.
 if (!only || only === "en") {
   const copy = await storeCopy("en");
   const dir = join(STORE, "firefox");

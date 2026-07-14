@@ -60,7 +60,7 @@ export function App() {
   const [tourCard, setTourCard] = useState<number | null>(null);
   const onExpand = useCallback((card: number | null) => setTourCard(card), []);
   // Drive each card open/closed from the tour; undefined hands control back to the
-  // user once the tour is gone. Slot order is Speed, Live-sync, Auto-slow, Audio.
+  // user once the tour is gone. Slot order is Speed, Live-sync, Viewer, Auto-slow, Audio.
   const forceOpen = (n: number): boolean | undefined => (showTour ? tourCard === n : undefined);
 
   // While the tour is up, present every card unlocked regardless of the page —
@@ -99,6 +99,7 @@ export function App() {
         <ViewerAutoControl
           viewerAuto={viewerAuto}
           viewerFit={viewerFit}
+          forceOpen={forceOpen(2)}
           blocked={speed.drm || !speed.viewerSupported}
           blockedMessage={
             speed.drm
@@ -146,13 +147,13 @@ export function App() {
           autoSlow={autoSlow}
           live={speedLive}
           blocked={!!audioBlk}
-          forceOpen={forceOpen(2)}
+          forceOpen={forceOpen(3)}
         />
         <AudioCard
           audio={audio}
           translating={audioTranslating}
           blocked={!!audioBlk}
-          forceOpen={forceOpen(3)}
+          forceOpen={forceOpen(4)}
         />
       </div>
       {showTour && <GuideTour onClose={closeTour} onExpand={onExpand} />}
