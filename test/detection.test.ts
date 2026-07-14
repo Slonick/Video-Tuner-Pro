@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isLive, liveVideo, onStreamPage, probeLive } from "../src/content/live/detection.js";
+import {
+  isLive,
+  isVkLiveChannelPage,
+  liveVideo,
+  onStreamPage,
+  probeLive,
+} from "../src/content/live/detection.js";
 
 function vid(over: Partial<HTMLVideoElement> = {}): HTMLVideoElement {
   return {
@@ -28,6 +34,59 @@ describe("isLive", () => {
   });
   it("NaN duration (VOD before metadata) → not live", () => {
     expect(isLive(vid({ duration: NaN }))).toBe(false);
+  });
+});
+
+describe("VK Live routing", () => {
+  it("accepts only a channel root as the live route", () => {
+    expect(isVkLiveChannelPage("live.vkvideo.ru", "/have_contact")).toBe(true);
+    expect(isVkLiveChannelPage("live.vkvideo.ru", "/have_contact/record/id")).toBe(false);
+    expect(isVkLiveChannelPage("live.vkvideo.ru", "/app")).toBe(false);
+    expect(isVkLiveChannelPage("vkvideo.ru", "/have_contact")).toBe(false);
+  });
+});
+
+describe("isLive (Boosty routing)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does not mistake a Boosty VOD's temporary Infinity duration for a stream", () => {
+    vi.stubGlobal("location", {
+      hostname: "boosty.to",
+      pathname: "/creator/posts/post-id",
+      search: "?layer=video:creator:post-id:video-id",
+    });
+
+    expect(isLive(vid({ duration: Infinity }))).toBe(false);
+  });
+
+  it("still recognises an actual Boosty broadcast route", () => {
+    vi.stubGlobal("location", {
+      hostname: "boosty.to",
+      pathname: "/creator/streams/video_stream",
+      search: "",
+    });
+
+    expect(isLive(vid({ duration: Infinity }))).toBe(true);
+  });
+});
+
+describe("isLive (authoritative VOD routes)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.documentElement.removeAttribute("data-vtp-live");
+  });
+
+  it.each([
+    ["www.twitch.tv", "/videos/2818975236"],
+    ["kick.com", "/fissure_cs_ru2/videos/122d2af5-37be-4229-8542-e2dd5300b995"],
+    ["live.vkvideo.ru", "/have_contact/record/record-id"],
+  ])("does not let a hidden live player override %s%s", (hostname, pathname) => {
+    vi.stubGlobal("location", { hostname, pathname, search: "" });
+    document.documentElement.setAttribute("data-vtp-live", "1");
+
+    expect(isLive(vid({ duration: Infinity }))).toBe(false);
   });
 });
 
@@ -129,6 +188,51 @@ describe("isLive (player-published data-vtp-live flag)", () => {
   });
 });
 
+describe("live-page stickiness", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = "";
+    document.documentElement.removeAttribute("data-vtp-live");
+  });
+
+  it("does not carry a VK channel's live state onto a recording SPA route", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const route = {
+      hostname: "live.vkvideo.ru",
+      pathname: "/have_contact",
+      search: "",
+    };
+    vi.stubGlobal("location", route);
+    const live = document.createElement("video");
+    Object.defineProperty(live, "duration", { value: Infinity, configurable: true });
+    Object.defineProperty(live, "paused", { value: false, configurable: true });
+    live.getBoundingClientRect = () =>
+      ({ width: 640, height: 360, left: 0, top: 0, right: 640, bottom: 360 }) as DOMRect;
+    document.body.append(live);
+    expect(onStreamPage()).toBe(true);
+
+    live.remove();
+    route.pathname = "/have_contact/record/record-id";
+    const vod = document.createElement("video");
+    Object.defineProperty(vod, "duration", { value: 8_157, configurable: true });
+    Object.defineProperty(vod, "paused", { value: false, configurable: true });
+    vod.getBoundingClientRect = () =>
+      ({ width: 640, height: 360, left: 0, top: 0, right: 640, bottom: 360 }) as DOMRect;
+    document.body.append(vod);
+
+    expect(location.pathname).toBe("/have_contact/record/record-id");
+    expect(isLive(vod)).toBe(false);
+    expect(liveVideo()).toBeNull();
+    expect(onStreamPage()).toBe(false);
+  });
+});
+
 describe("isLive (live signals are scoped to the video's own player)", () => {
   beforeEach(() => {
     vi.stubGlobal("location", { hostname: "www.youtube.com" });
@@ -219,6 +323,24 @@ describe("probeLive (generic real-time-edge detection)", () => {
     expect(isLive(v)).toBe(true);
   });
 
+  it("recognises a finite VK-style live edge that grows in media segments", () => {
+    let duration = 10;
+    const v = vid();
+    Object.defineProperty(v, "duration", {
+      configurable: true,
+      get: () => duration,
+    });
+    probeLive(v);
+    for (let i = 1; i <= 3; i++) {
+      vi.setSystemTime(i * 2000);
+      duration += 2;
+      probeLive(v); // a new DASH segment arrives at roughly 1x wall-clock rate
+      vi.setSystemTime(i * 2000 + 500);
+      probeLive(v); // timeupdate between segments must not erase the evidence
+    }
+    expect(isLive(v)).toBe(true);
+  });
+
   it("does NOT mark a VOD (edge already far ahead, no real-time growth) live", () => {
     const v = vid({
       buffered: { length: 1, start: () => 0, end: () => 1000 } as unknown as TimeRanges,
@@ -248,7 +370,7 @@ describe("probeLive (generic real-time-edge detection)", () => {
     expect(isLive(v)).toBe(false);
   });
 
-  it("clears a temporary live probe once a finite VOD duration appears", () => {
+  it("clears a temporary live probe as soon as a finite VOD duration appears", () => {
     let edge = 10;
     let duration = NaN;
     const v = vid({
@@ -268,6 +390,7 @@ describe("probeLive (generic real-time-edge detection)", () => {
 
     duration = 3600;
     vi.setSystemTime(3000);
+    expect(isLive(v)).toBe(false); // no background probe tick required
     probeLive(v);
     expect(isLive(v)).toBe(false);
   });

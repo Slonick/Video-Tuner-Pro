@@ -103,6 +103,10 @@ document.addEventListener(
     if (typingIn(target) || typingIn(deepActive())) return;
     const viewerAction = e.code === viewer || e.code === theater;
     if (viewerAction && !S.viewerAutoEnabled) return;
+    // A viewer rendered in a child frame would be clipped to that frame and its
+    // controls misleadingly appear to cover the host page. Leave the site's key
+    // untouched there; embedded players can still use native Picture-in-Picture.
+    if (viewerAction && window.top !== window) return;
     if (!primaryVideo() && !viewerAnchorVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
 
     e.preventDefault();

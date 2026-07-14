@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => h.primary,
+  collectVideos: () => (h.primary ? [h.primary as HTMLVideoElement] : []),
   isDrmVideo: () => false,
 }));
 vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));

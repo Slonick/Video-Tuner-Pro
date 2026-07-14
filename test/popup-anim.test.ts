@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { tweenNumber } from "../src/popup/core/tween-number.js";
 
-// tweenNumber is driven by motion.dev now (its own frameloop), so the tests let it
-// run and wait for the landing value rather than hand-stepping requestAnimationFrame.
+// tweenNumber uses the extension's requestAnimationFrame helper, so the tests let
+// it run and wait for the landing value rather than hand-stepping frames.
 function setReducedMotion(reduce: boolean): void {
   window.matchMedia = ((q: string) => ({
     matches: reduce && /prefers-reduced-motion/.test(q),

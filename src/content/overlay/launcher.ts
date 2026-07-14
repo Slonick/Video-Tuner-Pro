@@ -36,6 +36,7 @@ const R_DIST = 62; // px — item centre's distance from the FAB centre
 const R_SPREAD = Math.PI / 3.6; // 50° between neighbouring radial items
 const R_HIDE_MS = 350; // grace period for the pointer to travel FAB → item
 const R_CLOSE_MS = 240; // wait for the fan-in transition before hiding items
+const R_ENABLE_MS = 230; // never let an item intercept the click while fanning out from the FAB
 const RADIAL_TRANSITION =
   "left .22s cubic-bezier(.2,0,0,1), top .22s cubic-bezier(.2,0,0,1), opacity .18s ease, transform .22s cubic-bezier(.2,0,0,1)";
 const MARGIN = 16; // px — default inset from the video's right edge
@@ -59,6 +60,7 @@ let radialOpen = false;
 let radialTimer: Timer | undefined;
 let radialIdleTimer: Timer | undefined;
 let radialCloseTimer: Timer | undefined;
+let radialEnableTimer: Timer | undefined;
 let radialFrame = 0;
 let backdrop: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
@@ -165,6 +167,9 @@ function radialList(): HTMLButtonElement[] {
   if (!rItems) return [];
   if (!S.viewerAutoEnabled) return [];
   if (isDrmVideo(primaryVideo())) return viewerFormat() ? [rItems.exit] : [];
+  // The pop-out viewer cannot escape a child frame's viewport. Do not expose
+  // dead format buttons there; native PiP remains useful when the embed allows it.
+  if (window.top !== window) return canUseNativePiP() ? [rItems.pip] : [];
   const f = viewerFormat();
   const visual = [
     f === "theater" ? rItems.exit : rItems.theater,
@@ -305,7 +310,7 @@ function openRadial(): void {
     for (const b of items) {
       b.style.visibility = "visible";
       b.style.opacity = "1";
-      b.style.pointerEvents = "auto";
+      if (!radialEnableTimer) b.style.pointerEvents = "auto";
     }
     layoutRadial();
     flashFab();
@@ -322,13 +327,14 @@ function openRadial(): void {
     for (const b of items) {
       b.style.visibility = "visible";
       b.style.opacity = "1";
-      b.style.pointerEvents = "auto";
     }
     layoutRadial();
+    radialEnableTimer = setTimeout(() => {
+      radialEnableTimer = undefined;
+      if (!radialOpen) return;
+      for (const b of radialList()) b.style.pointerEvents = "auto";
+    }, R_ENABLE_MS);
   });
-  for (const b of items) {
-    b.style.pointerEvents = "auto";
-  }
   radialIdleTimer = setTimeout(() => closeRadial(true), 2600);
   flashFab(); // the menu holds the FAB up too
 }
@@ -343,9 +349,11 @@ function closeRadial(resumeHide = false): void {
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
   clearTimeout(radialCloseTimer);
+  clearTimeout(radialEnableTimer);
   radialTimer = undefined;
   radialIdleTimer = undefined;
   radialCloseTimer = undefined;
+  radialEnableTimer = undefined;
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   if (rItems) {
@@ -516,6 +524,16 @@ function overlaySchemeHash(): string {
 
 function openPopup(): void {
   if (open || !shadow) return;
+  let popupUrl: string;
+  try {
+    // Resolve the extension URL before mutating any UI state. An orphaned content
+    // script (after an extension reload) or an unrelated page `browser` global
+    // must not leave a transparent backdrop and a permanently "open" FAB behind.
+    popupUrl = api.runtime.getURL("popup/popup.html") + overlaySchemeHash();
+  } catch (error) {
+    console.error("[Video Tuner] unable to open embedded popup", error);
+    return;
+  }
   closeRadial();
   open = true;
   fab?.setAttribute("data-popup-open", "true"); // morphs the icon play → ✕
@@ -546,7 +564,7 @@ function openPopup(): void {
   // getComputedStyle doesn't surface). So compute it HERE and pass two things:
   //   host  → the popup sets color-scheme to match → transparent on any site;
   //   os    → the popup themes the glass to the OS (decoupled from color-scheme).
-  frame.src = api.runtime.getURL("popup/popup.html") + overlaySchemeHash();
+  frame.src = popupUrl;
   // The panel blurs the video behind it — backdrop-filter on the iframe element
   // (in the page) is reliable, unlike a filter applied inside the iframe document.
   // The translucent tint lives in the popup's own CSS (html.vtp-embedded, theme
@@ -719,6 +737,7 @@ function mount(): void {
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
   clearTimeout(radialCloseTimer);
+  clearTimeout(radialEnableTimer);
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   host = document.createElement("div");
@@ -1011,6 +1030,7 @@ function resetDetachedHost(): void {
   clearTimeout(radialTimer);
   clearTimeout(radialIdleTimer);
   clearTimeout(radialCloseTimer);
+  clearTimeout(radialEnableTimer);
   cancelAnimationFrame(radialFrame);
   radialFrame = 0;
   host = null;

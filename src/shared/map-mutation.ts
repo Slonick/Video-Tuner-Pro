@@ -1,3 +1,5 @@
+import { getExtensionApi } from "./extension-api.js";
+
 export const STORED_MAP_NAMES = [
   "domains",
   "channels",
@@ -25,7 +27,7 @@ export interface StoredMapMutation {
 
 type Done = (ok?: boolean) => void;
 
-const api = typeof browser !== "undefined" ? browser : chrome;
+const api = getExtensionApi();
 
 export function mutateStoredMap(
   map: StoredMapName,

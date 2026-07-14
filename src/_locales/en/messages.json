@@ -200,6 +200,7 @@
   "viewerBackdropVideo": { "message": "Background video" },
   "viewerBackdropVideoHint": { "message": "Mirror it under the Viewer glass" },
   "viewerDrmBlocked": { "message": "Protected video: pop-out viewer is unavailable" },
+  "viewerFrameBlocked": { "message": "Embedded player: pop-out viewer is unavailable" },
   "optSponsorLabel": { "message": "SponsorBlock markers" },
   "optSponsorHint": { "message": "Show sponsor segments on the viewer's seek bar (YouTube). Asks the public SponsorBlock service about the current video." },
   "optKeyPress": { "message": "Press a key…" },

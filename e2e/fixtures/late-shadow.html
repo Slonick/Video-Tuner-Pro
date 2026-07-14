@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Late shadow player fixture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #111;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="late-player"></div>
+    <script>
+      window.addEventListener("load", () => {
+        // Deliberately run after the extension's one-off load reconcile. Without
+        // the attachShadow bridge this player is only found by the 30s idle timer.
+        setTimeout(() => {
+          const host = document.getElementById("late-player");
+          const root = host.attachShadow({ mode: "open" });
+          const style = document.createElement("style");
+          style.textContent = "video{display:block;width:640px;height:360px}";
+          const video = document.createElement("video");
+          video.id = "late-video";
+          video.src = "sample.webm";
+          video.preload = "auto";
+          video.playsInline = true;
+          root.append(style, video);
+        }, 250);
+      });
+    </script>
+  </body>
+</html>

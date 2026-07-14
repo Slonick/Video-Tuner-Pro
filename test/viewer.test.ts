@@ -4,9 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // The pop-out viewer either mirrors or adopts the page's <video> into its own
 // overlay with our control bar. Mock only the video picker and i18n; the overlay,
 // bar and media wiring run against real jsdom DOM.
-const h = vi.hoisted(() => ({ primary: null as unknown }));
+const h = vi.hoisted(() => ({
+  primary: null as unknown,
+  videos: [] as HTMLVideoElement[],
+}));
 vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => h.primary,
+  collectVideos: () =>
+    h.videos.length ? h.videos : h.primary ? [h.primary as HTMLVideoElement] : [],
   isDrmVideo: (v: HTMLVideoElement | null | undefined) => !!v && v.hasAttribute("data-drm"),
 }));
 vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
@@ -14,6 +19,7 @@ vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
 import { S } from "../src/content/state.js";
 import {
   toggleViewer,
+  setViewerState,
   exitViewer,
   viewerFormat,
   viewerAnchorVideo,
@@ -23,6 +29,7 @@ import {
   VIEWER_LAYOUT_EVENT,
 } from "../src/content/viewer.js";
 import { LAUNCHER_TOP_LAYER_ATTR } from "../src/content/lifecycle.js";
+import { onStreamPage, probeLive } from "../src/content/live/detection.js";
 
 // A controllable media element: play/pause flip `paused` and fire the real
 // events; currentTime/duration/videoWidth behave like a loaded 720p video.
@@ -147,6 +154,7 @@ beforeEach(() => {
   document.body.innerHTML = "";
   document.documentElement.style.overflow = "";
   h.primary = null;
+  h.videos = [];
   S.viewerAutoEnabled = true;
   S.viewerAuto = "off";
   S.viewerBackdropVideo = false;
@@ -872,6 +880,238 @@ describe("control bar", () => {
     }
   });
 
+  it("a segmented finite-duration live stream keeps the live layout between segments", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    let duration = 7900;
+    const { v } = makeVideo();
+    Object.defineProperty(v, "duration", {
+      configurable: true,
+      get: () => duration,
+    });
+    h.primary = v;
+    probeLive(v);
+    for (let i = 1; i <= 3; i++) {
+      vi.setSystemTime(1000 + i * 2000);
+      duration += 2;
+      probeLive(v);
+      vi.setSystemTime(1500 + i * 2000);
+      probeLive(v);
+    }
+
+    await openViewer("normal");
+
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+    expect(seek.style.display).toBe("none");
+    expect(barTime()).toBe("LIVE");
+  });
+
+  it("keeps the live layout when a mirrored MSE player drops its timeline on entry", async () => {
+    let duration = Infinity;
+    const { v } = makeVideo();
+    Object.defineProperty(v, "duration", {
+      configurable: true,
+      get: () => duration,
+    });
+    const { stream, capture } = installCapture(v);
+    capture.mockImplementation(() => {
+      duration = Number.NaN;
+      return stream;
+    });
+    h.primary = v;
+
+    await openViewer("normal");
+
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+    expect(seek.style.display).toBe("none");
+    expect(barTime()).toBe("LIVE");
+  });
+
+  it("keeps a confirmed mirrored live stream live beyond the edge grace", async () => {
+    let duration = Infinity;
+    const { v } = makeVideo();
+    v.currentTime = 9_970;
+    Object.defineProperty(v, "duration", {
+      configurable: true,
+      get: () => duration,
+    });
+    const { stream, capture } = installCapture(v);
+    capture.mockImplementation(() => {
+      duration = 10_000;
+      return stream;
+    });
+    h.primary = v;
+
+    await openViewer("normal");
+
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+    expect(seek.style.display).toBe("none");
+    expect(barTime()).toBe("LIVE");
+  });
+
+  it("uses an explicit popup live verdict for a finite primary timeline", async () => {
+    const { v } = makeVideo(10_000);
+    v.currentTime = 9_970;
+    h.primary = v;
+
+    setViewerState("normal", true);
+    await flush();
+
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+    expect(seek.style.display).toBe("none");
+    expect(barTime()).toBe("LIVE");
+  });
+
+  it("keeps an unbounded VK-style live stream live when it also exposes a seekable range", async () => {
+    const { v } = makeVideo(Infinity);
+    v.currentTime = 30_196;
+    setSeekable(v, 0, 30_202);
+    h.primary = v;
+
+    setViewerState("normal", true);
+    await flush();
+
+    const [seek] = barInputs();
+    expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+    expect(seek.style.display).toBe("none");
+    expect(barTime()).toBe("LIVE");
+  });
+
+  it("uses the VK channel route for a finite player at the live edge", async () => {
+    vi.stubGlobal("location", {
+      hostname: "live.vkvideo.ru",
+      pathname: "/4cb",
+      search: "",
+    });
+    const { v } = makeVideo(10_000);
+    v.currentTime = 9_994;
+    h.primary = v;
+    try {
+      await openViewer("normal");
+
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+      expect(seek.style.display).toBe("none");
+      expect(barTime()).toBe("LIVE");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("switches a VK channel Viewer to LIVE when the player reaches the edge later", async () => {
+    vi.stubGlobal("location", {
+      hostname: "live.vkvideo.ru",
+      pathname: "/4cb",
+      search: "",
+    });
+    const { v } = makeVideo(10_000);
+    v.currentTime = 9_900;
+    h.primary = v;
+    try {
+      await openViewer("normal");
+      expect(barTime()).toBe("2:45:00 / 2:46:40");
+
+      v.currentTime = 9_994;
+      v.dispatchEvent(new Event("timeupdate"));
+
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+      expect(seek.style.display).toBe("none");
+      expect(barTime()).toBe("LIVE");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps a VK recording seekable near the end instead of treating it as live", async () => {
+    vi.stubGlobal("location", {
+      hostname: "live.vkvideo.ru",
+      pathname: "/have_contact/record/record-id",
+      search: "",
+    });
+    const { v } = makeVideo(8_157);
+    v.currentTime = 8_153;
+    setSeekable(v, 0, 8_157);
+    h.primary = v;
+    try {
+      setViewerState("normal", false);
+      await flush();
+
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("flex");
+      expect(seek.style.display).toBe("");
+      expect(barTime()).toBe("2:15:53 / 2:15:57");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("uses the confirmed page live state for a finite shadow-player video at the live edge", async () => {
+    const { v } = makeVideo(10_000);
+    v.currentTime = 9_994;
+    h.primary = v;
+    const { v: liveSibling } = makeVideo(Infinity);
+    h.videos = [v, liveSibling];
+    try {
+      await openViewer("normal");
+
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+      expect(seek.style.display).toBe("none");
+      expect(barTime()).toBe("LIVE");
+    } finally {
+      liveSibling.remove();
+      document.documentElement.setAttribute("data-vtp-live", "0");
+      onStreamPage();
+      document.documentElement.removeAttribute("data-vtp-live");
+    }
+  });
+
+  it("keeps LIVE while the selected player has not exposed its timeline yet", async () => {
+    const { v } = makeVideo(0);
+    h.primary = v;
+    const { v: liveSibling } = makeVideo(Infinity);
+    h.videos = [v, liveSibling];
+    try {
+      await openViewer("normal");
+
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("none");
+      expect(seek.style.display).toBe("none");
+      expect(barTime()).toBe("LIVE");
+    } finally {
+      liveSibling.remove();
+      document.documentElement.setAttribute("data-vtp-live", "0");
+      onStreamPage();
+      document.documentElement.removeAttribute("data-vtp-live");
+    }
+  });
+
+  it("keeps a finite video seekable when it is away from a confirmed page live edge", async () => {
+    const { v } = makeVideo(10_000);
+    v.currentTime = 9_900;
+    h.primary = v;
+    const { v: liveSibling } = makeVideo(Infinity);
+    h.videos = [v, liveSibling];
+    try {
+      await openViewer("normal");
+
+      const [seek] = barInputs();
+      expect((seek.parentElement as HTMLElement).style.display).toBe("flex");
+      expect(seek.style.display).toBe("");
+      expect(barTime()).toBe("2:45:00 / 2:46:40");
+    } finally {
+      liveSibling.remove();
+      document.documentElement.setAttribute("data-vtp-live", "0");
+      onStreamPage();
+      document.documentElement.removeAttribute("data-vtp-live");
+    }
+  });
+
   it("a finite-duration live stream ignores YouTube's seekable archive window at the live edge", async () => {
     document.documentElement.setAttribute("data-vtp-live", "1");
     const { v } = makeVideo(3922);
@@ -961,9 +1201,15 @@ describe("control bar", () => {
     const bg = viewerBackdropVideo();
     expect(bg).toBeTruthy();
     expect(bg?.srcObject).toBe(stream);
-    expect(bg?.style.filter).toContain("blur");
+    expect(bg?.style.filter).toBe("blur(28px) saturate(150%) brightness(0.72) contrast(1.16)");
     const backdrop = viewerBackdrop();
     expect(backdrop?.style.backdropFilter).toBe("");
+    expect(backdrop?.style.background).toContain("radial-gradient");
+    const surface = overlayEl()?.querySelector(
+      "video:not([data-vtp-viewer-backdrop-video])",
+    ) as HTMLVideoElement | null;
+    expect(surface?.parentElement?.style.boxShadow).toContain("rgba(255,255,255,0.2)");
+    expect(surface?.parentElement?.style.boxShadow).toContain("0 40px 120px rgba(0,0,0,0.74)");
     toggleViewer("theater");
     await flush();
     expect(viewerBackdropVideo()).toBeNull();
@@ -1175,10 +1421,10 @@ describe("control bar", () => {
     );
     expect(bgCall).toBeTruthy();
     expect((bgCall?.[0] as Keyframe[])[0]).toMatchObject({
-      // +48 on each axis: the backdrop box is overscanned by BACKDROP_OVERSCAN
-      // (48px) past the viewport so its own blur never vignettes at the screen
+      // +64 on each axis: the backdrop box is overscanned by BACKDROP_OVERSCAN
+      // (64px) past the viewport so its own blur never vignettes at the screen
       // edge; the animation's translate compensates by that same fixed amount.
-      transform: expect.stringContaining("translate(60px, 82px)"),
+      transform: expect.stringContaining("translate(76px, 98px)"),
     });
     expect((bgCall?.[0] as Keyframe[])[1]).toMatchObject({
       transform: "none",

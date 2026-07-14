@@ -36,7 +36,11 @@ export interface UseViewerAuto {
   pickScope: (scope: Scope) => void;
 }
 
-export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewerAuto {
+export function useViewerAuto(
+  tab: ActiveTab | null,
+  send: SendToTab,
+  pageLive = false,
+): UseViewerAuto {
   const domain = tab?.domain ?? "";
   const hasTab = tab?.tabId != null;
   const {
@@ -119,7 +123,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
       setPageModeState(mode);
       if (!hasTab) return;
       const requestId = ++pageModeRequestId.current;
-      void send<ViewerStateResponse>("setViewerState", { mode }).then((resp) => {
+      void send<ViewerStateResponse>("setViewerState", { mode, live: pageLive }).then((resp) => {
         if (requestId !== pageModeRequestId.current) return;
         if (!resp || resp.success === false) {
           pageModeHoldUntil.current = 0;
@@ -130,7 +134,7 @@ export function useViewerAuto(tab: ActiveTab | null, send: SendToTab): UseViewer
         applyPageState(resp, true);
       });
     },
-    [hasTab, send, applyPageState],
+    [hasTab, send, applyPageState, pageLive],
   );
 
   const fallbackFromStorage = useCallback(() => {

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SPA shadow player fixture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #111;
+      }
+
+      button {
+        position: fixed;
+        z-index: 2;
+        margin: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="navigate" type="button">Open next video</button>
+    <div id="route"></div>
+    <script>
+      const route = document.getElementById("route");
+
+      function createPlayer(id, populateLater = false) {
+        const host = document.createElement("div");
+        host.id = id;
+        const root = host.attachShadow({ mode: "open" });
+        route.appendChild(host);
+
+        const populate = () => {
+          const style = document.createElement("style");
+          style.textContent = "video{display:block;width:640px;height:360px}";
+          const video = document.createElement("video");
+          video.id = `${id}-video`;
+          video.src = "sample.webm";
+          video.preload = "auto";
+          video.playsInline = true;
+          root.append(style, video);
+        };
+
+        if (populateLater) setTimeout(populate, 250);
+        else populate();
+      }
+
+      createPlayer("first-player");
+
+      document.getElementById("navigate").addEventListener("click", () => {
+        history.pushState({}, "", "/spa-shadow.html?video=next");
+        route.replaceChildren();
+        // The new SPA route inserts an already-empty shadow root, then the player
+        // library mounts its media later — the ordering used by Boosty-like apps.
+        createPlayer("next-player", true);
+      });
+    </script>
+  </body>
+</html>

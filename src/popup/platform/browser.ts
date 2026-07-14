@@ -1,4 +1,6 @@
-export const api = typeof browser !== "undefined" ? browser : chrome;
+import { getExtensionApi } from "../../shared/extension-api.js";
+
+export const api = getExtensionApi();
 
 // The popup runs two ways: as the toolbar action page (a top-level extension page)
 // and as the on-video overlay (an iframe embedded in the host page). In the embedded

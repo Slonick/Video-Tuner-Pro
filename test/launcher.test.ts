@@ -525,6 +525,30 @@ describe("launcher — radial viewer menu", () => {
     expect(exit.style.display).toBe("none");
   });
 
+  it("keeps fanning radial items click-through until they leave the FAB", async () => {
+    vi.useFakeTimers();
+    try {
+      Object.defineProperty(document, "pictureInPictureEnabled", {
+        value: true,
+        configurable: true,
+      });
+      S.overlayButton = "always";
+      h.primary = fakeNativeVideo();
+      updateLauncher();
+      fire(fabEl()!, "mouseenter");
+
+      await vi.advanceTimersByTimeAsync(20);
+      const [, , pip] = items();
+      expect(pip.style.opacity).toBe("1");
+      expect(pip.style.pointerEvents).toBe("none");
+
+      await vi.advanceTimersByTimeAsync(230);
+      expect(pip.style.pointerEvents).toBe("auto");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("opens and navigates the radial menu from the keyboard", async () => {
     S.overlayButton = "always";
     h.primary = fakeVideo();
@@ -593,6 +617,33 @@ describe("launcher — radial viewer menu", () => {
     Object.defineProperty(document, "pictureInPictureElement", { value: null, configurable: true });
     document.dispatchEvent(new Event("leavepictureinpicture"));
     expect(pip.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("exits native PiP instead of requesting it again when the source is already active", async () => {
+    Object.defineProperty(document, "pictureInPictureEnabled", { value: true, configurable: true });
+    const video = fakeNativeVideo();
+    await openMenu(video);
+    const [, , pip] = items();
+    Object.defineProperty(document, "pictureInPictureElement", {
+      value: video,
+      configurable: true,
+    });
+
+    pip.click();
+
+    expect(document.exitPictureInPicture).toHaveBeenCalledTimes(1);
+    expect(video.requestPictureInPicture).not.toHaveBeenCalled();
+  });
+
+  it("does not offer native PiP when the site disabled it on the video", async () => {
+    Object.defineProperty(document, "pictureInPictureEnabled", { value: true, configurable: true });
+    const video = fakeNativeVideo();
+    Object.defineProperty(video, "disablePictureInPicture", { value: true, configurable: true });
+
+    await openMenu(video);
+
+    const [, , pip] = items();
+    expect(shown(pip)).toBe(false);
   });
 
   it("animates radial items out from the FAB", async () => {

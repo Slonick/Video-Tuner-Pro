@@ -22,6 +22,7 @@ const state = (page: import("@playwright/test").Page) =>
       videoInShadow: !!sourceVideo,
       mirrored: !!overlayVideo && !!sourceVideo && overlayVideo !== sourceVideo,
       bar: !!barHost?.shadowRoot?.querySelector(".bar"),
+      objectFit: overlayVideo?.style.objectFit || "",
       theaterFits:
         !!r &&
         Math.round(r.left) === 0 &&
@@ -97,6 +98,110 @@ test("Escape returns the video into the shadow root exactly", async ({ page }) =
     });
 });
 
+test("a stored auto-open mode opens the viewer when playback starts", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { viewerAutoGlobal: "theater" });
+  await ready(page);
+  await expect
+    .poll(async () => sendToContent(serviceWorker, "getViewerAuto"))
+    .toMatchObject({ mode: "theater", scope: "global" });
+  await page.evaluate(() =>
+    document
+      .getElementById("host")
+      ?.shadowRoot?.querySelector("video")
+      ?.play()
+      .catch(() => {}),
+  );
+  await expect
+    .poll(() => state(page))
+    .toMatchObject({ attr: "theater", overlay: true, mirrored: true, theaterFits: true });
+});
+
+test("a stored viewer fit mode is applied to the mirrored video", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { viewerFitGlobal: "fill" });
+  await ready(page);
+  await page.keyboard.press("KeyV");
+  await expect
+    .poll(() => state(page))
+    .toMatchObject({ attr: "normal", mirrored: true, objectFit: "fill" });
+});
+
+test("the launcher exposes a clickable native Picture-in-Picture action", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { overlayButton: "always" });
+  await ready(page);
+
+  const launcher = page.getByRole("button", { name: "Open Video Tuner" });
+  // The launcher is intentionally non-interactive while hidden. Moving across
+  // the video is the real user gesture that reveals it before the FAB can receive
+  // hover/click events.
+  await page.mouse.move(500, 250);
+  await expect(launcher).toHaveCSS("pointer-events", "auto");
+  await launcher.hover();
+  const pip = page.getByRole("button", { name: "Picture in Picture" });
+  await expect(pip).toBeVisible();
+  await pip.click();
+  await expect(pip).toBeHidden();
+  await expect(page.locator("[data-vtp-viewer-overlay]")).toHaveCount(0);
+});
+
+test("launcher radial buttons switch viewer formats and close it", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { overlayButton: "always" });
+  await ready(page);
+  const launcherHost = page.locator("#vtp-launcher-host");
+  const launcher = launcherHost.getByRole("button", { name: "Open Video Tuner" });
+
+  await page.mouse.move(500, 250);
+  await launcher.hover();
+  await launcherHost.getByRole("button", { name: "Pop out video" }).click();
+  await expect.poll(() => state(page)).toMatchObject({ attr: "normal", overlay: true });
+
+  await page.mouse.move(500, 250);
+  await launcher.hover();
+  await launcherHost.getByRole("button", { name: "Pop out in theater format" }).click();
+  await expect.poll(() => state(page)).toMatchObject({ attr: "theater", overlay: true });
+
+  await page.mouse.move(500, 250);
+  await launcher.hover();
+  await launcherHost.getByRole("button", { name: "Close the pop-out viewer" }).click();
+  await expect.poll(() => state(page)).toMatchObject({ attr: null, overlay: false });
+});
+
+test("off launcher mode hides clicks while the keyboard popup still works", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { overlayButton: "off" });
+  await ready(page);
+  await page.mouse.move(500, 250);
+  await expect(page.getByRole("button", { name: "Open Video Tuner" })).toHaveCount(0);
+
+  await page.keyboard.press("KeyO");
+  await page.waitForFunction(
+    () => !!document.querySelector("[data-vtp-launcher]")?.shadowRoot?.querySelector("iframe"),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const iframe = document
+          .querySelector("[data-vtp-launcher]")
+          ?.shadowRoot?.querySelector("iframe") as HTMLIFrameElement | null;
+        return iframe ? getComputedStyle(iframe).display : "missing";
+      }),
+    )
+    .not.toBe("none");
+});
+
 test("the quality picker drives a generic HLS-like engine", async ({ page }) => {
   await ready(page);
   await page.keyboard.press("KeyT");
@@ -158,6 +263,62 @@ test("live viewer keeps a compact bar and compact quality label", async ({ page 
     );
   });
   expect(barWidth).toBeLessThanOrEqual(460);
+});
+
+test("an SPA transition from live to a near-end VOD restores time and seek", async ({
+  page,
+  serviceWorker,
+}) => {
+  await readyLiveWithQuality(page);
+
+  // Keep the same media element and document, like VK's channel → /record SPA
+  // transition. The former live page must not leave its six-second sticky verdict
+  // behind when the route and media timeline become an ordinary finite VOD.
+  await page.evaluate(async () => {
+    history.pushState({}, "", "/have_contact/record/record-id");
+    const video = document.querySelector("video");
+    if (!video) throw new Error("fixture video missing");
+    video.srcObject = null;
+    video.src = "/sample.webm";
+    video.load();
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("VOD metadata timeout")), 10_000);
+      video.addEventListener(
+        "loadedmetadata",
+        () => {
+          clearTimeout(timeout);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+    video.currentTime = Math.max(0, video.duration - 4);
+  });
+
+  const status = (await sendToContent(serviceWorker, "getSpeed")) as { live?: boolean };
+  expect(status.live).toBe(false);
+  await page.waitForTimeout(250);
+
+  await page.keyboard.press("KeyV");
+  await expect.poll(() => state(page)).toMatchObject({ attr: "normal", overlay: true, bar: true });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const overlay = document.querySelector("[data-vtp-viewer-overlay]");
+        const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
+          el.shadowRoot?.querySelector(".bar"),
+        )?.shadowRoot;
+        const seek = shadow?.querySelector<HTMLInputElement>('input[aria-label="Seek"]');
+        return {
+          time: shadow?.querySelector(".time")?.textContent?.trim() || "",
+          seekDisplay: seek ? getComputedStyle(seek).display : "missing",
+        };
+      }),
+    )
+    .toMatchObject({
+      time: expect.stringMatching(/^\d+:\d{2} \/ \d+:\d{2}$/),
+      seekDisplay: "block",
+    });
 });
 
 test("switching formats keeps a single overlay, T again exits", async ({ page }) => {

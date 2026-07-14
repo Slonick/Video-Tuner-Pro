@@ -165,6 +165,7 @@
   "viewerBackdropVideo": { "message": "बैकग्राउंड वीडियो" },
   "viewerBackdropVideoHint": { "message": "इसे व्यूअर ग्लास के नीचे मिरर करें" },
   "viewerDrmBlocked": { "message": "सुरक्षित वीडियो: पॉप-आउट व्यूअर उपलब्ध नहीं है" },
+  "viewerFrameBlocked": { "message": "एम्बेडेड प्लेयर: पॉप-आउट व्यूअर उपलब्ध नहीं है" },
   "viewerFitContain": { "message": "फ़िट" },
   "viewerFitCover": { "message": "क्रॉप" },
   "viewerFitFill": { "message": "खींचें" },

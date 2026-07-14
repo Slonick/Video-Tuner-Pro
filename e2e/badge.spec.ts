@@ -42,6 +42,61 @@ test("the badge reflects a speed change", async ({ page, serviceWorker }) => {
   await expect.poll(async () => (await badge(page))?.text).toMatch(/^2×/);
 });
 
+test("a player attaching its shadow root after load is detected immediately", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { showRemaining: true });
+  await page.goto("/late-shadow.html");
+  await page.waitForFunction(() =>
+    document.getElementById("late-player")?.shadowRoot?.querySelector("video"),
+  );
+
+  // The old reconcile fallback takes 30 seconds on a media-free page. Keep this
+  // assertion tight so a regression cannot masquerade as a merely slow player.
+  await expect(page.locator("[data-vtp-badge]")).toBeAttached({ timeout: 3000 });
+});
+
+test("a detached player host populated after insertion is detected immediately", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { showRemaining: true });
+  await page.goto("/detached-shadow.html");
+  await page.waitForFunction(() =>
+    document.getElementById("detached-player")?.shadowRoot?.querySelector("video"),
+  );
+  await expect(page.locator("[data-vtp-badge]")).toBeAttached({ timeout: 3000 });
+});
+
+test("an SPA route replacement tracks a newly populated shadow player immediately", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { showRemaining: true, globalSpeed: 1.75 });
+  await page.goto("/spa-shadow.html");
+  await expect(page.locator("[data-vtp-badge]")).toBeAttached({ timeout: 3000 });
+
+  await page.getByRole("button", { name: "Open next video" }).click();
+  await page.waitForFunction(() =>
+    document.getElementById("next-player")?.shadowRoot?.querySelector("video"),
+  );
+
+  await expect(page.locator("[data-vtp-badge]")).toBeAttached({ timeout: 3000 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            document
+              .getElementById("next-player")
+              ?.shadowRoot?.querySelector("video") as HTMLVideoElement | null
+          )?.playbackRate,
+      ),
+    )
+    .toBe(1.75);
+});
+
 test("the badge stays visible while the hold key is pressed", async ({ page, serviceWorker }) => {
   await setStorage(serviceWorker, { showRemaining: true });
   await page.goto("/");

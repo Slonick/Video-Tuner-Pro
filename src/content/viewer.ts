@@ -17,7 +17,7 @@ import { api } from "./platform/browser.js";
 import { addFullscreenChangeListener, currentFullscreenElement } from "./platform/fullscreen.js";
 import { i18n } from "./platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
-import { isLive } from "./live/detection.js";
+import { isLive, isVkLiveChannelPage, onStreamPage } from "./live/detection.js";
 import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
 import { showBadgeNotice } from "./badge/overlay.js";
 import { LAUNCHER_TOP_LAYER_ATTR, listenerObjectOptions, listenerOptions } from "./lifecycle.js";
@@ -35,13 +35,18 @@ const VIEWER_ANIM_MS = 420;
 const VIEWER_BACKDROP_VIDEO_ANIM_MS = 680;
 const BACKDROP_CANVAS_SCALE = 0.125;
 const BACKDROP_CANVAS_MS = 66;
+const NORMAL_BACKDROP_FILTER = "blur(28px) saturate(150%) brightness(0.72) contrast(1.16)";
+const NORMAL_SURFACE_SHADOW =
+  "0 0 0 1px rgba(255,255,255,0.2)," +
+  "inset 0 1px 0 rgba(255,255,255,0.08)," +
+  "0 40px 120px rgba(0,0,0,0.74),0 12px 36px rgba(0,0,0,0.48)";
 // A CSS/backdrop-filter blur can't invent pixels past its own box, so an element
 // blurred exactly at the viewport edge fades toward whatever's behind it there —
 // a visible vignette right at the screen border. Overscanning the box (then
 // letting the overlay's overflow:hidden crop it back to the viewport) hides that
 // fade off-screen instead. Comfortably more than 2× the largest blur radius used
-// (14/22px) so the fade-out never reaches the visible edge.
-const BACKDROP_OVERSCAN = 48;
+// (14/28px) so the fade-out never reaches the visible edge.
+const BACKDROP_OVERSCAN = 64;
 
 // The overlay sits under the speed badge (…646) and the launcher FAB with its
 // radial menu (…647), so both remain usable over the popped-out video.
@@ -49,6 +54,16 @@ const Z_OVERLAY = "2147483643";
 
 let fmt: ViewerFormat | null = null;
 let video: HTMLVideoElement | null = null; // the page media element we control
+// Capture the page-level verdict before Viewer hides/adopts the source. Some
+// MSE players (VK Video Live in particular) temporarily drop duration and
+// seekable ranges while captureStream() is attached, which otherwise turns a
+// confirmed live stream into a misleading 0:00 loading timeline.
+let liveAtViewerEntry = false;
+// Stronger than the generic media-element live heuristic: this is set only by
+// the popup's page verdict or by a recognised live page sitting at its edge.
+// It lets an actual broadcast beat a seekable range without turning every
+// large-duration DVR-like element into the compact live layout.
+let liveLayoutAtViewerEntry = false;
 let surfaceVideo: HTMLVideoElement | null = null; // the overlay video we render/style
 let overlay: HTMLDivElement | null = null;
 let backdropEl: HTMLDivElement | null = null;
@@ -289,7 +304,7 @@ export function viewerFormat(): ViewerFormat | null {
   return null;
 }
 
-export function setViewerState(format: ViewerFormat | "off"): void {
+export function setViewerState(format: ViewerFormat | "off", liveHint = false): void {
   if (format === "off") {
     if (fmt) exitViewer();
     else document.dispatchEvent(new Event(CLOSE_EVENT));
@@ -300,7 +315,7 @@ export function setViewerState(format: ViewerFormat | "off"): void {
   if (fmt) setFormat(format);
   else {
     document.dispatchEvent(new Event(CLOSE_EVENT));
-    void enter(format);
+    void enter(format, undefined, { liveHint });
   }
 }
 
@@ -345,7 +360,13 @@ function applyOverlayBackdrop(): void {
     backdropEl.style.removeProperty("-webkit-backdrop-filter");
     backdropEl.style.backdropFilter = "";
   } else {
-    backdropEl.style.background = "rgb(28 28 32 / calc(0.24 * var(--glass-opacity,1)))";
+    // Keep the moving mirror recognisable while giving the primary player a
+    // distinct visual plane. The centre stays lightly veiled and the edges fall
+    // off more decisively, which also avoids a flat grey wash on dark footage.
+    backdropEl.style.background =
+      "radial-gradient(ellipse at center," +
+      "rgb(8 8 10 / calc(0.08 * var(--glass-opacity,1))) 0%," +
+      "rgb(2 2 4 / calc(0.5 * var(--glass-opacity,1))) 100%)";
     if (S.viewerBackdropVideo && mirrorStream) {
       backdropEl.style.removeProperty("-webkit-backdrop-filter");
       backdropEl.style.backdropFilter = "";
@@ -389,7 +410,10 @@ function styleBackdropVideo(el: HTMLElement): void {
     transformOrigin: "0 0",
     borderRadius: "0",
     objectFit: "cover",
-    filter: "blur(22px) saturate(135%) brightness(0.9)",
+    // More blur separates the duplicate image from the player. Contrast and
+    // saturation retain colour in the backdrop; lower brightness leaves the
+    // unfiltered primary video visually dominant.
+    filter: NORMAL_BACKDROP_FILTER,
     opacity: backdropEl?.style.opacity === "0" ? "0" : "1",
     pointerEvents: "none",
     willChange: "transform, opacity",
@@ -809,13 +833,42 @@ type Timeline =
   | { kind: "loading"; pos: number };
 
 const MAX_REAL_DURATION = 60 * 60 * 24 * 30;
+const LIVE_EDGE_GRACE = 15;
+
+// Some players (notably VK Video Live) keep the actual media element inside a
+// closed shadow root and expose a finite, segment-growing duration there. The
+// page-level detector can still be confidently live while that particular
+// element briefly loses its probe state during adoption/mirroring. Corroborate
+// the page result only when this video is itself sitting at the media edge; a
+// user who scrubbed back into DVR keeps the ordinary seekable timeline.
+function nearLiveEdge(v: HTMLVideoElement): boolean {
+  const dur = v.duration;
+  if (Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
+    const distance = dur - v.currentTime;
+    if (Number.isFinite(distance) && distance >= 0 && distance <= LIVE_EDGE_GRACE) return true;
+  }
+  try {
+    const ranges = v.seekable;
+    if (!ranges?.length) return false;
+    const distance = ranges.end(ranges.length - 1) - v.currentTime;
+    return Number.isFinite(distance) && distance >= 0 && distance <= LIVE_EDGE_GRACE;
+  } catch {
+    return false;
+  }
+}
 
 function mediaTimeline(v: HTMLVideoElement): Timeline {
   const dur = v.duration;
-  const live = isLive(v);
+  const edgeCorroborated = nearLiveEdge(v);
+  const pageEdgeLive = edgeCorroborated && (onStreamPage() || isVkLiveChannelPage());
+  const live = isLive(v) || liveAtViewerEntry || pageEdgeLive;
   if (live && Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
     return { kind: "live" };
   }
+  // VK exposes duration=Infinity together with a long seekable range. A strong
+  // page/popup verdict must beat that range, while a generic sentinel-duration
+  // element away from the edge remains an ordinary DVR timeline.
+  if (liveLayoutAtViewerEntry || pageEdgeLive) return { kind: "live" };
   if (Number.isFinite(dur) && dur > 0 && dur < MAX_REAL_DURATION) {
     return { kind: "vod", start: 0, pos: v.currentTime, len: dur };
   }
@@ -915,7 +968,7 @@ function sizeVideo(): void {
       "position:absolute !important;left:50% !important;top:50% !important;" +
       "transform:translate(-50%,-50%) !important;" +
       `width:${box.w}px !important;height:${box.h}px !important;` +
-      "border-radius:12px !important;box-shadow:0 32px 104px rgba(0,0,0,0.62),0 8px 28px rgba(0,0,0,0.35) !important;" +
+      `border-radius:12px !important;box-shadow:${NORMAL_SURFACE_SHADOW} !important;` +
       "overflow:hidden !important;background:#000 !important;z-index:1 !important;" +
       "will-change:transform,width,height,left,top,opacity !important;contain:paint !important;";
   }
@@ -1860,24 +1913,25 @@ function restoreMirroredSource(v: HTMLVideoElement): void {
 // exiting adds the video to the seen set, so a manual close isn't fought the
 // next time the user hits play.
 const autoSeen = new WeakSet<HTMLVideoElement>();
+export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
+  if (window.top !== window) return;
+  // Our own mirror/backdrop videos live inside the overlay and are started
+  // with .play() during enter(). Ignore them to avoid recursively opening a new
+  // viewer for the viewer's own media.
+  if (t.closest(`[${OVERLAY}]`)) return;
+  if (!S.viewerAutoEnabled || S.viewerAuto === "off" || fmt || autoSeen.has(t)) return;
+  const r = t.getBoundingClientRect();
+  if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
+  autoSeen.add(t);
+  void enter(S.viewerAuto, t, { mirrorOnly: true });
+}
+
 document.addEventListener(
   "play",
   (e) => {
-    if (window.top !== window) return;
     const t = e.target;
     if (!(t instanceof HTMLVideoElement)) return;
-    // Our own mirror/backdrop videos live inside the overlay and are started
-    // with .play() during enter() — their own (async) "play" event bubbles
-    // right back to this same document-level listener. Without this check,
-    // that self-generated event re-enters the viewer, which creates a new
-    // mirror, whose play event re-enters again — a confirmed infinite loop
-    // (reproduced: 43 stacked overlays within 500ms without this guard).
-    if (t.closest(`[${OVERLAY}]`)) return;
-    if (!S.viewerAutoEnabled || S.viewerAuto === "off" || fmt || autoSeen.has(t)) return;
-    const r = t.getBoundingClientRect();
-    if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
-    autoSeen.add(t);
-    enter(S.viewerAuto, t, { mirrorOnly: true });
+    maybeAutoOpenViewer(t);
   },
   listenerOptions(true),
 );
@@ -1885,11 +1939,35 @@ document.addEventListener(
 async function enter(
   format: ViewerFormat,
   target?: HTMLVideoElement,
-  opts: { mirrorOnly?: boolean } = {},
+  opts: { mirrorOnly?: boolean; liveHint?: boolean } = {},
 ): Promise<void> {
   if (window.top !== window) return;
   const v = target ?? primaryVideo();
   if (!v || currentFullscreenElement() || fmt || exiting || overlay || isDrmVideo(v)) return;
+  // Read this before createMirror()/DOM adoption: the site's player can clear
+  // its MSE timeline as soon as capture begins even though the page is still a
+  // confirmed live stream.
+  const targetLive = isLive(v);
+  const atEntryEdge = nearLiveEdge(v);
+  let hasEntrySeekableWindow = false;
+  try {
+    if (v.seekable?.length) {
+      const start = v.seekable.start(v.seekable.length - 1);
+      const end = v.seekable.end(v.seekable.length - 1);
+      const len = end - start;
+      hasEntrySeekableWindow = Number.isFinite(len) && len > 5 && len < MAX_REAL_DURATION;
+    }
+  } catch {
+    // A MediaSource swap can make TimeRanges throw between length/start/end.
+  }
+  const entryTimelineUnavailable =
+    (!Number.isFinite(v.duration) || v.duration <= 0 || v.duration >= MAX_REAL_DURATION) &&
+    !hasEntrySeekableWindow;
+  liveLayoutAtViewerEntry =
+    opts.liveHint === true ||
+    (isVkLiveChannelPage() && atEntryEdge) ||
+    (onStreamPage() && (atEntryEdge || entryTimelineUnavailable));
+  liveAtViewerEntry = liveLayoutAtViewerEntry || targetLive;
   const firstRect = v.getBoundingClientRect();
   const mirror = createMirror(v);
   if (!mirror && opts.mirrorOnly) return;
@@ -2119,6 +2197,8 @@ export function exitViewer(): void {
     viewerSession++;
     surfaceVideo = null;
     mirrored = false;
+    liveAtViewerEntry = false;
+    liveLayoutAtViewerEntry = false;
     video = null;
     // Players re-measure on resize — let the restored one lay itself out.
     window.dispatchEvent(new Event("resize"));

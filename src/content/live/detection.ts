@@ -1,9 +1,60 @@
 import { collectVideos } from "../videos.js";
 
 let liveSeenAt = 0; // timestamp of the last live <video> we saw (sticky detection)
+let liveSeenPageKey = ""; // never carry sticky live state across SPA route changes
 
 function isYouTube(): boolean {
   return /(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname);
+}
+
+function isBoosty(): boolean {
+  return /(^|\.)boosty\.to$/.test(location.hostname);
+}
+
+// These routes are authoritative recordings even when the site keeps a hidden
+// live/preload player mounted beside the visible VOD. Twitch and Kick both do
+// this during SPA navigation; letting that secondary Infinity-duration element
+// win makes Live-sync grab the page and turns the badge into a bogus hours-long
+// latency while the Viewer correctly shows a finite timeline.
+function isKnownVodPage(): boolean {
+  const host = location.hostname.toLowerCase();
+  const path = location.pathname;
+  if (/(^|\.)twitch\.tv$/.test(host)) return /^\/videos\/\d+(?:\/|$)/.test(path);
+  if (/(^|\.)kick\.com$/.test(host)) return /^\/[^/]+\/videos\/[^/]+(?:\/|$)/.test(path);
+  if (/(^|\.)live\.vkvideo\.ru$/.test(host)) return /^\/[^/]+\/record\/[^/]+(?:\/|$)/.test(path);
+  return false;
+}
+
+// Boosty VODs briefly expose an unbounded MediaSource duration while their
+// metadata or a new quality level is attached. That is indistinguishable from a
+// live MSE stream at the <video> API level, but Boosty gives broadcasts their own
+// stable route. Keep the generic Infinity/growing-edge heuristics away from post
+// videos and modal VODs; otherwise they are locked to 1x until the sticky live
+// state expires. A creator's actual broadcast lives at /streams/video_stream.
+function isBoostyLivePage(): boolean {
+  return isBoosty() && /\/streams\/video_stream(?:\/|$)/.test(location.pathname);
+}
+
+const VK_LIVE_RESERVED = new Set([
+  "app",
+  "feed",
+  "search",
+  "settings",
+  "help",
+  "support",
+  "about",
+  "categories",
+  "category",
+  "following",
+]);
+
+// VK Live channel broadcasts live at /<channel>; recordings have the stable
+// /<channel>/record/<id> route. Keep this route signal narrow so a recording,
+// catalog page, or settings page never inherits the live Viewer layout.
+export function isVkLiveChannelPage(host = location.hostname, path = location.pathname): boolean {
+  if (!/(^|\.)live\.vkvideo\.ru$/i.test(host)) return false;
+  const parts = path.split("/").filter(Boolean);
+  return parts.length === 1 && !VK_LIVE_RESERVED.has(parts[0].toLowerCase());
 }
 
 // YouTube DVR (scrubbed-back) state. On a live broadcast you can seek back into
@@ -149,6 +200,7 @@ export function isLive(video: HTMLVideoElement): boolean {
   // present, so it wins over the duration/DOM heuristics below.
   const flag = document.documentElement.getAttribute("data-vtp-live");
   if (dvrActive(video)) return false;
+  if (isKnownVodPage()) return false;
   // YouTube DVR: a live broadcast you've scrubbed back from is a recording, not a
   // stream, until you return to the live edge (see trackDvr/dvrMode).
   if (isYouTube() && flag === "1") return true;
@@ -178,13 +230,27 @@ export function isLive(video: HTMLVideoElement): boolean {
   // can safely clear sticky live state after SPA navigation.
   if (flag === "0") return false;
 
+  // Boosty's VOD player transiently reports Infinity during MSE startup and
+  // quality changes. Only its dedicated broadcast route may use the generic
+  // media-element live heuristics below.
+  if (isBoosty() && !isBoostyLivePage()) return false;
+
   // Most live MSE streams report an infinite duration (Twitch, many players).
   if (unboundedDuration(video.duration)) return true;
 
   // Generic fallback (covers Twitch low-latency and players that expose a finite
   // but growing live edge): a stream whose media edge advances in real time.
   const s = liveProbe.get(video);
-  if (s && s.live) return true;
+  if (s?.live) {
+    // An SPA can reuse the exact same media element when leaving a stream for a
+    // recording. The new finite metadata is authoritative immediately; do not
+    // keep reporting the old unbounded probe until the next background sample.
+    if (finiteVodDuration(video.duration) && !finiteVodDuration(s.lastDuration)) {
+      resetProbeToFinite(video, s);
+    } else {
+      return true;
+    }
+  }
 
   // Otherwise a real finite duration is a VOD. Some VOD players briefly look
   // unbounded while metadata/quality reloads settle; probeLive clears those
@@ -205,6 +271,15 @@ interface LiveProbe {
   live: boolean;
 }
 const liveProbe = new WeakMap<HTMLVideoElement, LiveProbe>();
+
+function resetProbeToFinite(video: HTMLVideoElement, probe: LiveProbe, now = Date.now()): void {
+  probe.lastEnd = video.duration;
+  probe.lastDuration = video.duration;
+  probe.lastT = now;
+  probe.lastGrow = 0;
+  probe.hits = 0;
+  probe.live = false;
+}
 
 function streamEnd(v: HTMLVideoElement): number {
   let end = 0;
@@ -252,16 +327,28 @@ export function probeLive(v: HTMLVideoElement): void {
     return;
   }
   const dT = (t - s.lastT) / 1000;
-  if (dT < 0.4) return; // need spacing between samples for a stable rate
-  if (finite && v.duration === s.lastDuration) {
-    s.lastEnd = v.duration;
-    s.lastT = t;
-    s.hits = 0;
-    s.lastGrow = 0;
-    s.live = false;
+  const wasFinite = finiteVodDuration(s.lastDuration);
+  // A player can briefly expose a growing buffered edge while an ordinary VOD
+  // attaches its final finite duration. That transition is authoritative and
+  // must clear the provisional live result immediately.
+  if (finite && !wasFinite) {
+    resetProbeToFinite(v, s, t);
     return;
   }
   const end = finite ? v.duration : streamEnd(v);
+  const delta = end - s.lastEnd;
+  // DASH players such as VK Video publish their finite live edge one media
+  // segment at a time. timeupdate fires several times between segment arrivals;
+  // keep the previous edge timestamp through those flat samples so the next
+  // segment is measured over its real wall-clock interval instead of looking
+  // like a burst. The confirmed result remains sticky through short stalls.
+  if (Math.abs(delta) < 0.01) {
+    s.lastDuration = v.duration;
+    s.live = s.lastGrow > 0 && t - s.lastGrow < 8000;
+    if (!s.live && t - s.lastT >= 8000) s.hits = 0;
+    return;
+  }
+  if (dT < 0.4) return; // need spacing between edge changes for a stable rate
   const rate = (end - s.lastEnd) / dT;
   s.lastEnd = end;
   s.lastDuration = v.duration;
@@ -272,7 +359,6 @@ export function probeLive(v: HTMLVideoElement): void {
     if (s.hits >= 3) s.lastGrow = t;
   } else {
     s.hits = 0;
-    if (finite) s.lastGrow = 0;
   }
   s.live = s.lastGrow > 0 && t - s.lastGrow < 8000; // sticky through brief stalls
 }
@@ -298,7 +384,10 @@ export function liveVideoFrom(videos: HTMLVideoElement[]): HTMLVideoElement | nu
       best = v;
     }
   }
-  if (best) liveSeenAt = Date.now();
+  if (best) {
+    liveSeenAt = Date.now();
+    liveSeenPageKey = currentPageKey();
+  }
   return best;
 }
 
@@ -309,9 +398,19 @@ export function liveVideo(): HTMLVideoElement | null {
 // True if this page is a live stream, staying sticky through brief detection
 // flickers (quality switches momentarily report a finite duration on Twitch).
 export function onStreamPage(live?: HTMLVideoElement | null): boolean {
-  if (live === undefined ? liveVideo() : live) return true;
+  const pageKey = currentPageKey();
+  if (liveSeenPageKey && liveSeenPageKey !== pageKey) {
+    liveSeenAt = 0;
+    liveSeenPageKey = "";
+  }
+  if (live === undefined ? liveVideo() : live) {
+    liveSeenAt = Date.now();
+    liveSeenPageKey = pageKey;
+    return true;
+  }
   if (document.documentElement.getAttribute("data-vtp-live") === "0") {
     liveSeenAt = 0;
+    liveSeenPageKey = "";
     return false;
   }
   if (Date.now() - dvrSeenAt < 6000) return false; // scrubbed back into the DVR buffer

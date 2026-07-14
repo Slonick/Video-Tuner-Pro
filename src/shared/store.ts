@@ -20,8 +20,9 @@ import {
   type Category,
   type SyncConfig,
 } from "./sync-config.js";
+import { getExtensionApi } from "./extension-api.js";
 
-const api = typeof browser !== "undefined" ? browser : chrome;
+const api = getExtensionApi();
 
 const LOCAL = api.storage.local;
 // Fall back to local when sync is unavailable; then both "areas" are the same

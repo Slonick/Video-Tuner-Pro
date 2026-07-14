@@ -13,6 +13,7 @@ const fx = vi.hoisted(() => ({
   reconcile: vi.fn(),
   markDrmVideo: vi.fn(),
   exitViewer: vi.fn(),
+  maybeAutoOpenViewer: vi.fn(),
   recordBufferSample: vi.fn(),
   audioSamplingReady: false,
   recordAudioSample: vi.fn(),
@@ -99,6 +100,7 @@ vi.mock("../src/content/overlay/launcher.js", () => ({
 }));
 vi.mock("../src/content/viewer.js", () => ({
   exitViewer: fx.exitViewer,
+  maybeAutoOpenViewer: fx.maybeAutoOpenViewer,
   ownsViewerNode: () => false,
   refreshViewerBackdrop: vi.fn(),
 }));

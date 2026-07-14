@@ -86,7 +86,9 @@ const FADE = `.popup-grid.has-overlay .sync-section:not(.is-overlay){opacity:0!i
 const { version } = JSON.parse(await readFile(join(ROOT, "src/manifest.json"), "utf8"));
 
 async function pageHtml(theme, locale) {
-  const messages = JSON.parse(await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"));
+  const messages = JSON.parse(
+    await readFile(join(ROOT, `src/_locales/${locale}/messages.json`), "utf8"),
+  );
   const inject =
     `<script>window.__SCENARIO__="promo";window.__MESSAGES__=${JSON.stringify(messages)};window.__VERSION__=${JSON.stringify(version)};window.__THEME__=${JSON.stringify(theme)};window.__LOCALE__=${JSON.stringify(locale)};</script>\n` +
     `<script src="mock.js"></script>\n`;
@@ -95,7 +97,10 @@ async function pageHtml(theme, locale) {
     '<link rel="stylesheet" href="popup.css" />',
     `<link rel="stylesheet" href="popup.css" /><style>:root{${blocks[themeVars[theme]]}}</style><style>${UNGREY}${freeze}${NOSHADOW}${FADE}</style>`,
   );
-  html = html.replace('<script src="popup.js"></script>', inject + '<script src="popup.js"></script>');
+  html = html.replace(
+    '<script src="popup.js"></script>',
+    inject + '<script src="popup.js"></script>',
+  );
   const f = join(CAP, `popup-${theme}-${locale}.html`);
   await writeFile(f, html);
   return f;
@@ -117,7 +122,10 @@ const browser = await chromium.launch(
 async function captureSet(theme, locale, suffix) {
   const dir = join(OUT, locale);
   await mkdir(dir, { recursive: true });
-  const page = await browser.newPage({ viewport: { width: 700, height: 760 }, deviceScaleFactor: 2 });
+  const page = await browser.newPage({
+    viewport: { width: 700, height: 760 },
+    deviceScaleFactor: 2,
+  });
   await page.goto("file://" + (await pageHtml(theme, locale)));
   await page.waitForSelector(".popup-grid");
   await sleep(450);

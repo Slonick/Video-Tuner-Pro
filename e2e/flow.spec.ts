@@ -74,9 +74,14 @@ test("configure in options → use via popup → persist across reload", async (
     .toBe(true);
   await popup!.locator("#speedUp").waitFor();
   await expect(popup!.locator("#currentSpeedPct")).toContainText("150%");
-  await popup!.locator('.btn-speed[data-percent="175"]').click(); // a default-pinned preset
-  await expect(popup!.locator("#currentSpeedPct")).toContainText("175%");
+  const preset175 = popup!.locator('.btn-speed[data-percent="175"]');
+  await expect(preset175).toBeEnabled();
+  await preset175.click(); // a default-pinned preset
+  // The media element is the authoritative outcome; assert it before the
+  // animated readout so a throttled iframe animation cannot hide a messaging
+  // failure (or misdiagnose a working command as one).
   await expect.poll(() => rate(page)).toBeCloseTo(1.75, 2);
+  await expect(popup!.locator("#currentSpeedPct")).toContainText("175%");
 
   // 5. Remember it for this site (the popup's Save contract), then reload.
   await sendToContent(serviceWorker, "remember", { scope: "site", speed: 1.75 });

@@ -1,4 +1,5 @@
 import { ctxValid } from "./platform/browser.js";
+import { SHADOW_ROOT_ATTACHED_EVENT } from "../shared/dom-events.js";
 
 export const seenVideos = new WeakSet<HTMLVideoElement>();
 export const seenAudios = new WeakSet<HTMLAudioElement>();
@@ -15,7 +16,7 @@ export const seenAudios = new WeakSet<HTMLAudioElement>();
 const trackedVideos = new Set<HTMLVideoElement>();
 const trackedAudios = new Set<HTMLAudioElement>();
 const drmVideos = new WeakSet<HTMLVideoElement>();
-const observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
+let observedRoots = new WeakSet<ShadowRoot>(); // open shadow roots we already observe
 interface ShadowHostCandidate {
   ref: WeakRef<Element>;
   active: boolean;
@@ -35,6 +36,29 @@ let tracking = false;
 let onMediaChange: () => void = () => {};
 let onContextDead: () => void = () => {};
 let isOwnNode: (n: Node) => boolean = () => false;
+let onVideoPlay: (video: HTMLVideoElement) => void = () => {};
+let trackingController: AbortController | null = null;
+let playHookedVideos = new WeakSet<HTMLVideoElement>();
+
+function hookVideoPlay(el: HTMLVideoElement): void {
+  const controller = trackingController;
+  // collectVideos() also has a scan-on-read fallback for callers before/without
+  // startTracking(). Do not leave permanent no-op listeners behind in that mode;
+  // the active registry owns the listener lifetime through this controller.
+  if (!controller || playHookedVideos.has(el)) return;
+  playHookedVideos.add(el);
+  el.addEventListener(
+    "play",
+    () => {
+      if (!ctxValid()) {
+        onContextDead();
+        return;
+      }
+      onVideoPlay(el);
+    },
+    { signal: controller.signal },
+  );
+}
 
 function addMedia(el: Element): boolean {
   if (isOwnNode(el)) return false;
@@ -44,8 +68,16 @@ function addMedia(el: Element): boolean {
       !el.hasAttribute(ADOPTED_VIEWER_VIDEO)
     )
       return false;
-    if (trackedVideos.has(el)) return false;
+    if (trackedVideos.has(el)) {
+      hookVideoPlay(el);
+      return false;
+    }
     trackedVideos.add(el);
+    // Media events are not composed, so a document-level capture listener never
+    // sees `play` from a video inside a shadow root (Boosty and many web-component
+    // players use exactly that shape). Listen on every tracked video as well so
+    // consumers such as viewer auto-open react consistently in light and shadow DOM.
+    hookVideoPlay(el);
     return true;
   }
   if (el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")) return false;
@@ -58,17 +90,30 @@ function addMedia(el: Element): boolean {
 }
 
 // Register an element's open shadow root: recurse into it for media, and observe it
-// if it holds media so a later in-root change (e.g. a quality-change <video> swap)
-// fires for us. Returns whether any NEW media was registered inside.
-function handleShadow(el: Element): boolean {
+// if it holds media (or when explicitly asked for a newly-created empty root) so a
+// later in-root change fires for us. Returns whether NEW media was registered inside.
+function handleShadow(el: Element, observeEmpty = false): boolean {
   const sr = el.shadowRoot;
   if (!sr || isOwnNode(el)) return false;
-  const added = scanTree(sr);
-  if (observer && !observedRoots.has(sr) && sr.querySelector("video,audio")) {
+  const added = scanTree(sr, observeEmpty);
+  if (observer && !observedRoots.has(sr) && (observeEmpty || sr.querySelector("video,audio"))) {
     observedRoots.add(sr);
     observer.observe(sr, { childList: true, subtree: true });
   }
   return added;
+}
+
+function handleShadowAttached(event: Event): void {
+  if (!ctxValid()) {
+    onContextDead();
+    return;
+  }
+  const host = event.target;
+  if (!(host instanceof Element) || isOwnNode(host) || !host.shadowRoot) return;
+  rememberShadowHostCandidate(host);
+  // Observe even an empty root: the MAIN-world bridge dispatches synchronously
+  // from attachShadow(), before player code normally appends the media element.
+  if (handleShadow(host, true)) onMediaChange();
 }
 
 function rememberShadowHostCandidate(el: Element): void {
@@ -92,13 +137,13 @@ function rememberShadowHostCandidate(el: Element): void {
 // whether any NEW media element was registered (used to decide whether a re-apply
 // is warranted). Bounded by the size of `root` — a freshly-added chat message costs
 // the chat message, not the whole page.
-function scanTree(root: ParentNode): boolean {
+function scanTree(root: ParentNode, observeEmptyRoots = false): boolean {
   let added = false;
   if (root instanceof Element) {
     if (isOwnNode(root)) return false;
     rememberShadowHostCandidate(root);
     if (addMedia(root)) added = true;
-    if (handleShadow(root)) added = true;
+    if (handleShadow(root, observeEmptyRoots)) added = true;
   }
   let all: NodeListOf<Element>;
   try {
@@ -109,7 +154,7 @@ function scanTree(root: ParentNode): boolean {
   for (const el of all) {
     rememberShadowHostCandidate(el);
     if (addMedia(el)) added = true;
-    if (handleShadow(el)) added = true;
+    if (handleShadow(el, observeEmptyRoots)) added = true;
   }
   return added;
 }
@@ -119,7 +164,10 @@ function scanAddedElement(root: Element): boolean {
   if (isOwnNode(root)) return false;
   rememberShadowHostCandidate(root);
   if (addMedia(root)) added = true;
-  if (handleShadow(root)) added = true;
+  // A detached custom element can receive an empty shadow root before it is
+  // inserted into the document. Its attach event cannot bubble to our listener,
+  // so observe that root now and catch media appended later.
+  if (handleShadow(root, true)) added = true;
   try {
     // Light-DOM selectors cannot see media inside a descendant's shadow root.
     // Inspect each element in this newly-added subtree once so a pre-populated
@@ -128,7 +176,7 @@ function scanAddedElement(root: Element): boolean {
     for (const el of root.querySelectorAll("*")) {
       rememberShadowHostCandidate(el);
       if (addMedia(el)) added = true;
-      if (handleShadow(el)) added = true;
+      if (handleShadow(el, true)) added = true;
     }
   } catch (e) {
     /* inaccessible subtree */
@@ -196,18 +244,33 @@ export function startTracking(opts: {
   onMediaChange: () => void;
   onContextDead: () => void;
   isOwnNode: (n: Node) => boolean;
+  onVideoPlay?: (video: HTMLVideoElement) => void;
 }): void {
   onMediaChange = opts.onMediaChange;
   onContextDead = opts.onContextDead;
   isOwnNode = opts.isOwnNode;
+  onVideoPlay = opts.onVideoPlay ?? (() => {});
+  trackingController?.abort();
+  trackingController = new AbortController();
+  playHookedVideos = new WeakSet<HTMLVideoElement>();
+  observedRoots = new WeakSet<ShadowRoot>();
   observer = new MutationObserver(handleMutations);
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener(SHADOW_ROOT_ATTACHED_EVENT, handleShadowAttached, {
+    capture: true,
+    signal: trackingController.signal,
+  });
   tracking = true;
-  scanTree(document);
+  // Observe empty roots already present when tracking starts as well. This
+  // matters after an extension reload on a long-lived SPA, where the player host
+  // can predate the fresh content script and populate asynchronously afterward.
+  scanTree(document, true);
 }
 
 export function stopTracking(): void {
   tracking = false;
+  trackingController?.abort();
+  trackingController = null;
   if (observer) {
     observer.disconnect();
     observer = null;

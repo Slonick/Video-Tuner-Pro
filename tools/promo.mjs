@@ -20,7 +20,11 @@ const locales = only ? [only] : LOCALES;
 const SCREENS = ["overview", "speed", "sync", "auto", "audio"];
 const pop = (locale, kind) => `file://${join(ANIM, locale, kind + ".png")}`;
 const popDark = (locale, kind) => `file://${join(ANIM, locale, kind + "-dark.png")}`;
-const exists = (p) => access(p).then(() => true, () => false);
+const exists = (p) =>
+  access(p).then(
+    () => true,
+    () => false,
+  );
 
 if (!only) await rm(STORE, { recursive: true, force: true });
 

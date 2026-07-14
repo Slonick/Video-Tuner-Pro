@@ -2,7 +2,7 @@
 //
 // Usage:
 //   npm run test:real-chrome
-//   REAL_CHROME_SITES=youtube,twitch,boosty,kick,dpbo npm run test:real-chrome
+//   REAL_CHROME_SITES=youtube,twitch,boosty,kick,hlsjs npm run test:real-chrome
 //
 // The test uses one browser page and navigates it between targets so it never
 // opens multiple video tabs at once.
@@ -27,6 +27,9 @@ interface Target {
   url: string;
   video: string;
   consent?: string;
+  engine?: "hlsjs";
+  skipAuth?: boolean;
+  skipBlocked?: boolean;
   skipLocked?: boolean;
   skipOffline?: boolean;
 }
@@ -38,6 +41,7 @@ const TARGETS: Record<string, Target> = {
     video: "video.html5-main-video",
     consent:
       'button:has-text("Reject all"), button:has-text("Отклонить все"), button:has-text("Accept all")',
+    skipBlocked: !process.env.REAL_CHROME_YOUTUBE_URL,
   },
   boosty: {
     name: "boosty",
@@ -64,6 +68,13 @@ const TARGETS: Record<string, Target> = {
     name: "dpbo",
     url: process.env.REAL_CHROME_DPBO_URL || "https://dpbo.gfw.ovh/item/view/124450/s0e1",
     video: "video",
+    skipAuth: !process.env.REAL_CHROME_DPBO_URL,
+  },
+  hlsjs: {
+    name: "hlsjs",
+    url: "https://hlsjs.video-dev.org/demo/basic-usage.html",
+    video: "video",
+    engine: "hlsjs",
   },
 };
 
@@ -96,7 +107,7 @@ function findChromeForTesting(): string | undefined {
 }
 
 function selectedTargets(): Target[] {
-  const names = (process.env.REAL_CHROME_SITES || "youtube,twitch,boosty,kick,dpbo")
+  const names = (process.env.REAL_CHROME_SITES || "hlsjs")
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
@@ -164,6 +175,18 @@ async function isOfflineChannel(page: Page): Promise<boolean> {
   return (await page.getByText(/\bis offline\b/i).count()) > 0;
 }
 
+async function isAuthenticationWall(page: Page): Promise<boolean> {
+  return (
+    (await page.getByRole("heading", { name: "Авторизация" }).count()) > 0 ||
+    ((await page.getByPlaceholder("Логин или email").count()) > 0 &&
+      (await page.getByPlaceholder("Пароль").count()) > 0)
+  );
+}
+
+function isBotBlocked(page: Page): boolean {
+  return page.url().startsWith("https://www.google.com/sorry/");
+}
+
 async function extensionWorker(context: BrowserContext): Promise<Worker> {
   const existing = context
     .serviceWorkers()
@@ -173,6 +196,24 @@ async function extensionWorker(context: BrowserContext): Promise<Worker> {
     predicate: (worker) => worker.url().startsWith("chrome-extension://"),
     timeout: 15_000,
   });
+}
+
+async function closePersistentContext(context: BrowserContext): Promise<void> {
+  // A real Chrome process can occasionally acknowledge every test action but
+  // stall forever while its temporary profile shuts down. Do not let teardown
+  // consume the test's four-minute budget and turn a completed quality assertion
+  // into a false failure. The Playwright worker still owns and reaps the process.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      context.close().catch(() => {}),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 10_000);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function seedHarnessSettings(context: BrowserContext): Promise<void> {
@@ -255,6 +296,8 @@ interface QualityState {
   timeText: string;
   sourceHeight: number;
   sourceWidth: number;
+  hlsCurrentLevel: number | null;
+  hlsManualLevel: number | null;
 }
 
 async function qualityState(page: Page): Promise<QualityState> {
@@ -272,6 +315,11 @@ async function qualityState(page: Page): Promise<QualityState> {
     );
     const video = overlay?.querySelector("video") as HTMLVideoElement | null;
     const source = document.querySelector("video") as HTMLVideoElement | null;
+    const hls = (
+      window as typeof window & {
+        hls?: { currentLevel?: number; manualLevel?: number };
+      }
+    ).hls;
     return {
       visible: qwrap?.style.display === "block",
       label,
@@ -282,6 +330,8 @@ async function qualityState(page: Page): Promise<QualityState> {
       timeText: timeEl?.textContent?.trim() || "",
       sourceHeight: source?.videoHeight ?? 0,
       sourceWidth: source?.videoWidth ?? 0,
+      hlsCurrentLevel: typeof hls?.currentLevel === "number" ? hls.currentLevel : null,
+      hlsManualLevel: typeof hls?.manualLevel === "number" ? hls.manualLevel : null,
     };
   });
 }
@@ -317,7 +367,10 @@ function qualityHeight(label: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-async function switchQualityAndAssertPlayback(page: Page): Promise<{
+async function switchQualityAndAssertPlayback(
+  page: Page,
+  targetPage: Target,
+): Promise<{
   before: QualityState;
   target: string;
   after: QualityState;
@@ -333,6 +386,19 @@ async function switchQualityAndAssertPlayback(page: Page): Promise<{
   await expect
     .poll(() => qualityState(page).then((state) => state.time), { timeout: 15_000 })
     .toBeGreaterThan(before.time + 0.5);
+  if (targetPage.engine === "hlsjs") {
+    const expectedLevel = before.options.indexOf(target) - 1;
+    expect(expectedLevel, `Hls.js level for ${target}`).toBeGreaterThanOrEqual(0);
+    await expect
+      .poll(() => qualityState(page).then((state) => state.hlsManualLevel), { timeout: 10_000 })
+      .toBe(expectedLevel);
+    // The bridge temporarily remembers a selection while the engine applies it.
+    // Re-check after that grace period so a stale UI label cannot make this pass.
+    await page.waitForTimeout(3500);
+    await expect
+      .poll(() => qualityState(page).then((state) => state.label), { timeout: 10_000 })
+      .toBe(expectedLabel);
+  }
   const expectedHeight = qualityHeight(target);
   if (expectedHeight) {
     await expect
@@ -364,6 +430,7 @@ test("viewer quality switches on real video pages in real Google Chrome", async 
   );
   const page = context.pages()[0] || (await context.newPage());
   const results: Record<string, unknown> = {};
+  let completedTargets = 0;
 
   try {
     await ensureRealChrome(page);
@@ -372,6 +439,10 @@ test("viewer quality switches on real video pages in real Google Chrome", async 
     for (const target of selectedTargets()) {
       await page.goto(target.url, { waitUntil: "domcontentloaded" });
       await dismissConsent(page, target.consent);
+      if (target.skipBlocked && isBotBlocked(page)) {
+        results[target.name] = { skipped: "site blocked automated Chrome with a bot challenge" };
+        continue;
+      }
       try {
         await startPageVideo(page, target.video);
       } catch (error) {
@@ -383,17 +454,22 @@ test("viewer quality switches on real video pages in real Google Chrome", async 
           results[target.name] = { skipped: "default channel is offline" };
           continue;
         }
+        if (target.skipAuth && (await isAuthenticationWall(page))) {
+          results[target.name] = { skipped: "site now requires authentication" };
+          continue;
+        }
         throw error;
       }
       await enterTheaterViewer(page);
-      results[target.name] = await switchQualityAndAssertPlayback(page);
+      results[target.name] = await switchQualityAndAssertPlayback(page, target);
+      completedTargets += 1;
       await page.screenshot({ path: testInfo.outputPath(`${target.name}-quality.png`) });
       await page.keyboard.press("Escape");
       await expect(page.locator("[data-vtp-viewer-overlay]")).toHaveCount(0, { timeout: 10_000 });
     }
+    expect(completedTargets, "at least one real network target must complete").toBeGreaterThan(0);
+    console.log("REAL_CHROME_QUALITY:", JSON.stringify(results, null, 2));
   } finally {
-    await context.close();
+    await closePersistentContext(context);
   }
-
-  console.log("REAL_CHROME_QUALITY:", JSON.stringify(results, null, 2));
 });

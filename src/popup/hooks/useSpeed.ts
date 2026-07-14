@@ -43,6 +43,7 @@ export interface UseSpeed {
   speedStep: number; // per ± tap / keyboard step, as a fraction (e.g. 0.05)
   live: boolean;
   drm: boolean;
+  viewerSupported: boolean;
   channel: string | null;
   channelName: string;
   scope: Scope;
@@ -85,6 +86,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
   const [speedStep, setSpeedStep] = useState<number>(STEP_DEFAULT / 100);
   const [live, setLive] = useState(false);
   const [drm, setDrm] = useState(false);
+  const [viewerSupported, setViewerSupported] = useState(true);
   // Synchronous mirror so back-to-back nudges / a save right after one see the
   // latest value (no re-render between them).
   const speedRef = useRef(1);
@@ -300,6 +302,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
           if (userRevision.current === initialRevision) apply(resp.speed, false);
           setLive(!!resp.live);
           setDrm(!!resp.drm);
+          setViewerSupported(resp.viewerSupported !== false);
           applyChannel(resp.channel, resp.channelName, resp.channelKeys);
           defaultScope(resp.scope, !!resp.channel);
           refreshSaved();
@@ -331,6 +334,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
         if (!resp) return;
         applyChannel(resp.channel, resp.channelName, resp.channelKeys);
         setDrm(!!resp.drm);
+        setViewerSupported(resp.viewerSupported !== false);
         if (resp.live) {
           missesRef.current = 0;
           setLive(true);
@@ -353,6 +357,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
         if (!resp) return;
         applyChannel(resp.channel, resp.channelName, resp.channelKeys);
         setDrm(!!resp.drm);
+        setViewerSupported(resp.viewerSupported !== false);
         if (resp.live) {
           missesRef.current = 0;
           setLive(true);
@@ -376,6 +381,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
       speedStep,
       live,
       drm,
+      viewerSupported,
       channel: sc.channel,
       channelName: sc.channelName,
       scope,
@@ -400,6 +406,7 @@ export function useSpeed(tab: ActiveTab | null, send: SendToTab): UseSpeed {
       speedStep,
       live,
       drm,
+      viewerSupported,
       sc.channel,
       sc.channelName,
       scope,

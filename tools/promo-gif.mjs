@@ -16,7 +16,11 @@ const KINDS = ["overview", "speed", "sync", "auto", "audio"];
 const ANIM = join(ROOT, ".screenshots/explore/anim");
 const OUT = join(ROOT, ".promo/github");
 const FR = join(TMP, "frames");
-const exists = (p) => access(p).then(() => true, () => false);
+const exists = (p) =>
+  access(p).then(
+    () => true,
+    () => false,
+  );
 
 if (!(await exists(join(ANIM, "en", "overview.png"))))
   throw new Error("No en captures — run: node tools/promo-capture.mjs en");

@@ -29,10 +29,10 @@ const baseManifest = JSON.parse(readFileSync(join(SRC, "manifest.json"), "utf8")
 function manifestFor(target) {
   const m = JSON.parse(JSON.stringify(baseManifest));
   if (target === "chrome") {
-    delete m.browser_specific_settings;       // gecko-only keys Chrome rejects
+    delete m.browser_specific_settings; // gecko-only keys Chrome rejects
     m.background = { service_worker: "background.js" };
   } else {
-    m.background = { scripts: ["background.js"] };  // Firefox event page
+    m.background = { scripts: ["background.js"] }; // Firefox event page
   }
   return m;
 }
@@ -44,7 +44,7 @@ const jsEntries = {
   background: join(SRC, "background/index.ts"),
   "popup/popup": join(SRC, "popup/index.tsx"),
   "options/options": join(SRC, "options/index.tsx"),
-  inject: join(SRC, "content/inject.ts"),   // MAIN-world Twitch/YouTube latency probe
+  inject: join(SRC, "content/inject.ts"), // MAIN-world Twitch/YouTube latency probe
   "page-bridge": join(SRC, "content/page-bridge.ts"), // shared MAIN-world quality/audio bootstrap
   "quality-inject": join(SRC, "content/quality-inject.ts"), // MAIN-world player quality bridge
 };
@@ -59,7 +59,11 @@ function copyStatics(out, target) {
   // Each page's .html: drop comments and collapse indentation (it links .css/.js).
   for (const page of PAGES) {
     let html = readFileSync(join(SRC, page + ".html"), "utf8");
-    if (!DEV) html = html.replace(/<!--[\s\S]*?-->/g, "").replace(/\n\s*/g, "\n").trim();
+    if (!DEV)
+      html = html
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/\n\s*/g, "\n")
+        .trim();
     mkdirSync(join(out, page, ".."), { recursive: true });
     writeFileSync(join(out, page + ".html"), html);
   }
@@ -81,7 +85,10 @@ function buildCssPage(out, page) {
   let css = code;
   if (DEV && map) {
     const inline = Buffer.from(map).toString("base64");
-    css = Buffer.concat([code, Buffer.from(`\n/*# sourceMappingURL=data:application/json;base64,${inline} */\n`)]);
+    css = Buffer.concat([
+      code,
+      Buffer.from(`\n/*# sourceMappingURL=data:application/json;base64,${inline} */\n`),
+    ]);
   }
   writeFileSync(join(out, page + ".css"), css);
 }
@@ -102,7 +109,7 @@ async function buildTarget(target) {
     bundle: true,
     format: "iife",
     target: "es2022",
-    jsx: "automatic",      // React 17+ automatic runtime — no `import React` needed
+    jsx: "automatic", // React 17+ automatic runtime — no `import React` needed
     minify: !DEV,
     sourcemap: DEV ? "inline" : false,
     legalComments: "none",
@@ -120,8 +127,12 @@ async function buildTarget(target) {
       if (!file || !file.endsWith(".css")) return;
       clearTimeout(t);
       t = setTimeout(() => {
-        try { buildCss(out); console.log("rebuilt CSS"); }
-        catch (e) { console.error("CSS error:", e.message); }
+        try {
+          buildCss(out);
+          console.log("rebuilt CSS");
+        } catch (e) {
+          console.error("CSS error:", e.message);
+        }
       }, 60);
     });
     console.log(`watching → ${out} (rebuilds JS/CSS; re-run for html/asset changes)`);

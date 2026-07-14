@@ -182,6 +182,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ...channelInfo(),
       scope: S.speedScope,
       live: onStreamPage(),
+      viewerSupported: topFrame(),
       ...(currentDrmProtected() ? { drm: true } : {}),
     }));
   }
@@ -285,7 +286,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const mode = viewerAutoFromRequest(request);
     return actInVideoFrame(
       sendResponse,
-      () => setViewerState(mode),
+      () => setViewerState(mode, request.live === true),
       () => ({
         success: true,
         mode: viewerFormat() ?? "off",

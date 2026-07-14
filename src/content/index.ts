@@ -22,7 +22,12 @@ import { applyAudioComp } from "./audio/compressor.js";
 import { engageAudio } from "./audio/status.js";
 import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
-import { exitViewer, ownsViewerNode, refreshViewerBackdrop } from "./viewer.js";
+import {
+  exitViewer,
+  maybeAutoOpenViewer,
+  ownsViewerNode,
+  refreshViewerBackdrop,
+} from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
 import { audioSamplingReady, recordAudioSample, A_HIST_MS } from "./audio/metering.js";
 import { autoSlowSample, AUTOSLOW_MS } from "./audio/autoslow.js";
@@ -272,6 +277,12 @@ function loadSpeed() {
       applyResolved(domains, channels, result.globalSpeed as number | undefined, keys);
       applyAll();
       syncAudioSampler();
+      // startTimers() runs before the async storage read and therefore sees the
+      // default `autoSlowEnabled = false`. If the feature was already enabled in
+      // a previous session, start its sampler now that the persisted flag has
+      // been loaded; otherwise it would remain idle until a later toggle or
+      // visibility change happened to call syncAutoSlowSampler().
+      syncAutoSlowSampler();
       // A live stream never inherits a saved speed — sync (or 100%) takes over.
       controlLive();
       updateTimeBadge();
@@ -506,6 +517,7 @@ function startObserver() {
     onMediaChange: scheduleReapply,
     onContextDead: teardown,
     isOwnNode: (n) => ownsBadgeNode(n) || ownsLauncherNode(n) || ownsViewerNode(n),
+    onVideoPlay: maybeAutoOpenViewer,
   });
   lastReconcileAt = Date.now();
 }

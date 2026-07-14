@@ -251,6 +251,7 @@ describe("getSpeed", () => {
       channelName: "Cool Channel",
       scope: "channel",
       live: false,
+      viewerSupported: true,
     });
   });
 
@@ -268,6 +269,11 @@ describe("getSpeed", () => {
     h.drm = true;
     const { resp } = send({ action: "getSpeed" });
     expect(resp).toMatchObject({ drm: true });
+  });
+
+  it("reports that the viewer is supported in the top frame", () => {
+    const { resp } = send({ action: "getSpeed" });
+    expect(resp).toMatchObject({ viewerSupported: true });
   });
 });
 
@@ -412,8 +418,13 @@ describe("auto-slow actions", () => {
 describe("viewer frame actions", () => {
   it("setViewerState only runs in a frame with video", () => {
     const { resp } = send({ action: "setViewerState", mode: "theater" });
-    expect(viewer.setViewerState).toHaveBeenCalledWith("theater");
+    expect(viewer.setViewerState).toHaveBeenCalledWith("theater", false);
     expect(resp).toEqual({ success: true, mode: "normal" });
+  });
+
+  it("passes the popup's confirmed live verdict into Viewer", () => {
+    send({ action: "setViewerState", mode: "normal", live: true });
+    expect(viewer.setViewerState).toHaveBeenCalledWith("normal", true);
   });
 
   it("setViewerState stays silent in a frame without video", () => {

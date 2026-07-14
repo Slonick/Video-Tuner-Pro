@@ -165,6 +165,7 @@
   "viewerBackdropVideo": { "message": "背景動画" },
   "viewerBackdropVideoHint": { "message": "ビューアのガラスの下に複製します" },
   "viewerDrmBlocked": { "message": "保護された動画: ポップアウトビューアは使用できません" },
+  "viewerFrameBlocked": { "message": "埋め込みプレーヤーではポップアウトビューアーを利用できません" },
   "viewerFitContain": { "message": "フィット" },
   "viewerFitCover": { "message": "クロップ" },
   "viewerFitFill": { "message": "引き伸ばす" },

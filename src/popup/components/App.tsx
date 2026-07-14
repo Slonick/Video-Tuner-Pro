@@ -34,7 +34,7 @@ export function App() {
   const speed = useSpeed(tab, send);
   const sync = useLiveSync(tab, send);
   const autoSlow = useAutoSlow(tab, send);
-  const viewerAuto = useViewerAuto(tab, send);
+  const viewerAuto = useViewerAuto(tab, send, speed.live);
   const viewerFit = useViewerFit(tab, send);
   const audio = useAudioCompressor();
   const [translating, setTranslating] = useState(false);
@@ -96,7 +96,18 @@ export function App() {
           forceOpen={forceOpen(0)}
         />
         <LiveSyncCard sync={sync} live={syncLive} forceOpen={forceOpen(1)} />
-        <ViewerAutoControl viewerAuto={viewerAuto} viewerFit={viewerFit} blocked={speed.drm} />
+        <ViewerAutoControl
+          viewerAuto={viewerAuto}
+          viewerFit={viewerFit}
+          blocked={speed.drm || !speed.viewerSupported}
+          blockedMessage={
+            speed.drm
+              ? msg("viewerDrmBlocked")
+              : !speed.viewerSupported
+                ? msg("viewerFrameBlocked")
+                : undefined
+          }
+        />
 
         <div className={"group-label" + (audioBlk ? " has-warn" : "")}>
           <span>{msg("groupAudio") || "Audio"}</span>

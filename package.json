@@ -1,6 +1,6 @@
 {
   "name": "video-tuner-pro",
-  "version": "3.0.8",
+  "version": "3.1.0",
   "description": "Build tooling for the Video Tuner Pro browser extension",
   "license": "GPL-3.0-only",
   "private": true,
@@ -14,8 +14,8 @@
     "check": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\" \"test/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\" \"test/**/*.ts\"",
+    "format": "prettier --write \".github/**/*.yml\" \".storybook/**/*.{ts,tsx}\" \"e2e/**/*.{ts,mjs,html}\" \"src/**/*.{ts,tsx,css,html}\" \"test/**/*.ts\" \"tools/**/*.mjs\" \"*.{js,mjs,json,ts}\"",
+    "format:check": "prettier --check \".github/**/*.yml\" \".storybook/**/*.{ts,tsx}\" \"e2e/**/*.{ts,mjs,html}\" \"src/**/*.{ts,tsx,css,html}\" \"test/**/*.ts\" \"tools/**/*.mjs\" \"*.{js,mjs,json,ts}\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "node tools/bench-dom.mjs",

@@ -20,8 +20,9 @@ import {
   currentVersion,
   fetchAmoLatest,
 } from "../shared/update.js";
+import { getExtensionApi } from "../shared/extension-api.js";
 
-const api = typeof browser !== "undefined" ? browser : chrome;
+const api = getExtensionApi();
 
 const DEFAULT_ICON = {
   16: "icons/icon-16.png",

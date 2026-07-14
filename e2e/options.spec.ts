@@ -49,6 +49,37 @@ test.describe("Options · General", () => {
       .toBe("off");
   });
 
+  test("viewer auto-open default and SponsorBlock markers persist", async ({
+    context,
+    extensionId,
+    serviceWorker,
+  }) => {
+    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#viewerAutoSeg [role=radio]").nth(2).click(); // theater
+    const sponsor = page.getByRole("switch", { name: /SponsorBlock/i });
+    await sponsor.click();
+
+    await expect
+      .poll(async () => readStored(serviceWorker, ["viewerAutoGlobal", "sponsorMarks"]))
+      .toEqual({ viewerAutoGlobal: "theater", sponsorMarks: true });
+  });
+
+  test("language selection survives the options-page reload", async ({
+    context,
+    extensionId,
+    serviceWorker,
+  }) => {
+    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    const radios = page.locator("#langGrid [role=radio]"); // system, en, ru, ...
+    await radios.nth(2).click();
+    await expect.poll(async () => (await readStored(serviceWorker, "uiLang")).uiLang).toBe("ru");
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page.locator("#langGrid [role=radio]").nth(2)).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
   test("glass-opacity slider persists min/max via Home/End", async ({
     context,
     extensionId,
@@ -116,6 +147,23 @@ test.describe("Options · General", () => {
     await expect
       .poll(async () => (await readStored(serviceWorker, "globalSpeed")).globalSpeed)
       .toBeCloseTo(1.33, 2);
+  });
+
+  test("invalid backup import is rejected without damaging existing settings", async ({
+    context,
+    extensionId,
+    serviceWorker,
+  }) => {
+    await setStorage(serviceWorker, { globalSpeed: 1.6 });
+    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await page.locator("#nav-data").click();
+    await page.locator("input[type=file]").setInputFiles({
+      name: "broken.json",
+      mimeType: "application/json",
+      buffer: Buffer.from("{ definitely not json"),
+    });
+    await expect(page.locator("#importBtn")).toHaveClass(/btn-err/);
+    expect((await readStored(serviceWorker, "globalSpeed")).globalSpeed).toBeCloseTo(1.6, 2);
   });
 });
 

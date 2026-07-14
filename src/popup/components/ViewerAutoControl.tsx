@@ -15,6 +15,7 @@ interface Props {
   viewerAuto: UseViewerAuto;
   viewerFit: UseViewerFit;
   blocked?: boolean;
+  blockedMessage?: string;
 }
 
 const VIEWER_AUTO_LABEL: Record<ViewerAutoMode, string> = {
@@ -33,6 +34,7 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
   viewerAuto: va,
   viewerFit: fit,
   blocked = false,
+  blockedMessage,
 }: Props) {
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -102,7 +104,7 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
                               : msg("viewerModesHint")
                     }`
                   : blocked
-                    ? msg("viewerDrmBlocked") || "Unavailable on protected video"
+                    ? blockedMessage || msg("viewerDrmBlocked") || "Viewer unavailable"
                     : msg("viewerModesHint")}
               </span>
             </span>
@@ -228,7 +230,7 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
             </div>
             {blocked && (
               <div className="viewer-drm-note" role="status">
-                {msg("viewerDrmBlocked") || "Unavailable on protected video"}
+                {blockedMessage || msg("viewerDrmBlocked") || "Viewer unavailable"}
               </div>
             )}
             <Segmented

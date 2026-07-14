@@ -2,6 +2,9 @@ name: Build release packages
 
 # When a GitHub Release is published, build the Chrome and Firefox packages,
 # attach them to that release, and publish them to both stores.
+# This workflow uploads code only; update each store's listing and privacy
+# disclosure before publishing a release whenever user-visible data handling
+# changes (for 3.1.0, document the optional SponsorBlock API request).
 # Store credentials live in repo secrets (one-time setup):
 #   Chrome:  CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
 #            (generate all three with `npx chrome-webstore-upload-keys`)
@@ -36,6 +39,17 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+
+      - name: Validate release tag matches manifest version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="$(node -p "require('./src/manifest.json').version")"
+          [ "$RELEASE_TAG" = "v$VERSION" ] || {
+            echo "Release tag $RELEASE_TAG does not match manifest version v$VERSION"
+            exit 1
+          }
 
       - name: Validate JSON, locale keys, and store length caps
         run: |
@@ -112,7 +126,7 @@ jobs:
           CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-        run: npx chrome-webstore-upload-cli@3 upload --source "video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" --auto-publish
+        run: npx chrome-webstore-upload-cli@3.5.0 upload --source "video-tuner-pro-chrome-v${{ steps.meta.outputs.version }}.zip" --auto-publish
 
       - name: Publish to Firefox Add-ons
         if: github.event_name == 'release' && matrix.target == 'firefox'
@@ -123,5 +137,5 @@ jobs:
           # AMO requires source code for review because the build is minified.
           git archive HEAD -o source.zip
           # --approval-timeout 0: submit and exit — listed reviews take hours/days.
-          npx web-ext@8 sign --channel listed --source-dir dist/firefox \
+          npx web-ext@8.10.0 sign --channel listed --source-dir dist/firefox \
             --upload-source-code source.zip --approval-timeout 0

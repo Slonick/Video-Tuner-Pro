@@ -165,6 +165,7 @@
   "viewerBackdropVideo": { "message": "Vidéo d'arrière-plan" },
   "viewerBackdropVideoHint": { "message": "La dupliquer sous le verre du lecteur" },
   "viewerDrmBlocked": { "message": "Vidéo protégée : le lecteur pop-out est indisponible" },
+  "viewerFrameBlocked": { "message": "Lecteur intégré : le lecteur pop-out est indisponible" },
   "viewerFitContain": { "message": "Ajuster" },
   "viewerFitCover": { "message": "Recadrer" },
   "viewerFitFill": { "message": "Étirer" },

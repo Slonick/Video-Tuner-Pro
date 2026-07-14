@@ -11,6 +11,7 @@ export interface SpeedResponse {
   channelName?: string | null;
   scope?: Scope | null;
   drm?: boolean;
+  viewerSupported?: boolean;
 }
 
 export interface TargetResponse {

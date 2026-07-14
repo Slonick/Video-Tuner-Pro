@@ -165,6 +165,7 @@
   "viewerBackdropVideo": { "message": "Hintergrundvideo" },
   "viewerBackdropVideoHint": { "message": "Unter dem Viewer-Glas spiegeln" },
   "viewerDrmBlocked": { "message": "Geschütztes Video: Der Pop-out-Viewer ist nicht verfügbar" },
+  "viewerFrameBlocked": { "message": "Eingebetteter Player: Der Pop-out-Viewer ist nicht verfügbar" },
   "viewerFitContain": { "message": "Einpassen" },
   "viewerFitCover": { "message": "Zuschneiden" },
   "viewerFitFill": { "message": "Strecken" },

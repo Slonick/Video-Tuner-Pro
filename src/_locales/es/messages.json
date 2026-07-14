@@ -165,6 +165,7 @@
   "viewerBackdropVideo": { "message": "Vídeo de fondo" },
   "viewerBackdropVideoHint": { "message": "Reflejarlo bajo el cristal del visor" },
   "viewerDrmBlocked": { "message": "Vídeo protegido: el visor emergente no está disponible" },
+  "viewerFrameBlocked": { "message": "Reproductor integrado: el visor emergente no está disponible" },
   "viewerFitContain": { "message": "Ajustar" },
   "viewerFitCover": { "message": "Recortar" },
   "viewerFitFill": { "message": "Estirar" },

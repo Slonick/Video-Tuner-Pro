@@ -175,6 +175,7 @@
   "viewerBackdropVideo": { "message": "Відео на фоні" },
   "viewerBackdropVideoHint": { "message": "Дублювати під склом в'ювера" },
   "viewerDrmBlocked": { "message": "Захищене відео: режим перегляду недоступний" },
+  "viewerFrameBlocked": { "message": "Вбудований програвач: режим перегляду недоступний" },
   "optSponsorLabel": { "message": "Мітки SponsorBlock" },
   "optSponsorHint": { "message": "Показувати сегменти спонсорів на смузі перемотування в'ювера (YouTube). Надсилає запит про поточне відео до публічного сервісу SponsorBlock." },
   "optMaxSpeed": { "message": "Максимальна швидкість" },

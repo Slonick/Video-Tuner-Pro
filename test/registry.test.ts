@@ -8,14 +8,17 @@ import {
   stopTracking,
   reconcile,
 } from "../src/content/videos.js";
+import { SHADOW_ROOT_ATTACHED_EVENT } from "../src/shared/dom-events.js";
 
 // MutationObserver callbacks fire on a microtask; let them drain before asserting.
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 let onMediaChange: ReturnType<typeof vi.fn>;
+let onVideoPlay: ReturnType<typeof vi.fn>;
 function track(isOwnNode: (n: Node) => boolean = () => false) {
   onMediaChange = vi.fn();
-  startTracking({ onMediaChange, onContextDead: () => {}, isOwnNode });
+  onVideoPlay = vi.fn();
+  startTracking({ onMediaChange, onContextDead: () => {}, isOwnNode, onVideoPlay });
 }
 
 beforeEach(() => {
@@ -105,6 +108,19 @@ describe("media registry — incremental tracking", () => {
     expect(onMediaChange).toHaveBeenCalled();
   });
 
+  it("reports play directly from a tracked shadow-DOM video", () => {
+    const host = document.createElement("div");
+    const video = document.createElement("video");
+    host.attachShadow({ mode: "open" }).appendChild(video);
+    document.body.appendChild(host);
+    track();
+
+    video.dispatchEvent(new Event("play"));
+
+    expect(onVideoPlay).toHaveBeenCalledOnce();
+    expect(onVideoPlay).toHaveBeenCalledWith(video);
+  });
+
   it("catches a shadow player nested in a subtree with no light-DOM media", async () => {
     track();
     const wrapper = document.createElement("section");
@@ -114,6 +130,54 @@ describe("media registry — incremental tracking", () => {
     wrapper.appendChild(host);
 
     document.body.appendChild(wrapper);
+    await flush();
+
+    expect(collectVideos()).toContain(video);
+    expect(onMediaChange).toHaveBeenCalled();
+  });
+
+  it("observes a late empty shadow root signalled by the MAIN-world bridge", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    track();
+    await flush();
+
+    const root = host.attachShadow({ mode: "open" });
+    host.dispatchEvent(new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true }));
+    const video = document.createElement("video");
+    root.appendChild(video);
+    await flush();
+
+    expect(collectVideos()).toContain(video);
+    expect(onMediaChange).toHaveBeenCalled();
+  });
+
+  it("observes an empty shadow root on a host inserted after detached creation", async () => {
+    track();
+    const host = document.createElement("div");
+    const root = host.attachShadow({ mode: "open" });
+    // The bridge event cannot reach document while the host is detached.
+    host.dispatchEvent(new Event(SHADOW_ROOT_ATTACHED_EVENT, { bubbles: true }));
+    document.body.appendChild(host);
+    await flush();
+
+    const video = document.createElement("video");
+    root.appendChild(video);
+    await flush();
+
+    expect(collectVideos()).toContain(video);
+    expect(onMediaChange).toHaveBeenCalled();
+  });
+
+  it("observes an empty shadow root already present when tracking starts", async () => {
+    const host = document.createElement("div");
+    const root = host.attachShadow({ mode: "open" });
+    document.body.appendChild(host);
+    track();
+    onMediaChange.mockClear();
+
+    const video = document.createElement("video");
+    root.appendChild(video);
     await flush();
 
     expect(collectVideos()).toContain(video);

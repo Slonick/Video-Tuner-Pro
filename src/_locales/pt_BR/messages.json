@@ -165,6 +165,7 @@
   "viewerBackdropVideo": { "message": "Vídeo de fundo" },
   "viewerBackdropVideoHint": { "message": "Espelhar sob o vidro do visualizador" },
   "viewerDrmBlocked": { "message": "Vídeo protegido: o visualizador pop-out não está disponível" },
+  "viewerFrameBlocked": { "message": "Player incorporado: o visualizador pop-out não está disponível" },
   "viewerFitContain": { "message": "Ajustar" },
   "viewerFitCover": { "message": "Cortar" },
   "viewerFitFill": { "message": "Esticar" },

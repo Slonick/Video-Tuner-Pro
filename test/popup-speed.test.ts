@@ -606,6 +606,7 @@ describe("viewer auto-open scope control", () => {
     expect(lastCall("setViewerState")).toMatchObject({
       action: "setViewerState",
       mode: "theater",
+      live: false,
     });
     expect(byId("viewerAutoVisual").querySelector('[aria-checked="true"]')?.textContent).toBe(
       "Theater",
@@ -737,6 +738,26 @@ describe("viewer auto-open scope control", () => {
     document.querySelector<HTMLElement>(".viewer-auto-section .sec-main")!.click();
     await flush();
     expect(document.querySelector(".viewer-auto-section")?.className).not.toContain("is-overlay");
+  });
+
+  it("blocks viewer controls with an honest reason for an embedded player", async () => {
+    await mountApp({
+      tab: YT,
+      replies: {
+        getSpeed: {
+          speed: 1,
+          channel: null,
+          channelName: "",
+          scope: null,
+          live: false,
+          viewerSupported: false,
+        },
+      },
+    });
+    await flush();
+
+    expect(byId("viewerAutoToggle").hasAttribute("disabled")).toBe(true);
+    expect(document.querySelector(".viewer-drm-note")?.textContent).toContain("Embedded player");
   });
 
   it("rolls back the background-video toggle when storage rejects it", async () => {

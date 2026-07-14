@@ -99,6 +99,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete (globalThis as unknown as { AudioContext?: unknown }).AudioContext;
+  vi.unstubAllGlobals();
 });
 
 describe("setupGraph source gating (canRouteAudio)", () => {
@@ -111,6 +112,22 @@ describe("setupGraph source gating (canRouteAudio)", () => {
     const { setupGraph } = await load();
     expect(setupGraph(vid({ src: "blob:https://x/abc" }))).not.toBeNull();
   });
+
+  it.each(["www.youtube.com", "boosty.to", "live.vkvideo.ru", "www.twitch.tv", "kick.com"])(
+    "never disables a safe MSE audio source just because the site is %s",
+    async (hostname) => {
+      vi.stubGlobal("location", { hostname, origin: `https://${hostname}` });
+      const { setupGraph, lastSkip } = await load();
+      const video = vid({
+        currentSrc: `blob:https://${hostname}/media-source`,
+        readyState: 4,
+      });
+
+      expect(setupGraph(video)).not.toBeNull();
+      expect(lastSkip(video)).toBeNull();
+      expect(createSourceCalls).toBe(1);
+    },
+  );
 
   it("skips ordinary network URLs without explicit CORS opt-in", async () => {
     const { setupGraph, lastSkip } = await load();

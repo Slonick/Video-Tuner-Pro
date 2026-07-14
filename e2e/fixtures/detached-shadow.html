@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Detached shadow player fixture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #111;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      window.addEventListener("load", () => {
+        const host = document.createElement("div");
+        host.id = "detached-player";
+        const root = host.attachShadow({ mode: "open" });
+        document.body.appendChild(host);
+
+        // Populate only after the empty host has already produced its light-DOM
+        // mutation. Missing the empty root here means waiting for the 30s fallback.
+        setTimeout(() => {
+          const style = document.createElement("style");
+          style.textContent = "video{display:block;width:640px;height:360px}";
+          const video = document.createElement("video");
+          video.id = "detached-video";
+          video.src = "sample.webm";
+          video.preload = "auto";
+          video.playsInline = true;
+          root.append(style, video);
+        }, 250);
+      });
+    </script>
+  </body>
+</html>

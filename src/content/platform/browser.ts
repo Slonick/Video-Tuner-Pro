@@ -1,6 +1,8 @@
-// Firefox exposes `browser`, Chromium `chrome`; both support the callback style
-// we use, so we alias to one.
-export const api = typeof browser !== "undefined" ? browser : chrome;
+// Firefox exposes `browser`, Chromium `chrome`; validate the runtime before
+// choosing because host pages may publish an unrelated global named `browser`.
+import { getExtensionApi } from "../../shared/extension-api.js";
+
+export const api = getExtensionApi();
 
 // The extension context dies when the extension is reloaded/updated; any api.*
 // call from this orphaned script then throws. Detect that and shut down cleanly.
