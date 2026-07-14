@@ -10,7 +10,6 @@ import {
   youTubeVideoId,
   readYouTubeChapters,
   fetchSponsorSegments,
-  hasNativeSponsorBlock,
   SPONSOR_COLORS,
 } from "./markers.js";
 import { api } from "./platform/browser.js";
@@ -1717,7 +1716,7 @@ async function loadMarkers(): Promise<void> {
   markerRanges = [];
   clearMarkerHover();
   const keyAtEntry = marksSourceKey;
-  if ((S.sponsorMarks || hasNativeSponsorBlock()) && isYouTube()) {
+  if (S.sponsorMarks && isYouTube() && (await sponsorBlockConsentGranted())) {
     const id = youTubeVideoId();
     if (id) {
       const segs = await fetchSponsorSegments(id);
@@ -1751,6 +1750,23 @@ async function loadMarkers(): Promise<void> {
     t.style.left = (ch.start / dur) * 100 + "%";
     marksEl.appendChild(t);
   }
+}
+
+function sponsorBlockConsentGranted(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      api.runtime.sendMessage({ action: "sponsorConsentStatus" }, (response?: unknown) => {
+        void api.runtime.lastError;
+        resolve(
+          !!response &&
+            typeof response === "object" &&
+            (response as { granted?: unknown }).granted === true,
+        );
+      });
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 // While popped out: the site's player may fight back — yank the video home or

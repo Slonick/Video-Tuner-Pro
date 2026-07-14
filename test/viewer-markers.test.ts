@@ -25,6 +25,7 @@ vi.mock("../src/content/markers.js", () => ({
 }));
 
 import { S } from "../src/content/state.js";
+import { fetchSponsorSegments } from "../src/content/markers.js";
 import { toggleViewer, exitViewer } from "../src/content/viewer.js";
 
 function makeVideo(duration = 100) {
@@ -60,6 +61,7 @@ const shadowRoot = () =>
   )?.shadowRoot ?? null;
 
 beforeEach(() => {
+  vi.mocked(fetchSponsorSegments).mockClear();
   exitViewer();
   document.body.innerHTML = "";
   h.primary = null;
@@ -71,6 +73,20 @@ beforeEach(() => {
 });
 
 describe("viewer marker hover", () => {
+  it("does not contact SponsorBlock when Firefox consent is absent", async () => {
+    const send = vi.spyOn(globalThis.chrome.runtime, "sendMessage").mockImplementation((
+      (_message: unknown, callback?: (response?: unknown) => void) => {
+        callback?.({ granted: false });
+      }
+    ) as typeof chrome.runtime.sendMessage);
+    h.primary = makeVideo();
+    toggleViewer("normal");
+    await flush();
+    expect(fetchSponsorSegments).not.toHaveBeenCalled();
+    expect(shadowRoot()!.querySelectorAll(".mark-chapter").length).toBeGreaterThan(0);
+    send.mockRestore();
+  });
+
   it("highlights SponsorBlock and YouTube chapter ranges with a tooltip", async () => {
     h.primary = makeVideo();
     toggleViewer("normal");

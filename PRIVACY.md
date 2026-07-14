@@ -1,6 +1,6 @@
 # Privacy Policy — Video Tuner Pro
 
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-15_
 
 Video Tuner Pro ("the extension") is designed with privacy as a
 priority. This policy explains what the extension does and does not do with
@@ -34,16 +34,24 @@ category on-device, clear saved settings, or uninstall the extension at any time
   update and to locate the frame that owns the active video.
 - **alarms** — to periodically check whether a newer extension release is available.
 - **Host access to all sites (`<all_urls>`)** — the extension must detect and
-  control HTML5 `<video>` playback on whatever website you are watching. It
-  does not read, collect, or transmit page content or browsing history.
+  control HTML5 `<video>` playback on whatever website you are watching. Page
+  and video data are otherwise processed locally; the only optional external
+  transmission is the SponsorBlock request described below.
 
 ## Data sharing
 
-When **SponsorBlock markers** are enabled, or a compatible SponsorBlock extension
-is detected, the extension requests public segment data from `sponsor.ajay.app`.
-That request includes the current YouTube video ID and the requested segment
-categories. Credentials and referrer data are explicitly omitted; the request
-does not include saved settings, audio, video content, or account credentials.
+**SponsorBlock markers are disabled by default.** When the user explicitly
+enables them on YouTube, the extension requests public segment data from
+`sponsor.ajay.app`. On Firefox, the extension first requests the optional
+`browsingActivity` data permission; if the user declines, no request is made.
+
+The HTTPS request includes the current YouTube video ID and a fixed list of
+requested segment categories. Credentials and referrer data are explicitly
+omitted. The request does not include cookies, saved settings, audio, video
+content, analytics identifiers, or account credentials. Like any network
+service, SponsorBlock receives ordinary connection metadata such as the user's
+IP address. Responses are cached only in memory and are not stored permanently.
+Disabling SponsorBlock markers stops these requests.
 
 The developer does not otherwise share, sell, or transfer user data. Browser
 settings sync is provided by the browser vendor under the user's browser account.

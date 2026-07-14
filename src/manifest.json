@@ -69,7 +69,8 @@
       "id": "video-speed-controller-pro@slonick.dev",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": ["none"],
+        "optional": ["browsingActivity"]
       }
     },
     "gecko_android": {

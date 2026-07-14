@@ -48,6 +48,10 @@ export function createMockChrome(data: MockData = {}): typeof chrome {
       },
       cb?: (response?: unknown) => void,
     ) {
+      if (msg?.action === "sponsorConsentStatus") {
+        cb?.({ granted: true });
+        return;
+      }
       if (msg?.action !== "mutateStoredMap" || !msg.map) {
         cb?.(undefined);
         return;

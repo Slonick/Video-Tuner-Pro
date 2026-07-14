@@ -20,6 +20,11 @@ import {
   GLASS_OPACITY_MAX,
   DEFAULT_GLASS_OPACITY,
 } from "../../shared/glass.js";
+import {
+  hasSponsorDataConsent,
+  removeSponsorDataConsent,
+  requestSponsorDataConsent,
+} from "../../shared/sponsor-consent.js";
 
 const THEME_LABEL: Record<Theme, string> = {
   system: "themeSystem",
@@ -122,11 +127,23 @@ function ViewerAutoSeg() {
 function SponsorSwitch() {
   const [on, setOn] = useState(false);
   useEffect(() => {
-    STORE.get(["sponsorMarks"], (r) => setOn(r.sponsorMarks === true));
+    STORE.get(["sponsorMarks"], (r) => {
+      if (r.sponsorMarks !== true) return setOn(false);
+      void hasSponsorDataConsent().then((granted) => {
+        setOn(granted);
+      });
+    });
   }, []);
-  const toggle = (v: boolean) => {
-    setOn(v);
-    STORE.set({ sponsorMarks: v });
+  const toggle = async (v: boolean) => {
+    if (!v) {
+      setOn(false);
+      STORE.set({ sponsorMarks: false });
+      await removeSponsorDataConsent();
+      return;
+    }
+    const granted = await requestSponsorDataConsent();
+    setOn(granted);
+    STORE.set({ sponsorMarks: granted });
   };
   return (
     <Switch

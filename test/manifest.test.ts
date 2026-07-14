@@ -9,6 +9,14 @@ interface Manifest {
     resources?: string[];
     use_dynamic_url?: boolean;
   }>;
+  browser_specific_settings?: {
+    gecko?: {
+      data_collection_permissions?: {
+        required?: string[];
+        optional?: string[];
+      };
+    };
+  };
 }
 
 const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8")) as Manifest;
@@ -41,5 +49,12 @@ describe("extension manifest hardening", () => {
       entry.resources?.includes("quality-inject.js"),
     );
     expect(exposed?.use_dynamic_url).toBe(true);
+  });
+
+  it("declares SponsorBlock browsing data as optional in Firefox", () => {
+    const permissions =
+      manifest.browser_specific_settings?.gecko?.data_collection_permissions;
+    expect(permissions?.required).toEqual(["none"]);
+    expect(permissions?.optional).toEqual(["browsingActivity"]);
   });
 });

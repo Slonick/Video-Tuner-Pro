@@ -21,6 +21,7 @@ import {
   fetchAmoLatest,
 } from "../shared/update.js";
 import { getExtensionApi } from "../shared/extension-api.js";
+import { hasSponsorDataConsent } from "../shared/sponsor-consent.js";
 
 const api = getExtensionApi();
 
@@ -234,6 +235,13 @@ function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.action === "sponsorConsentStatus") {
+    void hasSponsorDataConsent().then(
+      (granted) => sendResponse({ granted }),
+      () => sendResponse({ granted: false }),
+    );
+    return true;
+  }
   if (msg && msg.action === "mutateStoredMap") {
     const mutation = validStoredMapMutation(msg);
     if (!mutation) {
