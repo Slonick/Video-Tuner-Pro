@@ -52,8 +52,7 @@ describe("extension manifest hardening", () => {
   });
 
   it("declares SponsorBlock browsing data as optional in Firefox", () => {
-    const permissions =
-      manifest.browser_specific_settings?.gecko?.data_collection_permissions;
+    const permissions = manifest.browser_specific_settings?.gecko?.data_collection_permissions;
     expect(permissions?.required).toEqual(["none"]);
     expect(permissions?.optional).toEqual(["browsingActivity"]);
   });

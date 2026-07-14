@@ -74,11 +74,12 @@ beforeEach(() => {
 
 describe("viewer marker hover", () => {
   it("does not contact SponsorBlock when Firefox consent is absent", async () => {
-    const send = vi.spyOn(globalThis.chrome.runtime, "sendMessage").mockImplementation((
-      (_message: unknown, callback?: (response?: unknown) => void) => {
-        callback?.({ granted: false });
-      }
-    ) as typeof chrome.runtime.sendMessage);
+    const send = vi.spyOn(globalThis.chrome.runtime, "sendMessage").mockImplementation(((
+      _message: unknown,
+      callback?: (response?: unknown) => void,
+    ) => {
+      callback?.({ granted: false });
+    }) as typeof chrome.runtime.sendMessage);
     h.primary = makeVideo();
     toggleViewer("normal");
     await flush();
