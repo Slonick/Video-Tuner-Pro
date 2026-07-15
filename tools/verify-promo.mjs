@@ -39,7 +39,9 @@ async function imageSize(file) {
 // Decode enough of an 8-bit RGB/RGBA PNG to detect compositor corruption. Store
 // art legitimately uses very dark greys, but never large areas of exact #000;
 // black raster tiles therefore stand out reliably without image dependencies.
-function blackPixelRatio(data) {
+// The same scan rejects the all-white files produced when an image resize canvas
+// is captured before its source has decoded.
+function pixelRatios(data) {
   const width = data.readUInt32BE(16);
   const height = data.readUInt32BE(20);
   const bitDepth = data[24];
@@ -59,6 +61,7 @@ function blackPixelRatio(data) {
   let pos = 0;
   let previous = Buffer.alloc(stride);
   let black = 0;
+  let nearWhite = 0;
   for (let y = 0; y < height; y++) {
     const filter = raw[pos++];
     const row = Buffer.allocUnsafe(stride);
@@ -83,11 +86,15 @@ function blackPixelRatio(data) {
       row[x] = (value + predictor) & 255;
     }
     for (let x = 0; x < stride; x += bpp) {
-      if (row[x] <= 1 && row[x + 1] <= 1 && row[x + 2] <= 1) black++;
+      const red = row[x];
+      const green = row[x + 1];
+      const blue = row[x + 2];
+      if (red <= 1 && green <= 1 && blue <= 1) black++;
+      if (red >= 250 && green >= 250 && blue >= 250) nearWhite++;
     }
     previous = row;
   }
-  return black / (width * height);
+  return { black: black / (width * height), nearWhite: nearWhite / (width * height) };
 }
 
 async function expectImage(file, format, width, height) {
@@ -100,11 +107,16 @@ async function expectImage(file, format, width, height) {
   }
   if (format === "png") {
     try {
-      const ratio = blackPixelRatio(await readFile(file));
-      if (ratio != null && ratio > darkest.ratio) darkest = { file, ratio };
-      if (ratio != null && ratio > 0.0025) {
+      const ratios = pixelRatios(await readFile(file));
+      if (ratios != null && ratios.black > darkest.ratio) darkest = { file, ratio: ratios.black };
+      if (ratios != null && ratios.black > 0.0025) {
         errors.push(
-          `${file}: ${(ratio * 100).toFixed(2)}% pure-black pixels (likely raster tiles)`,
+          `${file}: ${(ratios.black * 100).toFixed(2)}% pure-black pixels (likely raster tiles)`,
+        );
+      }
+      if (ratios != null && ratios.nearWhite > 0.995) {
+        errors.push(
+          `${file}: ${(ratios.nearWhite * 100).toFixed(2)}% near-white pixels (blank render)`,
         );
       }
     } catch (error) {

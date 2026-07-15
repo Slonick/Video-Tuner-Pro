@@ -136,43 +136,13 @@ export function tileHTML({ copy, popImg }) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css(440, 280)}</style></head><body>${col}${stage}</body></html>`;
 }
 
-// Take a screenshot of an HTML string at w×h. Supersampled: the composite is
-// rendered at 2× device pixels (so the embedded popup bitmap — a high-res capture
-// shrunk into a small box — is sampled with headroom instead of mushed in one 1×
-// pass), then downscaled to the exact target size via a canvas with high-quality
-// smoothing. Output stays at the store-mandated w×h. (Chrome outputs rgb24.)
+// Take a screenshot of an HTML string at the store-mandated size. The popup
+// captures embedded in the composition are already 2×, so rendering the final
+// stage directly at 1× preserves legible UI while avoiding a second browser pass
+// that could snapshot the resize canvas before its source image had decoded.
 export async function shoot(html, w, h, out) {
   const htmlPath = `${out}.tmp.html`;
-  const bigPath = `${out}.2x.png`;
   await writeFile(htmlPath, html);
-  await runChrome([
-    "--headless=new",
-    "--disable-gpu",
-    "--no-sandbox",
-    "--hide-scrollbars",
-    "--force-device-scale-factor=2",
-    `--window-size=${w},${h}`,
-    "--virtual-time-budget=2000",
-    `--screenshot=${bigPath}`,
-    `file://${htmlPath}`,
-  ]);
-  await downscale(bigPath, w, h, out);
-  await rm(htmlPath, { force: true });
-  await rm(bigPath, { force: true });
-}
-
-// Downscale a 2w×2h PNG to exactly w×h. A canvas sized w×h is drawn at DSF 1, so
-// the screenshot captures its pixels 1:1 — the quality comes from the canvas's
-// high-quality image smoothing doing the 2×→1× resample.
-async function downscale(src, w, h, out) {
-  const dsPath = `${out}.ds.html`;
-  const html = `<!DOCTYPE html><html><head><style>*{margin:0;padding:0}canvas{display:block}</style></head><body><canvas id="c" width="${w}" height="${h}"></canvas><script>
-const img=new Image();
-img.decoding="sync";
-img.onload=async()=>{await img.decode();const x=document.getElementById("c").getContext("2d");x.imageSmoothingEnabled=true;x.imageSmoothingQuality="high";x.drawImage(img,0,0,${w},${h});document.body.dataset.ready="true";};
-img.src="file://${src}";
-</script></body></html>`;
-  await writeFile(dsPath, html);
   await runChrome([
     "--headless=new",
     "--disable-gpu",
@@ -180,9 +150,9 @@ img.src="file://${src}";
     "--hide-scrollbars",
     "--force-device-scale-factor=1",
     `--window-size=${w},${h}`,
-    "--virtual-time-budget=3000",
+    "--virtual-time-budget=2000",
     `--screenshot=${out}`,
-    `file://${dsPath}`,
+    `file://${htmlPath}`,
   ]);
-  await rm(dsPath, { force: true });
+  await rm(htmlPath, { force: true });
 }
