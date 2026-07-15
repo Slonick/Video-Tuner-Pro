@@ -118,6 +118,7 @@ async function flush() {
   for (let i = 0; i < 8; i++) await Promise.resolve();
 }
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+const settleNativeViewerExit = () => new Promise<void>((resolve) => setTimeout(resolve, 560));
 
 const overlayEl = () => document.querySelector("[data-vtp-viewer-overlay]") as HTMLElement | null;
 const barEl = () => {
@@ -164,8 +165,13 @@ beforeEach(() => {
   setWebkitFullscreen(null);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Native player surfaces stay in the top layer for their exit transition.
+  // Let that transition finish before the next test resets the document.
+  const hasNativeSurface = !!document.querySelector("[data-vtp-viewer-player]");
   vi.useRealTimers();
+  exitViewer();
+  if (hasNativeSurface) await settleNativeViewerExit();
 });
 
 function installQualityBridge(
@@ -357,6 +363,7 @@ describe("toggleViewer — lifecycle", () => {
     expect(popoverOpen).toBe(true);
 
     exitViewer();
+    await settleNativeViewerExit();
     expect(popoverOpen).toBe(false);
     expect(wrap.hasAttribute("data-vtp-viewer-player")).toBe(false);
     expect(v.parentElement).toBe(wrap);
@@ -388,6 +395,9 @@ describe("toggleViewer — lifecycle", () => {
 
     v.pause(); // the one-shot guard must not fight a later user pause
     expect(v.paused).toBe(true);
+
+    exitViewer();
+    await settleNativeViewerExit();
   });
 
   it("uses the original video even when captureStream is available", async () => {

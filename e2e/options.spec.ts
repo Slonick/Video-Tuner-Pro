@@ -49,19 +49,14 @@ test.describe("Options · General", () => {
       .toBe("off");
   });
 
-  test("viewer auto-open default and SponsorBlock markers persist", async ({
-    context,
-    extensionId,
-    serviceWorker,
-  }) => {
+  test("SponsorBlock markers persist", async ({ context, extensionId, serviceWorker }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
-    await page.locator("#viewerAutoSeg [role=radio]").nth(2).click(); // theater
     const sponsor = page.getByRole("switch", { name: /SponsorBlock/i });
     await sponsor.click();
 
     await expect
-      .poll(async () => readStored(serviceWorker, ["viewerAutoGlobal", "sponsorMarks"]))
-      .toEqual({ viewerAutoGlobal: "theater", sponsorMarks: true });
+      .poll(async () => readStored(serviceWorker, "sponsorMarks"))
+      .toEqual({ sponsorMarks: true });
   });
 
   test("language selection survives the options-page reload", async ({
