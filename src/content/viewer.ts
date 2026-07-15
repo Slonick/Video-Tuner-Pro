@@ -36,6 +36,7 @@ const VIEWER_ANIM_MS = 420;
 const VIEWER_BACKDROP_VIDEO_ANIM_MS = 680;
 const VIEWER_PLAYBACK_ANIM_MS = 300;
 const VIEWER_PLAYBACK_BACKDROP_VIDEO_ANIM_MS = 480;
+const VIEWER_PLAYBACK_STABLE_MS = 250;
 
 function viewerAnimationMs(): number {
   return autoOpenedSession && S.viewerAutoPlaybackOnly ? VIEWER_PLAYBACK_ANIM_MS : VIEWER_ANIM_MS;
@@ -74,7 +75,8 @@ const Z_OVERLAY = "2147483643";
 let fmt: ViewerFormat | null = null;
 let video: HTMLVideoElement | null = null; // the page media element we control
 let videoAutoIdentity = ""; // route/media identity captured when this viewer session opened
-let playbackPauseTimer: ReturnType<typeof setTimeout> | null = null;
+let playbackFollowArmTimer: ReturnType<typeof setTimeout> | null = null;
+let playbackFollowArmed = false;
 // Capture the page-level verdict before Viewer hides/adopts the source. Some
 // MSE players (VK Video Live in particular) temporarily drop duration and
 // seekable ranges while captureStream() is attached, which otherwise turns a
@@ -1406,7 +1408,7 @@ function showBar(): void {
 function syncPlay(): void {
   if (
     video?.paused &&
-    playerSurface &&
+    (playerSurface || (autoOpenedSession && S.viewerAutoPlaybackOnly && !playbackFollowArmed)) &&
     !resumeSurfacePlaybackUsed &&
     Date.now() < resumeSurfacePlaybackUntil
   ) {
@@ -1422,39 +1424,17 @@ function syncPlay(): void {
 
 function handleViewerPlayState(): void {
   syncPlay();
-  if (playbackPauseTimer != null) {
-    clearTimeout(playbackPauseTimer);
-    playbackPauseTimer = null;
-  }
-  const pausedVideo = video;
   if (
-    !pausedVideo?.paused ||
-    pausedVideo.ended ||
-    !autoOpenedSession ||
-    !S.viewerAutoPlaybackOnly ||
-    exiting
-  )
-    return;
-  // Player frameworks can emit a very short pause while their video is moved
-  // into the Viewer during autoplay startup. Debounce the transition so a
-  // matching play event cancels that synthetic pause, while a real user pause
-  // still returns to the page promptly.
-  const session = viewerSession;
-  playbackPauseTimer = setTimeout(() => {
-    playbackPauseTimer = null;
-    if (
-      video !== pausedVideo ||
-      viewerSession !== session ||
-      !pausedVideo.paused ||
-      pausedVideo.ended ||
-      !autoOpenedSession ||
-      !S.viewerAutoPlaybackOnly ||
-      exiting
-    )
-      return;
+    video?.paused &&
+    !video.ended &&
+    autoOpenedSession &&
+    S.viewerAutoPlaybackOnly &&
+    playbackFollowArmed &&
+    !exiting
+  ) {
     playbackPauseExit = true;
     exitViewer();
-  }, 120);
+  }
 }
 
 function setViewerLoading(on: boolean): void {
@@ -2322,6 +2302,10 @@ function refreshBackdropStream(): void {
 // identities per element instead: the same video stays dismissed, while a new
 // route can apply the configured auto mode again.
 const autoSeen = new WeakMap<HTMLVideoElement, Set<string>>();
+const pendingAutoOpen = new WeakMap<
+  HTMLVideoElement,
+  { identity: string; timer: ReturnType<typeof setTimeout> }
+>();
 let autoOpenedSession = false;
 let playbackPauseExit = false;
 
@@ -2382,6 +2366,30 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
     return;
   const r = t.getBoundingClientRect();
   if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
+  if (S.viewerAutoPlaybackOnly) {
+    const pending = pendingAutoOpen.get(t);
+    if (pending?.identity === identity) return;
+    if (pending) clearTimeout(pending.timer);
+    const timer = setTimeout(() => {
+      const current = pendingAutoOpen.get(t);
+      if (!current || current.identity !== identity || current.timer !== timer) return;
+      pendingAutoOpen.delete(t);
+      if (
+        t.paused ||
+        t.ended ||
+        !autoOpenAllowedOnCurrentPage() ||
+        !S.viewerAutoEnabled ||
+        S.viewerAuto === "off" ||
+        fmt ||
+        autoSeen.get(t)?.has(identity)
+      )
+        return;
+      rememberAutoOpen(t, identity);
+      void enter(S.viewerAuto, t, { autoTriggered: true });
+    }, VIEWER_PLAYBACK_STABLE_MS);
+    pendingAutoOpen.set(t, { identity, timer });
+    return;
+  }
   rememberAutoOpen(t, identity);
   void enter(S.viewerAuto, t, { autoTriggered: true });
 }
@@ -2462,11 +2470,12 @@ async function enter(
   fmt = format;
   video = v;
   videoAutoIdentity = autoOpenIdentity();
-  if (playbackPauseTimer != null) {
-    clearTimeout(playbackPauseTimer);
-    playbackPauseTimer = null;
+  if (playbackFollowArmTimer != null) {
+    clearTimeout(playbackFollowArmTimer);
+    playbackFollowArmTimer = null;
   }
   autoOpenedSession = opts.autoTriggered === true;
+  playbackFollowArmed = !autoOpenedSession || !S.viewerAutoPlaybackOnly;
   playbackPauseExit = false;
   surfaceVideo = null;
   backdropEl = null;
@@ -2574,6 +2583,13 @@ async function enter(
   syncPlay();
   syncVolume();
   syncTime();
+  if (!playbackFollowArmed) {
+    const session = viewerSession;
+    playbackFollowArmTimer = setTimeout(() => {
+      playbackFollowArmTimer = null;
+      if (viewerSession === session && autoOpenedSession && !exiting) playbackFollowArmed = true;
+    }, viewerAnimationMs() + 100);
+  }
   if (!enterAnim) {
     layoutPaused = false;
     notifyViewerLayout();
@@ -2615,9 +2631,9 @@ export function exitViewer(): void {
     }
     clearTimeout(barTimer);
     clearTimeout(barVisibilityTimer);
-    if (playbackPauseTimer != null) {
-      clearTimeout(playbackPauseTimer);
-      playbackPauseTimer = null;
+    if (playbackFollowArmTimer != null) {
+      clearTimeout(playbackFollowArmTimer);
+      playbackFollowArmTimer = null;
     }
     media?.abort();
     media = null;
@@ -2707,6 +2723,7 @@ export function exitViewer(): void {
     video = null;
     videoAutoIdentity = "";
     autoOpenedSession = false;
+    playbackFollowArmed = false;
     playbackPauseExit = false;
     // Players re-measure on resize — let the restored one lay itself out.
     window.dispatchEvent(new Event("resize"));

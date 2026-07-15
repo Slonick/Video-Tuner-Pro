@@ -1769,19 +1769,22 @@ describe("auto pop-out on play", () => {
     installCapture(v);
 
     await v.play();
-    await flush();
+    await vi.advanceTimersByTimeAsync(251);
     expect(viewerFormat()).toBe("theater");
 
+    await vi.advanceTimersByTimeAsync(401);
+
     v.pause();
-    await vi.advanceTimersByTimeAsync(121);
+    await flush();
     expect(viewerFormat()).toBeNull();
 
     await v.play();
-    await flush();
+    await vi.advanceTimersByTimeAsync(251);
     expect(viewerFormat()).toBe("theater");
   });
 
   it("opens an autoplaying video after persisted auto settings finish loading", async () => {
+    vi.useFakeTimers();
     const { v } = makeVideo();
     h.primary = v;
     await v.play();
@@ -1791,7 +1794,8 @@ describe("auto pop-out on play", () => {
     S.viewerAuto = "theater";
     S.viewerAutoPlaybackOnly = true;
     maybeAutoOpenPlayingPrimary();
-    await flush();
+    expect(viewerFormat()).toBeNull();
+    await vi.advanceTimersByTimeAsync(251);
     expect(viewerFormat()).toBe("theater");
   });
 
@@ -1802,13 +1806,26 @@ describe("auto pop-out on play", () => {
     const { v } = makeVideo();
 
     await v.play();
-    await flush();
+    await vi.advanceTimersByTimeAsync(251);
     expect(viewerFormat()).toBe("normal");
 
     v.pause();
     await v.play();
-    await vi.advanceTimersByTimeAsync(121);
+    await vi.advanceTimersByTimeAsync(401);
     expect(viewerFormat()).toBe("normal");
+  });
+
+  it("does not open when playback stops before the stability window", async () => {
+    vi.useFakeTimers();
+    S.viewerAuto = "theater";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+
+    await v.play();
+    await vi.advanceTimersByTimeAsync(100);
+    v.pause();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(viewerFormat()).toBeNull();
   });
 
   it("stays in the automatic viewer on pause in always mode", async () => {
