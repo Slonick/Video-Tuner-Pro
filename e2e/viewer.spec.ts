@@ -54,6 +54,24 @@ async function readyLiveWithQuality(page: import("@playwright/test").Page) {
   await page.waitForSelector("[data-vtp-badge]", { state: "attached" });
 }
 
+async function clickLauncherAction(
+  page: import("@playwright/test").Page,
+  name: string,
+): Promise<void> {
+  const button = page.locator("#vtp-launcher-host").getByRole("button", { name });
+  await expect(button).toBeVisible();
+  await expect(button).toHaveCSS("pointer-events", "auto");
+  await expect
+    .poll(() =>
+      button.evaluate(
+        (element) =>
+          element.getAnimations().filter(({ playState }) => playState === "running").length,
+      ),
+    )
+    .toBe(0);
+  await button.click();
+}
+
 test("T mirrors the shadow-DOM video into the overlay over the whole window", async ({ page }) => {
   await ready(page);
   await page.keyboard.press("KeyT");
@@ -163,17 +181,17 @@ test("launcher radial buttons switch viewer formats and close it", async ({
 
   await page.mouse.move(500, 250);
   await launcher.hover();
-  await launcherHost.getByRole("button", { name: "Pop out video" }).click();
+  await clickLauncherAction(page, "Pop out video");
   await expect.poll(() => state(page)).toMatchObject({ attr: "normal", overlay: true });
 
   await page.mouse.move(500, 250);
   await launcher.hover();
-  await launcherHost.getByRole("button", { name: "Pop out in theater format" }).click();
+  await clickLauncherAction(page, "Pop out in theater format");
   await expect.poll(() => state(page)).toMatchObject({ attr: "theater", overlay: true });
 
   await page.mouse.move(500, 250);
   await launcher.hover();
-  await launcherHost.getByRole("button", { name: "Close the pop-out viewer" }).click();
+  await clickLauncherAction(page, "Close the pop-out viewer");
   await expect.poll(() => state(page)).toMatchObject({ attr: null, overlay: false });
 });
 
