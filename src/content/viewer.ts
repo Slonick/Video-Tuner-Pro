@@ -34,6 +34,18 @@ const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
 const VIEWER_ANIM_MS = 420;
 const VIEWER_BACKDROP_VIDEO_ANIM_MS = 680;
+const VIEWER_PLAYBACK_ANIM_MS = 300;
+const VIEWER_PLAYBACK_BACKDROP_VIDEO_ANIM_MS = 480;
+
+function viewerAnimationMs(): number {
+  return autoOpenedSession && S.viewerAutoPlaybackOnly ? VIEWER_PLAYBACK_ANIM_MS : VIEWER_ANIM_MS;
+}
+
+function viewerBackdropVideoAnimationMs(): number {
+  return autoOpenedSession && S.viewerAutoPlaybackOnly
+    ? VIEWER_PLAYBACK_BACKDROP_VIDEO_ANIM_MS
+    : VIEWER_BACKDROP_VIDEO_ANIM_MS;
+}
 // The moving backdrop is blurred heavily, so full media cadence and resolution
 // only waste GPU/CPU time. Keep it deliberately coarse while the primary video
 // remains the original, full-rate media element.
@@ -745,7 +757,7 @@ function animateBackdropVideoIn(first: DOMRect | null): Animation | null {
   backdropVideo.style.opacity = "0";
   backdropVideo.getBoundingClientRect();
   const anim = backdropVideo.animate([backdropVideoTransformFrame(first, 0), viewportFrame(1)], {
-    duration: VIEWER_BACKDROP_VIDEO_ANIM_MS,
+    duration: viewerBackdropVideoAnimationMs(),
     easing: "cubic-bezier(0.2, 0, 0, 1)",
     fill: "forwards",
   });
@@ -758,7 +770,7 @@ function animateBackdropVideoOut(target: DOMRect | null): Animation | null {
   if (!canAnimate(backdropVideo)) return null;
   if (!visibleRect(target)) {
     return backdropVideo.animate([{ opacity: 1 }, { opacity: 0 }], {
-      duration: VIEWER_BACKDROP_VIDEO_ANIM_MS,
+      duration: viewerBackdropVideoAnimationMs(),
       easing: "cubic-bezier(0.4, 0, 1, 1)",
       fill: "forwards",
     });
@@ -766,7 +778,7 @@ function animateBackdropVideoOut(target: DOMRect | null): Animation | null {
   setBackdropVideoViewport("1");
   backdropVideo.getBoundingClientRect();
   const anim = backdropVideo.animate([viewportFrame(1), backdropVideoTransformFrame(target, 0)], {
-    duration: VIEWER_BACKDROP_VIDEO_ANIM_MS,
+    duration: viewerBackdropVideoAnimationMs(),
     easing: "cubic-bezier(0.4, 0, 1, 1)",
     fill: "forwards",
   });
@@ -776,11 +788,14 @@ function animateBackdropVideoOut(target: DOMRect | null): Animation | null {
   return anim;
 }
 
-function animateBackdropIn(delay = 190): void {
+function animateBackdropIn(
+  delay = viewerAnimationMs() === VIEWER_PLAYBACK_ANIM_MS ? 120 : 190,
+): void {
+  const duration = viewerAnimationMs();
   const keyframes: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
   const options: KeyframeAnimationOptions = {
     delay,
-    duration: VIEWER_ANIM_MS - Math.min(delay, VIEWER_ANIM_MS - 80),
+    duration: duration - Math.min(delay, duration - 80),
     easing: "cubic-bezier(0.2, 0, 0, 1)",
     fill: "forwards",
   };
@@ -792,7 +807,7 @@ function animateBackdropIn(delay = 190): void {
 function animateBackdropOut(target: DOMRect | null): Animation | null {
   const keyframes: Keyframe[] = [{ opacity: 1 }, { opacity: 0 }];
   const options: KeyframeAnimationOptions = {
-    duration: VIEWER_ANIM_MS,
+    duration: viewerAnimationMs(),
     easing: "cubic-bezier(0.4, 0, 1, 1)",
     fill: "forwards",
   };
@@ -875,8 +890,9 @@ function animateSurfaceFrom(first: SurfaceFrame | null): Animation | null {
     borderRadius: first.radius,
   } as Partial<CSSStyleDeclaration>);
   shell.getBoundingClientRect();
+  const duration = viewerAnimationMs();
   const anim = shell.animate([rectFrame(first.rect, first.radius), rectFrame(last, finalRadius)], {
-    duration: VIEWER_ANIM_MS,
+    duration,
     easing: "cubic-bezier(0.2, 0, 0, 1)",
   });
   surfaceTransition = anim;
@@ -899,7 +915,7 @@ function animateSurfaceFrom(first: SurfaceFrame | null): Animation | null {
   anim.oncancel = () => {
     if (surfaceTransition === anim) surfaceTransition = null;
   };
-  surfaceTransitionTimer = window.setTimeout(settle, VIEWER_ANIM_MS + 80);
+  surfaceTransitionTimer = window.setTimeout(settle, duration + 80);
   return anim;
 }
 
@@ -908,6 +924,7 @@ function animateSurfaceTo(target: DOMRect | null): Animation | null {
   if (!canAnimate(shell)) return null;
   const firstFrame = interruptSurfaceTransition();
   const first = firstFrame?.rect ?? shell.getBoundingClientRect();
+  const duration = viewerAnimationMs();
   if (!visibleRect(first) || !visibleRect(target)) {
     return shell.animate(
       [
@@ -915,7 +932,7 @@ function animateSurfaceTo(target: DOMRect | null): Animation | null {
         { opacity: 0, transform: `${shell.style.transform || "none"} scale(.96)` },
       ],
       {
-        duration: VIEWER_ANIM_MS,
+        duration,
         easing: "cubic-bezier(0.4, 0, 1, 1)",
         fill: "forwards",
       },
@@ -936,7 +953,7 @@ function animateSurfaceTo(target: DOMRect | null): Animation | null {
   } as Partial<CSSStyleDeclaration>);
   shell.getBoundingClientRect();
   const anim = shell.animate([rectFrame(first, startRadius), rectFrame(target, "0px")], {
-    duration: VIEWER_ANIM_MS,
+    duration,
     easing: "cubic-bezier(0.4, 0, 1, 1)",
     fill: "forwards",
   });
@@ -1007,12 +1024,13 @@ function animateNativeSurfaceFrom(first: DOMRect | null): Promise<void> | null {
   surface.style.setProperty("--vtp-viewer-motion-visibility", "visible");
   surface.getBoundingClientRect();
   layoutPaused = true;
+  const duration = viewerAnimationMs();
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
       surface.style.setProperty(
         "--vtp-viewer-motion-transition",
-        `transform ${VIEWER_ANIM_MS}ms cubic-bezier(0.2, 0, 0, 1)`,
+        `transform ${duration}ms cubic-bezier(0.2, 0, 0, 1)`,
       );
       surface.style.setProperty("--vtp-viewer-motion-transform", "translate(0, 0) scale(1)");
       nativeSurfaceTransitionTimer = setTimeout(() => {
@@ -1022,7 +1040,7 @@ function animateNativeSurfaceFrom(first: DOMRect | null): Promise<void> | null {
         layoutPaused = false;
         notifyViewerLayout();
         resolve();
-      }, VIEWER_ANIM_MS + 60);
+      }, duration + 60);
     });
   });
 }
@@ -1037,12 +1055,13 @@ function animateNativeSurfaceTo(target: DOMRect | null): Promise<void> | null {
   surface.style.setProperty("--vtp-viewer-motion-transform", "translate(0, 0) scale(1)");
   surface.style.setProperty("--vtp-viewer-motion-visibility", "visible");
   surface.getBoundingClientRect();
+  const duration = viewerAnimationMs();
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
       surface.style.setProperty(
         "--vtp-viewer-motion-transition",
-        `transform ${VIEWER_ANIM_MS}ms cubic-bezier(0.4, 0, 1, 1)`,
+        `transform ${duration}ms cubic-bezier(0.4, 0, 1, 1)`,
       );
       surface.style.setProperty(
         "--vtp-viewer-motion-transform",
@@ -1052,7 +1071,7 @@ function animateNativeSurfaceTo(target: DOMRect | null): Promise<void> | null {
         if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
         nativeSurfaceTransitionTimer = null;
         resolve();
-      }, VIEWER_ANIM_MS + 60);
+      }, duration + 60);
     });
   });
 }
@@ -1063,7 +1082,7 @@ function waitAnimation(anim: Animation | null): Promise<void> {
   const cancel = anim.oncancel;
   return new Promise((resolve) => {
     let done = false;
-    const timer = setTimeout(complete, VIEWER_ANIM_MS + 180);
+    const timer = setTimeout(complete, viewerAnimationMs() + 180);
     function complete() {
       if (done) return;
       done = true;
@@ -1402,13 +1421,7 @@ function syncPlay(): void {
 
 function handleViewerPlayState(): void {
   syncPlay();
-  if (
-    video?.paused &&
-    !video.ended &&
-    autoOpenedSession &&
-    S.viewerAutoPlaybackOnly &&
-    !exiting
-  ) {
+  if (video?.paused && !video.ended && autoOpenedSession && S.viewerAutoPlaybackOnly && !exiting) {
     playbackPauseExit = true;
     exitViewer();
   }
@@ -2556,7 +2569,7 @@ export function exitViewer(): void {
   document.documentElement.style.overflow = prevOverflow;
   notifyViewerState();
   bar?.animate?.([{ opacity: 1 }, { opacity: 0 }], {
-    duration: Math.min(160, VIEWER_ANIM_MS),
+    duration: Math.min(160, viewerAnimationMs()),
     easing: "ease",
     fill: "forwards",
   });

@@ -123,7 +123,8 @@ const settleNativeViewerExit = () => new Promise<void>((resolve) => setTimeout(r
 const overlayEl = () => document.querySelector("[data-vtp-viewer-overlay]") as HTMLElement | null;
 const badgeNotice = () =>
   Array.from(
-    document.querySelector<HTMLElement>("[data-vtp-badge]")?.shadowRoot?.querySelectorAll("span") ?? [],
+    document.querySelector<HTMLElement>("[data-vtp-badge]")?.shadowRoot?.querySelectorAll("span") ??
+      [],
   ).at(2) as HTMLSpanElement | undefined;
 const barEl = () => {
   const host = Array.from(overlayEl()?.children ?? []).find(
