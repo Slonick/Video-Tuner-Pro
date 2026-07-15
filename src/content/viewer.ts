@@ -1301,6 +1301,21 @@ function layoutBar(): void {
   bar.style.bottom = Math.max(Math.round(window.innerHeight - r.bottom + 14), 14) + "px";
 }
 
+function refreshNativePlayerLayout(): void {
+  const surface = playerSurface;
+  if (!surface) return;
+  const session = viewerSession;
+  requestAnimationFrame(() => {
+    // Several site-owned players measure their control rail only from a window
+    // resize. Moving their root into the top layer changes its box without a
+    // browser resize, so request one ordinary layout pass after the new format
+    // has been applied. This runs once per format change and never touches the
+    // media element or its playback pipeline.
+    if (session !== viewerSession || surface !== playerSurface || !fmt) return;
+    window.dispatchEvent(new Event("resize"));
+  });
+}
+
 function setFormat(f: ViewerFormat): void {
   const switchingFormat = !!fmt && fmt !== f;
   const firstFrame = switchingFormat ? interruptSurfaceTransition() : null;
@@ -1310,6 +1325,7 @@ function setFormat(f: ViewerFormat): void {
   fmtBtn?.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
   applyOverlayBackdrop();
   sizeVideo();
+  refreshNativePlayerLayout();
   const transition = firstFrame
     ? animateSurfaceFrom(firstFrame)
     : nativeFirstFrame
