@@ -93,37 +93,6 @@ function OverlayBtnSeg() {
   );
 }
 
-type ViewerAuto = "off" | "normal" | "theater";
-const VIEWER_AUTO_MODES: ViewerAuto[] = ["off", "normal", "theater"];
-const VIEWER_AUTO_LABEL: Record<ViewerAuto, string> = {
-  off: "overlayBtnOff",
-  normal: "viewerAutoNormal",
-  theater: "viewerAutoTheater",
-};
-
-function ViewerAutoSeg() {
-  const [mode, setMode] = useState<ViewerAuto>("off");
-  useEffect(() => {
-    STORE.get(["viewerAutoGlobal", "viewerAuto"], (r) => {
-      const v = r.viewerAutoGlobal ?? r.viewerAuto;
-      setMode(v === "normal" || v === "theater" ? v : "off");
-    });
-  }, []);
-  const pick = (m: ViewerAuto) => {
-    setMode(m);
-    STORE.set({ viewerAutoGlobal: m });
-  };
-  return (
-    <Segmented
-      id="viewerAutoSeg"
-      ariaLabel={msg("optViewerAutoLabel") || "Auto pop-out on play"}
-      items={VIEWER_AUTO_MODES.map((m) => ({ value: m, label: msg(VIEWER_AUTO_LABEL[m]) || m }))}
-      value={mode}
-      onChange={pick}
-    />
-  );
-}
-
 function SponsorSwitch() {
   const [on, setOn] = useState(false);
   useEffect(() => {
@@ -344,15 +313,6 @@ export function General() {
           <span className="opt-field-desc">{msg("overlayBtnHint")}</span>
         </span>
         <OverlayBtnSeg />
-      </div>
-      <div className="opt-field opt-field-block">
-        <span className="opt-field-text">
-          <span className="opt-field-label">
-            {msg("optViewerAutoLabel") || "Auto pop-out on play"}
-          </span>
-          <span className="opt-field-desc">{msg("optViewerAutoHint")}</span>
-        </span>
-        <ViewerAutoSeg />
       </div>
       <div className="opt-field">
         <span className="opt-field-text">
