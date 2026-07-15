@@ -1712,6 +1712,7 @@ describe("auto pop-out on play", () => {
   });
 
   it("ignores a playing YouTube homepage preview and opens it after SPA navigation to /watch", async () => {
+    vi.useFakeTimers();
     S.viewerAuto = "normal";
     const { v } = makeVideo();
     h.primary = v;
@@ -1726,7 +1727,7 @@ describe("auto pop-out on play", () => {
       // YouTube often keeps the preview element playing through the SPA route
       // transition, so there is deliberately no second play event here.
       document.dispatchEvent(new Event("yt-navigate-finish"));
-      await flush();
+      await vi.advanceTimersByTimeAsync(701);
       expect(viewerFormat()).toBe("normal");
     } finally {
       vi.unstubAllGlobals();
@@ -1828,6 +1829,30 @@ describe("auto pop-out on play", () => {
     expect(viewerFormat()).toBeNull();
   });
 
+  it("waits for the YouTube player lifecycle to settle after navigation", async () => {
+    vi.useFakeTimers();
+    S.viewerAuto = "normal";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+    h.primary = v;
+    const route = {
+      hostname: "www.youtube.com",
+      pathname: "/watch",
+      search: "?v=video-aaaaa",
+      href: "https://www.youtube.com/watch?v=video-aaaaa",
+    };
+    vi.stubGlobal("location", route);
+
+    document.dispatchEvent(new Event("yt-navigate-finish"));
+    await v.play();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(viewerFormat()).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(401);
+    expect(viewerFormat()).toBe("normal");
+    vi.unstubAllGlobals();
+  });
+
   it("stays in the automatic viewer on pause in always mode", async () => {
     S.viewerAuto = "normal";
     const { v } = makeVideo();
@@ -1841,6 +1866,7 @@ describe("auto pop-out on play", () => {
   });
 
   it("re-arms a reused YouTube video element only when the video id changes", async () => {
+    vi.useFakeTimers();
     const route = {
       hostname: "www.youtube.com",
       pathname: "/watch",
@@ -1855,7 +1881,7 @@ describe("auto pop-out on play", () => {
       installCapture(v);
 
       await v.play();
-      await flush();
+      await vi.advanceTimersByTimeAsync(1000);
       expect(viewerFormat()).toBe("theater");
       exitViewer();
 
@@ -1864,7 +1890,7 @@ describe("auto pop-out on play", () => {
       route.href = "https://www.youtube.com/watch?v=video-aaaaa&t=90";
       v.pause();
       await v.play();
-      await flush();
+      await vi.advanceTimersByTimeAsync(251);
       expect(viewerFormat()).toBeNull();
 
       // YouTube reuses the element after SPA navigation; the new id must open.
@@ -1872,7 +1898,7 @@ describe("auto pop-out on play", () => {
       route.href = "https://www.youtube.com/watch?v=video-bbbbb";
       v.pause();
       await v.play();
-      await flush();
+      await vi.advanceTimersByTimeAsync(251);
       expect(viewerFormat()).toBe("theater");
       exitViewer();
 

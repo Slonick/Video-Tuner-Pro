@@ -2308,6 +2308,7 @@ const pendingAutoOpen = new WeakMap<
 >();
 let autoOpenedSession = false;
 let playbackPauseExit = false;
+let autoOpenNotBefore = isYouTube() ? Date.now() + 900 : 0;
 
 function autoOpenIdentity(): string {
   if (isYouTube()) {
@@ -2366,14 +2367,22 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
     return;
   const r = t.getBoundingClientRect();
   if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
-  if (S.viewerAutoPlaybackOnly) {
+  if (S.viewerAutoPlaybackOnly || isYouTube()) {
     const pending = pendingAutoOpen.get(t);
     if (pending?.identity === identity) return;
     if (pending) clearTimeout(pending.timer);
+    const delay = Math.max(
+      VIEWER_PLAYBACK_STABLE_MS,
+      isYouTube() ? autoOpenNotBefore - Date.now() : 0,
+    );
     const timer = setTimeout(() => {
       const current = pendingAutoOpen.get(t);
       if (!current || current.identity !== identity || current.timer !== timer) return;
       pendingAutoOpen.delete(t);
+      if (isYouTube() && Date.now() < autoOpenNotBefore) {
+        maybeAutoOpenViewer(t);
+        return;
+      }
       if (
         t.paused ||
         t.ended ||
@@ -2386,7 +2395,7 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
         return;
       rememberAutoOpen(t, identity);
       void enter(S.viewerAuto, t, { autoTriggered: true });
-    }, VIEWER_PLAYBACK_STABLE_MS);
+    }, delay);
     pendingAutoOpen.set(t, { identity, timer });
     return;
   }
@@ -2413,6 +2422,10 @@ export function maybeAutoOpenPlayingPrimary(): void {
 document.addEventListener(
   "yt-navigate-finish",
   () => {
+    // During initial load and SPA navigation YouTube briefly considers its
+    // player ready, then rebuilds its top layer and closes our manual popover.
+    // Wait until that lifecycle settles before opening playback-follow mode.
+    autoOpenNotBefore = Date.now() + 700;
     maybeAutoOpenPlayingPrimary();
     requestAnimationFrame(maybeAutoOpenPlayingPrimary);
   },
