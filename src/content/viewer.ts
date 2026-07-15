@@ -124,6 +124,8 @@ let normalBox: { w: number; h: number; vw: number; vh: number; fromMetadata: boo
   null;
 let surfaceTransition: Animation | null = null;
 let surfaceTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+let nativeSurfaceTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+let nativeSurfaceTransitionToken = 0;
 let postRestoreLayoutTimer: ReturnType<typeof setTimeout> | null = null;
 let surfaceTransitionToken = 0;
 let backdropStream: MediaStream | null = null;
@@ -391,14 +393,24 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
   style.textContent =
     `[${PLAYER_SURFACE}]:popover-open{display:block!important;position:fixed!important;` +
     `box-sizing:border-box!important;margin:0!important;padding:0!important;border:0!important;` +
-    `max-width:none!important;max-height:none!important;overflow:hidden!important;background:#000!important}` +
+    `max-width:none!important;max-height:none!important;overflow:hidden!important;background:#000!important;` +
+    `visibility:var(--vtp-viewer-motion-visibility,visible)!important;` +
+    `will-change:var(--vtp-viewer-motion-will-change,auto)!important;` +
+    `transition:var(--vtp-viewer-motion-transition,none)!important;` +
+    `transform-origin:var(--vtp-viewer-motion-origin,center)!important}` +
     `[${PLAYER_SURFACE}][${PLAYER_SURFACE_FORMAT}="theater"]:popover-open{` +
-    `inset:0!important;width:100vw!important;height:100vh!important;transform:none!important;` +
+    `inset:auto!important;left:var(--vtp-viewer-motion-left,0px)!important;` +
+    `top:var(--vtp-viewer-motion-top,0px)!important;right:auto!important;bottom:auto!important;` +
+    `width:var(--vtp-viewer-motion-width,100vw)!important;` +
+    `height:var(--vtp-viewer-motion-height,100vh)!important;` +
+    `transform:var(--vtp-viewer-motion-transform,none)!important;` +
     `border-radius:0!important;box-shadow:none!important}` +
     `[${PLAYER_SURFACE}][${PLAYER_SURFACE_FORMAT}="normal"]:popover-open{` +
-    `inset:auto!important;left:50%!important;top:50%!important;` +
-    `width:var(--vtp-viewer-width)!important;height:var(--vtp-viewer-height)!important;` +
-    `transform:translate(-50%,-50%)!important;border-radius:12px!important;` +
+    `inset:auto!important;left:var(--vtp-viewer-motion-left,50%)!important;` +
+    `top:var(--vtp-viewer-motion-top,50%)!important;right:auto!important;bottom:auto!important;` +
+    `width:var(--vtp-viewer-motion-width,var(--vtp-viewer-width))!important;` +
+    `height:var(--vtp-viewer-motion-height,var(--vtp-viewer-height))!important;` +
+    `transform:var(--vtp-viewer-motion-transform,translate(-50%,-50%))!important;border-radius:12px!important;` +
     `box-shadow:${NORMAL_SURFACE_SHADOW}!important}` +
     `[${PLAYER_SURFACE}] [${PLAYER_SURFACE_VIDEO}]{position:absolute!important;inset:0!important;` +
     `width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;` +
@@ -420,6 +432,7 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
 
   candidate.setAttribute(PLAYER_SURFACE, "");
   candidate.setAttribute("popover", "manual");
+  candidate.style.setProperty("--vtp-viewer-motion-visibility", "hidden");
   v.setAttribute(PLAYER_SURFACE_VIDEO, "");
   try {
     candidate.showPopover?.();
@@ -428,6 +441,7 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
     candidate.removeAttribute(PLAYER_SURFACE);
     candidate.removeAttribute(PLAYER_SURFACE_FORMAT);
     candidate.removeAttribute("popover");
+    candidate.style.removeProperty("--vtp-viewer-motion-visibility");
     v.removeAttribute(PLAYER_SURFACE_VIDEO);
     style.remove();
     return false;
@@ -450,6 +464,7 @@ function unmountPlayerSurface(): void {
     surface.style.removeProperty("--vtp-viewer-fit");
     surface.style.removeProperty("--vtp-viewer-width");
     surface.style.removeProperty("--vtp-viewer-height");
+    clearNativeSurfaceMotion(surface);
   }
   video?.removeAttribute(PLAYER_SURFACE_VIDEO);
   playerSurfaceStyle?.remove();
@@ -928,6 +943,117 @@ function animateSurfaceTo(target: DOMRect | null): Animation | null {
   return anim;
 }
 
+type SurfaceTransition = Animation | Promise<void> | null;
+
+const NATIVE_MOTION_PROPERTIES = [
+  "--vtp-viewer-motion-left",
+  "--vtp-viewer-motion-top",
+  "--vtp-viewer-motion-width",
+  "--vtp-viewer-motion-height",
+  "--vtp-viewer-motion-transform",
+  "--vtp-viewer-motion-origin",
+  "--vtp-viewer-motion-will-change",
+  "--vtp-viewer-motion-transition",
+  "--vtp-viewer-motion-visibility",
+] as const;
+
+function clearNativeSurfaceMotion(surface: HTMLElement | null = playerSurface): void {
+  if (!surface) return;
+  for (const property of NATIVE_MOTION_PROPERTIES) surface.style.removeProperty(property);
+}
+
+function interruptNativeSurfaceTransition(): DOMRect | null {
+  const surface = playerSurface;
+  const frame = surface?.getBoundingClientRect() ?? null;
+  nativeSurfaceTransitionToken++;
+  if (nativeSurfaceTransitionTimer != null) {
+    clearTimeout(nativeSurfaceTransitionTimer);
+    nativeSurfaceTransitionTimer = null;
+  }
+  clearNativeSurfaceMotion(surface);
+  return visibleRect(frame) ? frame : null;
+}
+
+function setNativeSurfaceMotionBox(surface: HTMLElement, rect: DOMRect): void {
+  surface.style.setProperty("--vtp-viewer-motion-left", `${rect.left}px`);
+  surface.style.setProperty("--vtp-viewer-motion-top", `${rect.top}px`);
+  surface.style.setProperty("--vtp-viewer-motion-width", `${rect.width}px`);
+  surface.style.setProperty("--vtp-viewer-motion-height", `${rect.height}px`);
+  surface.style.setProperty("--vtp-viewer-motion-origin", "0 0");
+  surface.style.setProperty("--vtp-viewer-motion-will-change", "transform");
+}
+
+function transformBetweenRects(from: DOMRect, to: DOMRect): string {
+  const scaleX = Math.max(0.01, from.width / to.width);
+  const scaleY = Math.max(0.01, from.height / to.height);
+  return `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${scaleX}, ${scaleY})`;
+}
+
+function animateNativeSurfaceFrom(first: DOMRect | null): Promise<void> | null {
+  const surface = playerSurface;
+  if (!surface || !visibleRect(first)) {
+    clearNativeSurfaceMotion(surface);
+    return null;
+  }
+  const last = surface.getBoundingClientRect();
+  if (!visibleRect(last)) {
+    clearNativeSurfaceMotion(surface);
+    return null;
+  }
+  const token = ++nativeSurfaceTransitionToken;
+  setNativeSurfaceMotionBox(surface, last);
+  surface.style.setProperty("--vtp-viewer-motion-transition", "none");
+  surface.style.setProperty("--vtp-viewer-motion-transform", transformBetweenRects(first, last));
+  surface.style.setProperty("--vtp-viewer-motion-visibility", "visible");
+  surface.getBoundingClientRect();
+  layoutPaused = true;
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
+      surface.style.setProperty(
+        "--vtp-viewer-motion-transition",
+        `transform ${VIEWER_ANIM_MS}ms cubic-bezier(0.2, 0, 0, 1)`,
+      );
+      surface.style.setProperty("--vtp-viewer-motion-transform", "translate(0, 0) scale(1)");
+      nativeSurfaceTransitionTimer = setTimeout(() => {
+        if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
+        nativeSurfaceTransitionTimer = null;
+        clearNativeSurfaceMotion(surface);
+        layoutPaused = false;
+        notifyViewerLayout();
+        resolve();
+      }, VIEWER_ANIM_MS + 60);
+    });
+  });
+}
+
+function animateNativeSurfaceTo(target: DOMRect | null): Promise<void> | null {
+  const surface = playerSurface;
+  const first = interruptNativeSurfaceTransition();
+  if (!surface || !visibleRect(first) || !visibleRect(target)) return null;
+  const token = ++nativeSurfaceTransitionToken;
+  setNativeSurfaceMotionBox(surface, first);
+  surface.style.setProperty("--vtp-viewer-motion-transition", "none");
+  surface.style.setProperty("--vtp-viewer-motion-transform", "translate(0, 0) scale(1)");
+  surface.style.setProperty("--vtp-viewer-motion-visibility", "visible");
+  surface.getBoundingClientRect();
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
+      surface.style.setProperty(
+        "--vtp-viewer-motion-transition",
+        `transform ${VIEWER_ANIM_MS}ms cubic-bezier(0.4, 0, 1, 1)`,
+      );
+      surface.style.setProperty("--vtp-viewer-motion-transform", transformBetweenRects(target, first));
+      nativeSurfaceTransitionTimer = setTimeout(() => {
+        if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
+        nativeSurfaceTransitionTimer = null;
+        resolve();
+      }, VIEWER_ANIM_MS + 60);
+    });
+  });
+}
+
 function waitAnimation(anim: Animation | null): Promise<void> {
   if (!anim) return Promise.resolve();
   const finish = anim.onfinish;
@@ -950,6 +1076,10 @@ function waitAnimation(anim: Animation | null): Promise<void> {
       complete();
     };
   });
+}
+
+function waitSurfaceTransition(transition: SurfaceTransition): Promise<void> {
+  return transition && "then" in transition ? transition : waitAnimation(transition);
 }
 
 // True if a node belongs to the viewer's own DOM — the media observer ignores
@@ -1174,12 +1304,17 @@ function layoutBar(): void {
 function setFormat(f: ViewerFormat): void {
   const switchingFormat = !!fmt && fmt !== f;
   const firstFrame = switchingFormat ? interruptSurfaceTransition() : null;
+  const nativeFirstFrame = switchingFormat ? interruptNativeSurfaceTransition() : null;
   fmt = f;
   document.documentElement.setAttribute(ATTR, f);
   fmtBtn?.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
   applyOverlayBackdrop();
   sizeVideo();
-  const transition = firstFrame ? animateSurfaceFrom(firstFrame) : null;
+  const transition = firstFrame
+    ? animateSurfaceFrom(firstFrame)
+    : nativeFirstFrame
+      ? animateNativeSurfaceFrom(nativeFirstFrame)
+      : null;
   if (switchingFormat && !transition) {
     layoutPaused = false;
     layoutBar();
@@ -2342,7 +2477,9 @@ async function enter(
   setFormat(format);
   dispatchViewerLayout();
   animateBackdropIn();
-  const enterAnim = animateSurfaceFrom(frameFromRect(firstRect));
+  const enterAnim: SurfaceTransition = playerSurface
+    ? animateNativeSurfaceFrom(firstRect)
+    : animateSurfaceFrom(frameFromRect(firstRect));
   syncPlay();
   syncVolume();
   syncTime();
@@ -2365,7 +2502,9 @@ export function exitViewer(): void {
   layoutPaused = true;
   const exitingOverlay = overlay;
   const targetRect = sourceRect;
-  const surfaceAnim = animateSurfaceTo(targetRect);
+  const surfaceAnim: SurfaceTransition = playerSurface
+    ? animateNativeSurfaceTo(targetRect)
+    : animateSurfaceTo(targetRect);
   const backdropAnim = animateBackdropOut(targetRect);
   const animated = !!surfaceAnim || !!backdropAnim;
   fmt = null;
@@ -2486,7 +2625,7 @@ export function exitViewer(): void {
   };
 
   if (animated)
-    void Promise.all([waitAnimation(surfaceAnim), waitAnimation(backdropAnim)]).then(finish);
+    void Promise.all([waitSurfaceTransition(surfaceAnim), waitAnimation(backdropAnim)]).then(finish);
   else finish();
 }
 
