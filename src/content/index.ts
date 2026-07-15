@@ -24,6 +24,7 @@ import { updateTimeBadge, flashBadge, ownsBadgeNode } from "./badge/overlay.js";
 import { updateLauncher, ownsLauncherNode } from "./overlay/launcher.js";
 import {
   exitViewer,
+  maybeAutoOpenPlayingPrimary,
   maybeAutoOpenViewer,
   ownsViewerNode,
   refreshViewerBackdrop,
@@ -287,6 +288,10 @@ function loadSpeed() {
       controlLive();
       updateTimeBadge();
       updateLauncher();
+      // Autoplay can begin before the asynchronous settings read finishes. The
+      // play event then sees the default auto mode (off), so retry once the
+      // persisted Viewer mode and playback-only behavior are available.
+      maybeAutoOpenPlayingPrimary();
     },
   );
 }

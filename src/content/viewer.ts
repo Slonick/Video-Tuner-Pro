@@ -74,6 +74,7 @@ const Z_OVERLAY = "2147483643";
 let fmt: ViewerFormat | null = null;
 let video: HTMLVideoElement | null = null; // the page media element we control
 let videoAutoIdentity = ""; // route/media identity captured when this viewer session opened
+let playbackPauseTimer: ReturnType<typeof setTimeout> | null = null;
 // Capture the page-level verdict before Viewer hides/adopts the source. Some
 // MSE players (VK Video Live in particular) temporarily drop duration and
 // seekable ranges while captureStream() is attached, which otherwise turns a
@@ -1421,10 +1422,39 @@ function syncPlay(): void {
 
 function handleViewerPlayState(): void {
   syncPlay();
-  if (video?.paused && !video.ended && autoOpenedSession && S.viewerAutoPlaybackOnly && !exiting) {
+  if (playbackPauseTimer != null) {
+    clearTimeout(playbackPauseTimer);
+    playbackPauseTimer = null;
+  }
+  const pausedVideo = video;
+  if (
+    !pausedVideo?.paused ||
+    pausedVideo.ended ||
+    !autoOpenedSession ||
+    !S.viewerAutoPlaybackOnly ||
+    exiting
+  )
+    return;
+  // Player frameworks can emit a very short pause while their video is moved
+  // into the Viewer during autoplay startup. Debounce the transition so a
+  // matching play event cancels that synthetic pause, while a real user pause
+  // still returns to the page promptly.
+  const session = viewerSession;
+  playbackPauseTimer = setTimeout(() => {
+    playbackPauseTimer = null;
+    if (
+      video !== pausedVideo ||
+      viewerSession !== session ||
+      !pausedVideo.paused ||
+      pausedVideo.ended ||
+      !autoOpenedSession ||
+      !S.viewerAutoPlaybackOnly ||
+      exiting
+    )
+      return;
     playbackPauseExit = true;
     exitViewer();
-  }
+  }, 120);
 }
 
 function setViewerLoading(on: boolean): void {
@@ -2356,7 +2386,7 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
   void enter(S.viewerAuto, t, { autoTriggered: true });
 }
 
-function maybeAutoOpenPlayingPrimary(): void {
+export function maybeAutoOpenPlayingPrimary(): void {
   if (!autoOpenAllowedOnCurrentPage()) return;
   const t = primaryVideo();
   // A YouTube hover preview can keep playing while the SPA changes `/` to
@@ -2432,6 +2462,10 @@ async function enter(
   fmt = format;
   video = v;
   videoAutoIdentity = autoOpenIdentity();
+  if (playbackPauseTimer != null) {
+    clearTimeout(playbackPauseTimer);
+    playbackPauseTimer = null;
+  }
   autoOpenedSession = opts.autoTriggered === true;
   playbackPauseExit = false;
   surfaceVideo = null;
@@ -2581,6 +2615,10 @@ export function exitViewer(): void {
     }
     clearTimeout(barTimer);
     clearTimeout(barVisibilityTimer);
+    if (playbackPauseTimer != null) {
+      clearTimeout(playbackPauseTimer);
+      playbackPauseTimer = null;
+    }
     media?.abort();
     media = null;
     styleGuard?.disconnect();

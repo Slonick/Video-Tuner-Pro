@@ -24,6 +24,7 @@ import {
   exitViewer,
   viewerFormat,
   viewerAnchorVideo,
+  maybeAutoOpenPlayingPrimary,
   ownsViewerNode,
   refreshViewerBackdrop,
   fmtTime,
@@ -1761,6 +1762,7 @@ describe("auto pop-out on play", () => {
   });
 
   it("returns to the page on pause and reopens on play in playback-only mode", async () => {
+    vi.useFakeTimers();
     S.viewerAuto = "theater";
     S.viewerAutoPlaybackOnly = true;
     const { v } = makeVideo();
@@ -1771,12 +1773,42 @@ describe("auto pop-out on play", () => {
     expect(viewerFormat()).toBe("theater");
 
     v.pause();
-    await flush();
+    await vi.advanceTimersByTimeAsync(121);
     expect(viewerFormat()).toBeNull();
 
     await v.play();
     await flush();
     expect(viewerFormat()).toBe("theater");
+  });
+
+  it("opens an autoplaying video after persisted auto settings finish loading", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await v.play();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+
+    S.viewerAuto = "theater";
+    S.viewerAutoPlaybackOnly = true;
+    maybeAutoOpenPlayingPrimary();
+    await flush();
+    expect(viewerFormat()).toBe("theater");
+  });
+
+  it("ignores a transient pause while an autoplay viewer is settling", async () => {
+    vi.useFakeTimers();
+    S.viewerAuto = "normal";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+
+    await v.play();
+    await flush();
+    expect(viewerFormat()).toBe("normal");
+
+    v.pause();
+    await v.play();
+    await vi.advanceTimersByTimeAsync(121);
+    expect(viewerFormat()).toBe("normal");
   });
 
   it("stays in the automatic viewer on pause in always mode", async () => {

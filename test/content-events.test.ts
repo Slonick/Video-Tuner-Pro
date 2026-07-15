@@ -14,6 +14,7 @@ const fx = vi.hoisted(() => ({
   markDrmVideo: vi.fn(),
   exitViewer: vi.fn(),
   maybeAutoOpenViewer: vi.fn(),
+  maybeAutoOpenPlayingPrimary: vi.fn(),
   recordBufferSample: vi.fn(),
   audioSamplingReady: false,
   recordAudioSample: vi.fn(),
@@ -123,6 +124,7 @@ vi.mock("../src/content/overlay/launcher.js", () => ({
 vi.mock("../src/content/viewer.js", () => ({
   exitViewer: fx.exitViewer,
   maybeAutoOpenViewer: fx.maybeAutoOpenViewer,
+  maybeAutoOpenPlayingPrimary: fx.maybeAutoOpenPlayingPrimary,
   ownsViewerNode: () => false,
   refreshViewerBackdrop: vi.fn(),
 }));
@@ -258,6 +260,7 @@ describe("content media events", () => {
     expect(fx.controlLive).toHaveBeenCalled();
     expect(fx.updateTimeBadge).toHaveBeenCalled();
     expect(fx.updateLauncher).toHaveBeenCalled();
+    expect(fx.maybeAutoOpenPlayingPrimary).toHaveBeenCalled();
   });
 
   it("publishes the MAIN-world quality bridge URL for the lazy loader", async () => {
