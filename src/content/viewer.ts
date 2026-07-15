@@ -1044,7 +1044,10 @@ function animateNativeSurfaceTo(target: DOMRect | null): Promise<void> | null {
         "--vtp-viewer-motion-transition",
         `transform ${VIEWER_ANIM_MS}ms cubic-bezier(0.4, 0, 1, 1)`,
       );
-      surface.style.setProperty("--vtp-viewer-motion-transform", transformBetweenRects(target, first));
+      surface.style.setProperty(
+        "--vtp-viewer-motion-transform",
+        transformBetweenRects(target, first),
+      );
       nativeSurfaceTransitionTimer = setTimeout(() => {
         if (token !== nativeSurfaceTransitionToken || playerSurface !== surface) return;
         nativeSurfaceTransitionTimer = null;
@@ -2641,7 +2644,9 @@ export function exitViewer(): void {
   };
 
   if (animated)
-    void Promise.all([waitSurfaceTransition(surfaceAnim), waitAnimation(backdropAnim)]).then(finish);
+    void Promise.all([waitSurfaceTransition(surfaceAnim), waitAnimation(backdropAnim)]).then(
+      finish,
+    );
   else finish();
 }
 
