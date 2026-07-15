@@ -64,6 +64,40 @@ let badgeUpdateFrame: number | null = null;
 let dragging = false;
 let dragDX = 0,
   dragDY = 0;
+const NATIVE_VIEWER_SURFACE_ATTR = "data-vtp-viewer-player";
+const BADGE_POPOVER_ATTR = "data-vtp-badge-popover";
+
+type PopoverHost = HTMLDivElement & {
+  showPopover?: () => void;
+  hidePopover?: () => void;
+};
+
+function syncBadgePopover(active: boolean): void {
+  const host = badgeHost as PopoverHost | null;
+  if (!host || typeof host.showPopover !== "function" || typeof host.hidePopover !== "function")
+    return;
+  let open = false;
+  try {
+    open = host.matches(":popover-open");
+  } catch {}
+  if (active) {
+    host.setAttribute("popover", "manual");
+    host.setAttribute(BADGE_POPOVER_ATTR, "");
+    if (!open) {
+      try {
+        host.showPopover();
+      } catch {}
+    }
+  } else if (host.hasAttribute(BADGE_POPOVER_ATTR)) {
+    if (open) {
+      try {
+        host.hidePopover();
+      } catch {}
+    }
+    host.removeAttribute(BADGE_POPOVER_ATTR);
+    host.removeAttribute("popover");
+  }
+}
 
 // True if a node is our badge — the observer ignores our writes so they don't
 // re-trigger applyAll. The badge itself lives in a shadow root (its mutations are
@@ -344,6 +378,7 @@ export function updateTimeBadge(
 ): void {
   removeCurrentStaleBadgeHost();
   if (!S.streamBadge && !S.showRemaining) {
+    syncBadgePopover(false);
     if (timeBadgeEl) timeBadgeEl.style.display = "none";
     badgeVideo = null;
     badgeMedia = null;
@@ -357,6 +392,7 @@ export function updateTimeBadge(
   // they show latency/buffer seconds, so skip the duration check there.
   const enabled = stream ? S.streamBadge : S.showRemaining;
   if (!enabled || !v || !anchor || (!stream && (!isFinite(v.duration) || v.duration <= 0))) {
+    syncBadgePopover(false);
     if (timeBadgeEl) timeBadgeEl.style.display = "none";
     badgeVideo = null;
     badgeMedia = null;
@@ -388,6 +424,9 @@ export function updateTimeBadge(
   // keep the host on the page unless fullscreen targets a wrapper/container.
   const host = fullscreenOverlayHost();
   if (badgeHost && badgeHost.parentNode !== host) host.appendChild(badgeHost);
+  syncBadgePopover(
+    anchor instanceof HTMLElement && anchor.hasAttribute(NATIVE_VIEWER_SURFACE_ATTR),
+  );
   el.style.display = "flex";
   if (created || S.badgePinned || el.style.opacity !== "0") renderBadge(v, anchor);
   // Pinned: keep it shown regardless of mouse movement, and reflect the state on

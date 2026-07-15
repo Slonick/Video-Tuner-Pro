@@ -125,6 +125,21 @@ export function mountBadge(): BadgeRefs {
   const host = document.createElement("div");
   host.id = BADGE_HOST_ID;
   host.setAttribute("data-vtp-badge", ""); // marker (light DOM) so a re-injected instance removes a leftover
+  // Native Viewer surfaces use the browser's top layer. Keep this host zero-sized
+  // and neutral so it can temporarily become a manual popover without the user
+  // agent's default popover box affecting the fixed-position badge in its shadow.
+  Object.assign(host.style, {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    width: "0",
+    height: "0",
+    margin: "0",
+    padding: "0",
+    border: "0",
+    overflow: "visible",
+    background: "transparent",
+  } as CSSProperties);
   // Render straight into the shadow root (no wrapper element) so the badge is its
   // only child — overlay.ts and the tests can find it as the shadow's lone div.
   const shadow = host.attachShadow({ mode: "open" });
