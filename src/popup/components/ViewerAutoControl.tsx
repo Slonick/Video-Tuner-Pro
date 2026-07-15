@@ -41,6 +41,7 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [backdropVideo, setBackdropVideoState] = useState(false);
+  const [playbackOnly, setPlaybackOnlyState] = useState(false);
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !blocked && va.enabled);
   useEffect(() => {
     if (forceOpen !== undefined) setOpen(forceOpen);
@@ -50,8 +51,9 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
   const backdropLabel = msg("viewerBackdropVideo") || "Background video";
   const autoOpen = va.mode !== "off";
 
-  useStored(["viewerBackdropVideo"], (r) => {
+  useStored(["viewerBackdropVideo", "viewerAutoPlaybackOnly"], (r) => {
     setBackdropVideoState(r.viewerBackdropVideo === true);
+    setPlaybackOnlyState(r.viewerAutoPlaybackOnly === true);
   });
 
   const setEnabled = (on: boolean) => {
@@ -65,6 +67,15 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
     setBackdropVideoState(on);
     STORE.set({ viewerBackdropVideo: on }, (ok) => {
       if (ok === false) setBackdropVideoState(prev);
+    });
+  };
+  const setPlaybackOnly = (value: string) => {
+    if (blocked || !va.enabled || !autoOpen) return;
+    const next = value === "playing";
+    const prev = playbackOnly;
+    setPlaybackOnlyState(next);
+    STORE.set({ viewerAutoPlaybackOnly: next }, (ok) => {
+      if (ok === false) setPlaybackOnlyState(prev);
     });
   };
   const selectedAutoMode = (): ViewerAutoMode =>
@@ -201,6 +212,21 @@ export const ViewerAutoControl = memo(function ViewerAutoControl({
                   onChange={setAutoOpen}
                 />
               </div>
+              <Segmented
+                id="viewerAutoPlaybackSeg"
+                className="seg viewer-auto-seg viewer-auto-playback-seg"
+                ariaLabel={msg("viewerAutoBehavior") || "Automatic mode behavior"}
+                disabled={blocked || !va.enabled || !autoOpen}
+                items={[
+                  { value: "always", label: msg("viewerAutoAlways") || "Always" },
+                  {
+                    value: "playing",
+                    label: msg("viewerAutoWhilePlaying") || "While playing",
+                  },
+                ]}
+                value={playbackOnly ? "playing" : "always"}
+                onChange={setPlaybackOnly}
+              />
             </div>
             <div className="viewer-auto-save">
               <SaveScope

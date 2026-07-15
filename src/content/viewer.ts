@@ -1346,6 +1346,7 @@ function setFormat(f: ViewerFormat): void {
     f === "theater"
       ? notice("viewerNoticeTheater", "Theater")
       : notice("viewerNoticeViewer", "Viewer"),
+    { video },
   );
 }
 
@@ -1397,6 +1398,20 @@ function syncPlay(): void {
     showBar();
     setViewerLoading(false);
   } else scheduleBackdropCanvas();
+}
+
+function handleViewerPlayState(): void {
+  syncPlay();
+  if (
+    video?.paused &&
+    !video.ended &&
+    autoOpenedSession &&
+    S.viewerAutoPlaybackOnly &&
+    !exiting
+  ) {
+    playbackPauseExit = true;
+    exitViewer();
+  }
 }
 
 function setViewerLoading(on: boolean): void {
@@ -2152,7 +2167,7 @@ function hookGlobal(): void {
 function wireVideo(v: HTMLVideoElement): void {
   if (!media) return;
   const opt = { signal: media.signal };
-  for (const ev of ["play", "pause"]) v.addEventListener(ev, syncPlay, opt);
+  for (const ev of ["play", "pause"]) v.addEventListener(ev, handleViewerPlayState, opt);
   v.addEventListener("volumechange", syncVolume, opt);
   for (const ev of ["timeupdate", "durationchange", "loadedmetadata"]) {
     v.addEventListener(ev, syncTime, opt);
@@ -2264,6 +2279,8 @@ function refreshBackdropStream(): void {
 // identities per element instead: the same video stays dismissed, while a new
 // route can apply the configured auto mode again.
 const autoSeen = new WeakMap<HTMLVideoElement, Set<string>>();
+let autoOpenedSession = false;
+let playbackPauseExit = false;
 
 function autoOpenIdentity(): string {
   if (isYouTube()) {
@@ -2292,6 +2309,12 @@ function rememberAutoOpen(t: HTMLVideoElement, identity: string): void {
   autoSeen.set(t, seen);
 }
 
+function forgetAutoOpen(t: HTMLVideoElement, identity: string): void {
+  const seen = autoSeen.get(t);
+  seen?.delete(identity);
+  if (seen?.size === 0) autoSeen.delete(t);
+}
+
 function autoOpenAllowedOnCurrentPage(): boolean {
   const host = location.hostname.toLowerCase();
   if (host === "youtube.com" || host.endsWith(".youtube.com")) {
@@ -2317,7 +2340,7 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
   const r = t.getBoundingClientRect();
   if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
   rememberAutoOpen(t, identity);
-  void enter(S.viewerAuto, t);
+  void enter(S.viewerAuto, t, { autoTriggered: true });
 }
 
 function maybeAutoOpenPlayingPrimary(): void {
@@ -2358,7 +2381,7 @@ document.addEventListener(
 async function enter(
   format: ViewerFormat,
   target?: HTMLVideoElement,
-  opts: { liveHint?: boolean } = {},
+  opts: { liveHint?: boolean; autoTriggered?: boolean } = {},
 ): Promise<void> {
   if (window.top !== window) return;
   const v = target ?? primaryVideo();
@@ -2396,6 +2419,8 @@ async function enter(
   fmt = format;
   video = v;
   videoAutoIdentity = autoOpenIdentity();
+  autoOpenedSession = opts.autoTriggered === true;
+  playbackPauseExit = false;
   surfaceVideo = null;
   backdropEl = null;
   surfaceShell = null;
@@ -2556,10 +2581,13 @@ export function exitViewer(): void {
     marksSourceKey = "";
     markerRanges = [];
     activeMarker = null;
+    const restoredVideo = video;
+    const shouldResumeAuto = playbackPauseExit;
     if (video) {
       // Use the identity captured on entry. The URL may already point at the
       // next SPA video by the time the close animation finishes.
-      rememberAutoOpen(video, videoAutoIdentity);
+      if (shouldResumeAuto) forgetAutoOpen(video, videoAutoIdentity);
+      else rememberAutoOpen(video, videoAutoIdentity);
       if (playerSurface) {
         unmountPlayerSurface();
       } else {
@@ -2627,9 +2655,13 @@ export function exitViewer(): void {
     liveLayoutAtViewerEntry = false;
     video = null;
     videoAutoIdentity = "";
+    autoOpenedSession = false;
+    playbackPauseExit = false;
     // Players re-measure on resize — let the restored one lay itself out.
     window.dispatchEvent(new Event("resize"));
     notifyViewerLayout();
+    if (shouldResumeAuto && restoredVideo && !restoredVideo.paused && !restoredVideo.ended)
+      maybeAutoOpenViewer(restoredVideo);
     // Some site players (YouTube's included) don't finish re-laying the
     // returned video out in the same tick — a launcher position measured right
     // now can grab a transitional rect and stick there. One more pass shortly

@@ -70,6 +70,9 @@ export const S = {
   viewerAutoEnabled: true,
   viewerAuto: "off" as "off" | "normal" | "theater",
   viewerAutoScope: null as "channel" | "site" | "global" | null,
+  // When enabled, an automatically opened viewer follows playback: pause
+  // returns to the page and play opens the configured mode again.
+  viewerAutoPlaybackOnly: false,
   // How the pop-out viewer fits video inside its frame.
   viewerFit: "contain" as "contain" | "cover" | "fill",
   viewerFitScope: null as "channel" | "site" | "global" | null,

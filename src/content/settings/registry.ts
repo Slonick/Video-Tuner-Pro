@@ -113,6 +113,11 @@ export const REGISTRY: Entry<unknown>[] = [
     apply: () => updateLauncher(),
   }),
   entry({
+    key: "viewerAutoPlaybackOnly",
+    parse: (raw) => raw === true,
+    set: (v) => (S.viewerAutoPlaybackOnly = v),
+  }),
+  entry({
     key: "viewerBackdropVideo",
     parse: (raw) => raw === true,
     set: (v) => (S.viewerBackdropVideo = v),

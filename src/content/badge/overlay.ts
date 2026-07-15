@@ -329,8 +329,12 @@ export function flashBadge(): void {
   }, 2600);
 }
 
-export function showBadgeNotice(text: string): void {
-  if (!timeBadgeEl || !badgeNoticeEl || timeBadgeEl.style.display === "none") updateTimeBadge();
+export function showBadgeNotice(
+  text: string,
+  snapshot: { video?: HTMLVideoElement | null; stream?: boolean; anchor?: HTMLElement | null } = {},
+): void {
+  if (!timeBadgeEl || !badgeNoticeEl || timeBadgeEl.style.display === "none")
+    updateTimeBadge(snapshot);
   if (!timeBadgeEl || !badgeNoticeEl || timeBadgeEl.style.display === "none") return;
   clearTimeout(badgeNoticeTimer);
   badgeNoticeEl.textContent = text;

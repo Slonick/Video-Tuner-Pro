@@ -77,6 +77,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   overlayBtnPos: "general",
   overlayPanelPos: "general",
   viewerAutoEnabled: "general",
+  viewerAutoPlaybackOnly: "general",
   viewerAuto: "general", // legacy global fallback
   viewerAutoGlobal: "general",
   viewerAutoSites: "general",

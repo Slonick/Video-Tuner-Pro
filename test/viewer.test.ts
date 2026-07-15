@@ -121,6 +121,10 @@ const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => r
 const settleNativeViewerExit = () => new Promise<void>((resolve) => setTimeout(resolve, 560));
 
 const overlayEl = () => document.querySelector("[data-vtp-viewer-overlay]") as HTMLElement | null;
+const badgeNotice = () =>
+  Array.from(
+    document.querySelector<HTMLElement>("[data-vtp-badge]")?.shadowRoot?.querySelectorAll("span") ?? [],
+  ).at(2) as HTMLSpanElement | undefined;
 const barEl = () => {
   const host = Array.from(overlayEl()?.children ?? []).find(
     (c) => (c as HTMLElement).shadowRoot,
@@ -159,6 +163,8 @@ beforeEach(() => {
   h.videos = [];
   S.viewerAutoEnabled = true;
   S.viewerAuto = "off";
+  S.viewerAutoPlaybackOnly = false;
+  S.showRemaining = false;
   S.viewerBackdropVideo = false;
   S.keyboardEnabled = true;
   setFullscreen(null);
@@ -1727,11 +1733,14 @@ describe("auto pop-out on play", () => {
 
   it("opens in the configured format when a video starts", async () => {
     S.viewerAuto = "theater";
+    S.showRemaining = true;
     const { wrap, v } = makeVideo();
     installCapture(v);
     v.play();
     await flush();
     expect(viewerFormat()).toBe("theater");
+    expect(badgeNotice()?.textContent).toBe("Theater");
+    expect(badgeNotice()?.style.opacity).toBe("1");
     expect(v.parentElement).not.toBe(wrap);
     expect(overlayEl()?.querySelector("video:not([data-vtp-viewer-backdrop-video])")).toBe(v);
   });
@@ -1748,6 +1757,37 @@ describe("auto pop-out on play", () => {
     v.play();
     await flush();
     expect(viewerFormat()).toBeNull();
+  });
+
+  it("returns to the page on pause and reopens on play in playback-only mode", async () => {
+    S.viewerAuto = "theater";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+    installCapture(v);
+
+    await v.play();
+    await flush();
+    expect(viewerFormat()).toBe("theater");
+
+    v.pause();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+
+    await v.play();
+    await flush();
+    expect(viewerFormat()).toBe("theater");
+  });
+
+  it("stays in the automatic viewer on pause in always mode", async () => {
+    S.viewerAuto = "normal";
+    const { v } = makeVideo();
+    installCapture(v);
+
+    await v.play();
+    await flush();
+    v.pause();
+    await flush();
+    expect(viewerFormat()).toBe("normal");
   });
 
   it("re-arms a reused YouTube video element only when the video id changes", async () => {

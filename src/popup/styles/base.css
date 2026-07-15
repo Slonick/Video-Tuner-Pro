@@ -165,6 +165,11 @@ html.vtp-embedded .group-label::after {
   padding: 3px;
 }
 
+.viewer-auto-playback-seg {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: var(--space-2);
+}
+
 .viewer-auto-seg .seg-btn {
   min-width: 0;
   padding: 7px 14px;
