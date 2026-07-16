@@ -56,6 +56,9 @@ function copyStatics(out, target) {
   cpSync(join(SRC, "_locales"), join(out, "_locales"), { recursive: true });
   cpSync(join(SRC, "icons"), join(out, "icons"), { recursive: true });
   writeFileSync(join(out, "manifest.json"), JSON.stringify(manifestFor(target), null, 2) + "\n");
+  // Build stamp for the dev hot-reload (see src/background/dev-reload.ts): an
+  // unpacked install watches this file and reloads itself when a build lands.
+  writeFileSync(join(out, "build-stamp.txt"), String(Date.now()) + "\n");
   // Each page's .html: drop comments and collapse indentation (it links .css/.js).
   for (const page of PAGES) {
     let html = readFileSync(join(SRC, page + ".html"), "utf8");

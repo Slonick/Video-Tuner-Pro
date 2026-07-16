@@ -22,6 +22,9 @@ import {
 } from "../shared/update.js";
 import { getExtensionApi } from "../shared/extension-api.js";
 import { hasSponsorDataConsent } from "../shared/sponsor-consent.js";
+import { initDevReload } from "./dev-reload.js";
+
+void initDevReload();
 
 const api = getExtensionApi();
 
