@@ -2783,7 +2783,9 @@ export function exitViewer(): void {
     const restoredVideo = video;
     let shouldResumeAuto = playbackPauseExit;
     playbackResume =
-      playbackPauseExit && restoredVideo ? { el: restoredVideo, identity: videoAutoIdentity } : null;
+      playbackPauseExit && restoredVideo
+        ? { el: restoredVideo, identity: videoAutoIdentity }
+        : null;
     if (!shouldResumeAuto && involuntary && autoOpenedSession) {
       const tries = autoReopenTries.get(videoAutoIdentity) ?? 0;
       if (tries < MAX_AUTO_REOPEN_TRIES) {
