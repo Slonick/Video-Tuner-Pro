@@ -345,8 +345,10 @@ export function setViewerState(format: ViewerFormat | "off", liveHint = false): 
   }
   if (!S.viewerAutoEnabled) return;
   if (viewerFormat() === format) return;
-  if (fmt) setFormat(format);
-  else {
+  if (fmt) {
+    markViewerSessionManual();
+    setFormat(format);
+  } else {
     document.dispatchEvent(new Event(CLOSE_EVENT));
     void enter(format, undefined, { liveHint });
   }
@@ -2432,6 +2434,23 @@ function forgetAutoOpen(t: HTMLVideoElement, identity: string): void {
   if (seen?.size === 0) autoSeen.delete(t);
 }
 
+// A manual format switch turns an auto-opened session into a user-driven one.
+// Playback-follow must stop and this URL's auto-open stays consumed — otherwise
+// pause/play would keep snapping the viewer back to the configured auto mode
+// over the user's explicit choice.
+function markViewerSessionManual(): void {
+  if (!autoOpenedSession) return;
+  autoOpenedSession = false;
+  playbackFollowArmed = false;
+  if (playbackFollowArmTimer != null) {
+    clearTimeout(playbackFollowArmTimer);
+    playbackFollowArmTimer = null;
+  }
+  playbackPauseExit = false;
+  playbackResume = null;
+  if (video) rememberAutoOpen(video, videoAutoIdentity);
+}
+
 function autoOpenAllowedOnCurrentPage(): boolean {
   const host = location.hostname.toLowerCase();
   if (host === "youtube.com" || host.endsWith(".youtube.com")) {
@@ -2906,7 +2925,10 @@ export function toggleViewer(format: ViewerFormat): void {
   if (!S.viewerAutoEnabled) return;
   if (fmt) {
     if (fmt === format) exitViewer();
-    else setFormat(format);
+    else {
+      markViewerSessionManual();
+      setFormat(format);
+    }
     return;
   }
   const active = viewerFormat();

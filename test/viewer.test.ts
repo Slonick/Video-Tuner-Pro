@@ -1840,6 +1840,53 @@ describe("auto pop-out on play", () => {
     expect(viewerFormat()).toBe("theater");
   });
 
+  it("a manual format switch turns the session manual — pause no longer closes it", async () => {
+    vi.useFakeTimers();
+    S.viewerAuto = "theater";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+    installCapture(v);
+
+    await v.play();
+    await vi.advanceTimersByTimeAsync(251);
+    expect(viewerFormat()).toBe("theater");
+    await vi.advanceTimersByTimeAsync(401); // playback-follow arms
+
+    toggleViewer("normal"); // the user picks their own format
+    expect(viewerFormat()).toBe("normal");
+
+    v.pause();
+    await flush();
+    expect(viewerFormat()).toBe("normal");
+
+    await v.play();
+    await vi.advanceTimersByTimeAsync(251);
+    expect(viewerFormat()).toBe("normal"); // no snap back to the auto mode
+  });
+
+  it("does not auto-reopen the same video after a popup format switch and a close", async () => {
+    vi.useFakeTimers();
+    S.viewerAuto = "theater";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+    installCapture(v);
+
+    await v.play();
+    await vi.advanceTimersByTimeAsync(251);
+    expect(viewerFormat()).toBe("theater");
+    await vi.advanceTimersByTimeAsync(401);
+
+    setViewerState("normal"); // the popup path marks the session manual too
+    expect(viewerFormat()).toBe("normal");
+    exitViewer();
+    await flush();
+
+    v.pause();
+    await v.play();
+    await vi.advanceTimersByTimeAsync(251);
+    expect(viewerFormat()).toBeNull();
+  });
+
   it("opens an autoplaying video after persisted auto settings finish loading", async () => {
     vi.useFakeTimers();
     const { v } = makeVideo();
