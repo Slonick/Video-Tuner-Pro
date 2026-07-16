@@ -11,7 +11,8 @@ export type Action =
   | "hold"
   | "overlay"
   | "viewer"
-  | "theater";
+  | "theater"
+  | "chat";
 export const ACTIONS: Action[] = [
   "slower",
   "faster",
@@ -21,6 +22,7 @@ export const ACTIONS: Action[] = [
   "overlay",
   "viewer",
   "theater",
+  "chat",
 ];
 
 export interface Keymap {
@@ -39,6 +41,8 @@ export interface Keymap {
   // other, so the two keys jump straight between the views.
   viewer: string;
   theater: string;
+  // Cycle the stream-chat mode in an open viewer (off → side → overlay).
+  chat: string;
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -51,6 +55,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   overlay: "KeyO",
   viewer: "KeyV",
   theater: "KeyT",
+  chat: "KeyC",
 };
 
 // A code is bindable if it's a plain letter/digit position — enough to avoid
@@ -210,7 +215,9 @@ export function normalizeKeymap(raw: unknown): Keymap {
       !laterDefaultOwnerNeedsCode
     ) {
       out[a] = code;
-    } else if (legacy && (a === "viewer" || a === "theater") && !(a in src)) {
+    } else if (legacy && (a === "viewer" || a === "theater" || a === "chat") && !(a in src)) {
+      // Actions added after 1.x ship unbound for stored keymaps — a new default
+      // must not hijack a key the user may already rely on (e.g. YouTube's C).
       out[a] = "";
     } else {
       const fallback = DEFAULT_KEYMAP[a];

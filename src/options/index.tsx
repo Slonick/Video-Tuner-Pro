@@ -27,6 +27,7 @@ import { Saved } from "./sections/Saved.js";
 import { Sync } from "./sections/Sync.js";
 import { AutoSlow } from "./sections/AutoSlow.js";
 import { LiveSync } from "./sections/LiveSync.js";
+import { ViewerChat } from "./sections/ViewerChat.js";
 import { NavGeneral, NavSpeed, NavAudio, NavData } from "./nav-icons.js";
 
 interface Group {
@@ -43,7 +44,12 @@ const GROUPS: Group[] = [
     labelKey: "optNavGeneral",
     labelFallback: "General",
     Icon: NavGeneral,
-    Pane: () => <General />,
+    Pane: () => (
+      <>
+        <General />
+        <ViewerChat />
+      </>
+    ),
   },
   {
     id: "speed",

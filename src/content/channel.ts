@@ -279,6 +279,14 @@ export function channelKeys(): string[] {
   return [...keys];
 }
 
+// The bare channel login for the current first-path-segment site (lower-cased,
+// reserved routes filtered) — what platform chat popout URLs are keyed by. Null
+// on YouTube (no login in the URL) and off channel pages.
+export function currentSiteLogin(): string | null {
+  const site = siteFor(window.location.hostname);
+  return site ? siteLogin(site) : null;
+}
+
 export function sameChannelIdentity(a: string[], b: string[]): boolean {
   if (!a.length || !b.length) return false;
   const previous = new Set(a);

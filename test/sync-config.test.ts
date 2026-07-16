@@ -25,6 +25,9 @@ describe("categoryOf", () => {
     expect(categoryOf("speedMax")).toBe("speeds");
     expect(categoryOf("speedStep")).toBe("speeds");
     expect(categoryOf("holdSpeed")).toBe("speeds");
+    expect(categoryOf("viewerChatMode")).toBe("general");
+    expect(categoryOf("viewerChatOpacity")).toBe("general");
+    expect(categoryOf("viewerChatInput")).toBe("general");
   });
   it("falls back to general for unknown keys", () => {
     expect(categoryOf("somethingNew")).toBe("general");

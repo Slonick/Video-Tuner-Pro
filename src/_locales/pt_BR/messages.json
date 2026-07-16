@@ -242,5 +242,19 @@
   "optCancel": { "message": "Cancelar" },
   "updateAvailable": { "message": "Uma nova versão está disponível" },
   "updateAvailableVer": { "message": "A versão $1 já está disponível" },
-  "updateNew": { "message": "Nova versão" }
+  "updateNew": { "message": "Nova versão" },
+  "chatModeLabel": { "message": "Chat da transmissão" },
+  "chatModeSide": { "message": "Lateral" },
+  "chatModeOverlay": { "message": "Sobreposto" },
+  "viewerChatAria": { "message": "Chat da transmissão" },
+  "viewerNoticeChat": { "message": "Chat: $1" },
+  "chatUnavailable": { "message": "Chat indisponível" },
+  "optChatTitle": { "message": "Chat sobreposto da transmissão" },
+  "optChatHint": { "message": "Tamanho e aparência do painel de chat flutuante no player destacado." },
+  "optChatOpacityLabel": { "message": "Opacidade do fundo" },
+  "optChatWidthLabel": { "message": "Largura do painel" },
+  "optChatHeightLabel": { "message": "Altura do painel" },
+  "optChatInputLabel": { "message": "Campo de mensagem" },
+  "optChatInputHint": { "message": "Mostrar a caixa de envio no chat sobreposto." },
+  "optKeyChat": { "message": "Modo do chat" }
 }

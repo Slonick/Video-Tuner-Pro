@@ -242,5 +242,19 @@
   "optCancel": { "message": "Скасувати" },
   "updateAvailable": { "message": "Доступна нова версія" },
   "updateAvailableVer": { "message": "Доступна версія $1" },
-  "updateNew": { "message": "Нова версія" }
+  "updateNew": { "message": "Нова версія" },
+  "chatModeLabel": { "message": "Чат стріму" },
+  "chatModeSide": { "message": "Збоку" },
+  "chatModeOverlay": { "message": "Оверлей" },
+  "viewerChatAria": { "message": "Чат стріму" },
+  "viewerNoticeChat": { "message": "Чат: $1" },
+  "chatUnavailable": { "message": "Чат недоступний" },
+  "optChatTitle": { "message": "Оверлей чату стріму" },
+  "optChatHint": { "message": "Розмір і вигляд плаваючої панелі чату у винесеному відео." },
+  "optChatOpacityLabel": { "message": "Непрозорість фону" },
+  "optChatWidthLabel": { "message": "Ширина панелі" },
+  "optChatHeightLabel": { "message": "Висота панелі" },
+  "optChatInputLabel": { "message": "Поле введення повідомлень" },
+  "optChatInputHint": { "message": "Показувати рядок надсилання в оверлей-чаті." },
+  "optKeyChat": { "message": "Режим чату" }
 }

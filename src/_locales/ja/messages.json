@@ -242,5 +242,19 @@
   "optCancel": { "message": "キャンセル" },
   "updateAvailable": { "message": "新しいバージョンが利用可能です" },
   "updateAvailableVer": { "message": "バージョン $1 が利用可能です" },
-  "updateNew": { "message": "新しいバージョン" }
+  "updateNew": { "message": "新しいバージョン" },
+  "chatModeLabel": { "message": "配信チャット" },
+  "chatModeSide": { "message": "サイド" },
+  "chatModeOverlay": { "message": "オーバーレイ" },
+  "viewerChatAria": { "message": "配信チャット" },
+  "viewerNoticeChat": { "message": "チャット: $1" },
+  "chatUnavailable": { "message": "チャットは利用できません" },
+  "optChatTitle": { "message": "配信チャットオーバーレイ" },
+  "optChatHint": { "message": "ポップアウト動画ビューアに浮かぶチャットパネルのサイズと外観。" },
+  "optChatOpacityLabel": { "message": "背景の不透明度" },
+  "optChatWidthLabel": { "message": "パネルの幅" },
+  "optChatHeightLabel": { "message": "パネルの高さ" },
+  "optChatInputLabel": { "message": "メッセージ入力欄" },
+  "optChatInputHint": { "message": "オーバーレイチャットに送信欄を表示します。" },
+  "optKeyChat": { "message": "チャットモード" }
 }

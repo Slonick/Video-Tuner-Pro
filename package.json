@@ -1,6 +1,6 @@
 {
   "name": "video-tuner-pro",
-  "version": "3.1.4",
+  "version": "3.2.0",
   "description": "Build tooling for the Video Tuner Pro browser extension",
   "license": "GPL-3.0-only",
   "private": true,

@@ -114,9 +114,10 @@ describe("normalizeKeymap", () => {
       reset: "Digit0",
       viewer: "",
       theater: "",
+      chat: "",
     });
   });
-  it("does not add viewer shortcuts to an existing stored keymap", () => {
+  it("does not add viewer or chat shortcuts to an existing stored keymap", () => {
     const km = normalizeKeymap({
       slower: "KeyJ",
       faster: "KeyK",
@@ -127,6 +128,11 @@ describe("normalizeKeymap", () => {
     });
     expect(km.viewer).toBe("");
     expect(km.theater).toBe("");
+    expect(km.chat).toBe("");
+  });
+  it("keeps a stored chat binding and defaults chat only for fresh installs", () => {
+    expect(normalizeKeymap({ slower: "KeyJ", chat: "KeyH" }).chat).toBe("KeyH");
+    expect(normalizeKeymap(undefined).chat).toBe(DEFAULT_KEYMAP.chat);
   });
   it("drops a duplicate binding back to its default", () => {
     const km = normalizeKeymap({ slower: "KeyZ", faster: "KeyZ" });

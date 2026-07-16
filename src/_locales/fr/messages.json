@@ -242,5 +242,19 @@
   "optCancel": { "message": "Annuler" },
   "updateAvailable": { "message": "Une nouvelle version est disponible" },
   "updateAvailableVer": { "message": "La version $1 est disponible" },
-  "updateNew": { "message": "Nouvelle version" }
+  "updateNew": { "message": "Nouvelle version" },
+  "chatModeLabel": { "message": "Chat du stream" },
+  "chatModeSide": { "message": "Latéral" },
+  "chatModeOverlay": { "message": "Superposé" },
+  "viewerChatAria": { "message": "Chat du stream" },
+  "viewerNoticeChat": { "message": "Chat : $1" },
+  "chatUnavailable": { "message": "Chat indisponible" },
+  "optChatTitle": { "message": "Chat superposé du stream" },
+  "optChatHint": { "message": "Taille et apparence du panneau de chat flottant dans le lecteur détaché." },
+  "optChatOpacityLabel": { "message": "Opacité du fond" },
+  "optChatWidthLabel": { "message": "Largeur du panneau" },
+  "optChatHeightLabel": { "message": "Hauteur du panneau" },
+  "optChatInputLabel": { "message": "Champ de message" },
+  "optChatInputHint": { "message": "Afficher la zone d'envoi dans le chat superposé." },
+  "optKeyChat": { "message": "Mode du chat" }
 }

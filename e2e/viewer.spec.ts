@@ -248,6 +248,20 @@ test("auto-open dismissal follows SPA media routes on a reused video element", a
   await expect(page.locator("[data-vtp-viewer-overlay]")).toHaveCount(0);
 });
 
+test("a stored chat mode stays inert on a non-stream page", async ({ page, serviceWorker }) => {
+  await setStorage(serviceWorker, { viewerChatMode: "side" });
+  await ready(page);
+  await page.keyboard.press("KeyT");
+  // Chat is live-Twitch/YouTube/Kick only — on the fixture host the viewer must
+  // stay full-width with no chat column or floating panel.
+  await expect.poll(() => state(page)).toMatchObject({ attr: "theater", theaterFits: true });
+  const chat = await page.evaluate(() => ({
+    side: !!document.querySelector("[data-vtp-viewer-chat-side]"),
+    panel: !!document.querySelector("[data-vtp-viewer-chat-panel]"),
+  }));
+  expect(chat).toEqual({ side: false, panel: false });
+});
+
 test("a stored viewer fit mode is applied to the original video", async ({
   page,
   serviceWorker,

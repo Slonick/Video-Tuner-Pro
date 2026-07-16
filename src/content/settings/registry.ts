@@ -1,10 +1,15 @@
-// Declarative table for the SIMPLE settings keys — the scalars and flags that map
-// 1:1 onto a field of `S` through a pure parse, with at most one side-effect. Each
-// key is described ONCE here instead of being repeated across loadSpeed's get-list,
-// loadSpeed's assignment block, and the onChanged if-chain. Keys with cross-scope
-// resolution or per-domain maps (speed, sync target, auto-slow bundle, presets,
-// badge/button position) are deliberately NOT here — they keep their bespoke code.
 import { clampNum } from "../core/clamp.js";
+import {
+  CHAT_PANEL_HEIGHT,
+  CHAT_PANEL_HEIGHT_MAX,
+  CHAT_PANEL_HEIGHT_MIN,
+  CHAT_PANEL_WIDTH,
+  CHAT_PANEL_WIDTH_MAX,
+  CHAT_PANEL_WIDTH_MIN,
+  SIDE_CHAT_MAX,
+  SIDE_CHAT_MIN,
+  SIDE_CHAT_WIDTH,
+} from "../../shared/chat-bounds.js";
 import { normalizeSpeedStep, normalizeHoldSpeed } from "../../shared/presets.js";
 import { normalizeKeymap } from "../../shared/keymap.js";
 import { clampGlassOpacity, GLASS_OPACITY_KEY } from "../../shared/glass.js";
@@ -13,6 +18,7 @@ import { applyAll, resetAudios } from "../speed.js";
 import { updateTimeBadge, flashBadge, applyBadgeGlass } from "../badge/overlay.js";
 import { updateLauncher, applyLauncherGlass } from "../overlay/launcher.js";
 import { releaseAutoSlow } from "../audio/autoslow.js";
+import { applyViewerChatMode, applyViewerChatSettings } from "../viewer.js";
 
 // One settings key. `parse` turns a raw stored value into the typed value (default +
 // clamp/normalize); `set` writes it onto S (a typed setter, so field and value types
@@ -121,6 +127,62 @@ export const REGISTRY: Entry<unknown>[] = [
     key: "viewerBackdropVideo",
     parse: (raw) => raw === true,
     set: (v) => (S.viewerBackdropVideo = v),
+  }),
+  // Stream chat in the viewer. Mode changes remount the chat surface; the panel
+  // scalars restyle a mounted overlay panel live.
+  entry({
+    key: "viewerChatMode",
+    parse: (raw): "off" | "side" | "overlay" => (raw === "side" || raw === "overlay" ? raw : "off"),
+    set: (v) => (S.viewerChatMode = v),
+    apply: applyViewerChatMode,
+  }),
+  entry({
+    key: "viewerChatOpacity",
+    parse: (raw) => clampNum(raw, 0, 1, 0.4),
+    set: (v) => (S.viewerChatOpacity = v),
+    apply: applyViewerChatSettings,
+  }),
+  entry({
+    key: "viewerChatInput",
+    parse: (raw) => raw !== false,
+    set: (v) => (S.viewerChatInput = v),
+    apply: applyViewerChatSettings,
+  }),
+  entry({
+    key: "viewerChatWidth",
+    parse: (raw) =>
+      Math.round(clampNum(raw, CHAT_PANEL_WIDTH_MIN, CHAT_PANEL_WIDTH_MAX, CHAT_PANEL_WIDTH)),
+    set: (v) => (S.viewerChatWidth = v),
+    apply: applyViewerChatSettings,
+  }),
+  entry({
+    key: "viewerChatSideWidths",
+    parse: (raw) => {
+      const out: Record<string, { normal?: number; theater?: number }> = {};
+      if (raw && typeof raw === "object") {
+        for (const [site, v] of Object.entries(raw as Record<string, unknown>)) {
+          if (!v || typeof v !== "object") continue;
+          const widths: { normal?: number; theater?: number } = {};
+          for (const f of ["normal", "theater"] as const) {
+            const n = (v as Record<string, unknown>)[f];
+            if (typeof n === "number" && Number.isFinite(n)) {
+              widths[f] = Math.round(clampNum(n, SIDE_CHAT_MIN, SIDE_CHAT_MAX, SIDE_CHAT_WIDTH));
+            }
+          }
+          if (widths.normal != null || widths.theater != null) out[site] = widths;
+        }
+      }
+      return out;
+    },
+    set: (v) => (S.viewerChatSideWidths = v),
+    apply: applyViewerChatMode,
+  }),
+  entry({
+    key: "viewerChatHeight",
+    parse: (raw) =>
+      Math.round(clampNum(raw, CHAT_PANEL_HEIGHT_MIN, CHAT_PANEL_HEIGHT_MAX, CHAT_PANEL_HEIGHT)),
+    set: (v) => (S.viewerChatHeight = v),
+    apply: applyViewerChatSettings,
   }),
   // Glass opacity multiplier — scales the on-video badge + launcher glass live.
   entry({

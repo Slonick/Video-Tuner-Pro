@@ -242,5 +242,19 @@
   "optCancel": { "message": "取消" },
   "updateAvailable": { "message": "有新版本可用" },
   "updateAvailableVer": { "message": "版本 $1 可用" },
-  "updateNew": { "message": "新版本" }
+  "updateNew": { "message": "新版本" },
+  "chatModeLabel": { "message": "直播聊天" },
+  "chatModeSide": { "message": "侧边" },
+  "chatModeOverlay": { "message": "悬浮" },
+  "viewerChatAria": { "message": "直播聊天" },
+  "viewerNoticeChat": { "message": "聊天：$1" },
+  "chatUnavailable": { "message": "聊天不可用" },
+  "optChatTitle": { "message": "直播聊天悬浮层" },
+  "optChatHint": { "message": "弹出式播放器中悬浮聊天面板的大小和外观。" },
+  "optChatOpacityLabel": { "message": "背景不透明度" },
+  "optChatWidthLabel": { "message": "面板宽度" },
+  "optChatHeightLabel": { "message": "面板高度" },
+  "optChatInputLabel": { "message": "消息输入框" },
+  "optChatInputHint": { "message": "在悬浮聊天中显示发送框。" },
+  "optKeyChat": { "message": "聊天模式" }
 }

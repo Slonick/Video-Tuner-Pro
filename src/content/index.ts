@@ -54,6 +54,11 @@ import "./messaging.js"; // registers the popup message handler
 import "./keyboard.js"; // registers the keyboard-shortcut listener
 import "./theater.js"; // applies the YouTube "super theater" layout when enabled
 import { channelKeys, sameChannelIdentity, sameChannelKeys } from "./channel.js";
+import { applyChatFrameSkin, initChatFrameSkin } from "./chat/skin.js";
+
+// Dormant everywhere except inside a popout-chat iframe embedded by the viewer's
+// overlay chat panel (marked by a URL hash), where it restyles the chat page.
+initChatFrameSkin();
 
 try {
   const getURL = api.runtime?.getURL;
@@ -229,6 +234,10 @@ function loadSpeed() {
       // Simple scalars/flags (badge toggles, keyboard, steps, overlay button, audio
       // compressor params, auto-slow dynamics) load from the registry in one pass.
       loadRegistry(result);
+      // A skinned popout-chat frame builds its CSS at boot, before the stored
+      // settings arrive — rebuild it now that S holds the real values (no-op in
+      // every other frame).
+      applyChatFrameSkin();
       const ps = normalizePresetSet(result.speedPresets, result.presetKeys);
       S.presets = ps.presets.map((p) => p / 100);
       S.presetKeys = ps.keys;

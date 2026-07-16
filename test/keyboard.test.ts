@@ -11,6 +11,8 @@ const m = vi.hoisted(() => ({
   viewerAnchor: null as HTMLElement | null,
   primaryCalls: 0,
   viewerFormat: null as string | null,
+  canCycleChat: false,
+  cycleChat: vi.fn(),
 }));
 
 vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed, resetToSaved: m.resetToSaved }));
@@ -27,6 +29,8 @@ vi.mock("../src/content/viewer.js", () => ({
   exitViewer: vi.fn(),
   viewerFormat: () => m.viewerFormat,
   viewerAnchorVideo: () => m.viewerAnchor,
+  canCycleViewerChat: () => m.canCycleChat,
+  cycleViewerChatMode: m.cycleChat,
 }));
 
 import { S } from "../src/content/state.js";
@@ -56,7 +60,25 @@ describe("keyboard shortcuts", () => {
     m.viewerAnchor = null;
     m.primaryCalls = 0;
     m.viewerFormat = null;
+    m.canCycleChat = false;
     document.body.innerHTML = "";
+  });
+
+  it("C cycles the chat mode only when the viewer can act on it", () => {
+    press("KeyC");
+    expect(m.cycleChat).not.toHaveBeenCalled();
+    m.canCycleChat = true;
+    press("KeyC");
+    expect(m.cycleChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("a preset chord on the chat key still fires when chat cannot act", () => {
+    S.presets = [1.75];
+    S.presetKeys = ["KeyC"];
+    m.canCycleChat = false;
+    press("KeyC");
+    expect(m.setSpeed).toHaveBeenCalledWith(1.75, false, true);
+    expect(m.cycleChat).not.toHaveBeenCalled();
   });
 
   it("D speeds up by 5% (manual)", () => {

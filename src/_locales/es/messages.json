@@ -242,5 +242,19 @@
   "optCancel": { "message": "Cancelar" },
   "updateAvailable": { "message": "Hay una nueva versión disponible" },
   "updateAvailableVer": { "message": "La versión $1 ya está disponible" },
-  "updateNew": { "message": "Nueva versión" }
+  "updateNew": { "message": "Nueva versión" },
+  "chatModeLabel": { "message": "Chat del directo" },
+  "chatModeSide": { "message": "Lateral" },
+  "chatModeOverlay": { "message": "Superpuesto" },
+  "viewerChatAria": { "message": "Chat del directo" },
+  "viewerNoticeChat": { "message": "Chat: $1" },
+  "chatUnavailable": { "message": "Chat no disponible" },
+  "optChatTitle": { "message": "Chat superpuesto del directo" },
+  "optChatHint": { "message": "Tamaño y aspecto del panel de chat flotante en el visor emergente." },
+  "optChatOpacityLabel": { "message": "Opacidad del fondo" },
+  "optChatWidthLabel": { "message": "Ancho del panel" },
+  "optChatHeightLabel": { "message": "Alto del panel" },
+  "optChatInputLabel": { "message": "Campo de mensaje" },
+  "optChatInputHint": { "message": "Mostrar el cuadro de envío en el chat superpuesto." },
+  "optKeyChat": { "message": "Modo del chat" }
 }

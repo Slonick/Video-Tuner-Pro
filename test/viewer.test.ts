@@ -29,6 +29,8 @@ import {
   refreshViewerBackdrop,
   fmtTime,
   VIEWER_LAYOUT_EVENT,
+  canCycleViewerChat,
+  cycleViewerChatMode,
 } from "../src/content/viewer.js";
 import { LAUNCHER_TOP_LAYER_ATTR } from "../src/content/lifecycle.js";
 import { onStreamPage, probeLive } from "../src/content/live/detection.js";
@@ -168,6 +170,7 @@ beforeEach(() => {
   S.viewerAutoPlaybackOnly = false;
   S.showRemaining = false;
   S.viewerBackdropVideo = false;
+  S.viewerChatMode = "off";
   S.keyboardEnabled = true;
   setFullscreen(null);
   setWebkitFullscreen(null);
@@ -2240,5 +2243,318 @@ describe("guard", () => {
     // Nowhere to return to — the orphaned video left with the overlay.
     expect(overlayEl()).toBeNull();
     expect(v.isConnected).toBe(false);
+  });
+});
+
+describe("viewer chat — side mode", () => {
+  const chatCol = () => document.querySelector("[data-vtp-viewer-chat-side]") as HTMLElement | null;
+  const shellEl = () =>
+    (overlayEl()?.querySelector("video")?.parentElement ?? null) as HTMLElement | null;
+
+  function atTwitchLive(): void {
+    vi.stubGlobal("location", {
+      hostname: "www.twitch.tv",
+      pathname: "/somechannel",
+      search: "",
+      href: "https://www.twitch.tv/somechannel",
+    });
+  }
+
+  afterEach(() => {
+    exitViewer();
+    vi.unstubAllGlobals();
+  });
+
+  it("mounts the popout chat column and reserves the gutter in theater", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true); // live hint — chat is live-only
+    await flush();
+
+    const col = chatCol();
+    expect(col).not.toBeNull();
+    expect(col!.style.width).toBe("340px");
+    expect(col!.querySelector("iframe")?.getAttribute("src")).toBe(
+      "https://www.twitch.tv/popout/somechannel/chat?darkpopout#vtp-chat-overlay",
+    );
+    // The video shell stops at the chat column instead of filling the window.
+    expect(shellEl()!.style.right).toBe("340px");
+  });
+
+  it("attaches the chat panel beside the normal card, matching its height", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("normal", true);
+    await flush();
+
+    // The card + chat is centered as one flush block; the chat panel gets the
+    // card's height instead of the full viewport and rounds only its outer edge.
+    const availW = window.innerWidth - 340;
+    const ar = 1280 / 720;
+    const w = Math.round(Math.min(availW * 0.86, window.innerHeight * 0.86 * ar));
+    const hgt = Math.round(w / ar);
+    const left0 = Math.round((window.innerWidth - (w + 340)) / 2);
+    const shell = shellEl()!;
+    expect(shell.style.width).toBe(`${w}px`);
+    expect(shell.style.left).toBe(`${left0 + Math.round(w / 2)}px`);
+    expect(shell.style.borderRadius).toContain("12px 0");
+    const col = chatCol()!;
+    expect(col.style.left).toBe(`${left0 + w}px`);
+    expect(col.style.height).toBe(`${hgt}px`);
+    expect(col.style.top).toBe(`${Math.round((window.innerHeight - hgt) / 2)}px`);
+    expect(col.style.borderRadius).toBe("0 12px 12px 0");
+  });
+
+  it("uses the per-site per-format side width when one is stored", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    S.viewerChatSideWidths = { "twitch.tv": { theater: 420, normal: 260 } };
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+    expect(chatCol()!.style.width).toBe("420px");
+    expect(shellEl()!.style.right).toBe("420px");
+
+    setViewerState("normal", true);
+    await flush();
+    expect(chatCol()!.style.width).toBe("260px");
+    S.viewerChatSideWidths = {};
+  });
+
+  it("does not mount chat on a non-live page", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", false); // no live hint, no live signals
+    await flush();
+
+    expect(chatCol()).toBeNull();
+    expect(shellEl()!.style.right).toBe("0px");
+  });
+
+  it("does not mount chat on an unsupported host even when live", async () => {
+    vi.stubGlobal("location", {
+      hostname: "live.vkvideo.ru",
+      pathname: "/somechannel",
+      search: "",
+      href: "https://live.vkvideo.ru/somechannel",
+    });
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+    expect(chatCol()).toBeNull();
+  });
+
+  it("keeps the full width when chat mode is off (regression)", async () => {
+    atTwitchLive();
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("normal", true);
+    await flush();
+
+    const ar = 1280 / 720;
+    const w = Math.round(Math.min(window.innerWidth * 0.86, window.innerHeight * 0.86 * ar));
+    expect(shellEl()!.style.width).toBe(`${w}px`);
+    expect(chatCol()).toBeNull();
+  });
+});
+
+describe("viewer chat — overlay mode", () => {
+  const panelHost = () =>
+    document.querySelector("[data-vtp-viewer-chat-panel]") as HTMLElement | null;
+
+  function atTwitchLive(): void {
+    vi.stubGlobal("location", {
+      hostname: "www.twitch.tv",
+      pathname: "/somechannel",
+      search: "",
+      href: "https://www.twitch.tv/somechannel",
+      hash: "",
+    });
+  }
+
+  afterEach(() => {
+    exitViewer();
+    vi.unstubAllGlobals();
+  });
+
+  it("mounts a floating panel with the skinned popout chat iframe, no gutter", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "overlay";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+
+    const host = panelHost();
+    expect(host).not.toBeNull();
+    expect(host!.style.width).toBe("340px");
+    expect(host!.style.height).toBe("420px");
+    const frame = host!.shadowRoot!.querySelector("iframe");
+    expect(frame?.getAttribute("src")).toBe(
+      "https://www.twitch.tv/popout/somechannel/chat?darkpopout#vtp-chat-overlay",
+    );
+    // The tint alpha comes from the opacity setting.
+    const panel = host!.shadowRoot!.querySelector(".panel") as HTMLElement;
+    expect(panel.style.getPropertyValue("--vtp-chat-tint")).toBe("0.4");
+    // No side gutter in overlay mode — the video keeps the full width.
+    const shell = overlayEl()!.querySelector("video")!.parentElement as HTMLElement;
+    expect(shell.style.right).toBe("0px");
+  });
+
+  it("removes the panel on exit", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "overlay";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+    expect(panelHost()).not.toBeNull();
+
+    exitViewer();
+    await flush();
+    expect(panelHost()).toBeNull();
+  });
+});
+
+describe("viewer chat — hotkey cycle", () => {
+  const chatCol = () => document.querySelector("[data-vtp-viewer-chat-side]") as HTMLElement | null;
+  const panelHost = () =>
+    document.querySelector("[data-vtp-viewer-chat-panel]") as HTMLElement | null;
+
+  afterEach(() => {
+    exitViewer();
+    vi.unstubAllGlobals();
+  });
+
+  it("cycles off → side → overlay → off on a live Twitch page", async () => {
+    vi.stubGlobal("location", {
+      hostname: "www.twitch.tv",
+      pathname: "/somechannel",
+      search: "",
+      href: "https://www.twitch.tv/somechannel",
+    });
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+
+    expect(canCycleViewerChat()).toBe(true);
+    expect(chatCol()).toBeNull();
+
+    cycleViewerChatMode();
+    expect(S.viewerChatMode).toBe("side");
+    expect(chatCol()).not.toBeNull();
+    expect(panelHost()).toBeNull();
+
+    cycleViewerChatMode();
+    expect(S.viewerChatMode).toBe("overlay");
+    expect(chatCol()).toBeNull();
+    expect(panelHost()).not.toBeNull();
+
+    cycleViewerChatMode();
+    expect(S.viewerChatMode).toBe("off");
+    expect(chatCol()).toBeNull();
+    expect(panelHost()).toBeNull();
+  });
+
+  it("does not act on an unsupported/non-live page", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("normal"); // localhost fixture — no chat platform
+    expect(canCycleViewerChat()).toBe(false);
+    cycleViewerChatMode();
+    expect(S.viewerChatMode).toBe("off");
+    expect(chatCol()).toBeNull();
+  });
+});
+
+describe("viewer chat — on-video toggle button", () => {
+  const fabHost = () => document.querySelector("[data-vtp-viewer-chat-fab]") as HTMLElement | null;
+  const fabBtn = () => fabHost()?.shadowRoot?.querySelector(".fab") as HTMLButtonElement | null;
+  const modeBtn = (cls: string) =>
+    fabHost()?.shadowRoot?.querySelector(`.${cls}`) as HTMLButtonElement | null;
+
+  function atTwitchLive(): void {
+    vi.stubGlobal("location", {
+      hostname: "www.twitch.tv",
+      pathname: "/somechannel",
+      search: "",
+      href: "https://www.twitch.tv/somechannel",
+      hash: "",
+    });
+  }
+
+  afterEach(() => {
+    exitViewer();
+    vi.unstubAllGlobals();
+  });
+
+  it("mounts on a live chat platform, offset past the side column", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+
+    const host = fabHost()!;
+    expect(host).not.toBeNull();
+    // Video right edge = innerWidth - column; the fab sits inside that corner.
+    const videoRight = window.innerWidth - 340;
+    expect(host.style.left).toBe(`${videoRight - 40 - 12}px`);
+    expect(host.style.top).toBe("12px");
+    expect(fabBtn()!.getAttribute("aria-pressed")).toBe("true");
+    expect(modeBtn("m-side")!.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("toggles chat off and back to the last mode", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+
+    fabBtn()!.click();
+    expect(S.viewerChatMode).toBe("off");
+    expect(document.querySelector("[data-vtp-viewer-chat-side]")).toBeNull();
+    expect(fabBtn()!.getAttribute("aria-pressed")).toBe("false");
+    // Gutter gone — the fab moves to the full-width video's corner.
+    expect(fabHost()!.style.left).toBe(`${window.innerWidth - 40 - 12}px`);
+
+    fabBtn()!.click();
+    expect(S.viewerChatMode).toBe("side");
+    expect(document.querySelector("[data-vtp-viewer-chat-side]")).not.toBeNull();
+  });
+
+  it("switches the mode from the fan-out menu", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+
+    modeBtn("m-overlay")!.click();
+    expect(S.viewerChatMode).toBe("overlay");
+    expect(document.querySelector("[data-vtp-viewer-chat-side]")).toBeNull();
+    expect(document.querySelector("[data-vtp-viewer-chat-panel]")).not.toBeNull();
+    expect(modeBtn("m-overlay")!.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("does not mount on an unsupported page", async () => {
+    const { v } = makeVideo();
+    h.primary = v;
+    await openViewer("theater"); // localhost fixture
+    expect(fabHost()).toBeNull();
   });
 });

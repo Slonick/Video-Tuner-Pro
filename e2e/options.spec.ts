@@ -91,6 +91,30 @@ test.describe("Options · General", () => {
       .toBeCloseTo(0.3, 2);
   });
 
+  test("stream-chat panel sliders persist their clamped ranges", async ({
+    context,
+    extensionId,
+    serviceWorker,
+  }) => {
+    const page = await openExtensionPage(context, extensionId, OPTIONS);
+    await sliderTo(page, "#viewerChatOpacity", "Home");
+    await expect
+      .poll(async () => (await readStored(serviceWorker, "viewerChatOpacity")).viewerChatOpacity)
+      .toBeCloseTo(0, 2);
+    await page.locator("#viewerChatInput").click();
+    await expect
+      .poll(async () => (await readStored(serviceWorker, "viewerChatInput")).viewerChatInput)
+      .toBe(false);
+    await sliderTo(page, "#viewerChatWidth", "End");
+    await expect
+      .poll(async () => (await readStored(serviceWorker, "viewerChatWidth")).viewerChatWidth)
+      .toBe(560);
+    await sliderTo(page, "#viewerChatHeight", "Home");
+    await expect
+      .poll(async () => (await readStored(serviceWorker, "viewerChatHeight")).viewerChatHeight)
+      .toBe(160);
+  });
+
   test("force-speed toggle persists", async ({ context, extensionId, serviceWorker }) => {
     const page = await openExtensionPage(context, extensionId, OPTIONS);
     await page.locator("#nav-speed").click(); // Force speed lives under the Speed group

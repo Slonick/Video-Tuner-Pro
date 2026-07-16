@@ -28,6 +28,7 @@ const ROWS: Array<{ action: Action; labelKey: string }> = [
   { action: "overlay", labelKey: "optKeyOverlay" },
   { action: "viewer", labelKey: "optKeyViewer" },
   { action: "theater", labelKey: "optKeyTheater" },
+  { action: "chat", labelKey: "optKeyChat" },
 ];
 
 export function Keys() {

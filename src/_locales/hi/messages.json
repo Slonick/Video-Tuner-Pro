@@ -242,5 +242,19 @@
   "optCancel": { "message": "रद्द करें" },
   "updateAvailable": { "message": "एक नया संस्करण उपलब्ध है" },
   "updateAvailableVer": { "message": "संस्करण $1 उपलब्ध है" },
-  "updateNew": { "message": "नया संस्करण" }
+  "updateNew": { "message": "नया संस्करण" },
+  "chatModeLabel": { "message": "स्ट्रीम चैट" },
+  "chatModeSide": { "message": "साइड में" },
+  "chatModeOverlay": { "message": "ओवरले" },
+  "viewerChatAria": { "message": "स्ट्रीम चैट" },
+  "viewerNoticeChat": { "message": "चैट: $1" },
+  "chatUnavailable": { "message": "चैट उपलब्ध नहीं है" },
+  "optChatTitle": { "message": "स्ट्रीम चैट ओवरले" },
+  "optChatHint": { "message": "पॉप-आउट व्यूअर में तैरते चैट पैनल का आकार और रूप।" },
+  "optChatOpacityLabel": { "message": "पृष्ठभूमि की अपारदर्शिता" },
+  "optChatWidthLabel": { "message": "पैनल की चौड़ाई" },
+  "optChatHeightLabel": { "message": "पैनल की ऊँचाई" },
+  "optChatInputLabel": { "message": "संदेश इनपुट" },
+  "optChatInputHint": { "message": "ओवरले चैट में भेजने का बॉक्स दिखाएँ।" },
+  "optKeyChat": { "message": "चैट मोड" }
 }

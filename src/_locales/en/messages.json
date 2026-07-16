@@ -242,5 +242,19 @@
   "optCancel": { "message": "Cancel" },
   "updateAvailable": { "message": "A new version is available" },
   "updateAvailableVer": { "message": "Version $1 is available" },
-  "updateNew": { "message": "New version" }
+  "updateNew": { "message": "New version" },
+  "chatModeLabel": { "message": "Stream chat" },
+  "chatModeSide": { "message": "Side" },
+  "chatModeOverlay": { "message": "Overlay" },
+  "viewerChatAria": { "message": "Stream chat" },
+  "viewerNoticeChat": { "message": "Chat: $1" },
+  "chatUnavailable": { "message": "Chat unavailable" },
+  "optChatTitle": { "message": "Stream chat overlay" },
+  "optChatHint": { "message": "Size and look of the floating chat panel in the pop-out viewer." },
+  "optChatOpacityLabel": { "message": "Background opacity" },
+  "optChatWidthLabel": { "message": "Panel width" },
+  "optChatHeightLabel": { "message": "Panel height" },
+  "optChatInputLabel": { "message": "Message input" },
+  "optChatInputHint": { "message": "Show the send box in the overlay chat." },
+  "optKeyChat": { "message": "Chat mode" }
 }

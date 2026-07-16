@@ -242,5 +242,19 @@
   "optCancel": { "message": "Отмена" },
   "updateAvailable": { "message": "Доступна новая версия" },
   "updateAvailableVer": { "message": "Доступна версия $1" },
-  "updateNew": { "message": "Новая версия" }
+  "updateNew": { "message": "Новая версия" },
+  "chatModeLabel": { "message": "Чат стрима" },
+  "chatModeSide": { "message": "Сбоку" },
+  "chatModeOverlay": { "message": "Оверлей" },
+  "viewerChatAria": { "message": "Чат стрима" },
+  "viewerNoticeChat": { "message": "Чат: $1" },
+  "chatUnavailable": { "message": "Чат недоступен" },
+  "optChatTitle": { "message": "Оверлей чата стрима" },
+  "optChatHint": { "message": "Размер и вид плавающей панели чата в вынесенном видео." },
+  "optChatOpacityLabel": { "message": "Непрозрачность фона" },
+  "optChatWidthLabel": { "message": "Ширина панели" },
+  "optChatHeightLabel": { "message": "Высота панели" },
+  "optChatInputLabel": { "message": "Поле ввода сообщений" },
+  "optChatInputHint": { "message": "Показывать строку отправки в оверлей-чате." },
+  "optKeyChat": { "message": "Режим чата" }
 }

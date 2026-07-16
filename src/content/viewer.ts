@@ -19,6 +19,23 @@ import { isLive, isVkLiveChannelPage, onStreamPage } from "./live/detection.js";
 import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
 import { showBadgeNotice } from "./badge/overlay.js";
 import { LAUNCHER_TOP_LAYER_ATTR, listenerObjectOptions, listenerOptions } from "./lifecycle.js";
+import {
+  applyChatPanelSettings,
+  chatAvailable,
+  chatGutterWidth,
+  chatSatisfied,
+  cycleChatMode,
+  layoutChatFab,
+  layoutSideChat,
+  mountViewerChat,
+  raiseChatPopovers,
+  reelevateChatPanel,
+  unmountViewerChat,
+  updateViewerChat,
+  type ViewerChatMode,
+} from "./chat/index.js";
+import { chatPlatform } from "./chat/platform.js";
+import { applyChatFrameSkin } from "./chat/skin.js";
 
 export type ViewerFormat = "normal" | "theater";
 export const VIEWER_LAYOUT_EVENT = "vtp-viewer-layout";
@@ -29,6 +46,7 @@ const ADOPTED_VIDEO = "data-vtp-viewer-adopted-video";
 const PLAYER_SURFACE = "data-vtp-viewer-player";
 const PLAYER_SURFACE_FORMAT = "data-vtp-viewer-player-format";
 const PLAYER_SURFACE_VIDEO = "data-vtp-viewer-player-video";
+const PLAYER_SURFACE_STRETCH = "data-vtp-viewer-player-stretch";
 const FRACTION = 0.86; // the normal box's share of the viewport
 const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
@@ -382,6 +400,17 @@ function playerSurfaceCandidate(v: HTMLVideoElement): PopoverPlayer | null {
   const youtube = v.closest(".html5-video-player");
   let candidate = youtube instanceof HTMLElement ? youtube : null;
   if (!candidate) {
+    // Twitch: lift the whole player ZONE, not just the player. Sub/gift panels
+    // render into .channel-root__player beside the player (they'd open under
+    // the popover otherwise), while the generic walk below would climb all the
+    // way to MAIN and drag the site's chat column along in theater mode.
+    const twitch =
+      v.closest(".channel-root__player") ??
+      v.closest(".persistent-player") ??
+      v.closest('[data-a-target="video-player"]');
+    if (twitch instanceof HTMLElement) candidate = twitch;
+  }
+  if (!candidate) {
     let current = v.parentElement;
     for (let depth = 0; current && depth < 8; depth++, current = current.parentElement) {
       if (current === document.body || current === document.documentElement) break;
@@ -412,7 +441,10 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
   style.textContent =
     `[${PLAYER_SURFACE}]:popover-open{display:block!important;position:fixed!important;` +
     `box-sizing:border-box!important;margin:0!important;padding:0!important;border:0!important;` +
-    `max-width:none!important;max-height:none!important;overflow:hidden!important;background:#000!important;` +
+    // min-* too: Twitch's .video-player carries min-height:100%, which would
+    // clamp the popover to the viewport despite the important height above.
+    `max-width:none!important;max-height:none!important;` +
+    `min-width:0!important;min-height:0!important;overflow:hidden!important;background:#000!important;` +
     `visibility:var(--vtp-viewer-motion-visibility,visible)!important;` +
     `will-change:var(--vtp-viewer-motion-will-change,auto)!important;` +
     `transition:var(--vtp-viewer-motion-transition,none)!important;` +
@@ -420,17 +452,20 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
     `[${PLAYER_SURFACE}][${PLAYER_SURFACE_FORMAT}="theater"]:popover-open{` +
     `inset:auto!important;left:var(--vtp-viewer-motion-left,0px)!important;` +
     `top:var(--vtp-viewer-motion-top,0px)!important;right:auto!important;bottom:auto!important;` +
-    `width:var(--vtp-viewer-motion-width,100vw)!important;` +
+    `width:var(--vtp-viewer-motion-width,var(--vtp-viewer-avail-width,100vw))!important;` +
     `height:var(--vtp-viewer-motion-height,100vh)!important;` +
     `transform:var(--vtp-viewer-motion-transform,none)!important;` +
     `border-radius:0!important;box-shadow:none!important}` +
     `[${PLAYER_SURFACE}][${PLAYER_SURFACE_FORMAT}="normal"]:popover-open{` +
-    `inset:auto!important;left:var(--vtp-viewer-motion-left,50%)!important;` +
+    `inset:auto!important;left:var(--vtp-viewer-motion-left,var(--vtp-viewer-center-x,50%))!important;` +
     `top:var(--vtp-viewer-motion-top,50%)!important;right:auto!important;bottom:auto!important;` +
     `width:var(--vtp-viewer-motion-width,var(--vtp-viewer-width))!important;` +
     `height:var(--vtp-viewer-motion-height,var(--vtp-viewer-height))!important;` +
-    `transform:var(--vtp-viewer-motion-transform,translate(-50%,-50%))!important;border-radius:12px!important;` +
-    `box-shadow:${NORMAL_SURFACE_SHADOW}!important}` +
+    `transform:var(--vtp-viewer-motion-transform,translate(-50%,-50%))!important;` +
+    `border-radius:var(--vtp-viewer-radius,12px)!important;` +
+    // The shadow is suppressed while the side chat is glued on — it would
+    // paint over the column (the popover sits above it in the top layer).
+    `box-shadow:var(--vtp-viewer-shadow,${NORMAL_SURFACE_SHADOW})!important}` +
     `[${PLAYER_SURFACE}] [${PLAYER_SURFACE_VIDEO}]{position:absolute!important;inset:0!important;` +
     `width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;` +
     `display:block!important;visibility:visible!important;opacity:1!important;` +
@@ -444,12 +479,37 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
     `[${PLAYER_SURFACE}][${PLAYER_SURFACE_FORMAT}="normal"] [${PLAYER_SURFACE_VIDEO}]{` +
     `width:var(--vtp-viewer-width)!important;height:var(--vtp-viewer-height)!important}` +
     `[${PLAYER_SURFACE}][${PLAYER_SURFACE_FORMAT}="theater"] [${PLAYER_SURFACE_VIDEO}]{` +
-    `width:100vw!important;height:100vh!important}` +
-    `[${PLAYER_SURFACE}]::backdrop{background:transparent!important;pointer-events:none!important}`;
+    `width:var(--vtp-viewer-avail-width,100vw)!important;height:100vh!important}` +
+    // Wrappers between a wide Twitch surface (.channel-root__player) and the
+    // video keep their page-computed size and would clip the stretched video —
+    // force each marked one to fill its parent instead.
+    `[${PLAYER_SURFACE}] [${PLAYER_SURFACE_STRETCH}]{position:absolute!important;inset:0!important;` +
+    `width:100%!important;height:100%!important;padding:0!important;margin:0!important;` +
+    `max-width:none!important;max-height:none!important;transform:none!important}` +
+    `[${PLAYER_SURFACE}]::backdrop{background:transparent!important;pointer-events:none!important}` +
+    // Elevated page dialog layers keep their own full-screen layout — undo the
+    // UA popover styles (fit-content box, margin:auto, border, canvas bg).
+    `[data-vtp-viewer-dialog]:popover-open{position:fixed!important;inset:0!important;` +
+    `width:auto!important;height:auto!important;margin:0!important;border:0!important;` +
+    `padding:0!important;background:transparent!important;overflow:visible!important;` +
+    // The forced full-viewport box must not swallow clicks around the actual
+    // menu — only the layer's own content stays interactive.
+    `pointer-events:none!important}` +
+    `[data-vtp-viewer-dialog]:popover-open>*{pointer-events:auto}` +
+    `[data-vtp-viewer-dialog]::backdrop{background:transparent!important;pointer-events:none!important}`;
   if (root instanceof Document) (root.head ?? root.documentElement).appendChild(style);
   else root.appendChild(style);
 
   candidate.setAttribute(PLAYER_SURFACE, "");
+  // Only the Twitch player-zone containers need the wrapper stretch; on other
+  // sites the candidate IS the player root and its wrappers self-size.
+  if (
+    candidate.matches('.channel-root__player,.persistent-player,[data-a-target="video-player"]')
+  ) {
+    for (let el = v.parentElement; el && el !== candidate; el = el.parentElement) {
+      el.setAttribute(PLAYER_SURFACE_STRETCH, "");
+    }
+  }
   candidate.setAttribute("popover", "manual");
   candidate.style.setProperty("--vtp-viewer-motion-visibility", "hidden");
   v.setAttribute(PLAYER_SURFACE_VIDEO, "");
@@ -486,7 +546,7 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
   // disconnected element. The mutation observer sees the reinsertion in the
   // same mutation batch, and its callback runs as a microtask before the next
   // render, so re-showing here keeps the closed popover from ever painting.
-  playerSurfaceObserver = new MutationObserver(() => {
+  playerSurfaceObserver = new MutationObserver((mutations) => {
     const surface = playerSurface;
     if (surface !== candidate || !fmt || exiting) return;
     if (!surface.isConnected) return; // mid-migration — wait for the reinsertion
@@ -495,9 +555,77 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
       open = surface.matches(":popover-open");
     } catch {}
     if (!open) recoverPlayerSurface();
+    // Site menus portaled to page-level dialog layers (Twitch's settings and
+    // sub menus) would open UNDER the lifted player — lift them too, in the
+    // same mutation batch so the menu never paints hidden. Only when the batch
+    // actually touched such a layer (this observer sees every DOM mutation);
+    // the guard tick stays as the periodic fallback.
+    if (mutations.some(touchesPageDialogLayer)) elevatePageDialogLayers();
   });
   playerSurfaceObserver.observe(document.documentElement, { childList: true, subtree: true });
   return true;
+}
+
+// Layers sites portal their menus/modals into, at body level. In normal mode
+// they stack above the page; with the player in the top layer they must be
+// promoted as well or they open invisibly beneath it. Shown AFTER the player
+// and the chat panel, so they paint above both — matching native stacking.
+// Twitch uses .tw-dialog-layer for player menus and a bare ReactModalPortal
+// for the sub/gift modals.
+const PAGE_DIALOG_LAYERS = ".tw-dialog-layer,.ReactModalPortal";
+const DIALOG_ELEVATED = "data-vtp-viewer-dialog";
+
+// Whether a mutation batch entry added/removed nodes in (or as) a dialog layer.
+function touchesPageDialogLayer(m: MutationRecord): boolean {
+  if (m.target instanceof Element && m.target.closest(PAGE_DIALOG_LAYERS)) return true;
+  for (const n of m.addedNodes) {
+    if (
+      n instanceof Element &&
+      (n.matches(PAGE_DIALOG_LAYERS) || n.querySelector(PAGE_DIALOG_LAYERS))
+    )
+      return true;
+  }
+  return false;
+}
+
+function elevatePageDialogLayers(): void {
+  if (!playerSurface || !fmt || exiting) return;
+  // The layer selectors are Twitch's; on other hosts a generic .ReactModalPortal
+  // could be unrelated chrome that must not be lifted over the player.
+  if (chatPlatform() !== "twitch") return;
+  for (const layer of document.querySelectorAll<HTMLElement>(PAGE_DIALOG_LAYERS)) {
+    if (ownsViewerNode(layer)) continue;
+    // React keeps the empty portal div around after the modal closes; an empty
+    // elevated layer would sit fixed over the whole viewport and eat clicks.
+    const hasContent = layer.childElementCount > 0;
+    try {
+      if (layer.hasAttribute(DIALOG_ELEVATED)) {
+        if (!hasContent) {
+          if (layer.matches(":popover-open")) layer.hidePopover?.();
+          layer.removeAttribute("popover");
+          layer.removeAttribute(DIALOG_ELEVATED);
+        } else if (!layer.matches(":popover-open")) layer.showPopover?.();
+        continue;
+      }
+      if (!hasContent) continue;
+      layer.setAttribute(DIALOG_ELEVATED, "");
+      layer.setAttribute("popover", "manual");
+      layer.showPopover?.();
+    } catch {
+      layer.removeAttribute("popover");
+      layer.removeAttribute(DIALOG_ELEVATED);
+    }
+  }
+}
+
+function restorePageDialogLayers(): void {
+  for (const layer of document.querySelectorAll<HTMLElement>(`[${DIALOG_ELEVATED}]`)) {
+    try {
+      if (layer.matches(":popover-open")) layer.hidePopover?.();
+    } catch {}
+    layer.removeAttribute("popover");
+    layer.removeAttribute(DIALOG_ELEVATED);
+  }
 }
 
 // YouTube rebuilds its top layer while a page is still loading or navigating,
@@ -520,6 +648,9 @@ function reshowPlayerSurface(): boolean {
   } catch {
     return false;
   }
+  // The re-shown player landed on top of the top layer — put the chat surfaces
+  // back above it.
+  raiseChatPopovers();
   notifyViewerLayout();
   return true;
 }
@@ -548,6 +679,10 @@ function unmountPlayerSurface(): void {
     clearNativeSurfaceMotion(surface);
   }
   video?.removeAttribute(PLAYER_SURFACE_VIDEO);
+  document
+    .querySelectorAll(`[${PLAYER_SURFACE_STRETCH}]`)
+    .forEach((n) => n.removeAttribute(PLAYER_SURFACE_STRETCH));
+  restorePageDialogLayers();
   playerSurfaceObserver?.disconnect();
   playerSurfaceObserver = null;
   playerSurfaceStyle?.remove();
@@ -1290,31 +1425,79 @@ export function setViewerFitMode(mode: unknown, notify = false): ViewerFitMode {
   return S.viewerFit;
 }
 
+// Whether the chat-mode cycle (the C hotkey) can act right now: an open viewer
+// on a live page of a supported platform.
+export function canCycleViewerChat(): boolean {
+  return !!fmt && chatAvailable(liveAtViewerEntry);
+}
+
+// Cycle off → side → overlay, reflow the video around the gutter and announce
+// the new mode on the badge (the C hotkey; the on-video button sets modes
+// directly).
+export function cycleViewerChatMode(): void {
+  if (!canCycleViewerChat()) return;
+  const mode = cycleChatMode();
+  sizeVideo();
+  notifyViewerLayout();
+  const label = chatModeLabel(mode);
+  showBadgeNotice(notice("viewerNoticeChat", `Chat: ${label}`, label), { video });
+}
+
+// Registry apply hooks for the viewerChat* keys. No-ops while the viewer is
+// closed — enter() mounts chat from the current S values anyway.
+export function applyViewerChatMode(): void {
+  if (!fmt) return;
+  updateViewerChat();
+  sizeVideo();
+  notifyViewerLayout();
+}
+
+export function applyViewerChatSettings(): void {
+  // Runs in every frame: inside a skinned popout-chat iframe this restyles the
+  // chat page; in the top frame it restyles a mounted overlay panel.
+  applyChatFrameSkin();
+  if (!fmt) return;
+  applyChatPanelSettings();
+}
+
 function sizeVideo(): void {
   const surface = surfaceVideo ?? video;
   const shell = surfaceShell;
   if (!fmt || !surface) return;
+  // The side chat reserves horizontal space; the video gets what's left. In
+  // theater it's a full-height dock at the right edge; in normal format it's
+  // glued to the video card's right edge, matching its height — one block.
+  // normalBox caches against availW (not innerWidth) so a chat mount/unmount
+  // re-computes the box even when the window itself didn't resize.
+  const gutter = chatGutterWidth(fmt);
+  const availW = window.innerWidth - gutter;
   if (playerSurface) {
     playerSurface.setAttribute(PLAYER_SURFACE_FORMAT, fmt);
     playerSurface.style.setProperty("--vtp-viewer-fit", S.viewerFit);
+    if (gutter > 0) {
+      playerSurface.style.setProperty("--vtp-viewer-avail-width", `${availW}px`);
+    } else {
+      playerSurface.style.removeProperty("--vtp-viewer-avail-width");
+    }
     if (fmt === "theater") {
       normalBox = null;
+      playerSurface.style.removeProperty("--vtp-viewer-center-x");
+      if (gutter > 0) layoutSideChat({ fill: true, width: gutter });
+      layoutChatFab({ right: availW, top: 0 });
     } else {
       const mediaWidth = surface.videoWidth || video?.videoWidth || 0;
       const mediaHeight = surface.videoHeight || video?.videoHeight || 0;
       const hasMetadata = !!(mediaWidth && mediaHeight);
       const ar = hasMetadata ? mediaWidth / mediaHeight : 16 / 9;
       const viewportChanged =
-        !normalBox || normalBox.vw !== window.innerWidth || normalBox.vh !== window.innerHeight;
+        !normalBox || normalBox.vw !== availW || normalBox.vh !== window.innerHeight;
       const metadataArrived = !!normalBox && !normalBox.fromMetadata && hasMetadata;
       if (viewportChanged || metadataArrived) {
-        const w = Math.round(
-          Math.min(window.innerWidth * FRACTION, window.innerHeight * FRACTION * ar),
-        );
+        const w = Math.round(Math.min(availW * FRACTION, window.innerHeight * FRACTION * ar));
         normalBox = {
           w,
           h: Math.round(w / ar),
-          vw: window.innerWidth,
+          vw: availW,
           vh: window.innerHeight,
           fromMetadata: hasMetadata,
         };
@@ -1322,6 +1505,31 @@ function sizeVideo(): void {
       if (normalBox) {
         playerSurface.style.setProperty("--vtp-viewer-width", `${normalBox.w}px`);
         playerSurface.style.setProperty("--vtp-viewer-height", `${normalBox.h}px`);
+        layoutChatFab({
+          right: Math.round((window.innerWidth - (normalBox.w + gutter)) / 2) + normalBox.w,
+          top: Math.round((window.innerHeight - normalBox.h) / 2),
+        });
+        if (gutter > 0) {
+          // Center the card + chat as one flush block: the card keeps its left
+          // corners, the chat rounds the right ones.
+          const left0 = Math.round((window.innerWidth - (normalBox.w + gutter)) / 2);
+          playerSurface.style.setProperty(
+            "--vtp-viewer-center-x",
+            `${left0 + Math.round(normalBox.w / 2)}px`,
+          );
+          playerSurface.style.setProperty("--vtp-viewer-radius", "12px 0 0 12px");
+          playerSurface.style.setProperty("--vtp-viewer-shadow", "none");
+          layoutSideChat({
+            left: left0 + normalBox.w,
+            top: (window.innerHeight - normalBox.h) / 2,
+            height: normalBox.h,
+            width: gutter,
+          });
+        } else {
+          playerSurface.style.removeProperty("--vtp-viewer-center-x");
+          playerSurface.style.removeProperty("--vtp-viewer-radius");
+          playerSurface.style.removeProperty("--vtp-viewer-shadow");
+        }
       }
     }
     layoutBar();
@@ -1337,9 +1545,14 @@ function sizeVideo(): void {
     VIDEO_RESET;
   if (fmt === "theater") {
     normalBox = null;
+    if (gutter > 0) layoutSideChat({ fill: true, width: gutter });
+    layoutChatFab({ right: availW, top: 0 });
     shell.style.cssText =
-      "position:absolute !important;inset:0 !important;" +
-      "width:100% !important;height:100% !important;" +
+      "position:absolute !important;left:0 !important;top:0 !important;bottom:0 !important;" +
+      `right:${gutter}px !important;` +
+      // Explicit auto: a site width/height rule on generic divs would otherwise
+      // beat the inset-derived box.
+      "width:auto !important;height:auto !important;" +
       "transform:none !important;border-radius:0 !important;box-shadow:none !important;" +
       "overflow:hidden !important;background:#000 !important;z-index:1 !important;" +
       "will-change:transform,width,height,left,top,opacity !important;contain:paint !important;";
@@ -1349,27 +1562,42 @@ function sizeVideo(): void {
     const hasMetadata = !!(mediaWidth && mediaHeight);
     const ar = hasMetadata ? mediaWidth / mediaHeight : 16 / 9;
     const viewportChanged =
-      !normalBox || normalBox.vw !== window.innerWidth || normalBox.vh !== window.innerHeight;
+      !normalBox || normalBox.vw !== availW || normalBox.vh !== window.innerHeight;
     const metadataArrived = !!normalBox && !normalBox.fromMetadata && hasMetadata;
     if (viewportChanged || metadataArrived) {
-      const w = Math.round(
-        Math.min(window.innerWidth * FRACTION, window.innerHeight * FRACTION * ar),
-      );
+      const w = Math.round(Math.min(availW * FRACTION, window.innerHeight * FRACTION * ar));
       normalBox = {
         w,
         h: Math.round(w / ar),
-        vw: window.innerWidth,
+        vw: availW,
         vh: window.innerHeight,
         fromMetadata: hasMetadata,
       };
     }
     if (!normalBox) return;
     const box = normalBox;
+    layoutChatFab({
+      right: Math.round((window.innerWidth - (box.w + gutter)) / 2) + box.w,
+      top: Math.round((window.innerHeight - box.h) / 2),
+    });
+    let centerX = Math.round(window.innerWidth / 2);
+    if (gutter > 0) {
+      // Center the card + chat as one flush block; the chat matches the card.
+      const left0 = Math.round((window.innerWidth - (box.w + gutter)) / 2);
+      centerX = left0 + Math.round(box.w / 2);
+      layoutSideChat({
+        left: left0 + box.w,
+        top: (window.innerHeight - box.h) / 2,
+        height: box.h,
+        width: gutter,
+      });
+    }
     shell.style.cssText =
-      "position:absolute !important;left:50% !important;top:50% !important;" +
+      `position:absolute !important;left:${centerX}px !important;top:50% !important;` +
       "transform:translate(-50%,-50%) !important;" +
       `width:${box.w}px !important;height:${box.h}px !important;` +
-      `border-radius:12px !important;box-shadow:${NORMAL_SURFACE_SHADOW} !important;` +
+      `border-radius:${gutter > 0 ? "12px 0 0 12px" : "12px"} !important;` +
+      `box-shadow:${gutter > 0 ? "none" : NORMAL_SURFACE_SHADOW} !important;` +
       "overflow:hidden !important;background:#000 !important;z-index:1 !important;" +
       "will-change:transform,width,height,left,top,opacity !important;contain:paint !important;";
   }
@@ -1588,6 +1816,11 @@ const I_FIT =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/></svg>';
 const I_QUALITY =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg>';
+function chatModeLabel(mode: ViewerChatMode): string {
+  if (mode === "side") return i18n("chatModeSide") || "Side";
+  if (mode === "overlay") return i18n("chatModeOverlay") || "Overlay";
+  return i18n("overlayBtnOff") || "Off";
+}
 
 function ensureQualityVideoId(): string {
   if (!video) return "";
@@ -2213,17 +2446,79 @@ function sponsorBlockConsentGranted(): Promise<boolean> {
 // While popped out: the site's player may fight back — yank the video home or
 // tear the spot down (the layer closed, SPA navigation). Both mean the show is
 // over; put everything back (or let it go) and close.
+// YouTube (and other MSE players) swap the <video> element while (re)loading a
+// stream. Inside the lifted surface the replacement is the same player slot —
+// adopt it in place instead of tearing the session down and re-entering, which
+// replayed the whole enter animation on every buffering hiccup.
+function adoptReplacedSurfaceVideo(): boolean {
+  if (!playerSurface || !overlay) return false;
+  // An in-place swap only: an SPA navigation to DIFFERENT content should close
+  // the session and go through the normal (auto-)open path for the new page.
+  if (autoOpenIdentity() !== videoAutoIdentity) return false;
+  // Players can briefly hold two <video> elements mid-swap (preloading the
+  // replacement); the largest one is the visible player, not a thumbnail.
+  let replacement: HTMLVideoElement | null = null;
+  let bestArea = -1;
+  for (const el of playerSurface.querySelectorAll("video")) {
+    if (!el.isConnected) continue;
+    const r = el.getBoundingClientRect();
+    const area = r.width * r.height;
+    if (area > bestArea) {
+      bestArea = area;
+      replacement = el;
+    }
+  }
+  if (!replacement) return false;
+  video?.removeAttribute(PLAYER_SURFACE_VIDEO);
+  video = replacement;
+  surfaceVideo = replacement;
+  replacement.setAttribute(PLAYER_SURFACE_VIDEO, "");
+  // The replacement may sit under fresh wrappers — mark them like the mount did.
+  if (
+    playerSurface.matches('.channel-root__player,.persistent-player,[data-a-target="video-player"]')
+  ) {
+    for (let el = replacement.parentElement; el && el !== playerSurface; el = el.parentElement) {
+      el.setAttribute(PLAYER_SURFACE_STRETCH, "");
+    }
+  }
+  wireVideo(replacement);
+  sizeVideo();
+  syncPlay();
+  syncVolume();
+  syncTime();
+  return true;
+}
+
 function guard(): void {
   if (!fmt) return;
+  // Live detection (or the popout URL's video id) can settle AFTER the viewer
+  // opened — let the chat surfaces (and their on-video button) appear as soon
+  // as they can. updateViewerChat() is idempotent and cheap when nothing
+  // changed.
+  if (!chatSatisfied() && chatAvailable()) {
+    updateViewerChat();
+    sizeVideo();
+  }
   if (playerSurface) {
     let open = false;
     try {
       open = playerSurface.matches(":popover-open");
     } catch {}
-    if (!video?.isConnected || !overlay || !playerSurface.isConnected) involuntaryExitViewer();
+    if (!video?.isConnected || !overlay || !playerSurface.isConnected) {
+      if (!(playerSurface.isConnected && overlay && adoptReplacedSurfaceVideo())) {
+        involuntaryExitViewer();
+      }
+      return;
+    }
     // A silently closed popover (element briefly out of the top layer without a
     // toggle event) gets one re-show attempt before the session is torn down.
     else if (!open && !reshowPlayerSurface()) involuntaryExitViewer();
+    // The same page-side top-layer churn can close the chat panel's popover
+    // and the lifted page dialog layers.
+    else {
+      reelevateChatPanel();
+      elevatePageDialogLayers();
+    }
     return;
   }
   if (
@@ -2621,7 +2916,10 @@ async function enter(
     position: "fixed",
     inset: "0",
     zIndex: Z_OVERLAY,
-    overflow: "hidden",
+    // clip, not hidden: an embedded chat iframe focusing its input makes the
+    // browser scroll a hidden-overflow overlay (64px on Kick), shearing every
+    // absolutely-positioned child off its computed spot. clip can't scroll.
+    overflow: "clip",
     contain: "layout style paint",
   } as Partial<CSSStyleDeclaration>);
   overlay.tabIndex = -1;
@@ -2708,6 +3006,20 @@ async function enter(
   );
   layoutPaused = true;
   setFormat(format);
+  // Chat mounts after the first setFormat so the overlay exists; re-run the
+  // layout so the side column's gutter is already reserved when the enter
+  // animation measures its target box.
+  mountViewerChat({
+    overlay,
+    nativeSurface: !!playerSurface,
+    liveHint: liveAtViewerEntry,
+    format: () => fmt ?? format,
+    relayout: () => {
+      sizeVideo();
+      notifyViewerLayout();
+    },
+  });
+  sizeVideo();
   dispatchViewerLayout();
   animateBackdropIn();
   const enterAnim: SurfaceTransition = playerSurface
@@ -2737,6 +3049,9 @@ export function exitViewer(): void {
   if (!fmt || exiting) return;
   const involuntary = exitInvoluntarily;
   exiting = true;
+  // Chat goes first: the video animates back to its page rect, not to the
+  // gutter-adjusted box.
+  unmountViewerChat();
   // Stays paused for the whole close transition — same as enter() — so the
   // launcher doesn't reposition itself off a video mid-shrink/mid-restore.
   // finish() below clears it once the video is truly back in its original spot.

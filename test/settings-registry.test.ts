@@ -9,6 +9,8 @@ const fx = vi.hoisted(() => ({
   flashBadge: vi.fn(),
   updateLauncher: vi.fn(),
   releaseAutoSlow: vi.fn(),
+  applyViewerChatMode: vi.fn(),
+  applyViewerChatSettings: vi.fn(),
 }));
 vi.mock("../src/content/speed.js", () => ({ applyAll: fx.applyAll, resetAudios: fx.resetAudios }));
 vi.mock("../src/content/badge/overlay.js", () => ({
@@ -17,6 +19,10 @@ vi.mock("../src/content/badge/overlay.js", () => ({
 }));
 vi.mock("../src/content/overlay/launcher.js", () => ({ updateLauncher: fx.updateLauncher }));
 vi.mock("../src/content/audio/autoslow.js", () => ({ releaseAutoSlow: fx.releaseAutoSlow }));
+vi.mock("../src/content/viewer.js", () => ({
+  applyViewerChatMode: fx.applyViewerChatMode,
+  applyViewerChatSettings: fx.applyViewerChatSettings,
+}));
 
 import { S } from "../src/content/state.js";
 import {
@@ -73,6 +79,54 @@ describe("loadRegistry — defaults", () => {
     expect(S.audioCompThreshold).toBe(-60);
     expect(S.autoSlowFloor).toBe(1.0);
     expect(S.autoSlowKnee).toBe(0.5);
+  });
+});
+
+describe("loadRegistry — viewer chat keys", () => {
+  it("applies defaults when storage is empty", () => {
+    loadRegistry({});
+    expect(S.viewerChatMode).toBe("off");
+    expect(S.viewerChatOpacity).toBe(0.4);
+    expect(S.viewerChatInput).toBe(true);
+    expect(S.viewerChatWidth).toBe(340);
+    expect(S.viewerChatHeight).toBe(420);
+  });
+
+  it("accepts the two on modes and rejects garbage", () => {
+    loadRegistry({ viewerChatMode: "side" });
+    expect(S.viewerChatMode).toBe("side");
+    loadRegistry({ viewerChatMode: "overlay" });
+    expect(S.viewerChatMode).toBe("overlay");
+    loadRegistry({ viewerChatMode: "garbage" });
+    expect(S.viewerChatMode).toBe("off");
+  });
+
+  it("normalizes the per-site side-width map (clamps, drops junk)", () => {
+    loadRegistry({
+      viewerChatSideWidths: {
+        "twitch.tv": { theater: 5000, normal: 250.7 },
+        "youtube.com": { theater: "wide" },
+        junk: "nope",
+      },
+    });
+    expect(S.viewerChatSideWidths).toEqual({
+      "twitch.tv": { theater: 600, normal: 251 },
+    });
+    loadRegistry({});
+    expect(S.viewerChatSideWidths).toEqual({});
+  });
+
+  it("clamps and rounds the panel scalars", () => {
+    loadRegistry({
+      viewerChatOpacity: 7,
+      viewerChatInput: false,
+      viewerChatWidth: 100,
+      viewerChatHeight: 9999,
+    });
+    expect(S.viewerChatOpacity).toBe(1);
+    expect(S.viewerChatInput).toBe(false);
+    expect(S.viewerChatWidth).toBe(240);
+    expect(S.viewerChatHeight).toBe(720);
   });
 });
 
@@ -144,6 +198,19 @@ describe("applyRegistryChanges — value + side-effects", () => {
 
     expect(S.autoSlowEnabled).toBe(false);
     expect(fx.releaseAutoSlow).toHaveBeenCalledTimes(1);
+  });
+
+  it("remounts chat on a mode change and restyles the panel on scalar changes", () => {
+    applyRegistryChanges(changes({ viewerChatMode: "side" }));
+    expect(S.viewerChatMode).toBe("side");
+    expect(fx.applyViewerChatMode).toHaveBeenCalledTimes(1);
+    expect(fx.applyViewerChatSettings).not.toHaveBeenCalled();
+
+    applyRegistryChanges(changes({ viewerChatOpacity: 0.5, viewerChatInput: false }));
+    expect(S.viewerChatOpacity).toBe(0.5);
+    expect(S.viewerChatInput).toBe(false);
+    // Both scalars share one apply — deduped to a single call per batch.
+    expect(fx.applyViewerChatSettings).toHaveBeenCalledTimes(1);
   });
 
   it("sets audio-compressor values without firing a side-effect (that stays bespoke)", () => {

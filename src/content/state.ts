@@ -78,6 +78,20 @@ export const S = {
   viewerFitScope: null as "channel" | "site" | "global" | null,
   // In normal Viewer mode, mirror the video behind the glass backdrop.
   viewerBackdropVideo: false,
+  // Stream chat inside the pop-out viewer (live pages on Twitch/YouTube/Kick):
+  // "off", "side" (native popout chat docked as a right column) or "overlay"
+  // (the same popout chat, skinned, in our floating panel over the video).
+  viewerChatMode: "off" as "off" | "side" | "overlay",
+  // Overlay chat panel look — background tint alpha, whether the message input
+  // is shown, and panel size (px). Set from the options page; the panel's
+  // resize handle writes width/height back.
+  viewerChatOpacity: 0.4,
+  viewerChatInput: true,
+  viewerChatWidth: 340,
+  viewerChatHeight: 420,
+  // Side-column width per site AND per viewer format, written by dragging the
+  // column's left edge. Falls back to the default 340px column.
+  viewerChatSideWidths: {} as Record<string, { normal?: number; theater?: number }>,
   // Opt-in: fetch SponsorBlock segments for the current YouTube video and show
   // them on the viewer's seek bar (a third-party API request — hence opt-in).
   sponsorMarks: false,

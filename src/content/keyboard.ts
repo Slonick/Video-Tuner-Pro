@@ -18,7 +18,13 @@ import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
-import { toggleViewer, viewerAnchorVideo, viewerFormat } from "./viewer.js";
+import {
+  canCycleViewerChat,
+  cycleViewerChatMode,
+  toggleViewer,
+  viewerAnchorVideo,
+  viewerFormat,
+} from "./viewer.js";
 import { listenerOptions } from "./lifecycle.js";
 
 let cachedPresetKeys: (string | null)[] | null = null;
@@ -59,7 +65,7 @@ document.addEventListener(
   (e) => {
     if (e.defaultPrevented) return;
     if (!S.keyboardEnabled || !ctxValid()) return;
-    const { slower, faster, reset, toggle, hold, overlay, viewer, theater } = S.keymap;
+    const { slower, faster, reset, toggle, hold, overlay, viewer, theater, chat } = S.keymap;
     const oneShotRepeat =
       e.repeat &&
       !e.ctrlKey &&
@@ -70,7 +76,8 @@ document.addEventListener(
         e.code === toggle ||
         e.code === overlay ||
         e.code === viewer ||
-        e.code === theater);
+        e.code === theater ||
+        e.code === chat);
     if (oneShotRepeat) return;
     // A preset whose assigned chord matches this exact event (may use modifiers).
     let preset: number | undefined;
@@ -95,7 +102,8 @@ document.addEventListener(
         e.code === hold ||
         e.code === overlay ||
         e.code === viewer ||
-        e.code === theater);
+        e.code === theater ||
+        e.code === chat);
     const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (speedStepKey || plainActionKey);
     if (preset === undefined && !actionKey) return;
     // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
@@ -108,6 +116,10 @@ document.addEventListener(
     // untouched there; embedded players can still use native Picture-in-Picture.
     if (viewerAction && window.top !== window) return;
     if (!primaryVideo() && !viewerAnchorVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
+    // The chat key acts only inside an open viewer on a chat-capable live page —
+    // otherwise leave the site's own key (e.g. YouTube's C = captions) alone.
+    // A preset chord on the same key still wins (dispatched below).
+    if (e.code === chat && preset === undefined && !canCycleViewerChat()) return;
 
     e.preventDefault();
     if (preset !== undefined) {
@@ -124,6 +136,10 @@ document.addEventListener(
     }
     if (e.code === theater) {
       toggleViewer("theater");
+      return;
+    }
+    if (e.code === chat) {
+      cycleViewerChatMode();
       return;
     }
     if (e.code === hold) {
