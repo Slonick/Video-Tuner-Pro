@@ -95,6 +95,8 @@ let backdropCanvasTimer: ReturnType<typeof setTimeout> | null = null;
 let surfaceShell: HTMLDivElement | null = null;
 let playerSurface: HTMLElement | null = null;
 let playerSurfaceStyle: HTMLStyleElement | null = null;
+let playerSurfaceToggle: ((e: Event) => void) | null = null;
+let playerSurfaceObserver: MutationObserver | null = null;
 let loadingEl: HTMLDivElement | null = null;
 let loadingShown = false;
 let holder: Comment | null = null; // marks the video's original DOM spot
@@ -464,12 +466,74 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
   playerSurface = candidate;
   playerSurfaceStyle = style;
   surfaceVideo = v;
+  playerSurfaceToggle = (e: Event) => {
+    if ((e as { newState?: string }).newState !== "closed") return;
+    if (playerSurface !== candidate) return;
+    // beforetoggle fires synchronously inside the hide algorithm, where
+    // re-showing is not allowed yet. A microtask runs right after the hide
+    // completes but still before the next paint, so the closed state never
+    // reaches the screen. The plain toggle handler stays as a fallback for
+    // engines that only deliver the queued event.
+    if (e.type === "beforetoggle") queueMicrotask(recoverPlayerSurface);
+    else recoverPlayerSurface();
+  };
+  candidate.addEventListener("beforetoggle", playerSurfaceToggle);
+  candidate.addEventListener("toggle", playerSurfaceToggle);
+  // Reparenting (YouTube's playerAttach moves the player into the hydrated
+  // watch layout) hides the popover SILENTLY — no toggle events fire for a
+  // disconnected element. The mutation observer sees the reinsertion in the
+  // same mutation batch, and its callback runs as a microtask before the next
+  // render, so re-showing here keeps the closed popover from ever painting.
+  playerSurfaceObserver = new MutationObserver(() => {
+    const surface = playerSurface;
+    if (surface !== candidate || !fmt || exiting) return;
+    if (!surface.isConnected) return; // mid-migration — wait for the reinsertion
+    let open = false;
+    try {
+      open = surface.matches(":popover-open");
+    } catch {}
+    if (!open) recoverPlayerSurface();
+  });
+  playerSurfaceObserver.observe(document.documentElement, { childList: true, subtree: true });
   return true;
+}
+
+// YouTube rebuilds its top layer while a page is still loading or navigating,
+// which force-closes every open popover — ours included. That closure is not a
+// user action: put the surface back instead of tearing the session down. The
+// per-session cap concedes to a player that actively fights the popover.
+const MAX_SURFACE_RESHOWS = 6;
+let surfaceReshows = 0;
+function reshowPlayerSurface(): boolean {
+  const surface = playerSurface as PopoverPlayer | null;
+  if (!surface || !fmt || exiting) return false;
+  try {
+    if (surface.matches(":popover-open")) return true; // already recovered
+  } catch {}
+  if (!surface.isConnected || surfaceReshows >= MAX_SURFACE_RESHOWS) return false;
+  surfaceReshows++;
+  try {
+    surface.showPopover?.();
+    if (!surface.matches(":popover-open")) return false;
+  } catch {
+    return false;
+  }
+  notifyViewerLayout();
+  return true;
+}
+
+function recoverPlayerSurface(): void {
+  if (!playerSurface || !fmt || exiting) return; // no session to recover
+  if (!reshowPlayerSurface()) involuntaryExitViewer();
 }
 
 function unmountPlayerSurface(): void {
   const surface = playerSurface as PopoverPlayer | null;
   if (surface) {
+    if (playerSurfaceToggle) {
+      surface.removeEventListener("beforetoggle", playerSurfaceToggle);
+      surface.removeEventListener("toggle", playerSurfaceToggle);
+    }
     try {
       if (surface.matches(":popover-open")) surface.hidePopover?.();
     } catch {}
@@ -482,9 +546,12 @@ function unmountPlayerSurface(): void {
     clearNativeSurfaceMotion(surface);
   }
   video?.removeAttribute(PLAYER_SURFACE_VIDEO);
+  playerSurfaceObserver?.disconnect();
+  playerSurfaceObserver = null;
   playerSurfaceStyle?.remove();
   playerSurfaceStyle = null;
   playerSurface = null;
+  playerSurfaceToggle = null;
 }
 
 export function viewerLayoutPaused(): boolean {
@@ -2151,7 +2218,10 @@ function guard(): void {
     try {
       open = playerSurface.matches(":popover-open");
     } catch {}
-    if (!video?.isConnected || !overlay || !playerSurface.isConnected || !open) exitViewer();
+    if (!video?.isConnected || !overlay || !playerSurface.isConnected) involuntaryExitViewer();
+    // A silently closed popover (element briefly out of the top layer without a
+    // toggle event) gets one re-show attempt before the session is torn down.
+    else if (!open && !reshowPlayerSurface()) involuntaryExitViewer();
     return;
   }
   if (
@@ -2162,7 +2232,7 @@ function guard(): void {
     video.parentElement !== surfaceShell ||
     (holder && !holder.isConnected)
   ) {
-    exitViewer();
+    involuntaryExitViewer();
   }
 }
 
@@ -2308,7 +2378,26 @@ const pendingAutoOpen = new WeakMap<
 >();
 let autoOpenedSession = false;
 let playbackPauseExit = false;
-let autoOpenNotBefore = isYouTube() ? Date.now() + 900 : 0;
+// The video playback-follow just returned to the page on pause. Its next play
+// press reopens the viewer immediately — see maybeAutoOpenViewer.
+let playbackResume: { el: HTMLVideoElement; identity: string } | null = null;
+// An exit the page forced on us (it yanked the video home, tore the spot down,
+// or force-closed our popover) is not the user dismissing the viewer, so it
+// must not burn the once-per-identity auto-open. The flag is only ever set for
+// the synchronous exitViewer() call right under it; the per-identity counter
+// keeps a player that actively fights the viewer from bouncing it forever.
+let exitInvoluntarily = false;
+const autoReopenTries = new Map<string, number>();
+const MAX_AUTO_REOPEN_TRIES = 3;
+
+function involuntaryExitViewer(): void {
+  exitInvoluntarily = true;
+  try {
+    exitViewer();
+  } finally {
+    exitInvoluntarily = false;
+  }
+}
 
 function autoOpenIdentity(): string {
   if (isYouTube()) {
@@ -2367,22 +2456,23 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
     return;
   const r = t.getBoundingClientRect();
   if (r.width < 200 || r.height < 112) return; // thumbnails/previews don't count
+  // Resuming a video that playback-follow itself just closed: the play press is
+  // an explicit gesture at a known-good video, so the "is playback stable?"
+  // debounce below (an anti-preview-flicker measure) would only add lag.
+  if (playbackResume && playbackResume.el === t && playbackResume.identity === identity) {
+    playbackResume = null;
+    rememberAutoOpen(t, identity);
+    void enter(S.viewerAuto, t, { autoTriggered: true });
+    return;
+  }
   if (S.viewerAutoPlaybackOnly || isYouTube()) {
     const pending = pendingAutoOpen.get(t);
     if (pending?.identity === identity) return;
     if (pending) clearTimeout(pending.timer);
-    const delay = Math.max(
-      VIEWER_PLAYBACK_STABLE_MS,
-      isYouTube() ? autoOpenNotBefore - Date.now() : 0,
-    );
     const timer = setTimeout(() => {
       const current = pendingAutoOpen.get(t);
       if (!current || current.identity !== identity || current.timer !== timer) return;
       pendingAutoOpen.delete(t);
-      if (isYouTube() && Date.now() < autoOpenNotBefore) {
-        maybeAutoOpenViewer(t);
-        return;
-      }
       if (
         t.paused ||
         t.ended ||
@@ -2395,7 +2485,7 @@ export function maybeAutoOpenViewer(t: HTMLVideoElement): void {
         return;
       rememberAutoOpen(t, identity);
       void enter(S.viewerAuto, t, { autoTriggered: true });
-    }, delay);
+    }, VIEWER_PLAYBACK_STABLE_MS);
     pendingAutoOpen.set(t, { identity, timer });
     return;
   }
@@ -2422,10 +2512,6 @@ export function maybeAutoOpenPlayingPrimary(): void {
 document.addEventListener(
   "yt-navigate-finish",
   () => {
-    // During initial load and SPA navigation YouTube briefly considers its
-    // player ready, then rebuilds its top layer and closes our manual popover.
-    // Wait until that lifecycle settles before opening playback-follow mode.
-    autoOpenNotBefore = Date.now() + 700;
     maybeAutoOpenPlayingPrimary();
     requestAnimationFrame(maybeAutoOpenPlayingPrimary);
   },
@@ -2490,6 +2576,7 @@ async function enter(
   autoOpenedSession = opts.autoTriggered === true;
   playbackFollowArmed = !autoOpenedSession || !S.viewerAutoPlaybackOnly;
   playbackPauseExit = false;
+  playbackResume = null; // a session is opening — the pending resume is served or stale
   surfaceVideo = null;
   backdropEl = null;
   surfaceShell = null;
@@ -2497,6 +2584,7 @@ async function enter(
   playerSurfaceStyle = null;
   backdropStream = null;
   viewerSession++;
+  surfaceReshows = 0;
   resumeSurfacePlaybackUntil = wasPlayingAtEntry ? Date.now() + 1800 : 0;
   resumeSurfacePlaybackUsed = false;
   sourceParent = null;
@@ -2577,6 +2665,19 @@ async function enter(
   media = new AbortController();
   const opt = { signal: media.signal };
   wireVideo(v);
+  // The one-shot resume in syncPlay() exists to undo the HOST player pausing
+  // itself as a side effect of top-layer entry — a pause that arrives without
+  // any user input. The moment real input happens, every later pause is the
+  // user's intent (YouTube even flashes its pause bezel), so never fight it.
+  for (const ev of ["pointerdown", "keydown", "touchstart"] as const) {
+    window.addEventListener(
+      ev,
+      () => {
+        resumeSurfacePlaybackUsed = true;
+      },
+      { capture: true, passive: true, signal: media.signal },
+    );
+  }
   overlay.addEventListener("mousemove", showBar, { passive: true, signal: media.signal });
   // A press on the dim (not on the video or the bar) closes.
   overlay.addEventListener(
@@ -2615,17 +2716,35 @@ async function enter(
 
 export function exitViewer(): void {
   if (!fmt || exiting) return;
+  const involuntary = exitInvoluntarily;
   exiting = true;
   // Stays paused for the whole close transition — same as enter() — so the
   // launcher doesn't reposition itself off a video mid-shrink/mid-restore.
   // finish() below clears it once the video is truly back in its original spot.
   layoutPaused = true;
   const exitingOverlay = overlay;
-  const targetRect = sourceRect;
-  const surfaceAnim: SurfaceTransition = playerSurface
-    ? animateNativeSurfaceTo(targetRect)
-    : animateSurfaceTo(targetRect);
-  const backdropAnim = animateBackdropOut(targetRect);
+  // sourceRect was measured at entry; the page may have re-laid itself out
+  // since (YouTube hydrates well past the auto-open). While the popover holds
+  // the player, its home spot can't be measured directly — but the surface's
+  // parent stays in normal flow and keeps the reserved player box. Prefer that
+  // live rect so the return animation lands where the player will actually sit.
+  let targetRect = sourceRect;
+  if (playerSurface) {
+    const home = playerSurface.parentElement;
+    if (home?.isConnected) {
+      const r = home.getBoundingClientRect();
+      if (visibleRect(r)) targetRect = r;
+    }
+  }
+  // A forced teardown means the page already reclaimed (or destroyed) the
+  // video's spot — animating the surface back to a stale rect just flashes.
+  // Restore instantly; only user-intended exits get the shrink transition.
+  const surfaceAnim: SurfaceTransition = involuntary
+    ? null
+    : playerSurface
+      ? animateNativeSurfaceTo(targetRect)
+      : animateSurfaceTo(targetRect);
+  const backdropAnim = involuntary ? null : animateBackdropOut(targetRect);
   const animated = !!surfaceAnim || !!backdropAnim;
   fmt = null;
   document.documentElement.removeAttribute(ATTR);
@@ -2662,7 +2781,16 @@ export function exitViewer(): void {
     markerRanges = [];
     activeMarker = null;
     const restoredVideo = video;
-    const shouldResumeAuto = playbackPauseExit;
+    let shouldResumeAuto = playbackPauseExit;
+    playbackResume =
+      playbackPauseExit && restoredVideo ? { el: restoredVideo, identity: videoAutoIdentity } : null;
+    if (!shouldResumeAuto && involuntary && autoOpenedSession) {
+      const tries = autoReopenTries.get(videoAutoIdentity) ?? 0;
+      if (tries < MAX_AUTO_REOPEN_TRIES) {
+        autoReopenTries.set(videoAutoIdentity, tries + 1);
+        shouldResumeAuto = true;
+      }
+    }
     if (video) {
       // Use the identity captured on entry. The URL may already point at the
       // next SPA video by the time the close animation finishes.
@@ -2741,8 +2869,14 @@ export function exitViewer(): void {
     // Players re-measure on resize — let the restored one lay itself out.
     window.dispatchEvent(new Event("resize"));
     notifyViewerLayout();
-    if (shouldResumeAuto && restoredVideo && !restoredVideo.paused && !restoredVideo.ended)
-      maybeAutoOpenViewer(restoredVideo);
+    if (shouldResumeAuto) {
+      if (restoredVideo?.isConnected && !restoredVideo.paused && !restoredVideo.ended)
+        maybeAutoOpenViewer(restoredVideo);
+      // The page may have replaced the element while yanking the old one home
+      // (a reload/SPA teardown). The replacement is often already playing, so
+      // no further `play` event will arrive — re-check the primary directly.
+      else if (involuntary) maybeAutoOpenPlayingPrimary();
+    }
     // Some site players (YouTube's included) don't finish re-laying the
     // returned video out in the same tick — a launcher position measured right
     // now can grab a transitional rect and stick there. One more pass shortly

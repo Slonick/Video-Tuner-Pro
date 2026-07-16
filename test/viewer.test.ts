@@ -408,6 +408,39 @@ describe("toggleViewer — lifecycle", () => {
     await settleNativeViewerExit();
   });
 
+  it("never resumes a pause that follows real user input", async () => {
+    const { wrap, v } = makeVideo();
+    wrap.getBoundingClientRect = v.getBoundingClientRect;
+    let popoverOpen = false;
+    const matches = wrap.matches.bind(wrap);
+    wrap.matches = (selector: string) =>
+      selector === ":popover-open" ? popoverOpen : matches(selector);
+    Object.assign(wrap, {
+      showPopover: () => {
+        popoverOpen = true;
+      },
+      hidePopover: () => {
+        popoverOpen = false;
+      },
+    });
+    h.primary = v;
+    v.play();
+
+    await openViewer("theater");
+    expect(v.paused).toBe(false);
+
+    // The user clicks the player and YouTube pauses: input arrived first, so
+    // the top-layer-entry resume must stay out of the way — even though the
+    // pause lands inside its arming window.
+    window.dispatchEvent(new Event("pointerdown"));
+    v.pause();
+    await flush();
+    expect(v.paused).toBe(true);
+
+    exitViewer();
+    await settleNativeViewerExit();
+  });
+
   it("uses the original video even when captureStream is available", async () => {
     const { wrap, v } = makeVideo();
     v.controls = true;
@@ -1784,6 +1817,29 @@ describe("auto pop-out on play", () => {
     expect(viewerFormat()).toBe("theater");
   });
 
+  it("reopens on play with no stability debounce after a pause exit", async () => {
+    vi.useFakeTimers();
+    S.viewerAuto = "theater";
+    S.viewerAutoPlaybackOnly = true;
+    const { v } = makeVideo();
+    installCapture(v);
+
+    await v.play();
+    await vi.advanceTimersByTimeAsync(251);
+    expect(viewerFormat()).toBe("theater");
+    await vi.advanceTimersByTimeAsync(401); // playback-follow arms
+
+    v.pause();
+    await flush();
+    expect(viewerFormat()).toBeNull();
+
+    // The play press resumes what playback-follow itself closed — the viewer
+    // must come back in the same task, without the 250ms playback debounce.
+    await v.play();
+    await flush();
+    expect(viewerFormat()).toBe("theater");
+  });
+
   it("opens an autoplaying video after persisted auto settings finish loading", async () => {
     vi.useFakeTimers();
     const { v } = makeVideo();
@@ -1829,12 +1885,8 @@ describe("auto pop-out on play", () => {
     expect(viewerFormat()).toBeNull();
   });
 
-  it("waits for the YouTube player lifecycle to settle after navigation", async () => {
+  it("re-shows a native surface the page force-closed instead of exiting", async () => {
     vi.useFakeTimers();
-    S.viewerAuto = "normal";
-    S.viewerAutoPlaybackOnly = true;
-    const { v } = makeVideo();
-    h.primary = v;
     const route = {
       hostname: "www.youtube.com",
       pathname: "/watch",
@@ -1842,15 +1894,149 @@ describe("auto pop-out on play", () => {
       href: "https://www.youtube.com/watch?v=video-aaaaa",
     };
     vi.stubGlobal("location", route);
+    try {
+      S.viewerAuto = "theater";
+      const { wrap, v } = makeVideo();
+      wrap.getBoundingClientRect = v.getBoundingClientRect;
+      h.primary = v;
+      let popoverOpen = false;
+      const matches = wrap.matches.bind(wrap);
+      wrap.matches = (selector: string) =>
+        selector === ":popover-open" ? popoverOpen : matches(selector);
+      Object.assign(wrap, {
+        showPopover: () => {
+          popoverOpen = true;
+        },
+        hidePopover: () => {
+          popoverOpen = false;
+        },
+      });
 
-    document.dispatchEvent(new Event("yt-navigate-finish"));
-    await v.play();
-    await vi.advanceTimersByTimeAsync(300);
-    expect(viewerFormat()).toBeNull();
+      await v.play();
+      await vi.advanceTimersByTimeAsync(251);
+      expect(viewerFormat()).toBe("theater");
+      expect(popoverOpen).toBe(true);
 
-    await vi.advanceTimersByTimeAsync(401);
-    expect(viewerFormat()).toBe("normal");
-    vi.unstubAllGlobals();
+      // YouTube rebuilding its top layer force-closes every open popover.
+      popoverOpen = false;
+      const toggle = new Event("toggle");
+      (toggle as { newState?: string }).newState = "closed";
+      wrap.dispatchEvent(toggle);
+
+      expect(popoverOpen).toBe(true);
+      expect(viewerFormat()).toBe("theater");
+      exitViewer();
+      await vi.advanceTimersByTimeAsync(560);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("re-shows a surface hidden silently by reparenting, before the next paint", async () => {
+    vi.useFakeTimers();
+    const route = {
+      hostname: "www.youtube.com",
+      pathname: "/watch",
+      search: "?v=video-ccccc",
+      href: "https://www.youtube.com/watch?v=video-ccccc",
+    };
+    vi.stubGlobal("location", route);
+    try {
+      S.viewerAuto = "theater";
+      const { wrap, v } = makeVideo();
+      wrap.getBoundingClientRect = v.getBoundingClientRect;
+      h.primary = v;
+      let popoverOpen = false;
+      const matches = wrap.matches.bind(wrap);
+      wrap.matches = (selector: string) =>
+        selector === ":popover-open" ? popoverOpen : matches(selector);
+      Object.assign(wrap, {
+        showPopover: () => {
+          popoverOpen = true;
+        },
+        hidePopover: () => {
+          popoverOpen = false;
+        },
+      });
+
+      await v.play();
+      await vi.advanceTimersByTimeAsync(251);
+      expect(viewerFormat()).toBe("theater");
+      expect(popoverOpen).toBe(true);
+
+      // YouTube's playerAttach moves the player element into the hydrated
+      // watch layout. Disconnecting an open popover hides it with NO toggle
+      // events — only the DOM mutation itself is observable.
+      popoverOpen = false;
+      const newHome = document.createElement("div");
+      document.body.appendChild(newHome);
+      newHome.appendChild(wrap);
+      await flush(); // MutationObserver callbacks are microtasks
+
+      expect(popoverOpen).toBe(true);
+      expect(viewerFormat()).toBe("theater");
+      exitViewer();
+      await vi.advanceTimersByTimeAsync(560);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("reopens after the page yanks the video out of an automatic viewer", async () => {
+    vi.useFakeTimers();
+    // The reopen-retry budget is per media identity — give this test its own.
+    vi.stubGlobal("location", {
+      hostname: "yank-once.example",
+      pathname: "/",
+      href: "https://yank-once.example/",
+    });
+    try {
+      S.viewerAuto = "normal";
+      const { wrap, v } = makeVideo();
+      installCapture(v);
+      h.primary = v;
+
+      await v.play();
+      await flush();
+      expect(viewerFormat()).toBe("normal");
+
+      // The site's player pulls its element home (reload/SPA teardown), the
+      // 500ms guard notices. That exit is not the user's — the viewer comes back.
+      wrap.appendChild(v);
+      await vi.advanceTimersByTimeAsync(501);
+      await vi.advanceTimersByTimeAsync(600); // exit transition + reopen
+      expect(viewerFormat()).toBe("normal");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("gives up reopening after repeated forced teardowns of the same video", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", {
+      hostname: "yank-forever.example",
+      pathname: "/",
+      href: "https://yank-forever.example/",
+    });
+    try {
+      S.viewerAuto = "normal";
+      const { wrap, v } = makeVideo();
+      installCapture(v);
+      h.primary = v;
+
+      await v.play();
+      await flush();
+      // The initial open plus three bounded reopens…
+      for (let i = 0; i < 4; i++) {
+        expect(viewerFormat()).toBe("normal");
+        wrap.appendChild(v);
+        await vi.advanceTimersByTimeAsync(1101);
+      }
+      // …then the page wins.
+      expect(viewerFormat()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("stays in the automatic viewer on pause in always mode", async () => {
