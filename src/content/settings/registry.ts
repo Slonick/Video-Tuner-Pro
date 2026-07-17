@@ -178,6 +178,57 @@ export const REGISTRY: Entry<unknown>[] = [
     apply: applyViewerChatMode,
   }),
   entry({
+    key: "viewerChatPanelSites",
+    parse: (raw) => {
+      const out: Record<
+        string,
+        {
+          opacity?: number;
+          width?: number;
+          height?: number;
+          h?: "left" | "right";
+          v?: "top" | "bottom";
+          dx?: number;
+          dy?: number;
+        }
+      > = {};
+      if (raw && typeof raw === "object") {
+        for (const [site, v] of Object.entries(raw as Record<string, unknown>)) {
+          if (!v || typeof v !== "object") continue;
+          const src = v as Record<string, unknown>;
+          const prefs: (typeof out)[string] = {};
+          if (typeof src.opacity === "number" && Number.isFinite(src.opacity)) {
+            prefs.opacity = clampNum(src.opacity, 0, 1, 0.4);
+          }
+          if (typeof src.width === "number" && Number.isFinite(src.width)) {
+            prefs.width = Math.round(
+              clampNum(src.width, CHAT_PANEL_WIDTH_MIN, CHAT_PANEL_WIDTH_MAX, CHAT_PANEL_WIDTH),
+            );
+          }
+          if (typeof src.height === "number" && Number.isFinite(src.height)) {
+            prefs.height = Math.round(
+              clampNum(src.height, CHAT_PANEL_HEIGHT_MIN, CHAT_PANEL_HEIGHT_MAX, CHAT_PANEL_HEIGHT),
+            );
+          }
+          if (src.h === "left" || src.h === "right") prefs.h = src.h;
+          if (src.v === "top" || src.v === "bottom") prefs.v = src.v;
+          // The distances may legitimately be negative (panel hanging past the
+          // video edge) — just keep them sane.
+          if (typeof src.dx === "number" && Number.isFinite(src.dx)) {
+            prefs.dx = Math.round(clampNum(src.dx, -4000, 4000, 0));
+          }
+          if (typeof src.dy === "number" && Number.isFinite(src.dy)) {
+            prefs.dy = Math.round(clampNum(src.dy, -4000, 4000, 0));
+          }
+          if (Object.keys(prefs).length) out[site] = prefs;
+        }
+      }
+      return out;
+    },
+    set: (v) => (S.viewerChatPanelSites = v),
+    apply: applyViewerChatSettings,
+  }),
+  entry({
     key: "viewerChatHeight",
     parse: (raw) =>
       Math.round(clampNum(raw, CHAT_PANEL_HEIGHT_MIN, CHAT_PANEL_HEIGHT_MAX, CHAT_PANEL_HEIGHT)),

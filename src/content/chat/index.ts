@@ -16,7 +16,8 @@ import {
   type SideChat,
   type SideChatBox,
 } from "./side.js";
-import { mountChatPanel, type ChatPanel } from "./panel.js";
+import { mountChatPanel, type ChatPanel, type ChatPanelPrefs } from "./panel.js";
+import type { PanelBox } from "./anchor.js";
 import { mountChatFab, type ChatFab } from "./fab.js";
 
 export type ViewerChatMode = "off" | "side" | "overlay";
@@ -90,9 +91,29 @@ export function layoutChatFab(box: { right: number; top: number }): void {
   fab?.layout(box);
 }
 
+// Report the video box to the floating panel — it keeps its remembered spot
+// relative to the box's nearest edges.
+export function layoutChatPanel(box: PanelBox): void {
+  panel?.layout(box);
+}
+
 function desiredMode(): ViewerChatMode {
   if (!ctx || !chatAvailable(ctx.liveHint)) return "off";
   return S.viewerChatMode;
+}
+
+function panelPrefs(): ChatPanelPrefs {
+  return S.viewerChatPanelSites[getDomain()] ?? {};
+}
+
+function persistPanelPrefs(patch: ChatPanelPrefs): void {
+  const domain = getDomain();
+  const map = {
+    ...S.viewerChatPanelSites,
+    [domain]: { ...S.viewerChatPanelSites[domain], ...patch },
+  };
+  S.viewerChatPanelSites = map;
+  STORE.set({ viewerChatPanelSites: map });
 }
 
 function persistSideWidth(width: number): void {
@@ -153,7 +174,7 @@ export function updateViewerChat(): void {
     });
   }
   if (want === "overlay" && !panel) {
-    panel = mountChatPanel(ctx.overlay);
+    panel = mountChatPanel(ctx.overlay, { prefs: panelPrefs, persist: persistPanelPrefs });
     if (ctx.nativeSurface) panel.elevate();
   }
   // The on-video toggle exists whenever chat COULD be shown, whatever the mode.

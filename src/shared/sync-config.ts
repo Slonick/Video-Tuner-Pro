@@ -92,6 +92,7 @@ export const KEY_CATEGORY: Record<string, Category> = {
   viewerChatWidth: "general",
   viewerChatHeight: "general",
   viewerChatSideWidths: "general",
+  viewerChatPanelSites: "general",
   liveSyncSeen: "general",
   audioSeen: "general",
   popupGuideSeen: "general",

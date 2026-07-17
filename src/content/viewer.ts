@@ -26,6 +26,7 @@ import {
   chatSatisfied,
   cycleChatMode,
   layoutChatFab,
+  layoutChatPanel,
   layoutSideChat,
   mountViewerChat,
   raiseChatPopovers,
@@ -1484,6 +1485,7 @@ function sizeVideo(): void {
       playerSurface.style.removeProperty("--vtp-viewer-center-x");
       if (gutter > 0) layoutSideChat({ fill: true, width: gutter });
       layoutChatFab({ right: availW, top: 0 });
+      layoutChatPanel({ left: 0, top: 0, width: availW, height: window.innerHeight });
     } else {
       const mediaWidth = surface.videoWidth || video?.videoWidth || 0;
       const mediaHeight = surface.videoHeight || video?.videoHeight || 0;
@@ -1508,6 +1510,12 @@ function sizeVideo(): void {
         layoutChatFab({
           right: Math.round((window.innerWidth - (normalBox.w + gutter)) / 2) + normalBox.w,
           top: Math.round((window.innerHeight - normalBox.h) / 2),
+        });
+        layoutChatPanel({
+          left: Math.round((window.innerWidth - (normalBox.w + gutter)) / 2),
+          top: Math.round((window.innerHeight - normalBox.h) / 2),
+          width: normalBox.w,
+          height: normalBox.h,
         });
         if (gutter > 0) {
           // Center the card + chat as one flush block: the card keeps its left
@@ -1547,6 +1555,7 @@ function sizeVideo(): void {
     normalBox = null;
     if (gutter > 0) layoutSideChat({ fill: true, width: gutter });
     layoutChatFab({ right: availW, top: 0 });
+    layoutChatPanel({ left: 0, top: 0, width: availW, height: window.innerHeight });
     shell.style.cssText =
       "position:absolute !important;left:0 !important;top:0 !important;bottom:0 !important;" +
       `right:${gutter}px !important;` +
@@ -1579,6 +1588,12 @@ function sizeVideo(): void {
     layoutChatFab({
       right: Math.round((window.innerWidth - (box.w + gutter)) / 2) + box.w,
       top: Math.round((window.innerHeight - box.h) / 2),
+    });
+    layoutChatPanel({
+      left: Math.round((window.innerWidth - (box.w + gutter)) / 2),
+      top: Math.round((window.innerHeight - box.h) / 2),
+      width: box.w,
+      height: box.h,
     });
     let centerX = Math.round(window.innerWidth / 2);
     if (gutter > 0) {

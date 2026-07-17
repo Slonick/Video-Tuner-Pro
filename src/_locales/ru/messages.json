@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "Чат: $1" },
   "chatUnavailable": { "message": "Чат недоступен" },
   "optChatTitle": { "message": "Оверлей чата стрима" },
-  "optChatHint": { "message": "Размер и вид плавающей панели чата в вынесенном видео." },
+  "optChatHint": { "message": "Размер и вид плавающей панели чата в вынесенном видео. Изменения, сделанные на самой панели, сохраняются для каждого сайта отдельно." },
   "optChatOpacityLabel": { "message": "Непрозрачность фона" },
   "optChatWidthLabel": { "message": "Ширина панели" },
   "optChatHeightLabel": { "message": "Высота панели" },

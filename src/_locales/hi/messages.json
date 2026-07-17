@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "चैट: $1" },
   "chatUnavailable": { "message": "चैट उपलब्ध नहीं है" },
   "optChatTitle": { "message": "स्ट्रीम चैट ओवरले" },
-  "optChatHint": { "message": "पॉप-आउट व्यूअर में तैरते चैट पैनल का आकार और रूप।" },
+  "optChatHint": { "message": "पॉप-आउट व्यूअर में तैरते चैट पैनल का आकार और रूप। पैनल पर किए गए बदलाव हर साइट के लिए अलग से सहेजे जाते हैं।" },
   "optChatOpacityLabel": { "message": "पृष्ठभूमि की अपारदर्शिता" },
   "optChatWidthLabel": { "message": "पैनल की चौड़ाई" },
   "optChatHeightLabel": { "message": "पैनल की ऊँचाई" },

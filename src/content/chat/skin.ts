@@ -10,6 +10,11 @@ import { chatPlatform } from "./platform.js";
 import { OVERLAY_SKIN_HASH } from "./panel.js";
 
 const STYLE_ATTR = "data-vtp-chat-skin";
+// Set on <html> while the pointer has been away from the chat for a while —
+// hides the input zone (unless it holds focus) so the overlay is video-only.
+const IDLE_ATTR = "data-vtp-chat-idle";
+// Mirrors the viewer bar's auto-hide cadence.
+const INPUT_IDLE_MS = 2600;
 
 // Everything that must lose its opaque background, per platform. Broad on
 // purpose: Twitch popouts also run third-party chat replacements (FFZ), so the
@@ -18,7 +23,7 @@ const TRANSPARENT: Record<string, string> = {
   twitch:
     "html,body,#root,.chat-shell,.chat-room,.chat-room__content,.stream-chat," +
     ".chat-list--default,.chat-list--other,.chat-scrollable-area__message-container," +
-    ".channel-leaderboard,.community-highlight-stack__card,.chat-input," +
+    ".channel-leaderboard,.chat-input," +
     ".chat-wysiwyg-input__box,.chat-input__textarea",
   // Kick (2026 DOM): Tailwind utility classes; bg-surface-* carries every
   // opaque plate. Popups (gift shop, pinned message) keep their own.
@@ -44,7 +49,10 @@ const HIDE: Record<string, string> = {
     // its own — match the wrapper by its paging controls. The input footer
     // hosts a "ChatBadgeCarousel" too, so it must be excluded explicitly.
     '.chat-room__content>div:not(.chat-input):has([aria-label*="leaderboard" i]),' +
-    ".community-highlight-stack__scroll-area--disable",
+    // The community-highlight stack (pinned messages, drops, hype train) hangs
+    // its cards over the messages; collapsed it leaves an opaque backlog plate.
+    ".community-highlight-stack__scroll-area--disable," +
+    ".community-highlight-stack__card,.community-highlight-stack__backlog-card",
   kick: ".animate-leaderboards-marquee,div:has(>.animate-leaderboards-marquee)",
   youtube: "",
 };
@@ -149,6 +157,24 @@ function inputZoneCss(p: NonNullable<typeof platform>): string {
   );
 }
 
+// While idle, the whole input zone folds away — but never while it holds focus
+// (mid-message) and only when the input is enabled at all. Animated via
+// max-height (display can't transition); overflow stays visible in the shown
+// state so popups opening FROM the zone (emote picker, rewards) aren't clipped.
+function inputIdleCss(p: NonNullable<typeof platform>): string {
+  const shown = boost(INPUT[p]);
+  const idle = INPUT[p]
+    .split(",")
+    .map((s) => `:root[${IDLE_ATTR}] ${s.trim()}:not(:focus-within):not(#vtp-a):not(#vtp-b)`)
+    .join(",");
+  return (
+    `${shown}{max-height:320px!important;` +
+    `transition:max-height .3s ease,opacity .22s ease!important}` +
+    `${idle}{max-height:0!important;opacity:0!important;overflow:hidden!important;` +
+    `pointer-events:none!important}`
+  );
+}
+
 function css(p: NonNullable<typeof platform>): string {
   return (
     // Must match the embedding iframe's color-scheme (panel.ts pins it to
@@ -161,8 +187,36 @@ function css(p: NonNullable<typeof platform>): string {
     (p === "kick" ? KICK_POPOVER_PLATE : "") +
     inputZoneCss(p) +
     `${TEXT[p]}{text-shadow:0 0 3px #000,0 1px 3px #000,0 0 10px rgba(0,0,0,0.7)}` +
-    (S.viewerChatInput ? "" : `${boost(INPUT[p])}{display:none!important}`)
+    (S.viewerChatInput ? inputIdleCss(p) : `${boost(INPUT[p])}{display:none!important}`)
   );
+}
+
+// Show the input while the cursor is over the chat (the frame fills the panel,
+// so "over the chat" is "over this document"); hide it a beat after it leaves.
+function initInputIdle(): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const hide = (): void => document.documentElement.setAttribute(IDLE_ATTR, "");
+  const schedule = (): void => {
+    if (timer != null) clearTimeout(timer);
+    timer = setTimeout(hide, INPUT_IDLE_MS);
+  };
+  document.addEventListener(
+    "pointerover",
+    () => {
+      if (timer != null) clearTimeout(timer);
+      timer = null;
+      document.documentElement.removeAttribute(IDLE_ATTR);
+    },
+    { passive: true },
+  );
+  document.addEventListener(
+    "pointerout",
+    (e: PointerEvent) => {
+      if (!e.relatedTarget) schedule();
+    },
+    { passive: true },
+  );
+  schedule();
 }
 
 // Re-style a mounted skin after a settings change (called via the registry's
@@ -197,4 +251,5 @@ export function initChatFrameSkin(): void {
   };
   if (document.head && document.body) attach();
   else document.addEventListener("DOMContentLoaded", attach, { once: true });
+  initInputIdle();
 }

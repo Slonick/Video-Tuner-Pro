@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "Chat: $1" },
   "chatUnavailable": { "message": "Chat indisponível" },
   "optChatTitle": { "message": "Chat sobreposto da transmissão" },
-  "optChatHint": { "message": "Tamanho e aparência do painel de chat flutuante no player destacado." },
+  "optChatHint": { "message": "Tamanho e aparência do painel de chat flutuante no player destacado. Ajustes feitos no próprio painel são salvos separadamente para cada site." },
   "optChatOpacityLabel": { "message": "Opacidade do fundo" },
   "optChatWidthLabel": { "message": "Largura do painel" },
   "optChatHeightLabel": { "message": "Altura do painel" },

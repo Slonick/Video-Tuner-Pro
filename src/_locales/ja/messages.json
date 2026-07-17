@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "チャット: $1" },
   "chatUnavailable": { "message": "チャットは利用できません" },
   "optChatTitle": { "message": "配信チャットオーバーレイ" },
-  "optChatHint": { "message": "ポップアウト動画ビューアに浮かぶチャットパネルのサイズと外観。" },
+  "optChatHint": { "message": "ポップアウト動画ビューアに浮かぶチャットパネルのサイズと外観。 パネル上で行った調整はサイトごとに個別に保存されます。" },
   "optChatOpacityLabel": { "message": "背景の不透明度" },
   "optChatWidthLabel": { "message": "パネルの幅" },
   "optChatHeightLabel": { "message": "パネルの高さ" },

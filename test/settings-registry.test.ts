@@ -116,6 +116,37 @@ describe("loadRegistry — viewer chat keys", () => {
     expect(S.viewerChatSideWidths).toEqual({});
   });
 
+  it("normalizes the per-site panel prefs (clamps, drops junk fields)", () => {
+    loadRegistry({
+      viewerChatPanelSites: {
+        "twitch.tv": {
+          opacity: 3,
+          width: 100.4,
+          height: 9999,
+          h: "right",
+          v: "bottom",
+          dx: -20.6,
+          dy: 96,
+        },
+        "youtube.com": { h: "sideways", dx: "far" },
+        junk: 12,
+      },
+    });
+    expect(S.viewerChatPanelSites).toEqual({
+      "twitch.tv": {
+        opacity: 1,
+        width: 240,
+        height: 720,
+        h: "right",
+        v: "bottom",
+        dx: -21,
+        dy: 96,
+      },
+    });
+    loadRegistry({});
+    expect(S.viewerChatPanelSites).toEqual({});
+  });
+
   it("clamps and rounds the panel scalars", () => {
     loadRegistry({
       viewerChatOpacity: 7,

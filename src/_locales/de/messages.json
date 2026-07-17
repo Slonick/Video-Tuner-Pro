@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "Chat: $1" },
   "chatUnavailable": { "message": "Chat nicht verfügbar" },
   "optChatTitle": { "message": "Stream-Chat-Overlay" },
-  "optChatHint": { "message": "Größe und Aussehen des schwebenden Chat-Panels im ausgekoppelten Video-Viewer." },
+  "optChatHint": { "message": "Größe und Aussehen des schwebenden Chat-Panels im ausgekoppelten Video-Viewer. Änderungen direkt am Panel werden für jede Website separat gespeichert." },
   "optChatOpacityLabel": { "message": "Hintergrund-Deckkraft" },
   "optChatWidthLabel": { "message": "Panel-Breite" },
   "optChatHeightLabel": { "message": "Panel-Höhe" },

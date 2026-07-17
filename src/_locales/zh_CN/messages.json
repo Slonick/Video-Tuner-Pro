@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "聊天：$1" },
   "chatUnavailable": { "message": "聊天不可用" },
   "optChatTitle": { "message": "直播聊天悬浮层" },
-  "optChatHint": { "message": "弹出式播放器中悬浮聊天面板的大小和外观。" },
+  "optChatHint": { "message": "弹出式播放器中悬浮聊天面板的大小和外观。 在面板上所做的调整会按网站分别保存。" },
   "optChatOpacityLabel": { "message": "背景不透明度" },
   "optChatWidthLabel": { "message": "面板宽度" },
   "optChatHeightLabel": { "message": "面板高度" },

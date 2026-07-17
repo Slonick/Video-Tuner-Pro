@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "Chat : $1" },
   "chatUnavailable": { "message": "Chat indisponible" },
   "optChatTitle": { "message": "Chat superposé du stream" },
-  "optChatHint": { "message": "Taille et apparence du panneau de chat flottant dans le lecteur détaché." },
+  "optChatHint": { "message": "Taille et apparence du panneau de chat flottant dans le lecteur détaché. Les réglages effectués sur le panneau lui-même sont enregistrés séparément pour chaque site." },
   "optChatOpacityLabel": { "message": "Opacité du fond" },
   "optChatWidthLabel": { "message": "Largeur du panneau" },
   "optChatHeightLabel": { "message": "Hauteur du panneau" },

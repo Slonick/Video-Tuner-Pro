@@ -250,7 +250,7 @@
   "viewerNoticeChat": { "message": "Chat: $1" },
   "chatUnavailable": { "message": "Chat no disponible" },
   "optChatTitle": { "message": "Chat superpuesto del directo" },
-  "optChatHint": { "message": "Tamaño y aspecto del panel de chat flotante en el visor emergente." },
+  "optChatHint": { "message": "Tamaño y aspecto del panel de chat flotante en el visor emergente. Los ajustes hechos en el propio panel se guardan por separado para cada sitio." },
   "optChatOpacityLabel": { "message": "Opacidad del fondo" },
   "optChatWidthLabel": { "message": "Ancho del panel" },
   "optChatHeightLabel": { "message": "Alto del panel" },
