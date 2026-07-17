@@ -5,6 +5,7 @@
 import { S } from "../state.js";
 import { i18n } from "../platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../../shared/glass.js";
+import { animateIn, glide } from "./motion.js";
 import { popoverElevation } from "./popover.js";
 import type { ViewerChatMode } from "./index.js";
 
@@ -33,6 +34,8 @@ export interface ChatFab {
   reelevate(): void;
   // Re-append to the top layer after the player itself was re-shown.
   raise(): void;
+  // Transition window for the next layout() — see motion.ts.
+  glide(ms: number): void;
   destroy(): void;
 }
 
@@ -112,6 +115,7 @@ export function mountChatFab(
   );
   shadow.append(style, fab, sideBtn, overlayBtn);
   overlay.appendChild(host);
+  animateIn(host, { opacity: 0, transform: "scale(.85)" });
 
   // The last non-off mode is what the toggle returns to.
   let lastOn: Exclude<ViewerChatMode, "off"> = S.viewerChatMode === "overlay" ? "overlay" : "side";
@@ -190,6 +194,7 @@ export function mountChatFab(
     elevate: pop.elevate,
     reelevate: pop.reelevate,
     raise: pop.raise,
+    glide: (ms: number) => glide(host, ms),
     destroy(): void {
       cancelHide();
       window.removeEventListener("pointermove", wake);

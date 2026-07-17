@@ -20,6 +20,7 @@ import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
 import { showBadgeNotice } from "./badge/overlay.js";
 import { LAUNCHER_TOP_LAYER_ATTR, listenerObjectOptions, listenerOptions } from "./lifecycle.js";
 import {
+  animateChatLayout,
   applyChatPanelSettings,
   chatAvailable,
   chatGutterWidth,
@@ -1432,16 +1433,51 @@ export function canCycleViewerChat(): boolean {
   return !!fmt && chatAvailable(liveAtViewerEntry);
 }
 
-// Cycle off → side → overlay, reflow the video around the gutter and announce
-// the new mode on the badge (the C hotkey; the on-video button sets modes
-// directly).
+// Cycle off → side → overlay and announce the new mode on the badge (the C
+// hotkey; the on-video button sets modes directly). The reflow — animated —
+// happens inside setChatMode's relayoutSmooth.
 export function cycleViewerChatMode(): void {
   if (!canCycleViewerChat()) return;
   const mode = cycleChatMode();
-  sizeVideo();
-  notifyViewerLayout();
   const label = chatModeLabel(mode);
   showBadgeNotice(notice("viewerNoticeChat", `Chat: ${label}`, label), { video });
+}
+
+// True when the two boxes differ enough that a reflow animation is worth it.
+function rectMoved(a: DOMRect | null, b: DOMRect | null): boolean {
+  if (!a || !b) return false;
+  return (
+    Math.abs(a.left - b.left) > 1 ||
+    Math.abs(a.top - b.top) > 1 ||
+    Math.abs(a.width - b.width) > 1 ||
+    Math.abs(a.height - b.height) > 1
+  );
+}
+
+// Reflow the video around a changed chat gutter with the same FLIP the format
+// switch uses; the chat surfaces glide along. Skipped when the geometry didn't
+// actually change (overlay/off flips leave the video box alone).
+function relayoutViewerChatAnimated(): void {
+  if (!fmt) return;
+  const firstFrame = interruptSurfaceTransition();
+  const nativeFirst = interruptNativeSurfaceTransition();
+  animateChatLayout(viewerAnimationMs());
+  sizeVideo();
+  let transition: SurfaceTransition = null;
+  if (firstFrame && rectMoved(firstFrame.rect, surfaceShell?.getBoundingClientRect() ?? null)) {
+    transition = animateSurfaceFrom(firstFrame);
+  } else if (
+    nativeFirst &&
+    rectMoved(nativeFirst, playerSurface?.getBoundingClientRect() ?? null)
+  ) {
+    transition = animateNativeSurfaceFrom(nativeFirst);
+  }
+  if (!transition) {
+    layoutPaused = false;
+    layoutBar();
+    showBar();
+  }
+  notifyViewerLayout();
 }
 
 // Registry apply hooks for the viewerChat* keys. No-ops while the viewer is
@@ -1449,8 +1485,7 @@ export function cycleViewerChatMode(): void {
 export function applyViewerChatMode(): void {
   if (!fmt) return;
   updateViewerChat();
-  sizeVideo();
-  notifyViewerLayout();
+  relayoutViewerChatAnimated();
 }
 
 export function applyViewerChatSettings(): void {
@@ -1459,6 +1494,9 @@ export function applyViewerChatSettings(): void {
   applyChatFrameSkin();
   if (!fmt) return;
   applyChatPanelSettings();
+  // The panel may have moved/resized — the launcher listens for this to steer
+  // clear of the chat surfaces.
+  notifyViewerLayout();
 }
 
 function sizeVideo(): void {
@@ -1657,6 +1695,7 @@ function setFormat(f: ViewerFormat): void {
   const switchingFormat = !!fmt && fmt !== f;
   const firstFrame = switchingFormat ? interruptSurfaceTransition() : null;
   const nativeFirstFrame = switchingFormat ? interruptNativeSurfaceTransition() : null;
+  if (switchingFormat) animateChatLayout(viewerAnimationMs());
   fmt = f;
   document.documentElement.setAttribute(ATTR, f);
   fmtBtn?.setAttribute("aria-pressed", f === "theater" ? "true" : "false");
@@ -3033,6 +3072,7 @@ async function enter(
       sizeVideo();
       notifyViewerLayout();
     },
+    relayoutSmooth: relayoutViewerChatAnimated,
   });
   sizeVideo();
   dispatchViewerLayout();

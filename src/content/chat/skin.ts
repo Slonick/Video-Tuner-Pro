@@ -75,7 +75,12 @@ const YT_MENU_FIX =
 const YT_HEADER_COLLAPSE =
   "yt-live-chat-header-renderer:not(#vtp-a):not(#vtp-b)" +
   "{height:0!important;min-height:0!important;padding:0!important;border:0!important;" +
-  "margin:0!important;overflow:visible!important}";
+  // visibility (not display) hides the header's own row that overflow:visible
+  // would otherwise paint over the top of the collapsed box; the dropdown gets
+  // visibility back below, so the menus it hosts still open.
+  "margin:0!important;overflow:visible!important;visibility:hidden!important}" +
+  "yt-live-chat-header-renderer tp-yt-iron-dropdown:not(#vtp-a):not(#vtp-b)" +
+  "{visibility:visible!important}";
 
 // The message-input area, toggled by the viewerChatInput setting.
 const INPUT: Record<string, string> = {

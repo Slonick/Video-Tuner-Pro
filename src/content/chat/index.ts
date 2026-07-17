@@ -31,8 +31,12 @@ interface ChatContext {
   liveHint: boolean;
   // The viewer's current format — the side width is remembered per format.
   format(): ViewerChatFormat;
-  // Re-run the viewer's layout pass (sizeVideo) — the gutter changed.
+  // Re-run the viewer's layout pass (sizeVideo) — the gutter changed. Used
+  // continuously (drag-resize), so it must stay instant.
   relayout(): void;
+  // Same, but animated: the video FLIPs to its new box and the chat surfaces
+  // glide along. Used for discrete changes (mode switches).
+  relayoutSmooth(): void;
 }
 
 let ctx: ChatContext | null = null;
@@ -134,7 +138,7 @@ export function setChatMode(mode: ViewerChatMode): void {
   S.viewerChatMode = mode;
   STORE.set({ viewerChatMode: mode });
   updateViewerChat();
-  ctx?.relayout();
+  ctx?.relayoutSmooth();
 }
 
 // Reconcile mounted surfaces with the configured mode. Idempotent — safe to
@@ -216,6 +220,14 @@ export function reelevateChatPanel(): void {
 export function raiseChatPopovers(): void {
   panel?.raise();
   fab?.raise();
+}
+
+// Open a transition window on every mounted chat surface so the layout writes
+// of the next viewer animation glide along with the video instead of snapping.
+export function animateChatLayout(ms: number): void {
+  side?.glide(ms);
+  panel?.glide(ms);
+  fab?.glide(ms);
 }
 
 // Hotkey cycle: off → side → overlay → off.

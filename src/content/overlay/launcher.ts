@@ -176,6 +176,40 @@ function eligible(): boolean {
   return false;
 }
 
+// The viewer's chat surfaces (side column, floating panel) can cover the
+// button's spot. Steer clear of them for the moment WITHOUT saving anything:
+// the stored fraction stays put, so the button returns to its usual place the
+// instant the chat stops being in the way.
+function avoidViewerChat(left: number, top: number, r: DOMRect): { left: number; top: number } {
+  const pad = 8;
+  const sel = "[data-vtp-viewer-chat-side],[data-vtp-viewer-chat-panel]";
+  for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+    const c = el.getBoundingClientRect();
+    if (!c.width || !c.height) continue;
+    const overlaps =
+      left < c.right + pad &&
+      left + FAB_SIZE > c.left - pad &&
+      top < c.bottom + pad &&
+      top + FAB_SIZE > c.top - pad;
+    if (!overlaps) continue;
+    // Slide out horizontally toward the side of the video with room; failing
+    // that, dodge above/below the surface.
+    const leftRoom = c.left - r.left;
+    const rightRoom = r.right - c.right;
+    const need = FAB_SIZE + pad * 2;
+    if (leftRoom >= need && (leftRoom >= rightRoom || rightRoom < need)) {
+      left = c.left - FAB_SIZE - pad;
+    } else if (rightRoom >= need) {
+      left = c.right + pad;
+    } else if (c.top - r.top >= r.bottom - c.bottom) {
+      top = c.top - FAB_SIZE - pad;
+    } else {
+      top = c.bottom + pad;
+    }
+  }
+  return { left, top };
+}
+
 // Place the button at its saved per-site fraction of the video, or the default
 // right-center spot when it's never been moved.
 function positionFab(v: HTMLElement): void {
@@ -186,8 +220,9 @@ function positionFab(v: HTMLElement): void {
   const maxLeft = r.left + Math.max(0, r.width - bw);
   const maxTop = r.top + Math.max(0, r.height - bh);
   const place = (left: number, top: number) => {
-    const nextLeft = Math.round(Math.min(Math.max(left, r.left), maxLeft)) + "px";
-    const nextTop = Math.round(Math.min(Math.max(top, r.top), maxTop)) + "px";
+    const dodged = avoidViewerChat(left, top, r);
+    const nextLeft = Math.round(Math.min(Math.max(dodged.left, r.left), maxLeft)) + "px";
+    const nextTop = Math.round(Math.min(Math.max(dodged.top, r.top), maxTop)) + "px";
     if (fab!.style.left !== nextLeft) fab!.style.left = nextLeft;
     if (fab!.style.top !== nextTop) fab!.style.top = nextTop;
   };

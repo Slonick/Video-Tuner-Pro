@@ -15,6 +15,7 @@ import {
   CHAT_PANEL_WIDTH_MIN,
 } from "../../shared/chat-bounds.js";
 import { anchorFromRect, positionFromAnchor, type PanelAnchor, type PanelBox } from "./anchor.js";
+import { animateIn, animateOutAndRemove, glide } from "./motion.js";
 import { sideChatUrl } from "./platform.js";
 import { popoverElevation } from "./popover.js";
 
@@ -61,6 +62,8 @@ export interface ChatPanel {
   reelevate(): void;
   // Re-append to the top layer after the player itself was re-shown.
   raise(): void;
+  // Transition window for the next layout()/applySettings() — see motion.ts.
+  glide(ms: number): void;
   destroy(): void;
 }
 
@@ -160,6 +163,7 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
   panel.append(head, body, grip);
   shadow.append(style, panel);
   overlay.appendChild(host);
+  animateIn(host, { opacity: 0, transform: "scale(.96) translateY(10px)" });
 
   const pop = popoverElevation(host);
   // The video box from the viewer's last layout pass; the anchored position is
@@ -296,9 +300,12 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
     elevate: pop.elevate,
     reelevate: pop.reelevate,
     raise: pop.raise,
+    glide: (ms: number) => glide(host, ms),
     destroy(): void {
-      pop.dispose();
-      host.remove();
+      // Drop the marker first so a replacement panel can mount while this one
+      // is still fading out; the popover stays shown until the fade ends.
+      host.removeAttribute("data-vtp-viewer-chat-panel");
+      animateOutAndRemove(host, { transform: "scale(.96) translateY(8px)" }, () => pop.dispose());
     },
   };
 }

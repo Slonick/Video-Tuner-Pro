@@ -8,6 +8,7 @@
 // site and per format.
 import { S } from "../state.js";
 import { i18n } from "../platform/i18n.js";
+import { animateIn, animateOutAndRemove, glide } from "./motion.js";
 import { SIDE_CHAT_MAX, SIDE_CHAT_MIN, SIDE_CHAT_WIDTH } from "../../shared/chat-bounds.js";
 import { sideChatUrl } from "./platform.js";
 import { OVERLAY_SKIN_HASH } from "./panel.js";
@@ -39,6 +40,9 @@ export interface SideChat {
   el: HTMLElement;
   layout(box: SideChatBox): void;
   applySettings(): void;
+  // Open a short transition window so the next layout() glides along with the
+  // viewer's own video animation instead of snapping.
+  glide(ms: number): void;
   destroy(): void;
 }
 
@@ -122,6 +126,7 @@ export function mountSideChat(overlay: HTMLElement, cb: SideChatCallbacks): Side
   });
   col.append(fallback, frame, grip);
   overlay.appendChild(col);
+  animateIn(col, { opacity: 0, transform: "translateX(32px)" });
   return {
     el: col,
     layout(box: SideChatBox): void {
@@ -153,6 +158,12 @@ export function mountSideChat(overlay: HTMLElement, cb: SideChatCallbacks): Side
     applySettings(): void {
       col.style.background = sideTint();
     },
-    destroy: () => col.remove(),
+    glide: (ms: number) => glide(col, ms),
+    destroy(): void {
+      // Drop the marker first so a replacement column can mount while this one
+      // is still fading out.
+      col.removeAttribute("data-vtp-viewer-chat-side");
+      animateOutAndRemove(col, { transform: "translateX(24px)" });
+    },
   };
 }
