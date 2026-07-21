@@ -15,7 +15,6 @@
   "permissions": ["storage", "scripting", "alarms"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_popup": "popup/popup.html",
     "default_title": "__MSG_extName__",
     "default_icon": {
       "16": "icons/icon-16.png",

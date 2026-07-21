@@ -343,6 +343,18 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false; // no async response (only relayToTab keeps the channel open)
 });
 
+// The toolbar icon has no default_popup, so a click reaches us here. Ask the top
+// frame to toggle the content script's in-page overlay iframe — it isn't capped by
+// the native popup's size. Pages without a content script (privileged pages, the
+// store, PDF viewer) have no video to control, so a click there is simply a no-op.
+if (api.action && api.action.onClicked) {
+  api.action.onClicked.addListener((tab) => {
+    const tabId = tab?.id;
+    if (typeof tabId !== "number") return;
+    call(() => api.tabs.sendMessage(tabId, { action: "toggleOverlay" }, { frameId: 0 }));
+  });
+}
+
 // Clear badge + restore default icon when a tab starts navigating, so stale state
 // from the previous page doesn't linger before the new content script reports.
 if (api.tabs && api.tabs.onUpdated) {
