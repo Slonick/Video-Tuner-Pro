@@ -246,7 +246,6 @@
   "chatModeLabel": { "message": "配信チャット" },
   "chatModeSide": { "message": "サイド" },
   "chatModeOverlay": { "message": "オーバーレイ" },
-  "viewerChatAria": { "message": "配信チャット" },
   "viewerNoticeChat": { "message": "チャット: $1" },
   "chatUnavailable": { "message": "チャットは利用できません" },
   "optChatTitle": { "message": "配信チャットオーバーレイ" },

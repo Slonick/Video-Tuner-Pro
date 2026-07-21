@@ -246,7 +246,6 @@
   "chatModeLabel": { "message": "स्ट्रीम चैट" },
   "chatModeSide": { "message": "साइड में" },
   "chatModeOverlay": { "message": "ओवरले" },
-  "viewerChatAria": { "message": "स्ट्रीम चैट" },
   "viewerNoticeChat": { "message": "चैट: $1" },
   "chatUnavailable": { "message": "चैट उपलब्ध नहीं है" },
   "optChatTitle": { "message": "स्ट्रीम चैट ओवरले" },

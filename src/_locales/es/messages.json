@@ -246,7 +246,6 @@
   "chatModeLabel": { "message": "Chat del directo" },
   "chatModeSide": { "message": "Lateral" },
   "chatModeOverlay": { "message": "Superpuesto" },
-  "viewerChatAria": { "message": "Chat del directo" },
   "viewerNoticeChat": { "message": "Chat: $1" },
   "chatUnavailable": { "message": "Chat no disponible" },
   "optChatTitle": { "message": "Chat superpuesto del directo" },

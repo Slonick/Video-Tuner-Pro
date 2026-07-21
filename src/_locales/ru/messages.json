@@ -246,7 +246,6 @@
   "chatModeLabel": { "message": "Чат стрима" },
   "chatModeSide": { "message": "Сбоку" },
   "chatModeOverlay": { "message": "Оверлей" },
-  "viewerChatAria": { "message": "Чат стрима" },
   "viewerNoticeChat": { "message": "Чат: $1" },
   "chatUnavailable": { "message": "Чат недоступен" },
   "optChatTitle": { "message": "Оверлей чата стрима" },

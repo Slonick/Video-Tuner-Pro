@@ -67,7 +67,12 @@ export interface ChatPanel {
   destroy(): void;
 }
 
-export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): ChatPanel {
+export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): ChatPanel | null {
+  // Like side mode: with no popout URL yet (e.g. YouTube's video id hasn't
+  // arrived after navigation), stay unmounted so the facade's guard retries once
+  // it resolves — rather than parking a panel that's stuck "unavailable" forever.
+  const url = sideChatUrl();
+  if (!url) return null;
   const effOpacity = (): number => cb.prefs().opacity ?? S.viewerChatOpacity;
   const effWidth = (): number => cb.prefs().width ?? S.viewerChatWidth;
   const effHeight = (): number => cb.prefs().height ?? S.viewerChatHeight;
@@ -118,7 +123,6 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
     `.pill::before{content:"";width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.35)}` +
     `.tint{flex:none;width:88px;height:12px;margin:0;cursor:pointer;accent-color:#0a84ff}` +
     `iframe{flex:1;min-height:0;width:100%;border:0;background:transparent}` +
-    `.empty{margin:auto;color:rgba(255,255,255,0.55);font-size:13px}` +
     `.grip{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;` +
     `touch-action:none;z-index:1}` +
     `.grip::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;` +
@@ -143,24 +147,15 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
   tint.title = tintLabel;
   tint.setAttribute("aria-label", tintLabel);
   head.append(pill, tint);
-  const url = sideChatUrl();
-  let body: HTMLElement;
-  if (url) {
-    const frame = document.createElement("iframe");
-    frame.src = url + OVERLAY_SKIN_HASH;
-    // Both ends pinned to dark (the skin pins the frame document): a
-    // color-scheme mismatch makes Chrome paint an opaque canvas behind the
-    // frame, killing the transparency.
-    frame.style.colorScheme = "dark";
-    body = frame;
-  } else {
-    body = document.createElement("div");
-    body.className = "empty";
-    body.textContent = i18n("chatUnavailable") || "Chat unavailable";
-  }
+  const frame = document.createElement("iframe");
+  frame.src = url + OVERLAY_SKIN_HASH;
+  // Both ends pinned to dark (the skin pins the frame document): a color-scheme
+  // mismatch makes Chrome paint an opaque canvas behind the frame, killing the
+  // transparency.
+  frame.style.colorScheme = "dark";
   const grip = document.createElement("div");
   grip.className = "grip";
-  panel.append(head, body, grip);
+  panel.append(head, frame, grip);
   shadow.append(style, panel);
   overlay.appendChild(host);
   animateIn(host, { opacity: 0, transform: "scale(.96) translateY(10px)" });
@@ -302,6 +297,7 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
     raise: pop.raise,
     glide: (ms: number) => glide(host, ms),
     destroy(): void {
+      if (tintSave != null) clearTimeout(tintSave);
       // Drop the marker first so a replacement panel can mount while this one
       // is still fading out; the popover stays shown until the fade ends.
       host.removeAttribute("data-vtp-viewer-chat-panel");

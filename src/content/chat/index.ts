@@ -178,8 +178,10 @@ export function updateViewerChat(): void {
     });
   }
   if (want === "overlay" && !panel) {
+    // null when the popout URL can't be built yet — chatSatisfied() stays false
+    // and the viewer's guard retries, so overlay recovers like side mode.
     panel = mountChatPanel(ctx.overlay, { prefs: panelPrefs, persist: persistPanelPrefs });
-    if (ctx.nativeSurface) panel.elevate();
+    if (panel && ctx.nativeSurface) panel.elevate();
   }
   // The on-video toggle exists whenever chat COULD be shown, whatever the mode.
   if (chatAvailable(ctx.liveHint) && !fab) {

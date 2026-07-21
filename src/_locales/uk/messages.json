@@ -246,7 +246,6 @@
   "chatModeLabel": { "message": "Чат стріму" },
   "chatModeSide": { "message": "Збоку" },
   "chatModeOverlay": { "message": "Оверлей" },
-  "viewerChatAria": { "message": "Чат стріму" },
   "viewerNoticeChat": { "message": "Чат: $1" },
   "chatUnavailable": { "message": "Чат недоступний" },
   "optChatTitle": { "message": "Оверлей чату стріму" },
