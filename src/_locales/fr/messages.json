@@ -260,5 +260,8 @@
   "optChatHeightLabel": { "message": "Hauteur du panneau" },
   "optChatInputLabel": { "message": "Champ de message" },
   "optChatInputHint": { "message": "Afficher la zone d'envoi dans le chat superposé." },
-  "optKeyChat": { "message": "Mode du chat" }
+  "optKeyChat": { "message": "Mode du chat" },
+  "optKeyRewind": { "message": "Reculer" },
+  "optKeyAdvance": { "message": "Avancer" },
+  "optSeekStep": { "message": "Durée du saut" }
 }

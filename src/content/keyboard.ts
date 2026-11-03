@@ -1,9 +1,10 @@
-// In-page keyboard shortcuts for playback speed (default-on; toggled in the popup).
+// In-page keyboard shortcuts for playback speed and seeking (default-on; toggled in the popup).
 // Bare single keys by physical position (e.code, so they hold across layouts).
 // The action keys default to A (decrease), D (increase) by S.speedStep (Shift
 // doubles it), R (drop the manual change and re-take the saved speed by priority:
-// channel > site > global > 100%), S (toggle the last speed ⇄ 1×) and X (hold for
-// S.holdSpeed while pressed). All are remappable on the options page (S.keymap).
+// channel > site > global > 100%), S (toggle the last speed ⇄ 1×), X (hold for
+// S.holdSpeed while pressed) and Q / E (jump back / forward by S.seekStep seconds;
+// Shift doubles it). All are remappable on the options page (S.keymap).
 // Each editable preset can carry its own hotkey chord (S.presetKeys, e.g. ⇧1 by
 // default); pressing it jumps to that preset speed. Preset chords may use
 // modifiers; the bare action keys above never fire with Ctrl/Cmd/Alt (Shift is
@@ -17,6 +18,7 @@ import { eventMatchesChord, parseChord, type KeyChord } from "../shared/keymap.j
 import { setSpeed, resetToSaved } from "./speed.js";
 import { ctxValid } from "./platform/browser.js";
 import { primaryVideo } from "./videos.js";
+import { fmtTime, showBadgeNotice } from "./badge/overlay.js";
 import { toggleOverlayPopup } from "./overlay/launcher.js";
 import {
   canCycleViewerChat,
@@ -60,12 +62,28 @@ function typingIn(el: EventTarget | null): boolean {
   );
 }
 
+// Jump within the seekable range only, so a live stream sitting at its edge
+// (or a player with nothing seekable yet) is left alone.
+function seekBy(video: HTMLVideoElement, delta: number): void {
+  const ranges = video.seekable;
+  if (!ranges?.length) return;
+  const next = Math.min(
+    ranges.end(ranges.length - 1),
+    Math.max(ranges.start(0), video.currentTime + delta),
+  );
+  const moved = next - video.currentTime;
+  if (Math.abs(moved) < 0.001) return;
+  video.currentTime = next;
+  showBadgeNotice(`${moved > 0 ? "+" : "-"}${fmtTime(Math.abs(moved))}`, { video });
+}
+
 document.addEventListener(
   "keydown",
   (e) => {
     if (e.defaultPrevented) return;
     if (S.siteDisabled || !S.keyboardEnabled || !ctxValid()) return;
-    const { slower, faster, reset, toggle, hold, overlay, viewer, theater, chat } = S.keymap;
+    const { slower, faster, reset, toggle, hold, overlay, viewer, theater, chat, rewind, advance } =
+      S.keymap;
     const oneShotRepeat =
       e.repeat &&
       !e.ctrlKey &&
@@ -90,8 +108,11 @@ document.addEventListener(
     }
     // Action keys are bare position keys (Shift only, to double the step) — never
     // with Ctrl/Cmd/Alt, so browser/site chords are left alone.
-    const speedStepKey =
-      !e.ctrlKey && !e.metaKey && !e.altKey && (e.code === slower || e.code === faster);
+    const stepKey =
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      (e.code === slower || e.code === faster || e.code === rewind || e.code === advance);
     const plainActionKey =
       !e.ctrlKey &&
       !e.metaKey &&
@@ -104,7 +125,7 @@ document.addEventListener(
         e.code === viewer ||
         e.code === theater ||
         e.code === chat);
-    const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (speedStepKey || plainActionKey);
+    const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (stepKey || plainActionKey);
     if (preset === undefined && !actionKey) return;
     // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
     const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
@@ -159,6 +180,13 @@ document.addEventListener(
         S.toggleMemory = S.currentSpeed;
         setSpeed(1, false, true);
       }
+      return;
+    }
+    if (e.code === rewind || e.code === advance) {
+      const anchor = viewerAnchorVideo();
+      const video = primaryVideo() ?? (anchor instanceof HTMLVideoElement ? anchor : null);
+      const seconds = e.shiftKey ? S.seekStep * 2 : S.seekStep;
+      if (video) seekBy(video, e.code === advance ? seconds : -seconds);
       return;
     }
     const step = e.shiftKey ? S.speedStep * 2 : S.speedStep;

@@ -260,5 +260,8 @@
   "optChatHeightLabel": { "message": "Высота панели" },
   "optChatInputLabel": { "message": "Поле ввода сообщений" },
   "optChatInputHint": { "message": "Показывать строку отправки в оверлей-чате." },
-  "optKeyChat": { "message": "Режим чата" }
+  "optKeyChat": { "message": "Режим чата" },
+  "optKeyRewind": { "message": "Перемотать назад" },
+  "optKeyAdvance": { "message": "Перемотать вперёд" },
+  "optSeekStep": { "message": "Шаг перемотки" }
 }

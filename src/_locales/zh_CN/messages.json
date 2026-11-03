@@ -260,5 +260,8 @@
   "optChatHeightLabel": { "message": "面板高度" },
   "optChatInputLabel": { "message": "消息输入框" },
   "optChatInputHint": { "message": "在悬浮聊天中显示发送框。" },
-  "optKeyChat": { "message": "聊天模式" }
+  "optKeyChat": { "message": "聊天模式" },
+  "optKeyRewind": { "message": "后退" },
+  "optKeyAdvance": { "message": "快进" },
+  "optSeekStep": { "message": "跳转秒数" }
 }

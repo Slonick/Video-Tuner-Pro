@@ -356,6 +356,19 @@ describe("Options · Keys", () => {
     expect(km.faster).toBe("KeyD");
     expect(km.reset).toBe("KeyR");
   });
+
+  it("seek step slider persists, and reset-to-defaults clears it", async () => {
+    const { get } = await mountOptions({});
+    const [thumb] = thumbsIn(sectionWith("#keyRows"), ".opt-param");
+    sliderKey(thumb, "End");
+    await flush();
+    expect(get(["seekStep"]).seekStep).toBe(60);
+    await confirmText(
+      document.querySelector("#keyRows ~ .card-actions .confirm-btn") as HTMLElement,
+    );
+    expect(get(["seekStep"]).seekStep).toBeUndefined();
+    expect(thumb.getAttribute("aria-valuenow")).toBe("10");
+  });
 });
 
 describe("Options · Speed presets", () => {

@@ -260,5 +260,8 @@
   "optChatHeightLabel": { "message": "Panel height" },
   "optChatInputLabel": { "message": "Message input" },
   "optChatInputHint": { "message": "Show the send box in the overlay chat." },
-  "optKeyChat": { "message": "Chat mode" }
+  "optKeyChat": { "message": "Chat mode" },
+  "optKeyRewind": { "message": "Jump back" },
+  "optKeyAdvance": { "message": "Jump forward" },
+  "optSeekStep": { "message": "Seek step" }
 }

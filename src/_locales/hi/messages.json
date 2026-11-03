@@ -260,5 +260,8 @@
   "optChatHeightLabel": { "message": "पैनल की ऊँचाई" },
   "optChatInputLabel": { "message": "संदेश इनपुट" },
   "optChatInputHint": { "message": "ओवरले चैट में भेजने का बॉक्स दिखाएँ।" },
-  "optKeyChat": { "message": "चैट मोड" }
+  "optKeyChat": { "message": "चैट मोड" },
+  "optKeyRewind": { "message": "पीछे जाएँ" },
+  "optKeyAdvance": { "message": "आगे जाएँ" },
+  "optSeekStep": { "message": "छलांग की अवधि" }
 }

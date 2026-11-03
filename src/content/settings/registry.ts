@@ -11,7 +11,7 @@ import {
   SIDE_CHAT_WIDTH,
 } from "../../shared/chat-bounds.js";
 import { normalizeSpeedStep, normalizeHoldSpeed } from "../../shared/presets.js";
-import { normalizeKeymap } from "../../shared/keymap.js";
+import { normalizeKeymap, normalizeSeekStep } from "../../shared/keymap.js";
 import { clampGlassOpacity, GLASS_OPACITY_KEY } from "../../shared/glass.js";
 import { S } from "../state.js";
 import { applyAll, resetAudios } from "../speed.js";
@@ -97,6 +97,11 @@ export const REGISTRY: Entry<unknown>[] = [
     key: "holdSpeed",
     parse: (raw) => normalizeHoldSpeed(raw) / 100,
     set: (v) => (S.holdSpeed = v),
+  }),
+  entry({
+    key: "seekStep",
+    parse: (raw) => normalizeSeekStep(raw),
+    set: (v) => (S.seekStep = v),
   }),
   // On-video launcher: when to surface the button. updateLauncher re-evaluates it.
   entry({

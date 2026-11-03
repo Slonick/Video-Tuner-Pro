@@ -16,7 +16,7 @@ themes, in 10 languages, with no accounts and no tracking.
 
 - **Playback speed** — editable presets or a fine slider, on almost any video. Set your own preset values and raise the maximum speed as high as you need.
 - **Remember speed per channel, site, or globally** — save a speed for a detected channel, the current site, or as a global default; it's applied automatically next time, by priority (channel → site → global). Anything not saved stays at normal speed.
-- **Keyboard shortcuts** — slower, faster, and reset keys, a hold-to-speed key, and a key per preset — all remappable to chords of your choice.
+- **Keyboard shortcuts** — slower, faster, and reset keys, a hold-to-speed key, jump back / forward keys with an adjustable step, and a key per preset — all remappable to chords of your choice.
 - **Live-sync** — automatically catches live streams back up to the live edge, then returns to normal.
 - **Rewind live streams** — scrub back and watch the recording at any speed; return to the live edge and it's a live stream again.
 - **True latency** — see the real delay to the broadcaster on YouTube and Twitch, not just the buffer.

@@ -260,5 +260,8 @@
   "optChatHeightLabel": { "message": "Panel-Höhe" },
   "optChatInputLabel": { "message": "Nachrichteneingabe" },
   "optChatInputHint": { "message": "Eingabefeld im Overlay-Chat anzeigen." },
-  "optKeyChat": { "message": "Chat-Modus" }
+  "optKeyChat": { "message": "Chat-Modus" },
+  "optKeyRewind": { "message": "Zurückspringen" },
+  "optKeyAdvance": { "message": "Vorspringen" },
+  "optSeekStep": { "message": "Sprungweite" }
 }

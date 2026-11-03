@@ -1,4 +1,4 @@
-// Remappable keyboard shortcuts for the three playback-speed actions. Keys are
+// Remappable keyboard shortcuts for the playback-speed and seek actions. Keys are
 // stored as KeyboardEvent.code values (physical position, layout-independent),
 // under storage key "keymap". Pure + unit-tested; shared by the content listener
 // and the options-page editor.
@@ -12,7 +12,9 @@ export type Action =
   | "overlay"
   | "viewer"
   | "theater"
-  | "chat";
+  | "chat"
+  | "rewind"
+  | "advance";
 export const ACTIONS: Action[] = [
   "slower",
   "faster",
@@ -23,6 +25,8 @@ export const ACTIONS: Action[] = [
   "viewer",
   "theater",
   "chat",
+  "rewind",
+  "advance",
 ];
 
 export interface Keymap {
@@ -43,6 +47,9 @@ export interface Keymap {
   theater: string;
   // Cycle the stream-chat mode in an open viewer (off → side → overlay).
   chat: string;
+  // Jump back / forward by the seek step (S.seekStep; Shift doubles it).
+  rewind: string;
+  advance: string;
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -56,7 +63,21 @@ export const DEFAULT_KEYMAP: Keymap = {
   viewer: "KeyV",
   theater: "KeyT",
   chat: "KeyC",
+  rewind: "KeyQ",
+  advance: "KeyE",
 };
+
+// Seconds one rewind/advance press jumps. Stored under "seekStep" (integer
+// seconds); Shift doubles it.
+export const SEEK_STEP_DEFAULT = 10;
+export const SEEK_STEP_MIN = 1;
+export const SEEK_STEP_MAX = 60;
+
+export function normalizeSeekStep(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return SEEK_STEP_DEFAULT;
+  return Math.min(SEEK_STEP_MAX, Math.max(SEEK_STEP_MIN, Math.round(n)));
+}
 
 // A code is bindable if it's a plain letter/digit position — enough to avoid
 // capturing modifier-only or navigation keys while keeping the UI simple.
@@ -218,6 +239,8 @@ export function normalizeKeymap(raw: unknown): Keymap {
     } else if (legacy && (a === "viewer" || a === "theater" || a === "chat") && !(a in src)) {
       // Actions added after 1.x ship unbound for stored keymaps — a new default
       // must not hijack a key the user may already rely on (e.g. YouTube's C).
+      // rewind/advance are deliberately not listed: Q/E clash with no major
+      // player's keys, and existing users asked for seek keys out of the box.
       out[a] = "";
     } else {
       const fallback = DEFAULT_KEYMAP[a];

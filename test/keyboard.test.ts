@@ -9,6 +9,8 @@ const m = vi.hoisted(() => ({
   toggleViewer: vi.fn(),
   hasVideo: true,
   viewerAnchor: null as HTMLElement | null,
+  video: null as HTMLVideoElement | null,
+  notice: vi.fn(),
   primaryCalls: 0,
   viewerFormat: null as string | null,
   canCycleChat: false,
@@ -19,7 +21,7 @@ vi.mock("../src/content/speed.js", () => ({ setSpeed: m.setSpeed, resetToSaved: 
 vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => {
     m.primaryCalls++;
-    return m.hasVideo ? ({} as HTMLVideoElement) : null;
+    return m.hasVideo ? (m.video ?? ({} as HTMLVideoElement)) : null;
   },
 }));
 vi.mock("../src/content/platform/browser.js", () => ({ ctxValid: () => true }));
@@ -31,6 +33,10 @@ vi.mock("../src/content/viewer.js", () => ({
   viewerAnchorVideo: () => m.viewerAnchor,
   canCycleViewerChat: () => m.canCycleChat,
   cycleViewerChatMode: m.cycleChat,
+}));
+vi.mock("../src/content/badge/overlay.js", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  showBadgeNotice: m.notice,
 }));
 
 import { S } from "../src/content/state.js";
@@ -48,6 +54,13 @@ function release(code: string, init: KeyboardEventInit = {}): void {
   );
 }
 
+function seekable(currentTime: number, start: number, end: number): HTMLVideoElement {
+  return {
+    currentTime,
+    seekable: { length: 1, start: () => start, end: () => end },
+  } as unknown as HTMLVideoElement;
+}
+
 describe("keyboard shortcuts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,6 +72,8 @@ describe("keyboard shortcuts", () => {
     S.holdPrev = 1.0;
     m.hasVideo = true;
     m.viewerAnchor = null;
+    m.video = null;
+    S.seekStep = 10;
     m.primaryCalls = 0;
     m.viewerFormat = null;
     m.canCycleChat = false;
@@ -299,5 +314,57 @@ describe("keyboard shortcuts", () => {
     release("KeyX");
     expect(S.holdActive).toBe(false);
     expect(m.setSpeed).toHaveBeenLastCalledWith(1.25, false, true);
+  });
+
+  it("E / Q jump forward / back by the seek step and show the jump", () => {
+    m.video = seekable(100, 0, 600);
+    press("KeyE");
+    expect(m.video.currentTime).toBe(110);
+    expect(m.notice).toHaveBeenLastCalledWith("+0:10", { video: m.video });
+    press("KeyQ");
+    press("KeyQ", { repeat: true });
+    expect(m.video.currentTime).toBe(90);
+    expect(m.notice).toHaveBeenLastCalledWith("-0:10", { video: m.video });
+    expect(m.setSpeed).not.toHaveBeenCalled();
+  });
+
+  it("Shift doubles the seek step", () => {
+    m.video = seekable(100, 0, 600);
+    press("KeyE", { shiftKey: true });
+    expect(m.video.currentTime).toBe(120);
+  });
+
+  it("clamps a jump to the seekable range and skips a no-op jump", () => {
+    m.video = seekable(5, 0, 600);
+    press("KeyQ");
+    expect(m.video.currentTime).toBe(0);
+    m.notice.mockClear();
+    press("KeyQ");
+    expect(m.video.currentTime).toBe(0);
+    expect(m.notice).not.toHaveBeenCalled();
+    m.video.currentTime = 595;
+    press("KeyE");
+    expect(m.video.currentTime).toBe(600);
+  });
+
+  it("leaves a video with nothing seekable alone", () => {
+    m.video = {
+      currentTime: 42,
+      seekable: { length: 0, start: () => 0, end: () => 0 },
+    } as unknown as HTMLVideoElement;
+    press("KeyE");
+    expect(m.video.currentTime).toBe(42);
+    expect(m.notice).not.toHaveBeenCalled();
+  });
+
+  it("seeks the adopted viewer video when no page video is tracked", () => {
+    m.hasVideo = false;
+    const video = document.createElement("video");
+    Object.defineProperty(video, "seekable", {
+      value: { length: 1, start: () => 0, end: () => 600 },
+    });
+    m.viewerAnchor = video;
+    press("KeyE");
+    expect(video.currentTime).toBe(10);
   });
 });
