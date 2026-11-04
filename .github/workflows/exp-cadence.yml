@@ -1,0 +1,33 @@
+name: exp-cadence
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ab:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.0-jammy
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - name: A/B cadence
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          cp -r src /tmp/src-new
+          rm -rf /tmp/src-old && mkdir /tmp/src-old && git archive 7bea309 src | tar -x -C /tmp/src-old
+          run() {
+            rm -rf src && cp -r "$1" src
+            node build.mjs >/dev/null
+            AB_LABEL="$2" npx playwright test e2e/viewer-cadence.spec.ts --repeat-each=6 --retries=0 --reporter=list 2>&1 | grep "FPS " || true
+          }
+            run /tmp/src-new NEW
+            run /tmp/src-old/src OLD
+          done

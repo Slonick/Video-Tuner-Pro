@@ -76,6 +76,16 @@ test("Viewer and Theater retain the original 30fps cadence without a capture mir
   await expect.poll(() => viewerState(page)).toMatchObject({ attr: "theater" });
   const theater = await measureVideoCadence(page);
 
+  console.log(
+    "FPS " +
+      JSON.stringify({
+        label: process.env.AB_LABEL,
+        base: baseline.fps,
+        glass: glassViewer.fps,
+        backdrop: videoBackdropViewer.fps,
+        theater: theater.fps,
+      }),
+  );
   expect(baseline.frames).toBeGreaterThanOrEqual(25);
   expect(glassViewer.fps).toBeGreaterThanOrEqual(baseline.fps * 0.7);
   expect(videoBackdropViewer.fps).toBeGreaterThanOrEqual(baseline.fps * 0.7);
