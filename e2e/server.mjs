@@ -15,14 +15,34 @@ const TYPES = {
 };
 
 createServer(async (req, res) => {
-  const rel = normalize(decodeURIComponent((req.url || "/").split("?")[0])).replace(
-    /^(\.\.[/\\])+/,
-    "",
-  );
-  const file = join(DIR, rel === "/" ? "video.html" : rel);
   try {
+    const rel = normalize(decodeURIComponent((req.url || "/").split("?")[0])).replace(
+      /^(\.\.[/\\])+/,
+      "",
+    );
+    const file = join(DIR, rel === "/" ? "video.html" : rel);
     const body = await readFile(file);
-    res.writeHead(200, { "content-type": TYPES[extname(file)] || "application/octet-stream" });
+    const type = TYPES[extname(file)] || "application/octet-stream";
+    // Media elements seek via Range requests; a plain 200 leaves fixture videos unseekable.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+    if (range && (range[1] || range[2])) {
+      const size = body.length;
+      const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+      if (start > end) {
+        res.writeHead(416, { "content-range": `bytes */${size}` }).end();
+        return;
+      }
+      res.writeHead(206, {
+        "content-type": type,
+        "accept-ranges": "bytes",
+        "content-range": `bytes ${start}-${end}/${size}`,
+        "content-length": end - start + 1,
+      });
+      res.end(body.subarray(start, end + 1));
+      return;
+    }
+    res.writeHead(200, { "content-type": type, "accept-ranges": "bytes" });
     res.end(body);
   } catch {
     res.writeHead(404).end("not found");

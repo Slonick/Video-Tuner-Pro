@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   normalizePresets,
   normalizePresetSet,
@@ -7,6 +7,7 @@ import {
   normalizeHoldSpeed,
   quickPresetIndices,
   DEFAULT_PRESETS,
+  DEFAULT_PRESET_KEYS,
   MAX_PRESETS,
 } from "../src/shared/presets.js";
 import {
@@ -62,6 +63,9 @@ describe("normalizePresets", () => {
   it("keeps the provided count, clamped to [1, MAX_PRESETS]", () => {
     expect(normalizePresets([60])).toEqual([60]); // one in, one out
     expect(normalizePresets(new Array(20).fill(100))).toHaveLength(MAX_PRESETS);
+  });
+  it("ignores non-numeric entries instead of turning them into a preset", () => {
+    expect(normalizePresets(["x", 100])).toEqual([100]);
   });
 });
 
@@ -182,6 +186,54 @@ describe("normalizeKeymap", () => {
     expect(km.rewind).toBe("");
     expect(km.advance).toBe("");
   });
+  it("ships the documented default bindings on a fresh install", () => {
+    expect(normalizeKeymap(undefined)).toEqual({
+      slower: "KeyA",
+      faster: "KeyD",
+      reset: "KeyR",
+      toggle: "KeyS",
+      hold: "KeyX",
+      overlay: "KeyO",
+      viewer: "KeyV",
+      theater: "KeyT",
+      chat: "KeyC",
+      rewind: "KeyQ",
+      advance: "KeyE",
+    });
+  });
+  it("treats a stored null like nothing stored", () => {
+    expect(normalizeKeymap(null)).toEqual(normalizeKeymap(undefined));
+  });
+  it("rejects non-string bindings even if they stringify to a bindable code", () => {
+    const km = normalizeKeymap({ slower: ["KeyJ"], faster: 7 });
+    expect(km.slower).toBe("KeyA");
+    expect(km.faster).toBe("KeyD");
+  });
+  it("lets an action take another's default key when that action is explicitly unbound", () => {
+    const km = normalizeKeymap({ slower: "KeyD", faster: "" });
+    expect(km.slower).toBe("KeyD");
+    expect(km.faster).toBe("");
+  });
+  it("lets an action take another's default key when that action is rebound elsewhere", () => {
+    const km = normalizeKeymap({ slower: "KeyD", faster: "KeyK" });
+    expect(km.slower).toBe("KeyD");
+    expect(km.faster).toBe("KeyK");
+  });
+  it("yields a default key back to its owner when the owner's stored binding is invalid", () => {
+    const km = normalizeKeymap({ slower: "KeyD", faster: "Space" });
+    expect(km.slower).toBe("KeyA");
+    expect(km.faster).toBe("KeyD");
+  });
+  it("yields a default key back to its owner when the owner's stored binding is not a string", () => {
+    const km = normalizeKeymap({ slower: "KeyD", faster: ["KeyK"] });
+    expect(km.slower).toBe("KeyA");
+    expect(km.faster).toBe("KeyD");
+  });
+  it("keeps a stored binding over a later action's default when that action isn't stored", () => {
+    const km = normalizeKeymap({ slower: "KeyR" });
+    expect(km.slower).toBe("KeyR");
+    expect(km.reset).toBe("");
+  });
 });
 
 describe("keymap helpers", () => {
@@ -195,6 +247,12 @@ describe("keymap helpers", () => {
     expect(codeLabel("KeyA")).toBe("A");
     expect(codeLabel("Digit3")).toBe("3");
     expect(codeLabel("Space")).toBe("Space");
+  });
+  it("isBindableCode / codeLabel only accept a whole letter or digit code", () => {
+    for (const code of ["xKeyA", "KeyAB", "Digit10", "NumDigit1"]) {
+      expect(isBindableCode(code)).toBe(false);
+      expect(codeLabel(code)).toBe(code);
+    }
   });
 });
 
@@ -264,9 +322,74 @@ describe("key chords", () => {
     expect(chordLabel("M+A+KeyM", false)).toBe("Ctrl+Alt+M");
     expect(chordLabel(null, true)).toBe("");
   });
+  it("formatChord writes every modifier in the fixed S+M+A order", () => {
+    expect(formatChord({ code: "KeyM", shift: true, mod: true, alt: true })).toBe("S+M+A+KeyM");
+    expect(formatChord({ code: "KeyM", shift: false, mod: true, alt: false })).toBe("M+KeyM");
+    expect(formatChord({ code: "KeyM", shift: false, mod: false, alt: true })).toBe("A+KeyM");
+  });
+  it("eventMatchesSpec requires Alt to match exactly", () => {
+    expect(eventMatchesSpec("A+KeyG", ev("KeyG", { altKey: true }))).toBe(true);
+    expect(eventMatchesSpec("A+KeyG", ev("KeyG"))).toBe(false);
+    expect(eventMatchesSpec("KeyG", ev("KeyG", { altKey: true }))).toBe(false);
+  });
+  it("reports no conflict for another key, no chord, or an unbound action", () => {
+    expect(actionConflictsWithSpec("slower", "KeyA", "KeyB")).toBe(false);
+    expect(actionConflictsWithSpec("slower", "KeyA", null)).toBe(false);
+    expect(actionConflictsWithSpec("slower", "", "KeyA")).toBe(false);
+  });
+});
+
+// IS_MAC is resolved once at import, so each case re-imports the module under a
+// stubbed navigator.
+describe("platform detection", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+  const load = async (nav: unknown) => {
+    vi.resetModules();
+    vi.stubGlobal("navigator", nav);
+    return import("../src/shared/keymap.js");
+  };
+
+  it("detects a Mac from navigator.platform", async () => {
+    expect((await load({ platform: "MacIntel" })).IS_MAC).toBe(true);
+    expect((await load({ platform: "Win32" })).IS_MAC).toBe(false);
+  });
+  it("prefers userAgentData.platform over navigator.platform", async () => {
+    expect((await load({ userAgentData: { platform: "macOS" }, platform: "Win32" })).IS_MAC).toBe(
+      true,
+    );
+    expect((await load({ userAgentData: { platform: "macOS" }, platform: "" })).IS_MAC).toBe(true);
+    expect(
+      (await load({ userAgentData: { platform: "Windows" }, platform: "MacIntel" })).IS_MAC,
+    ).toBe(false);
+  });
+  it("is not a Mac without a navigator or a platform", async () => {
+    expect((await load(undefined)).IS_MAC).toBe(false);
+    expect((await load({})).IS_MAC).toBe(false);
+  });
+  it("maps the mod chord to ⌘ on Mac and Ctrl elsewhere", async () => {
+    const mac = await load({ platform: "MacIntel" });
+    expect(mac.eventMatchesSpec("M+KeyG", ev("KeyG", { metaKey: true }))).toBe(true);
+    expect(mac.eventMatchesSpec("M+KeyG", ev("KeyG", { ctrlKey: true }))).toBe(false);
+    const win = await load({ platform: "Win32" });
+    expect(win.eventMatchesSpec("M+KeyG", ev("KeyG", { ctrlKey: true }))).toBe(true);
+    expect(win.eventMatchesSpec("M+KeyG", ev("KeyG", { metaKey: true }))).toBe(false);
+  });
 });
 
 describe("normalizePresetSet", () => {
+  it("keeps keys and pins on their own preset when a stored value is not a number", () => {
+    const { presets, keys, pinned } = normalizePresetSet(
+      ["x", 150, 200],
+      ["S+Digit1", "S+Digit2", "S+Digit3"],
+      [true, false, true],
+    );
+    expect(presets).toEqual([150, 200]);
+    expect(keys).toEqual(["S+Digit2", "S+Digit3"]);
+    expect(pinned).toEqual([false, true]);
+  });
   it("keeps each key + pin attached to its value when sorting", () => {
     const { presets, keys, pinned } = normalizePresetSet(
       [200, 100],
@@ -312,6 +435,22 @@ describe("normalizePresetSet", () => {
     expect(pinned.filter(Boolean)).toHaveLength(8);
     expect(pinned[presets.indexOf(450)]).toBe(false); // the highest got dropped
   });
+  it("ignores non-numeric stored values instead of turning them into a preset", () => {
+    const { presets } = normalizePresetSet(["x", 150], []);
+    expect(presets).toEqual([150]);
+  });
+  it("keeps at most MAX_PRESETS presets", () => {
+    const { presets, keys, pinned } = normalizePresetSet(new Array(20).fill(100), [], []);
+    expect(presets).toHaveLength(MAX_PRESETS);
+    expect(keys).toHaveLength(MAX_PRESETS);
+    expect(pinned).toHaveLength(MAX_PRESETS);
+  });
+  it("ships ⇧1…⇧9 for the nine lowest default presets and no key for the rest", () => {
+    expect(DEFAULT_PRESET_KEYS).toEqual([
+      ...Array.from({ length: 9 }, (_, i) => `S+Digit${i + 1}`),
+      ...Array(DEFAULT_PRESETS.length - 9).fill(null),
+    ]);
+  });
 });
 
 describe("quickPresetIndices", () => {
@@ -333,5 +472,8 @@ describe("quickPresetIndices", () => {
     ]);
     // capped at eight even if more are pinned
     expect(quickPresetIndices(Array(10).fill(true))).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+  it("never repeats a pinned index when padding the row", () => {
+    expect(quickPresetIndices([true, false, false, false, false])).toEqual([0, 1, 2, 3]);
   });
 });

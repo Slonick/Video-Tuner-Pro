@@ -15,7 +15,7 @@ function makeChrome() {
     sync: {},
     local: {},
   };
-  const holdNext: Record<string, Partial<Record<"set", boolean>>> = {
+  const holdNext: Record<string, Partial<Record<"get" | "set", boolean>>> = {
     sync: {},
     local: {},
   };
@@ -32,13 +32,22 @@ function makeChrome() {
   };
   const area = (backing: Record<string, unknown>, name: string) => ({
     get(keys: string | string[] | null, cb: (items: Record<string, unknown>) => void) {
-      if (fail(name, "get", () => cb({}))) return;
-      let out: Record<string, unknown> = {};
-      if (keys == null) out = { ...backing };
-      else
-        for (const k of typeof keys === "string" ? [keys] : keys)
-          if (k in backing) out[k] = backing[k];
-      cb(out);
+      // A failed read hands the callback no items, as the browser does.
+      if (fail(name, "get", () => cb(undefined as unknown as Record<string, unknown>))) return;
+      const read = () => {
+        let out: Record<string, unknown> = {};
+        if (keys == null) out = { ...backing };
+        else
+          for (const k of typeof keys === "string" ? [keys] : keys)
+            if (k in backing) out[k] = backing[k];
+        cb(out);
+      };
+      if (holdNext[name].get) {
+        delete holdNext[name].get;
+        held.push(read);
+        return;
+      }
+      read();
     },
     set(obj: Record<string, unknown>, cb?: () => void) {
       if (fail(name, "set", cb)) return;
@@ -131,6 +140,75 @@ describe("routed STORE", () => {
       fired = true;
     });
     expect(fired).toBe(true); // mock get is synchronous → ready by now
+  });
+
+  it("becomes ready on the defaults when the startup config read fails", async () => {
+    env.backing.local.syncMaster = false;
+    env.failNext.local.get = "local read failed";
+    const { whenReady, getSyncMaster } = await freshStore(env.chrome);
+    let fired = false;
+    whenReady(() => {
+      fired = true;
+    });
+    expect(fired).toBe(true);
+    expect(getSyncMaster()).toBe(true); // the unread switch keeps its default
+  });
+
+  it("routes on the all-synced defaults and queues whenReady until the config loads", async () => {
+    env.backing.local.syncMaster = false;
+    env.holdNext.local.get = true;
+    const { STORE, getSyncConfig, getSyncMaster, whenReady } = await freshStore(env.chrome);
+    const ran: string[] = [];
+    whenReady(() => ran.push("first"));
+    whenReady(() => ran.push("second"));
+
+    expect(ran).toEqual([]);
+    expect(getSyncConfig()).toEqual({
+      speeds: true,
+      delays: true,
+      audio: true,
+      shortcuts: true,
+      general: true,
+    });
+    STORE.set({ globalSpeed: 2 });
+    expect(env.backing.sync.globalSpeed).toBe(2);
+
+    env.resumeHeld();
+
+    expect(ran).toEqual(["first", "second"]);
+    expect(getSyncMaster()).toBe(false);
+    whenReady(() => ran.push("late"));
+    expect(ran).toEqual(["first", "second", "late"]);
+  });
+
+  it("becomes ready on the defaults when the startup read yields no items", async () => {
+    // No lastError, yet no items either: startup must not trip over the missing result.
+    const local = env.chrome.storage.local as unknown as Record<string, unknown>;
+    local.get = (_keys: unknown, cb: (items?: unknown) => void) => cb();
+    const { whenReady, getSyncMaster } = await freshStore(env.chrome);
+    let fired = false;
+    whenReady(() => {
+      fired = true;
+    });
+    expect(fired).toBe(true);
+    expect(getSyncMaster()).toBe(true);
+  });
+
+  it("ignores routing metadata that arrives in the sync area", async () => {
+    const { getSyncConfig, getSyncMaster } = await freshStore(env.chrome);
+
+    env.chrome.storage.sync.set({ syncCategories: { speeds: false }, syncMaster: false });
+
+    expect(getSyncConfig().speeds).toBe(true);
+    expect(getSyncMaster()).toBe(true);
+  });
+
+  it("ignores a non-boolean master switch written by another context", async () => {
+    const { getSyncMaster } = await freshStore(env.chrome);
+
+    env.chrome.storage.local.set({ syncMaster: "off" });
+
+    expect(getSyncMaster()).toBe(true);
   });
 
   it("subscribe fires on a watched key and stops after unsubscribe", async () => {
@@ -248,6 +326,99 @@ describe("routed STORE", () => {
 
     expect(env.backing.local.syncCategories).toBeUndefined();
     expect(env.backing.local.syncMaster).toBeUndefined();
+  });
+
+  it("reads a single key and answers an empty key list with no items", async () => {
+    env.backing.sync.globalSpeed = 2;
+    const { STORE } = await freshStore(env.chrome);
+    const single = vi.fn();
+    const none = vi.fn();
+
+    STORE.get("globalSpeed", single);
+    STORE.get([], none);
+
+    expect(single).toHaveBeenCalledWith({ globalSpeed: 2 });
+    expect(none).toHaveBeenCalledOnce();
+    expect(none).toHaveBeenCalledWith({});
+  });
+
+  it("answers a read spanning both areas once, with the merged items", async () => {
+    env.backing.local.syncCategories = { speeds: false };
+    env.backing.local.globalSpeed = 2;
+    env.backing.sync.audioComp = true;
+    const { STORE } = await freshStore(env.chrome);
+    const got = vi.fn();
+
+    STORE.get(["globalSpeed", "audioComp"], got);
+
+    expect(got).toHaveBeenCalledOnce();
+    expect(got).toHaveBeenCalledWith({ globalSpeed: 2, audioComp: true });
+  });
+
+  it("get(null) waits for the sync area even when local answers first", async () => {
+    env.backing.sync.audioComp = true;
+    env.backing.local.syncCategories = { speeds: false };
+    env.backing.local.globalSpeed = 2;
+    const { STORE } = await freshStore(env.chrome);
+    env.holdNext.sync.get = true;
+    const got = vi.fn();
+
+    STORE.get(null, got);
+    expect(got).not.toHaveBeenCalled();
+    env.resumeHeld();
+
+    expect(got).toHaveBeenCalledOnce();
+    expect(got).toHaveBeenCalledWith({
+      audioComp: true,
+      globalSpeed: 2,
+      syncCategories: { speeds: false },
+    });
+  });
+
+  it("get(null) takes each key only from the area it routes to", async () => {
+    env.backing.local.syncCategories = { speeds: false };
+    env.backing.sync.globalSpeed = 1.5; // another device's speed; this device keeps speeds local
+    env.backing.sync.syncMaster = false; // routing metadata only ever counts from local
+    const { STORE } = await freshStore(env.chrome);
+    let all: Record<string, unknown> = {};
+
+    STORE.get(null, (r) => {
+      all = r;
+    });
+
+    // Strict: a key missing from its routed area is absent, not present-but-undefined.
+    expect(all).toStrictEqual({ syncCategories: { speeds: false } });
+  });
+
+  it("reports a write spanning both areas once, after both have finished", async () => {
+    env.backing.local.syncCategories = { speeds: false };
+    const { STORE } = await freshStore(env.chrome);
+    env.holdNext.local.set = true;
+    const done = vi.fn();
+
+    STORE.set({ globalSpeed: 2, audioComp: true }, done);
+    expect(done).not.toHaveBeenCalled();
+    env.resumeHeld();
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(done).toHaveBeenCalledWith(true);
+  });
+
+  it("treats an empty write or removal as a success that touches no storage", async () => {
+    const { STORE } = await freshStore(env.chrome);
+    // Every storage call would now fail, so success proves none was made.
+    for (const area of ["sync", "local"]) {
+      env.failNext[area].set = "unexpected write";
+      env.failNext[area].remove = "unexpected remove";
+    }
+    const done = vi.fn();
+
+    STORE.set({}, done);
+    STORE.remove([], done);
+    STORE.removeEverywhere([], done);
+
+    expect(done.mock.calls).toEqual([[true], [true], [true]]);
+    expect(() => STORE.set({})).not.toThrow();
   });
 });
 
@@ -373,8 +544,11 @@ describe("master sync switch", () => {
   it("setting the switch to its current value is a no-op (still persisted, nothing moved)", async () => {
     const env = makeChrome();
     env.backing.sync.globalSpeed = 2;
+    env.backing.local.globalSpeed = 1.5; // stale copy left by an earlier off period
     const { setMasterSync } = await freshStore(env.chrome);
-    setMasterSync(true); // already on
+    const done = vi.fn();
+    setMasterSync(true, done); // already on
+    expect(done).toHaveBeenCalledWith(true);
     expect(env.backing.sync.globalSpeed).toBe(2); // unmoved
     expect(env.backing.local.syncMaster).toBe(true); // recorded
   });
@@ -391,6 +565,75 @@ describe("master sync switch", () => {
       got = r;
     });
     expect(got.globalSpeed).toBeUndefined();
+  });
+
+  it("while master is off, a toggle applies by done and copies no stale synced data", async () => {
+    const env = makeChrome();
+    env.backing.local.syncMaster = false;
+    env.backing.local.audioComp = true; // live value: everything is local while off
+    env.backing.sync.audioComp = false; // stale copy from before the switch went off
+    const { getSyncConfig, setCategorySync } = await freshStore(env.chrome);
+    let seen: unknown;
+
+    setCategorySync("audio", false, (ok) => {
+      seen = { ok, audio: getSyncConfig().audio };
+    });
+
+    expect(seen).toEqual({ ok: true, audio: false });
+    expect(env.backing.local.audioComp).toBe(true);
+  });
+
+  it("while master is off, a toggle that fails to save keeps the old preference", async () => {
+    const env = makeChrome();
+    env.backing.local.syncMaster = false;
+    const { getSyncConfig, setCategorySync } = await freshStore(env.chrome);
+    env.failNext.local.set = "quota exceeded";
+    const done = vi.fn();
+
+    setCategorySync("audio", false, done);
+
+    expect(done).toHaveBeenCalledWith(false);
+    expect(getSyncConfig().audio).toBe(true);
+  });
+
+  it("routes everything locally by the time done reports the switch off", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 1.75;
+    const { getSyncMaster, routedChanges, setMasterSync } = await freshStore(env.chrome);
+    let seen: unknown;
+
+    setMasterSync(false, (ok) => {
+      seen = { ok, master: getSyncMaster(), synced: routedChanges({ globalSpeed: 1 }, "sync") };
+    });
+
+    expect(seen).toEqual({ ok: true, master: false, synced: {} });
+  });
+
+  it("flips at once when no category is synced, keeping the switch if saving fails", async () => {
+    const env = makeChrome();
+    env.backing.local.syncCategories = {
+      speeds: false,
+      delays: false,
+      audio: false,
+      shortcuts: false,
+      general: false,
+    };
+    const { getSyncMaster, setMasterSync } = await freshStore(env.chrome);
+    env.failNext.local.set = "quota exceeded";
+    const failed = vi.fn();
+
+    setMasterSync(false, failed);
+
+    expect(failed).toHaveBeenCalledWith(false);
+    expect(getSyncMaster()).toBe(true);
+
+    let seen: unknown;
+    setMasterSync(false, (ok) => {
+      seen = { ok, master: getSyncMaster() };
+    });
+
+    expect(seen).toEqual({ ok: true, master: false });
+    expect(env.backing.local.syncMaster).toBe(false);
   });
 });
 
@@ -524,12 +767,26 @@ describe("setCategorySync migration", () => {
     env.backing.sync.globalSpeed = 1.75;
     env.failNext.local.set = "quota exceeded";
     const { getSyncMaster, setMasterSync } = await freshStore(env.chrome);
+    let ok: boolean | undefined;
 
-    setMasterSync(false);
+    setMasterSync(false, (result) => {
+      ok = result;
+    });
 
+    expect(ok).toBe(false);
     expect(env.backing.sync.globalSpeed).toBe(1.75);
     expect(env.backing.local.globalSpeed).toBeUndefined();
     expect(env.backing.local.syncMaster).toBeUndefined();
+    expect(getSyncMaster()).toBe(true);
+  });
+
+  it("tolerates a missing callback when moving synced categories to local fails", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 1.75;
+    env.failNext.local.set = "quota exceeded";
+    const { getSyncMaster, setMasterSync } = await freshStore(env.chrome);
+
+    expect(() => setMasterSync(false)).not.toThrow();
     expect(getSyncMaster()).toBe(true);
   });
 
@@ -578,5 +835,113 @@ describe("setCategorySync migration", () => {
       got = r;
     });
     expect(got.globalSpeed).toBe(1.75);
+  });
+
+  it("routes the category to its new area by the time done reports success", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 1.75;
+    const { getSyncConfig, routedChanges, setCategorySync } = await freshStore(env.chrome);
+    let seen: unknown;
+
+    setCategorySync("speeds", false, (ok) => {
+      seen = {
+        ok,
+        speeds: getSyncConfig().speeds,
+        local: routedChanges({ globalSpeed: 1 }, "local"),
+      };
+    });
+
+    expect(seen).toEqual({ ok: true, speeds: false, local: { globalSpeed: 1 } });
+  });
+
+  it("re-asserting a category's current preference moves nothing", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 2;
+    env.backing.local.globalSpeed = 1.5; // stale copy left by an earlier opt-out
+    const { setCategorySync } = await freshStore(env.chrome);
+    const done = vi.fn();
+
+    setCategorySync("speeds", true, done);
+
+    expect(done).toHaveBeenCalledWith(true);
+    expect(env.backing.sync.globalSpeed).toBe(2);
+  });
+
+  it("reports failure and keeps routing when reading the category to move fails", async () => {
+    const env = makeChrome();
+    env.backing.sync.globalSpeed = 1.75;
+    const { getSyncConfig, setCategorySync } = await freshStore(env.chrome);
+    env.failNext.sync.get = "sync read failed";
+    const done = vi.fn();
+
+    setCategorySync("speeds", false, done);
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(done).toHaveBeenCalledWith(false);
+    expect(getSyncConfig().speeds).toBe(true);
+    expect(env.backing.local).toEqual({});
+  });
+
+  it("opting an empty category into sync needs no write there", async () => {
+    const env = makeChrome();
+    env.backing.local.syncCategories = { audio: false };
+    const { getSyncConfig, setCategorySync } = await freshStore(env.chrome);
+    // Sync is refusing writes (say, rate-limited); with no audio settings stored, none is needed.
+    env.failNext.sync.set = "sync write quota exceeded";
+    const done = vi.fn();
+
+    setCategorySync("audio", true, done);
+
+    expect(done).toHaveBeenCalledWith(true);
+    expect(getSyncConfig().audio).toBe(true);
+  });
+});
+
+describe("routedChanges", () => {
+  const change = { newValue: 2 };
+
+  it("keeps each change only from the area its key routes to", async () => {
+    const env = makeChrome();
+    env.backing.local.syncCategories = { speeds: false }; // speeds local, audio synced
+    const { routedChanges } = await freshStore(env.chrome);
+
+    // Another device's speed edit still syncs into storage.sync, but isn't ours.
+    expect(routedChanges({ globalSpeed: change, audioComp: change }, "sync")).toEqual({
+      audioComp: change,
+    });
+    expect(routedChanges({ globalSpeed: change, audioComp: change }, "local")).toEqual({
+      globalSpeed: change,
+    });
+    expect(routedChanges({ syncMaster: change }, "local")).toEqual({ syncMaster: change });
+    expect(routedChanges({ syncMaster: change }, "sync")).toEqual({});
+    expect(routedChanges({ audioComp: change }, "managed")).toEqual({});
+  });
+
+  it("drops every synced change while the master switch is off", async () => {
+    const env = makeChrome();
+    env.backing.local.syncMaster = false;
+    const { routedChanges } = await freshStore(env.chrome);
+
+    expect(routedChanges({ siteBlacklist: change, keymap: change }, "sync")).toEqual({});
+    expect(routedChanges({ siteBlacklist: change }, "local")).toEqual({ siteBlacklist: change });
+  });
+
+  it("follows a routing change made in another context", async () => {
+    const env = makeChrome();
+    const { routedChanges } = await freshStore(env.chrome);
+    expect(routedChanges({ globalSpeed: change }, "sync")).toEqual({ globalSpeed: change });
+
+    env.chrome.storage.local.set({ syncCategories: { speeds: false } });
+
+    expect(routedChanges({ globalSpeed: change }, "sync")).toEqual({});
+    expect(routedChanges({ globalSpeed: change }, "local")).toEqual({ globalSpeed: change });
+  });
+
+  it("keeps local changes when there is no sync area", async () => {
+    const env = makeChrome();
+    (env.chrome.storage as { sync?: unknown }).sync = undefined;
+    const { routedChanges } = await freshStore(env.chrome);
+
+    expect(routedChanges({ globalSpeed: change }, "local")).toEqual({ globalSpeed: change });
   });
 });

@@ -15,6 +15,7 @@ import {
   typeInput,
   pressDoc,
 } from "./mocks/mount-options.js";
+import { setSlider } from "./mocks/mount-popup.js";
 
 beforeEach(() => {
   document.body.innerHTML = "";
@@ -26,6 +27,14 @@ const sectionWith = (sel: string) =>
   ) as HTMLElement;
 const thumbsIn = (root: Element, sel: string) =>
   [...root.querySelectorAll(`${sel} [role="slider"]`)] as HTMLElement[];
+
+// Feed a backup file to the hidden import <input>; FileReader reads it async.
+function importBackup(text: string): void {
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const file = new File([text], "s.json", { type: "application/json" });
+  Object.defineProperty(input, "files", { value: [file], configurable: true });
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
 
 // Two-step confirmation: a text button arms on the first click, confirms on the
 // second; a split (icon) button arms then exposes a ✓ in the same place.
@@ -152,6 +161,50 @@ describe("Options · General", () => {
       domains: { "old.example": 1.25 },
       globalSpeed: 1.25,
     });
+  });
+
+  // Restoring removes every setting the file lacks, so a file with nothing usable
+  // must be refused before that step can wipe the user's settings.
+  it("rejects a backup with no usable settings and deletes nothing", async () => {
+    const seeded = { domains: { "old.example": 1.25 }, globalSpeed: 1.25, uiLang: "ru" };
+    const { get } = await mountOptions(seeded);
+    for (const text of ["{}", '{"name":"pkg","version":"1.0.0"}', '{"uiLang":"it"}']) {
+      importBackup(text);
+      await settle();
+      expect(get(Object.keys(seeded))).toEqual(seeded);
+    }
+    expect(byId("importBtn").className).toContain("btn-err");
+  });
+
+  it("imports only known keys, a shipped language and readable map entries", async () => {
+    const { get } = await mountOptions({ domains: { "old.example": 1.25 }, uiLang: "ru" });
+    importBackup(
+      JSON.stringify({
+        globalSpeed: 1.5,
+        autoSlowSites: { "a.com": null, "b.com": { target: 6 } },
+        channels: { "youtube:x": "fast" },
+        uiLang: "it",
+        notASetting: 1,
+      }),
+    );
+    await settle();
+    expect(
+      get(["globalSpeed", "autoSlowSites", "channels", "domains", "uiLang", "notASetting"]),
+    ).toEqual({ globalSpeed: 1.5, autoSlowSites: { "b.com": { target: 6 } } });
+  });
+
+  it("reports a backup file that can't be read", async () => {
+    const { get } = await mountOptions({ globalSpeed: 1.25 });
+    const readAsText = vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (
+      this: FileReader,
+    ) {
+      this.onerror?.(new ProgressEvent("error") as ProgressEvent<FileReader>);
+    });
+    importBackup("{}");
+    await settle();
+    readAsText.mockRestore();
+    expect(byId("importBtn").className).toContain("btn-err");
+    expect(get(["globalSpeed"])).toEqual({ globalSpeed: 1.25 });
   });
 
   it("export omits sync routing metadata", async () => {
@@ -369,6 +422,47 @@ describe("Options · Keys", () => {
     expect(get(["seekStep"]).seekStep).toBeUndefined();
     expect(thumb.getAttribute("aria-valuenow")).toBe("10");
   });
+
+  it("names the configured speed step on the slower/faster rows", async () => {
+    await mountOptions({ speedStep: 10 });
+    const label = byId("keySlower").closest(".key-row")!.querySelector(".key-label")!;
+    expect(label.textContent).toBe("Slower (−10%)");
+  });
+
+  it("a window blur cancels the capture, so the next key isn't bound", async () => {
+    const { get } = await mountOptions({});
+    byId("keySlower").click();
+    await flush();
+    act(() => window.dispatchEvent(new Event("blur")));
+    await flush();
+    pressDoc({ code: "KeyJ" });
+    await flush();
+    expect(get(["keymap"]).keymap).toBeUndefined();
+    expect(byId("keySlower").textContent).toBe("A");
+  });
+
+  it("a press outside the waiting key-cap cancels the capture", async () => {
+    const { get } = await mountOptions({});
+    byId("keySlower").click();
+    await flush();
+    act(() => byId("siteBlacklist").dispatchEvent(new Event("pointerdown", { bubbles: true })));
+    await flush();
+    pressDoc({ code: "KeyJ" });
+    await flush();
+    expect(get(["keymap"]).keymap).toBeUndefined();
+  });
+
+  it("starting a preset capture cancels an armed action capture", async () => {
+    const { get } = await mountOptions({});
+    byId("keyReset").click();
+    await flush();
+    sectionWith(".preset-rows").querySelector<HTMLElement>(".preset-row .preset-key")!.click();
+    await flush();
+    pressDoc({ code: "KeyG" });
+    await flush();
+    expect(get(["keymap"]).keymap).toBeUndefined(); // only the preset took the key
+    expect((get(["presetKeys"]).presetKeys as (string | null)[])[0]).toBe("KeyG");
+  });
 });
 
 describe("Options · Speed presets", () => {
@@ -464,6 +558,32 @@ describe("Options · Speed presets", () => {
     expect(get(["speedPresets"]).speedPresets).toEqual([
       25, 50, 75, 90, 100, 110, 125, 150, 175, 200, 250, 1600,
     ]);
+  });
+
+  it("an emptied preset field reverts instead of committing the 25% floor", async () => {
+    const { get } = await mountOptions({});
+    const field = () =>
+      sp().querySelectorAll<HTMLInputElement>('.preset-rows input[type="number"]')[4]; // 100%
+    typeInput(field(), "");
+    await flush();
+    expect(field().value).toBe("100");
+    expect(get(["speedPresets"]).speedPresets).toEqual([
+      25, 50, 75, 90, 100, 110, 125, 150, 175, 200, 250, 1600,
+    ]);
+  });
+
+  it("a row keeps its controls when a blur commit re-sorts the list", async () => {
+    const { get } = await mountOptions({});
+    const rows = () => [...sp().querySelectorAll<HTMLElement>(".preset-row")];
+    const pin150 = rows()[7].querySelector<HTMLElement>(".preset-pin")!;
+    typeInput(rows()[0].querySelector("input")!, "300"); // 25 → 300 shifts every row up
+    await flush();
+    pin150.click();
+    await flush();
+    const pcts = get(["speedPresets"]).speedPresets as number[];
+    const pins = get(["presetPins"]).presetPins as boolean[];
+    expect(pins[pcts.indexOf(150)]).toBe(true);
+    expect(pins[pcts.indexOf(175)]).toBe(true); // the default pin the old slot now holds
   });
 });
 
@@ -585,6 +705,15 @@ describe("Options · Compressor presets", () => {
     expect(get(["compPresets"]).compPresets).toBeUndefined();
     expect(cp().querySelectorAll(".comp-list-row")).toHaveLength(3);
   });
+
+  it("dragging a preset row carries data, which Firefox needs to start the drag", async () => {
+    await mountOptions({});
+    const setData = vi.fn();
+    const e = new Event("dragstart", { bubbles: true });
+    Object.defineProperty(e, "dataTransfer", { value: { setData, effectAllowed: "" } });
+    act(() => cp().querySelector(".comp-list-row")!.dispatchEvent(e));
+    expect(setData).toHaveBeenCalledWith("text/plain", "0");
+  });
 });
 
 describe("Options · Auto-slow", () => {
@@ -601,6 +730,38 @@ describe("Options · Auto-slow", () => {
     expect(get(["autoSlowHold"]).autoSlowHold).toBe(4);
     expect(get(["autoSlowReaction"]).autoSlowReaction).toBe(100);
     expect(get(["autoSlowEaseBack"]).autoSlowEaseBack).toBe(100);
+  });
+
+  it("shows a stored fractional floor as a whole percent", async () => {
+    await mountOptions({ autoSlowFloor: 0.55 });
+    const value = byId("autoSlowFloor").closest(".opt-param")!.querySelector(".opt-param-val")!;
+    expect(value.textContent).toBe("55%");
+  });
+});
+
+// A drag only previews; each of these synced keys is written once, on release — a
+// write per drag step would trip storage.sync's per-minute write quota.
+describe("Options · slider drags persist on release", () => {
+  it.each([
+    "autoSlowFloor",
+    "autoSlowKnee",
+    "autoSlowHold",
+    "autoSlowReaction",
+    "autoSlowEaseBack",
+    "liveSyncBufferReserve",
+    "glassOpacity",
+    "viewerChatOpacity",
+    "viewerChatWidth",
+    "viewerChatHeight",
+  ])("%s", async (key) => {
+    const { get } = await mountOptions({});
+    const max = Number(byId(key).querySelector('[role="slider"]')!.getAttribute("aria-valuemax"));
+    setSlider(key, max, { commit: false });
+    await flush();
+    expect(get([key])[key]).toBeUndefined();
+    setSlider(key, max);
+    await flush();
+    expect(get([key])[key]).toBeDefined();
   });
 });
 

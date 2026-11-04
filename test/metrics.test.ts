@@ -35,4 +35,53 @@ describe("forwardBuffer", () => {
   it("returns 0 for empty buffered", () => {
     expect(forwardBuffer(fakeVideo([], 0))).toBe(0);
   });
+  it("still reports the last fraction of a second before the buffered end", () => {
+    expect(forwardBuffer(fakeVideo([[0, 10]], 9.9))).toBeCloseTo(0.1, 5);
+  });
+  it("counts a playhead up to 0.25s before a range start as inside it", () => {
+    expect(forwardBuffer(fakeVideo([[10, 30]], 9.75))).toBe(20.25);
+  });
+  it("returns 0 when the playhead is before or between buffered ranges", () => {
+    expect(forwardBuffer(fakeVideo([[50, 80]], 10))).toBe(0);
+    expect(
+      forwardBuffer(
+        fakeVideo(
+          [
+            [0, 5],
+            [50, 80],
+          ],
+          20,
+        ),
+      ),
+    ).toBe(0);
+  });
+  it("never reports a negative buffer just past a range end", () => {
+    expect(forwardBuffer(fakeVideo([[0, 10]], 10.2))).toBe(0);
+  });
+  it("measures from the next range when the playhead sits in a tiny gap", () => {
+    expect(
+      forwardBuffer(
+        fakeVideo(
+          [
+            [0, 10],
+            [10.3, 30],
+          ],
+          10.1,
+        ),
+      ),
+    ).toBeCloseTo(19.9, 5);
+  });
+  it("measures across a tiny gap from a playhead stalled at the range end", () => {
+    expect(
+      forwardBuffer(
+        fakeVideo(
+          [
+            [0, 10],
+            [10.2, 30],
+          ],
+          10,
+        ),
+      ),
+    ).toBe(20);
+  });
 });

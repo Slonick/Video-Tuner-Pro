@@ -196,8 +196,8 @@ describe("auto-slow card", () => {
 });
 
 // The global response knobs surfaced on the card (Slowest speed + Soft knee) write
-// their own storage keys live — not per-site — via useAutoSlowKnobs. Reaction / Hold
-// / Ease-back live in the options page only.
+// their own storage keys on release — not per-site — via useAutoSlowKnobs. Reaction /
+// Hold / Ease-back live in the options page only.
 describe("auto-slow response knobs (global)", () => {
   // aria-valuenow is rounded to an integer, so the fractional knee is read off its
   // aria-valuetext readout instead (e.g. "±0.5 /s").
@@ -232,5 +232,26 @@ describe("auto-slow response knobs (global)", () => {
     await flush();
     expect(sliderValue("asFloor")).toBe(85);
     expect(sliderText("asKnee")).toBe("±2.0 /s");
+  });
+
+  it("a drag previews the knobs and writes them only on release", async () => {
+    const { saved } = await mountApp({ tab: EX, replies: reply() });
+    setSlider("asFloor", 85, { commit: false });
+    setSlider("asKnee", 2, { commit: false });
+    await flush();
+    expect(sliderValue("asFloor")).toBe(85);
+    expect(sliderText("asKnee")).toBe("±2.0 /s");
+    expect(saved().autoSlowFloor).toBeUndefined();
+    expect(saved().autoSlowKnee).toBeUndefined();
+    setSlider("asFloor", 85);
+    setSlider("asKnee", 2);
+    await flush();
+    expect(saved().autoSlowFloor).toBeCloseTo(0.85, 5);
+    expect(saved().autoSlowKnee).toBe(2);
+  });
+
+  it("loads a fractional floor as a whole percent", async () => {
+    await mountApp({ tab: EX, replies: reply(), settings: { autoSlowFloor: 0.55 } });
+    expect(sliderValue("asFloor")).toBe(55);
   });
 });

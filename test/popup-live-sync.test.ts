@@ -22,6 +22,10 @@ const row = (scope: string) =>
   );
 const val = (scope: string) => row(scope)?.querySelector(".scope-val");
 
+// Off a stream the card is locked (controls disabled), so tests that drive its
+// controls mount on a live page.
+const LIVE = { getSpeed: { speed: 1, domain: "", channel: null, channelName: "", live: true } };
+
 describe("loadSyncSettings", () => {
   it("reflects the resolved target + scope from getTarget", async () => {
     await mountApp({
@@ -91,7 +95,7 @@ describe("loadSyncSettings", () => {
 
 describe("toggle + slider", () => {
   it("the toggle persists the liveSync flag", async () => {
-    const { saved } = await mountApp({ tab: EX });
+    const { saved } = await mountApp({ tab: EX, replies: LIVE });
     const t = byId("liveSyncToggle") as HTMLInputElement;
     t.click(); // on → off
     await flush();
@@ -99,7 +103,7 @@ describe("toggle + slider", () => {
   });
 
   it("the +/− buttons nudge the delay (slider + readout) and preview live", async () => {
-    const { lastCall } = await mountApp({ tab: EX });
+    const { lastCall } = await mountApp({ tab: EX, replies: LIVE });
     click("syncUp");
     await flush();
     expect(sliderValue("syncTarget")).toBe(6);
@@ -113,7 +117,7 @@ describe("toggle + slider", () => {
   });
 
   it("the slider previews live (setTarget) without persisting", async () => {
-    const { lastCall, saved } = await mountApp({ tab: EX });
+    const { lastCall, saved } = await mountApp({ tab: EX, replies: LIVE });
     setSlider("syncTarget", 9, { commit: false });
     await flush();
     expect(byId("syncTargetVal").textContent).toBe("9");
@@ -126,6 +130,7 @@ describe("toggle + slider", () => {
     await mountApp({
       tab: EX,
       replies: {
+        ...LIVE,
         getTarget: {
           __delayMs: 80,
           target: 12,
@@ -145,7 +150,7 @@ describe("toggle + slider", () => {
 
 describe("save / reset by scope", () => {
   it("Save sends rememberTarget for the default scope and marks it saved", async () => {
-    const { lastCall } = await mountApp({ tab: EX });
+    const { lastCall } = await mountApp({ tab: EX, replies: LIVE });
     click("syncUp"); // 5 → 6
     await flush();
     await openMenu();
@@ -250,7 +255,7 @@ describe("save / reset by scope", () => {
   });
 
   it("the per-target Reset sends resetTargetToSaved and pulls the saved value", async () => {
-    const { replies, lastCall } = await mountApp({ tab: EX });
+    const { replies, lastCall } = await mountApp({ tab: EX, replies: LIVE });
     replies.resetTargetToSaved = { success: true };
     replies.getTarget = { target: 8, scope: "site", channel: null, channelName: "", live: false };
     click("syncReset");
@@ -263,7 +268,7 @@ describe("save / reset by scope", () => {
     await mountApp({
       tab: EX,
       settings: { syncTargets: { "example.com": 7 } },
-      replies: { getTarget: undefined },
+      replies: { ...LIVE, getTarget: undefined },
     });
     click("syncReset");
     await wait(120);
@@ -287,7 +292,7 @@ describe("no content script (storage fallback)", () => {
     const { saved } = await mountApp({
       tab: EX,
       settings: { liveSyncTarget: 7 },
-      replies: { getTarget: undefined, rememberTarget: undefined },
+      replies: { ...LIVE, getTarget: undefined, rememberTarget: undefined },
     });
     setSlider("syncTarget", 11, { commit: false });
     await flush();

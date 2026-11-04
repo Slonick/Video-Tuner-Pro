@@ -13,8 +13,9 @@ export function applyTheme(theme: Theme): void {
   else delete el.dataset.theme;
 }
 
-// Read the saved theme and apply it. Called as early as possible on each page to
-// keep the flash from the default (system) palette short.
+// Read the saved theme and apply it. Call it once the store is ready (whenReady),
+// so the read goes to the area the theme is routed to, and before the first render
+// to keep the flash from the default (system) palette short.
 //
 // In the on-video overlay iframe two things must be decoupled (the launcher passes
 // both as `#vtp-<host>-<os>`):

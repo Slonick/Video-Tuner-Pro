@@ -58,7 +58,10 @@ import {
   setSpeed,
   applyAll,
   reassertRate,
+  reapplyPrimaryRate,
 } from "../src/content/speed.js";
+import { controlLive } from "../src/content/live/sync.js";
+import { trackDvr, resetDvrFor } from "../src/content/live/detection.js";
 
 const get = (keys: string[]): Record<string, unknown> => {
   let out: Record<string, unknown> = {};
@@ -145,6 +148,29 @@ describe("persistGlobalSpeed", () => {
   });
 });
 
+describe("persist results reported to the caller", () => {
+  it("reports a write refused in a subframe as failed", () => {
+    Object.defineProperty(window, "top", { value: {}, configurable: true });
+    h.keys = ["UC123"];
+    const done = vi.fn();
+
+    persistDomainSpeed(1.5, done);
+    persistChannelSpeed(1.5, done);
+    persistGlobalSpeed(1.5, done);
+
+    expect(done.mock.calls).toEqual([[false], [false], [false]]);
+  });
+
+  it("reports a channel write without a channel on the page as failed", () => {
+    h.keys = [];
+    const done = vi.fn();
+
+    persistChannelSpeed(1.5, done);
+
+    expect(done.mock.calls).toEqual([[false]]);
+  });
+});
+
 describe("resetScope", () => {
   it("channel: drops every key form and falls back to the per-domain speed", () => {
     STORE.set({ channels: { UC123: 2.0, "@handle": 2.0 }, domains: { localhost: 1.5 } });
@@ -216,6 +242,92 @@ describe("resetScope", () => {
     expect(S.speedScope).toBe("site");
     expect(S.speedManual).toBe(false);
   });
+
+  it("resetToSaved prefers a saved channel speed and reports success", () => {
+    STORE.set({ channels: { UC123: 2.0 }, domains: { localhost: 1.5 }, globalSpeed: 1.25 });
+    h.keys = ["UC123"];
+    const done = vi.fn();
+
+    resetToSaved(done);
+
+    expect(S.currentSpeed).toBe(2.0);
+    expect(S.speedScope).toBe("channel");
+    expect(done.mock.calls).toEqual([[true]]);
+  });
+
+  it("reports a failed removal and keeps the manual speed", () => {
+    STORE.set({ channels: { UC123: 2.0 }, domains: { localhost: 1.5 } });
+    h.keys = ["UC123"];
+    S.currentSpeed = 2.0;
+    S.userSpeed = 2.0;
+    S.speedManual = true;
+    const runtime = globalThis.chrome.runtime as unknown as {
+      sendMessage: (msg: unknown, cb?: (response: unknown) => void) => void;
+    };
+    const send = vi.spyOn(runtime, "sendMessage");
+    send.mockImplementation((_msg, cb) => cb?.({ success: false }));
+    try {
+      const done = vi.fn();
+
+      resetScope("channel", done);
+
+      expect(done.mock.calls).toEqual([[false]]);
+      expect(S.speedManual).toBe(true); // nothing was re-resolved over the manual speed
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it("global: a failed removal reports failure and keeps the manual speed", () => {
+    STORE.set({ channels: {}, domains: {}, globalSpeed: 1.4 });
+    S.currentSpeed = 1.9;
+    S.userSpeed = 1.9;
+    S.speedManual = true;
+    const remove = vi.spyOn(STORE, "remove").mockImplementation((_keys, cb) => cb?.(false));
+    try {
+      const done = vi.fn();
+
+      resetScope("global", done);
+      resetScope("global"); // without a callback it is just as quiet
+
+      expect(done.mock.calls).toEqual([[false]]);
+      expect(S.currentSpeed).toBe(1.9);
+      expect(S.speedManual).toBe(true);
+    } finally {
+      remove.mockRestore();
+    }
+  });
+
+  it("channel: with no channel on the page, reports failure and changes nothing", () => {
+    STORE.set({ channels: {}, domains: { localhost: 1.5 } });
+    h.keys = [];
+    S.currentSpeed = 1.9;
+    S.userSpeed = 1.9;
+    S.speedManual = true;
+    const done = vi.fn();
+
+    resetScope("channel", done);
+    resetScope("channel"); // without a callback it is just as quiet
+
+    expect(done.mock.calls).toEqual([[false]]);
+    expect(S.currentSpeed).toBe(1.9);
+    expect(S.speedManual).toBe(true);
+  });
+
+  it("has nothing to drop for the built-in default scope", () => {
+    STORE.set({ channels: {}, domains: {}, globalSpeed: 1.25 });
+    S.currentSpeed = 1.9;
+    S.userSpeed = 1.9;
+    S.speedManual = true;
+    const done = vi.fn();
+
+    resetScope(null, done);
+    resetScope(null); // without a callback it is just as quiet
+
+    expect(done.mock.calls).toEqual([[false]]);
+    expect(get(["globalSpeed"]).globalSpeed).toBe(1.25);
+    expect(S.currentSpeed).toBe(1.9);
+  });
 });
 
 describe("setSpeed", () => {
@@ -227,15 +339,10 @@ describe("setSpeed", () => {
   });
 
   it("marks an in-tab manual speed override", () => {
-    setSpeed(1.4, false, true);
+    setSpeed(1.4, true);
     expect(S.currentSpeed).toBeCloseTo(1.4, 5);
     expect(S.userSpeed).toBeCloseTo(1.4, 5);
     expect(S.speedManual).toBe(true);
-  });
-
-  it("persists to the domain only when asked", () => {
-    setSpeed(1.4, true);
-    expect((get(["domains"]).domains as Record<string, number>).localhost).toBe(1.4);
   });
 
   it("ignores a MANUAL change on a live stream page (governed by live-sync)", () => {
@@ -243,7 +350,7 @@ describe("setSpeed", () => {
     h.videos = [live];
     h.liveVideos.add(live);
     onStream = true;
-    setSpeed(1.4, false, true);
+    setSpeed(1.4, true);
     expect(S.currentSpeed).toBe(1.0); // unchanged
   });
 
@@ -254,7 +361,7 @@ describe("setSpeed", () => {
     h.liveVideos.add(livePreview);
     onStream = true;
 
-    setSpeed(1.4, false, true);
+    setSpeed(1.4, true);
 
     expect(S.currentSpeed).toBeCloseTo(1.4, 5);
     expect(S.userSpeed).toBeCloseTo(1.4, 5);
@@ -265,7 +372,7 @@ describe("setSpeed", () => {
 
   it("still applies a non-manual change on a stream page (live-sync's own write)", () => {
     onStream = true;
-    setSpeed(1.1, false, false);
+    setSpeed(1.1, false);
     expect(S.currentSpeed).toBeCloseTo(1.1, 5);
   });
 });
@@ -285,6 +392,17 @@ describe("applyAll", () => {
     expect(live.playbackRate).toBe(1);
     expect(preview.playbackRate).toBeCloseTo(1.75, 5);
     expect(preview.defaultPlaybackRate).toBeCloseTo(1.75, 5);
+  });
+
+  it("treats a stream page with no primary video as live, like the tick does", () => {
+    const small = document.createElement("video");
+    onStream = true;
+    S.currentSpeed = 1.05; // live-sync catch-up rate
+    S.userSpeed = 1.75;
+
+    applyAll({ videos: [small], primary: null });
+
+    expect(small.playbackRate).toBeCloseTo(1.75, 5);
   });
 
   it("resolves the primary live state once per pass", () => {
@@ -343,6 +461,36 @@ describe("dead extension context — never writes", () => {
     resetScope("channel");
     expect((get(["channels"]).channels as Record<string, number>).UC1).toBe(2.0); // untouched
   });
+
+  it("persistGlobalSpeed bails when the context is gone", () => {
+    persistGlobalSpeed(1.5);
+    expect(get(["globalSpeed"]).globalSpeed).toBeUndefined();
+  });
+
+  it("reports every refused write or reset to its caller as failed", () => {
+    h.keys = ["UC1"];
+    const done = vi.fn();
+
+    persistDomainSpeed(1.5, done);
+    persistChannelSpeed(1.5, done);
+    persistGlobalSpeed(1.5, done);
+    resetScope("site", done);
+    resetToSaved(done);
+
+    expect(done.mock.calls).toEqual([[false], [false], [false], [false], [false]]);
+  });
+
+  it("resetToSaved keeps the current speed when the context is gone", () => {
+    STORE.set({ channels: {}, domains: { localhost: 1.5 } });
+    S.currentSpeed = 1.9;
+    S.userSpeed = 1.9;
+    S.speedManual = true;
+
+    resetToSaved(); // the R hotkey passes no callback
+
+    expect(S.currentSpeed).toBe(1.9);
+    expect(S.speedManual).toBe(true);
+  });
 });
 
 describe("applyToVideo (via applyAll)", () => {
@@ -391,6 +539,24 @@ describe("applyToVideo (via applyAll)", () => {
       callsAfterFirst,
     );
   });
+
+  it("does NOT re-seed defaultPlaybackRate when it already matches", () => {
+    let seeds = 0,
+      seeded = 1;
+    const v = fakeVideo(1);
+    Object.defineProperty(v, "defaultPlaybackRate", {
+      get: () => seeded,
+      set: (x: number) => {
+        seeds++;
+        seeded = x;
+      },
+    });
+    h.videos = [v];
+    setSpeed(1.5); // differs → one write
+    expect(seeds).toBe(1);
+    setSpeed(1.5); // equal → no write
+    expect(seeds).toBe(1);
+  });
 });
 
 describe("reassertRate", () => {
@@ -437,5 +603,177 @@ describe("reassertRate", () => {
     expect(v.playbackRate).toBeCloseTo(1, 5); // 2 × 0.5 (auto-slowed)
     expect(v.preservesPitch).toBe(true); // pitch kept natural
     expect(v.defaultPlaybackRate).toBeCloseTo(2, 5); // seeded at the intended speed
+  });
+});
+
+describe("per-element listeners (wired by applyAll)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(controlLive).mockClear();
+    vi.mocked(trackDvr).mockClear();
+    vi.mocked(resetDvrFor).mockClear();
+    S.currentSpeed = 1.5;
+    S.userSpeed = 1.5;
+  });
+  afterEach(() => {
+    vi.runOnlyPendingTimers(); // settle a throttled live re-evaluation before the next test
+    vi.useRealTimers();
+    S.siteDisabled = false;
+  });
+
+  function wiredVideo(): HTMLVideoElement {
+    const v = document.createElement("video");
+    h.videos = [v];
+    applyAll();
+    return v;
+  }
+
+  it("re-asserts the speed when the page's player changes the rate", () => {
+    const v = wiredVideo();
+    expect(v.playbackRate).toBe(1.5);
+
+    v.playbackRate = 1;
+    v.dispatchEvent(new Event("ratechange"));
+
+    expect(v.playbackRate).toBe(1.5);
+  });
+
+  it("re-applies the current speed when playback starts or new data loads", () => {
+    const v = wiredVideo();
+
+    S.currentSpeed = 2;
+    v.dispatchEvent(new Event("play"));
+    expect(v.playbackRate).toBe(2);
+
+    S.currentSpeed = 2.5;
+    v.dispatchEvent(new Event("loadeddata"));
+    expect(v.playbackRate).toBe(2.5);
+  });
+
+  it("leaves a live video's rate to live-sync", () => {
+    const v = document.createElement("video");
+    h.liveVideos.add(v);
+    h.videos = [v];
+    S.currentSpeed = 1.05;
+    S.userSpeed = 1.75;
+    applyAll();
+
+    v.playbackRate = 1.2; // live-sync's catch-up write
+    v.dispatchEvent(new Event("ratechange"));
+    v.dispatchEvent(new Event("play"));
+
+    expect(v.playbackRate).toBe(1.2);
+  });
+
+  it("feeds DVR tracking on seeking/timeupdate and resets it on new metadata", () => {
+    const v = wiredVideo();
+
+    v.dispatchEvent(new Event("seeking"));
+    expect(trackDvr).toHaveBeenCalledTimes(1);
+    v.dispatchEvent(new Event("timeupdate"));
+    expect(trackDvr).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(trackDvr).mock.calls.every(([video]) => video === v)).toBe(true);
+    expect(resetDvrFor).not.toHaveBeenCalled();
+
+    v.dispatchEvent(new Event("loadedmetadata"));
+    expect(resetDvrFor).toHaveBeenCalledOnce();
+    expect(vi.mocked(resetDvrFor).mock.calls[0][0]).toBe(v);
+  });
+
+  it("re-evaluates live state when the duration or the metadata changes", () => {
+    const v = wiredVideo();
+
+    v.dispatchEvent(new Event("durationchange"));
+    expect(controlLive).toHaveBeenCalledTimes(1);
+    v.dispatchEvent(new Event("loadedmetadata"));
+    expect(controlLive).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-evaluates live state at most once per 250 ms of playback progress", () => {
+    const v = wiredVideo();
+
+    v.dispatchEvent(new Event("timeupdate"));
+    v.dispatchEvent(new Event("timeupdate"));
+    vi.advanceTimersByTime(249);
+    v.dispatchEvent(new Event("timeupdate"));
+    expect(controlLive).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(controlLive).toHaveBeenCalledOnce();
+
+    v.dispatchEvent(new Event("timeupdate"));
+    vi.advanceTimersByTime(250);
+    expect(controlLive).toHaveBeenCalledTimes(2);
+  });
+
+  it("schedules no live re-evaluation on a blacklisted site", () => {
+    const v = wiredVideo();
+    S.siteDisabled = true;
+
+    v.dispatchEvent(new Event("timeupdate"));
+    vi.advanceTimersByTime(250);
+
+    expect(controlLive).not.toHaveBeenCalled();
+  });
+});
+
+describe("reapplyPrimaryRate", () => {
+  afterEach(() => {
+    S.autoSlowEnabled = false;
+    S.autoSlowFactor = 1;
+  });
+
+  it("re-asserts the auto-slowed rate on the primary video right away", () => {
+    const v = document.createElement("video");
+    h.videos = [v];
+    S.currentSpeed = 1.6;
+    S.autoSlowEnabled = true;
+    S.autoSlowFactor = 0.5;
+
+    reapplyPrimaryRate();
+
+    expect(v.playbackRate).toBeCloseTo(0.8, 5);
+    expect(v.defaultPlaybackRate).toBeCloseTo(1.6, 5);
+  });
+
+  it("leaves a live primary video to live-sync", () => {
+    const v = document.createElement("video");
+    h.videos = [v];
+    h.liveVideos.add(v);
+    S.currentSpeed = 1.6;
+    S.userSpeed = 1.6;
+
+    reapplyPrimaryRate();
+
+    expect(v.playbackRate).toBe(1);
+  });
+});
+
+describe("content teardown", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("cancels a pending live re-evaluation when the content script is torn down", async () => {
+    // A fresh module graph: aborting its lifecycle must not silence the other tests' listeners.
+    vi.resetModules();
+    const fresh = await import("../src/content/speed.js");
+    const { abortContentListeners } = await import("../src/content/lifecycle.js");
+    const { controlLive: freshControlLive } = await import("../src/content/live/sync.js");
+    vi.mocked(freshControlLive).mockClear();
+    vi.useFakeTimers();
+    const v = document.createElement("video");
+    h.videos = [v];
+    fresh.applyAll();
+
+    v.dispatchEvent(new Event("timeupdate"));
+    vi.advanceTimersByTime(250);
+    expect(freshControlLive).toHaveBeenCalledOnce(); // the throttled re-evaluation is live here
+
+    v.dispatchEvent(new Event("timeupdate"));
+    abortContentListeners();
+    vi.advanceTimersByTime(250);
+
+    expect(freshControlLive).toHaveBeenCalledOnce();
   });
 });

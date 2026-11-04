@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   videos: [] as HTMLVideoElement[],
@@ -26,12 +26,22 @@ vi.mock("../src/content/platform/browser.js", () => ({
 }));
 
 describe("toolbar badge updates", () => {
+  const realTop = Object.getOwnPropertyDescriptor(window, "top");
+  const asSubframe = () => Object.defineProperty(window, "top", { value: {}, configurable: true });
+
   beforeEach(() => {
     vi.resetModules();
     h.videos = [];
     h.messages = [];
     h.live = false;
     window.history.replaceState(null, "", "/one");
+  });
+
+  afterEach(async () => {
+    if (realTop) Object.defineProperty(window, "top", realTop);
+    // Drop this test's pagehide listener so it can't answer a later test's event.
+    const { abortContentListeners } = await import("../src/content/lifecycle.js");
+    abortContentListeners();
   });
 
   it("does not clear the toolbar badge from a frame that never owned a video", async () => {
@@ -82,6 +92,46 @@ describe("toolbar badge updates", () => {
     S.siteDisabled = true;
 
     updateBadge();
+
+    expect(h.messages).toEqual([]);
+  });
+
+  it("hands the toolbar badge back when its iframe goes away", async () => {
+    const { updateBadge } = await import("../src/content/badge/icon.js");
+    asSubframe();
+    h.videos = [document.createElement("video")];
+
+    updateBadge();
+    window.dispatchEvent(new Event("pagehide"));
+    // Restored from the back/forward cache: the badge is reported again.
+    updateBadge();
+
+    expect(h.messages).toEqual([
+      { action: "icon", text: "1.0", live: false },
+      { action: "icon", clear: true },
+      { action: "icon", text: "1.0", live: false },
+    ]);
+  });
+
+  it("leaves the top frame's badge to the tab navigation, then re-reports it", async () => {
+    const { updateBadge } = await import("../src/content/badge/icon.js");
+    h.videos = [document.createElement("video")];
+
+    updateBadge();
+    window.dispatchEvent(new Event("pagehide"));
+    updateBadge();
+
+    expect(h.messages).toEqual([
+      { action: "icon", text: "1.0", live: false },
+      { action: "icon", text: "1.0", live: false },
+    ]);
+  });
+
+  it("stays silent on pagehide in a frame that never showed a badge", async () => {
+    await import("../src/content/badge/icon.js");
+    asSubframe();
+
+    window.dispatchEvent(new Event("pagehide"));
 
     expect(h.messages).toEqual([]);
   });

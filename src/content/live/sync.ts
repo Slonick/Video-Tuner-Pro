@@ -14,16 +14,15 @@ let lastControlAt = 0;
 let lastStepAt = 0; // when the applied catch-up step last changed — the dwell anchor
 let activeLiveVideo: HTMLVideoElement | null = null;
 
-// Net video frames dropped since the previous call (decoder/network can't keep up).
+// Net video frames dropped since the previous call (decoder/network can't keep up);
+// negative once a new source resets the counter, which the burst threshold ignores.
 function droppedFramesDelta(video: HTMLVideoElement): number {
   try {
     const q = video.getVideoPlaybackQuality ? video.getVideoPlaybackQuality() : null;
     const total = q ? q.droppedVideoFrames : 0;
-    const previous = droppedFrames.get(video);
+    const previous = droppedFrames.get(video) ?? total; // a first reading is only the baseline
     droppedFrames.set(video, total);
-    if (previous == null) return 0;
-    const delta = total - previous;
-    return delta > 0 ? delta : 0;
+    return total - previous;
   } catch (e) {
     return 0;
   }
@@ -93,9 +92,9 @@ export function controlLive(
   }
   // Not a live stream. Wait out the sticky window, then restore the user's
   // intended non-live speed — otherwise a (mistaken) live detection would leave
-  // playback stuck at 100%.
+  // playback stuck at 100%. A manual speed is included: setSpeed keeps userSpeed
+  // equal to it, so the two only differ once live control has changed the rate.
   if (snapshot.onStream !== undefined ? snapshot.onStream : onStreamPage()) return;
-  if (S.speedManual) return;
   if (Math.abs(S.currentSpeed - S.userSpeed) > 0.001) {
     S.currentSpeed = S.userSpeed;
     applyAll();
@@ -130,31 +129,18 @@ function runLiveSync(video: HTMLVideoElement): void {
 
   const lag = lat != null ? lat : buffer;
   const floor = catchupBufferFloor(lat, target, S.liveSyncBufferReserve);
+  // A rate switch itself drops a frame or two, and a bail here causes another
+  // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
+  // Ignore drops briefly after the catch-up decision changes and below a real burst.
   const rawDropped = droppedFramesDelta(video);
+  const dropped = Date.now() - lastRateDecisionAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
   let desired = decideCatchupSpeed({
     buffer,
     latency: lat,
-    dropped: 0,
+    dropped,
     target,
     reserve: S.liveSyncBufferReserve,
   });
-  const holdingCatchup = S.currentSpeed > 1 && lag > target && buffer > floor + 0.05;
-  let dropped = 0;
-  if (desired > 1 || holdingCatchup) {
-    // A rate switch itself drops a frame or two, and a bail here causes another
-    // switch — reacting to every dropped frame oscillates 100%↔105%+ forever.
-    // Ignore drops briefly after the catch-up decision changes and below a real burst.
-    dropped = Date.now() - lastRateDecisionAt < 1500 || rawDropped < 3 ? 0 : rawDropped;
-    if (dropped > 0) {
-      desired = decideCatchupSpeed({
-        buffer,
-        latency: lat,
-        dropped,
-        target,
-        reserve: S.liveSyncBufferReserve,
-      });
-    }
-  }
   if (
     desired <= 1 &&
     S.currentSpeed > 1 &&
@@ -163,14 +149,9 @@ function runLiveSync(video: HTMLVideoElement): void {
     buffer > floor + 0.05
   ) {
     desired = Math.min(S.currentSpeed, 1.05);
-  } else if (
-    lastStepAt > 0 &&
-    desired > 1 &&
-    desired < S.currentSpeed &&
-    dropped === 0 &&
-    lag > target &&
-    buffer > floor + 0.05
-  ) {
+  } else if (lastStepAt > 0 && desired > 1 && desired < S.currentSpeed) {
+    // Hold the higher step; a >100% decision already rules out a drop burst,
+    // a reached target and a thin buffer.
     desired = S.currentSpeed;
   }
   const settled = settleCatchupRate(

@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // The on-video launcher: a draggable button over the video that opens the popup
 // as an in-page overlay (an iframe). updateLauncher mounts/positions it by mode
 // ("off"/"fullscreen"/"always"); a click without a drag toggles the iframe.
-const h = vi.hoisted(() => ({ primary: null as unknown, drm: false, primaryReads: 0 }));
+const h = vi.hoisted(() => ({
+  primary: null as unknown,
+  drm: false,
+  primaryReads: 0,
+  sendMessage: vi.fn(() => Promise.resolve()),
+}));
 vi.mock("../src/content/videos.js", () => ({
   primaryVideo: () => {
     h.primaryReads++;
@@ -12,9 +17,12 @@ vi.mock("../src/content/videos.js", () => ({
   },
   isDrmVideo: () => h.drm,
 }));
-// runtime.getURL is the only browser API the launcher touches at mount/open time.
+// runtime.getURL is the only browser API the launcher touches at mount/open time;
+// sendMessage carries a click on an embedded player's button to the top frame.
 vi.mock("../src/content/platform/browser.js", () => ({
-  api: { runtime: { getURL: (p: string) => "chrome-extension://test/" + p } },
+  api: {
+    runtime: { getURL: (p: string) => "chrome-extension://test/" + p, sendMessage: h.sendMessage },
+  },
   ctxValid: () => true,
 }));
 vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
@@ -29,6 +37,7 @@ const v = vi.hoisted(() => ({
 }));
 vi.mock("../src/content/viewer.js", () => ({
   VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
+  VIEWER_RAISE_EVENT: "vtp-viewer-raise",
   toggleViewer: v.toggleViewer,
   exitViewer: v.exitViewer,
   viewerFormat: () => v.format,
@@ -93,6 +102,20 @@ function fire(el: EventTarget, type: string, x = 0, y = 0) {
 
 function key(el: EventTarget, key: string) {
   el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+}
+
+// A message as the browser delivers it from the popup iframe: our frame's window as
+// the source (jsdom gives an iframe in a shadow tree none, so null here) and the
+// extension's own origin.
+function fromPopup(data: unknown, init: MessageEventInit = {}) {
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data,
+      source: frameEl()?.contentWindow ?? null,
+      origin: "chrome-extension://test",
+      ...init,
+    }),
+  );
 }
 
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -393,34 +416,38 @@ describe("launcher — open / close", () => {
     const frame = frameEl();
     expect(frame).not.toBeNull();
     expect(fab.getAttribute("aria-label")).toBe("Close Video Tuner");
-    // src carries the host + OS schemes in the hash, so the popup can match the host's
-    // color-scheme (transparency) and theme the glass to the OS.
+    // src carries the page's origin (the popup addresses its messages to it alone) and
+    // the host + OS schemes in the hash, so the popup can match the host's color-scheme
+    // (transparency) and theme the glass to the OS.
     expect(frame!.src).toMatch(
-      /^chrome-extension:\/\/test\/popup\/popup\.html#vtp-(light|dark)-(light|dark)$/,
+      /^chrome-extension:\/\/test\/popup\/popup\.html\?host=[^#]+#vtp-(light|dark)-(light|dark)$/,
     );
+    expect(new URL(frame!.src).searchParams.get("host")).toBe(location.origin);
     expect(frame!.style.display).toBe("block");
     // Outside click (the backdrop) closes it.
     const backdrop = host()!.shadowRoot!.querySelector("div") as HTMLElement;
     fire(backdrop, "pointerdown");
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
     expect(fab.getAttribute("aria-label")).toBe("Open Video Tuner");
   });
 
-  it("recreates the iframe on each open so it loads the current popup", () => {
+  it("drops the iframe on close and creates a fresh one on the next open", () => {
     S.overlayButton = "always";
     h.primary = fakeVideo();
     updateLauncher();
     const fab = fabEl()!;
-    // Open, close, reopen.
     fire(fab, "pointerdown", 580, 158);
     fire(fab, "pointerup", 580, 158);
     const first = frameEl()!;
     fire(host()!.shadowRoot!.querySelector("div") as HTMLElement, "pointerdown"); // backdrop → close
+    // Removed, not just hidden: a hidden popup document keeps polling the tab.
+    expect(first.isConnected).toBe(false);
+    expect(frameEl()).toBeNull();
     fire(fab, "pointerdown", 580, 158);
     fire(fab, "pointerup", 580, 158);
     const second = frameEl()!;
-    expect(second).not.toBe(first); // fresh element each open
-    expect(host()!.shadowRoot!.querySelectorAll("iframe").length).toBe(1); // old one removed
+    expect(second).not.toBe(first);
+    expect(host()!.shadowRoot!.querySelectorAll("iframe").length).toBe(1);
     expect(second.style.display).toBe("block");
     fire(host()!.shadowRoot!.querySelector("div") as HTMLElement, "pointerdown"); // leave closed
   });
@@ -507,14 +534,8 @@ describe("launcher — open / close", () => {
     const fab = fabEl()!;
     fire(fab, "pointerdown", 580, 158);
     fire(fab, "pointerup", 580, 158);
-    const frame = frameEl()!;
 
-    window.dispatchEvent(
-      new MessageEvent("message", {
-        data: { type: "vtp-overlay", drag: "reset" },
-        source: frame.contentWindow,
-      }),
-    );
+    fromPopup({ type: "vtp-overlay", drag: "reset" });
 
     expect(S.overlayPanelPos).toBeNull();
     expect(get(["overlayPanelPos"]).overlayPanelPos).toBeUndefined();
@@ -531,12 +552,7 @@ describe("launcher — open / close", () => {
     fire(fab, "pointerup", 580, 158);
     const popup = frameEl()!;
 
-    window.dispatchEvent(
-      new MessageEvent("message", {
-        data: { type: "vtp-overlay", height: 600 },
-        source: popup.contentWindow,
-      }),
-    );
+    fromPopup({ type: "vtp-overlay", height: 600 });
 
     expect(Number.parseFloat(popup.style.left)).toBeGreaterThan(0);
     expect(Number.parseFloat(popup.style.left)).toBeLessThan(window.innerWidth);
@@ -936,7 +952,7 @@ describe("toggleOverlayPopup — pages without a video", () => {
     expect(popup).not.toBeNull();
     expect(popup!.style.display).toBe("block");
     expect(popup!.src).toMatch(
-      /^chrome-extension:\/\/test\/popup\/popup\.html#vtp-(light|dark)-(light|dark)$/,
+      /^chrome-extension:\/\/test\/popup\/popup\.html\?host=[^#]+#vtp-(light|dark)-(light|dark)$/,
     );
     expect(popup!.style.left).toBe(window.innerWidth / 2 + "px");
     expect(popup!.style.top).toBe(window.innerHeight / 2 + "px");
@@ -958,19 +974,19 @@ describe("toggleOverlayPopup — pages without a video", () => {
 
     fire(backdropEl(), "pointerdown");
 
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
     expect(fabShown()).toBe(false);
   });
 
   it("a second call closes it, and so does a click outside", () => {
     toggleOverlayPopup();
     toggleOverlayPopup();
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
 
     toggleOverlayPopup();
     expect(frameEl()!.style.display).toBe("block");
     fire(backdropEl(), "pointerdown");
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
   });
 
   it("stays open through the launcher's periodic refresh while the page has no video", () => {
@@ -1001,7 +1017,7 @@ describe("toggleOverlayPopup — pages without a video", () => {
     h.primary = null;
     updateLauncher();
 
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
   });
 
   it("forgets that it was opened without a video once it is closed", () => {
@@ -1013,7 +1029,7 @@ describe("toggleOverlayPopup — pages without a video", () => {
     h.primary = null;
     updateLauncher();
 
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
   });
 
   it("follows into the fullscreen element so it stays visible", () => {
@@ -1082,7 +1098,7 @@ describe("launcher — blacklisted site", () => {
     expect(frameEl()!.style.display).toBe("block");
 
     fire(backdropEl(), "pointerdown");
-    expect(frameEl()!.style.display).toBe("none");
+    expect(frameEl()).toBeNull();
     expect(fabShown()).toBe(false); // closing doesn't flash the button either
   });
 
@@ -1100,5 +1116,146 @@ describe("launcher — blacklisted site", () => {
 
     expect(frameEl()!.style.display).toBe("block");
     expect(fabShown()).toBe(false);
+  });
+});
+
+describe("launcher — popup messages", () => {
+  it("only takes well-formed requests from the popup it opened", () => {
+    toggleOverlayPopup();
+    const popup = frameEl()!;
+    // Give our frame a real window, so a null source can't pass for it.
+    const stand = document.createElement("iframe");
+    document.body.append(stand);
+    Object.defineProperty(popup, "contentWindow", { value: stand.contentWindow });
+    const box = () => [popup.style.left, popup.style.top, popup.style.height];
+    const before = box();
+    const close = { type: "vtp-overlay", close: true };
+
+    fromPopup(close, { source: window }); // the page itself
+    fromPopup(close, { source: null });
+    fromPopup(close, { origin: "https://example.com" }); // our frame, navigated elsewhere
+    fromPopup({ ...close, type: "other" });
+    fromPopup(null);
+    fromPopup({ type: "vtp-overlay", height: Number.NaN });
+    fromPopup({ type: "vtp-overlay", height: Infinity });
+    fromPopup({ type: "vtp-overlay", drag: "start", sx: 0, sy: 0 });
+    fromPopup({ type: "vtp-overlay", drag: "move", sx: 200, sy: Number.NaN });
+    fromPopup({ type: "vtp-overlay", drag: "move", sx: Number.NaN, sy: 200 });
+
+    expect(popup.isConnected).toBe(true);
+    expect(popup.style.display).toBe("block");
+    expect(box()).toEqual(before);
+
+    fromPopup(close); // the popup itself is still heard
+    expect(frameEl()).toBeNull();
+    stand.remove();
+  });
+});
+
+describe("launcher — panel position", () => {
+  it("keeps the saved spot when the window or a taller panel only clamps it on screen", () => {
+    S.overlayPanelPos = { fx: 0.95, fy: 0.5 };
+    STORE.set({ overlayPanelPos: { localhost: S.overlayPanelPos } });
+
+    toggleOverlayPopup();
+    expect(Number.parseFloat(frameEl()!.style.left)).toBeLessThan(0.95 * window.innerWidth);
+    fromPopup({ type: "vtp-overlay", height: 700 });
+    window.dispatchEvent(new Event("resize"));
+
+    expect(S.overlayPanelPos).toEqual({ fx: 0.95, fy: 0.5 });
+    expect(get(["overlayPanelPos"]).overlayPanelPos).toEqual({ localhost: { fx: 0.95, fy: 0.5 } });
+  });
+
+  it("saves the panel spot when a drag ends, not while it moves", () => {
+    toggleOverlayPopup();
+    frameEl()!.getBoundingClientRect = () =>
+      ({ left: 170, top: 124, width: 684, height: 520, right: 854, bottom: 644 }) as DOMRect;
+
+    fromPopup({ type: "vtp-overlay", drag: "start", sx: 500, sy: 400 });
+    fromPopup({ type: "vtp-overlay", drag: "move", sx: 400, sy: 380 });
+    expect(get(["overlayPanelPos"]).overlayPanelPos).toEqual({});
+
+    fromPopup({ type: "vtp-overlay", drag: "end", moved: true });
+    const dropped = { fx: 412 / window.innerWidth, fy: 364 / window.innerHeight };
+    expect(S.overlayPanelPos).toEqual(dropped);
+    expect(get(["overlayPanelPos"]).overlayPanelPos).toEqual({ localhost: dropped });
+  });
+});
+
+describe("launcher — native viewer", () => {
+  // jsdom has no Popover API; the launcher only needs the two methods to exist.
+  beforeEach(() => {
+    Object.assign(HTMLElement.prototype, { showPopover: vi.fn(), hidePopover: vi.fn() });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLElement.prototype, "showPopover");
+    Reflect.deleteProperty(HTMLElement.prototype, "hidePopover");
+  });
+
+  it("lifts a popup opened with the button off above the lifted site player", () => {
+    S.overlayButton = "off";
+    const player = document.createElement("div");
+    player.setAttribute("data-vtp-viewer-player", "");
+    player.getBoundingClientRect = fakeVideo().getBoundingClientRect;
+    v.anchor = player;
+    v.format = "normal";
+
+    toggleOverlayPopup(); // toolbar icon / hotkey
+    expect(host()!.getAttribute("popover")).toBe("manual");
+    updateLauncher(); // the periodic refresh keeps it there
+    expect(host()!.getAttribute("popover")).toBe("manual");
+
+    toggleOverlayPopup();
+    updateLauncher();
+    expect(host()!.hasAttribute("popover")).toBe(false);
+  });
+
+  it("re-appends its lifted host when the viewer re-raises the player", () => {
+    S.overlayButton = "always";
+    const player = document.createElement("div");
+    player.setAttribute("data-vtp-viewer-player", "");
+    player.getBoundingClientRect = fakeVideo().getBoundingClientRect;
+    v.anchor = player;
+    v.format = "normal";
+    updateLauncher();
+    const el = host() as HTMLElement;
+    expect(el.getAttribute("popover")).toBe("manual");
+
+    const calls: string[] = [];
+    let open = true;
+    const matches = el.matches.bind(el);
+    Object.assign(el, {
+      matches: (s: string) => (s === ":popover-open" ? open : matches(s)),
+      hidePopover: () => {
+        open = false;
+        calls.push("hide");
+      },
+      showPopover: () => {
+        open = true;
+        calls.push("show");
+      },
+    });
+    document.dispatchEvent(new Event("vtp-viewer-raise"));
+    expect(calls).toEqual(["hide", "show"]);
+  });
+});
+
+describe("launcher — inside an embedded player", () => {
+  const realTop = Object.getOwnPropertyDescriptor(window, "top");
+  afterEach(() => {
+    if (realTop) Object.defineProperty(window, "top", realTop);
+  });
+
+  it("a button click asks the top frame to open the popup rather than open one here", () => {
+    S.overlayButton = "always";
+    h.primary = fakeVideo();
+    updateLauncher();
+    Object.defineProperty(window, "top", { value: {}, configurable: true });
+
+    fire(fabEl()!, "pointerdown", 580, 158);
+    fire(fabEl()!, "pointerup", 580, 158);
+
+    expect(frameEl()).toBeNull();
+    expect(h.sendMessage).toHaveBeenCalledWith({ action: "toggleOverlay" });
   });
 });

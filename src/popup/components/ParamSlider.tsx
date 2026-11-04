@@ -14,8 +14,10 @@ interface Props {
   value: number;
   tickStep?: number; // track tick spacing (value units), for uniformity with the other sliders
   animate: boolean; // glide the thumb to `value` instead of snapping
+  disabled?: boolean;
   fmt: (n: number) => string;
   onChange: (value: number) => void;
+  onCommit?: (value: number) => void;
 }
 
 export function ParamSlider({
@@ -29,8 +31,10 @@ export function ParamSlider({
   value,
   tickStep,
   animate,
+  disabled,
   fmt,
   onChange,
+  onCommit,
 }: Props) {
   return (
     <div className="param">
@@ -49,9 +53,11 @@ export function ParamSlider({
         value={value}
         tickStep={tickStep}
         animate={animate}
+        disabled={disabled}
         ariaLabel={label}
         ariaValueText={fmt(value)}
         onChange={onChange}
+        onCommit={onCommit}
       />
       <div className="param-desc">{desc}</div>
     </div>

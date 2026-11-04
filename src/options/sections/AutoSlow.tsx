@@ -27,8 +27,21 @@ interface KnobProps {
   tickStep?: number;
   id: string;
   onChange: (v: number) => void;
+  onCommit: (v: number) => void;
 }
-function Knob({ label, hint, value, display, min, max, step, tickStep, id, onChange }: KnobProps) {
+function Knob({
+  label,
+  hint,
+  value,
+  display,
+  min,
+  max,
+  step,
+  tickStep,
+  id,
+  onChange,
+  onCommit,
+}: KnobProps) {
   return (
     <div className="opt-param">
       <div className="opt-param-row">
@@ -45,6 +58,7 @@ function Knob({ label, hint, value, display, min, max, step, tickStep, id, onCha
         value={value}
         ariaLabel={label}
         onChange={onChange}
+        onCommit={onCommit}
       />
       <p className="opt-param-hint">{hint}</p>
     </div>
@@ -63,7 +77,7 @@ export function AutoSlow() {
       ["autoSlowFloor", "autoSlowKnee", "autoSlowHold", "autoSlowReaction", "autoSlowEaseBack"],
       (r) => {
         const f = Number(r.autoSlowFloor);
-        setFloorPct(Number.isNaN(f) ? 100 : clampNum(f * 100, 50, 200, 100));
+        setFloorPct(Number.isNaN(f) ? 100 : clampNum(Math.round(f * 100), 50, 200, 100));
         setKnee(clampNum(r.autoSlowKnee, 0, 2, 0.5));
         setHold(clampNum(r.autoSlowHold, 0, 4, 1.2));
         setReaction(clampNum(r.autoSlowReaction, 0, 100, 50));
@@ -72,11 +86,12 @@ export function AutoSlow() {
     );
   }, []);
 
-  const write = (key: string, set: (v: number) => void, lo: number, hi: number) => (v: number) => {
-    const n = clampNum(v, lo, hi, v);
-    set(n);
-    STORE.set({ [key]: n });
-  };
+  // A drag only previews; the write lands on release — these keys sync, and a write
+  // per drag step would trip storage.sync's per-minute quota.
+  const write = (key: string, set: (v: number) => void, lo: number, hi: number) => ({
+    onChange: (v: number) => set(clampNum(v, lo, hi, v)),
+    onCommit: (v: number) => STORE.set({ [key]: clampNum(v, lo, hi, v) }),
+  });
 
   return (
     <Group
@@ -97,11 +112,8 @@ export function AutoSlow() {
           min={50}
           max={200}
           step={5}
-          onChange={(v) => {
-            const n = clampNum(v, 50, 200, 100);
-            setFloorPct(n);
-            STORE.set({ autoSlowFloor: n / 100 });
-          }}
+          onChange={(v) => setFloorPct(clampNum(v, 50, 200, 100))}
+          onCommit={(v) => STORE.set({ autoSlowFloor: clampNum(v, 50, 200, 100) / 100 })}
         />
         <Knob
           id="autoSlowKnee"
@@ -116,7 +128,7 @@ export function AutoSlow() {
           max={2}
           step={0.1}
           tickStep={0.5}
-          onChange={write("autoSlowKnee", setKnee, 0, 2)}
+          {...write("autoSlowKnee", setKnee, 0, 2)}
         />
         <Knob
           id="autoSlowHold"
@@ -130,7 +142,7 @@ export function AutoSlow() {
           min={0}
           max={4}
           step={0.1}
-          onChange={write("autoSlowHold", setHold, 0, 4)}
+          {...write("autoSlowHold", setHold, 0, 4)}
         />
         <Knob
           id="autoSlowReaction"
@@ -141,7 +153,7 @@ export function AutoSlow() {
           min={0}
           max={100}
           step={5}
-          onChange={write("autoSlowReaction", setReaction, 0, 100)}
+          {...write("autoSlowReaction", setReaction, 0, 100)}
         />
         <Knob
           id="autoSlowEaseBack"
@@ -152,7 +164,7 @@ export function AutoSlow() {
           min={0}
           max={100}
           step={5}
-          onChange={write("autoSlowEaseBack", setEaseBack, 0, 100)}
+          {...write("autoSlowEaseBack", setEaseBack, 0, 100)}
         />
       </div>
     </Group>

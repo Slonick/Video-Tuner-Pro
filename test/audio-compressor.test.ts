@@ -19,6 +19,7 @@ const m = vi.hoisted(() => {
     stream: false,
     streamReads: 0,
     liveReads: 0,
+    now: 0,
     makeParam,
   };
 });
@@ -39,7 +40,7 @@ vi.mock("../src/content/videos.js", () => ({
   primaryVideo: m.primaryVideo,
 }));
 vi.mock("../src/content/audio/routing.js", () => ({
-  audioContext: () => ({ currentTime: 0 }),
+  audioContext: () => ({ currentTime: m.now }),
   audioGraphs: m.graphs,
   graphForCurrentSource: (v: unknown) => (m.routable ? (m.graphs.get(v) ?? null) : null),
   hasAudioGraphs: () => m.graphs.size > 0,
@@ -50,6 +51,7 @@ vi.mock("../src/content/audio/routing.js", () => ({
 }));
 
 import { S } from "../src/content/state.js";
+import { hookAudioGesture, resumeAudioCtx } from "../src/content/audio/routing.js";
 import { applyAudioComp } from "../src/content/audio/compressor.js";
 
 function makeGraph() {
@@ -84,6 +86,7 @@ describe("applyAudioComp param mapping", () => {
     m.collectVideos.mockImplementation(() => m.list);
     m.primaryVideo.mockImplementation(() => m.primary);
     m.routable = true;
+    m.now = 0;
     S.audioCompEnabled = true;
     S.autoSlowEnabled = false;
     S.audioCompThreshold = -40;
@@ -189,6 +192,40 @@ describe("applyAudioComp param mapping", () => {
     applyAudioComp();
     expect(g.gain.gain.setTargetAtTime.mock.calls.length).toBeGreaterThan(before);
     expect(target(g.gain.gain)).toBeCloseTo(Math.pow(10, 6 / 20), 6);
+  });
+
+  it("cancels any pending ramp from now before scheduling the new target", () => {
+    m.now = 4.2;
+    const v = {} as HTMLVideoElement;
+    const g = makeGraph();
+    m.graphs.set(v, g);
+    m.list = [v];
+    m.primary = v;
+
+    applyAudioComp();
+
+    const { cancelScheduledValues, setTargetAtTime } = g.comp.ratio;
+    expect(cancelScheduledValues).toHaveBeenCalledWith(4.2);
+    expect(setTargetAtTime).toHaveBeenCalledWith(6, 4.2, 0.02);
+    expect(cancelScheduledValues.mock.invocationCallOrder[0]).toBeLessThan(
+      setTargetAtTime.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("falls back to setting the value directly when a ramp can't be scheduled", () => {
+    const v = {} as HTMLVideoElement;
+    const g = makeGraph();
+    g.comp.ratio.setTargetAtTime.mockImplementation(() => {
+      throw new Error("detached");
+    });
+    m.graphs.set(v, g);
+    m.list = [v];
+    m.primary = v;
+
+    applyAudioComp();
+
+    expect(g.comp.ratio.value).toBe(6);
+    expect(target(g.comp.knee)).toBe(25); // the other params still ramp
   });
 });
 
@@ -378,5 +415,102 @@ describe("applyAudioComp routing decisions", () => {
     const res = applyAudioComp();
 
     expect(res.reason).toBe("inuse");
+  });
+
+  it("surfaces the first failure's reason when none is 'inuse'", () => {
+    S.audioCompEnabled = true;
+    const a = { id: "a" } as unknown as HTMLVideoElement;
+    const b = { id: "b" } as unknown as HTMLVideoElement;
+    m.primary = a;
+    m.list = [a, b];
+    m.setupGraph.mockReturnValue(null);
+    m.lastSkipByVideo.set(a, "cors");
+    m.lastSkipByVideo.set(b, "loading");
+
+    expect(applyAudioComp()).toEqual({ engaged: 0, skipped: 2, reason: "cors" });
+  });
+
+  it("compression on: a graph whose source turned unsafe is skipped, not re-tuned", () => {
+    S.audioCompEnabled = true;
+    m.routable = false; // e.g. the element switched to a cross-origin URL
+    const v = {} as HTMLVideoElement;
+    const g = makeGraph();
+    m.graphs.set(v, g);
+    m.primary = v;
+    m.list = [v];
+    m.setupGraph.mockReturnValue(null);
+    m.lastSkipByVideo.set(v, "cors");
+
+    expect(applyAudioComp()).toEqual({ engaged: 0, skipped: 1, reason: "cors" });
+    expect(g.comp.ratio.setTargetAtTime).not.toHaveBeenCalled();
+  });
+
+  it("auto-slow routes the caller's primary instead of resolving its own", () => {
+    S.audioCompEnabled = false;
+    S.autoSlowEnabled = true;
+    m.compOn = false;
+    const resolved = { id: "resolved" } as unknown as HTMLVideoElement;
+    const given = { id: "given" } as unknown as HTMLVideoElement;
+    m.primary = resolved;
+    m.setupGraph.mockImplementation(() => makeGraph());
+
+    const res = applyAudioComp([resolved, given], given);
+
+    expect(res.engaged).toBe(1);
+    expect(m.setupGraph).toHaveBeenCalledTimes(1);
+    expect(m.setupGraph).toHaveBeenCalledWith(given);
+    expect(m.primaryVideo).not.toHaveBeenCalled();
+  });
+
+  it("compression only (auto-slow off): never consults live-stream detection", () => {
+    S.audioCompEnabled = true;
+    const a = { id: "a" } as unknown as HTMLVideoElement;
+    const b = { id: "b" } as unknown as HTMLVideoElement;
+    m.primary = a;
+    m.list = [a, b];
+    m.setupGraph.mockImplementation(() => makeGraph());
+
+    expect(applyAudioComp().engaged).toBe(2);
+    expect(m.streamReads).toBe(0);
+    expect(m.liveReads).toBe(0);
+  });
+
+  it("auto-slow without a primary video: no stream check, nothing captured", () => {
+    S.audioCompEnabled = false;
+    S.autoSlowEnabled = true;
+    m.compOn = false;
+    m.primary = null;
+    m.list = [{ id: "o" } as unknown as HTMLVideoElement];
+    m.setupGraph.mockImplementation(() => makeGraph());
+
+    expect(applyAudioComp().engaged).toBe(0);
+    expect(m.setupGraph).not.toHaveBeenCalled();
+    expect(m.streamReads).toBe(0);
+  });
+
+  it("with a primary video, lets the context resume on a gesture even with compression off", () => {
+    S.audioCompEnabled = false;
+    m.compOn = false;
+    const v = {} as HTMLVideoElement;
+    m.graphs.set(v, makeGraph()); // an existing graph keeps the meter running
+    m.primary = v;
+    m.list = [v];
+
+    applyAudioComp();
+
+    expect(hookAudioGesture).toHaveBeenCalledTimes(1);
+    expect(resumeAudioCtx).toHaveBeenCalledTimes(1);
+  });
+
+  it("without a primary video, leaves the context alone", () => {
+    S.audioCompEnabled = true;
+    m.primary = null;
+    m.list = [{} as HTMLVideoElement];
+    m.setupGraph.mockImplementation(() => makeGraph());
+
+    applyAudioComp();
+
+    expect(hookAudioGesture).not.toHaveBeenCalled();
+    expect(resumeAudioCtx).not.toHaveBeenCalled();
   });
 });

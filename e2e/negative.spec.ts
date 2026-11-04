@@ -26,7 +26,11 @@ test("ignores keyboard shortcuts while typing in a field", async ({ page }) => {
   });
   await page.keyboard.press("KeyD");
   await page.keyboard.press("KeyD");
-  expect(await rate(page)).toBe(1); // unchanged
+  // Positive control: the same key on the video lands exactly one step, proving
+  // the content script was listening and the field presses were dropped.
+  await page.locator("#v").click();
+  await page.keyboard.press("KeyD");
+  await expect.poll(() => rate(page)).toBeCloseTo(1.05, 2);
 });
 
 test("ignores shortcuts combined with a modifier key", async ({ page }) => {
@@ -35,7 +39,8 @@ test("ignores shortcuts combined with a modifier key", async ({ page }) => {
   await page.keyboard.press("Control+KeyD");
   await page.keyboard.press("Alt+KeyD");
   await page.keyboard.press("Meta+KeyD");
-  expect(await rate(page)).toBe(1);
+  await page.keyboard.press("KeyD"); // positive control: a bare press is one step
+  await expect.poll(() => rate(page)).toBeCloseTo(1.05, 2);
 });
 
 test("does nothing and doesn't crash on a page with no video", async ({ page, serviceWorker }) => {
@@ -86,7 +91,15 @@ test("the badge does NOT appear when the on-video display is off", async ({
   await page.evaluate(() =>
     (document.getElementById("v") as HTMLVideoElement).play().catch(() => {}),
   );
+  await page.waitForFunction(() => {
+    const v = document.getElementById("v") as HTMLVideoElement;
+    return v && isFinite(v.duration) && v.duration > 0;
+  });
   await page.mouse.move(320, 180);
   await page.waitForTimeout(1500); // give the 1s badge tick a chance to (not) show it
   expect(await hasBadge(page)).toBe(false);
+  // Positive control: under the same conditions, turning the display on shows it.
+  await setStorage(serviceWorker, { showRemaining: true });
+  await page.mouse.move(330, 190);
+  await expect.poll(() => hasBadge(page)).toBe(true);
 });

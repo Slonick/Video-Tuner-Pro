@@ -33,6 +33,12 @@ describe("popup i18n (bundled locales)", () => {
     expect(msg("optThemeLabel")).toBe(ja.optThemeLabel.message); // after: saved override
   });
 
+  it("loadLang falls back to the browser language for a saved uiLang it doesn't ship", async () => {
+    const { msg, loadLang } = await fresh({ uiLang: "it" }, "ru");
+    await new Promise<void>((res) => loadLang(res));
+    expect(msg("optThemeLabel")).toBe("Тема");
+  });
+
   it("returns '' for an unknown key", async () => {
     const { msg } = await fresh({}, "en");
     expect(msg("totallyMadeUpKey")).toBe("");

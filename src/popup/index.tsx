@@ -1,6 +1,7 @@
-// Popup entry. Apply the theme, then — once the selective-sync config has loaded
-// and the saved language is applied — render the React app (so msg() returns text
-// in the chosen language during the first render).
+// Popup entry. Once the selective-sync config has loaded (so the theme and language
+// are read from the area they're routed to), apply the theme and the saved language,
+// then render the React app (so msg() returns text in the chosen language during
+// the first render).
 import { createRoot, type Root } from "react-dom/client";
 import { whenReady } from "./platform/storage.js";
 import { loadLang } from "./i18n.js";
@@ -23,8 +24,12 @@ function wireEmbeddedOverlay(): void {
   // Lets the stylesheet drop the popup's opaque base background so the launcher's
   // frosted-glass panel shows through (the toolbar popup keeps its solid --bg).
   document.documentElement.classList.add("vtp-embedded");
+  // Address the host page only. The launcher passes its origin; an opaque or file:
+  // origin, which no targetOrigin can name, falls back to "*".
+  const host = new URLSearchParams(location.search).get("host");
+  const target = host && /^https?:\/\/[^/]+$/.test(host) ? host : "*";
   const post = (data: Record<string, unknown>) =>
-    window.parent.postMessage({ type: "vtp-overlay", ...data }, "*");
+    window.parent.postMessage({ type: "vtp-overlay", ...data }, target);
   // scrollHeight never drops below the iframe's own height, so the panel could not
   // shrink for the short "disabled on this site" view; the rect tracks the content.
   const report = () =>
@@ -32,7 +37,8 @@ function wireEmbeddedOverlay(): void {
   new ResizeObserver(report).observe(document.documentElement);
   report();
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") post({ close: true });
+    // A menu or tooltip that took this Escape closes itself, not the whole overlay.
+    if (e.key === "Escape" && !e.defaultPrevented) post({ close: true });
   });
   // Drag the panel by its header. The gesture starts inside this iframe, so we own
   // it here: setPointerCapture keeps the moves coming even when the cursor leaves
@@ -94,8 +100,8 @@ function wireEmbeddedOverlay(): void {
   document.addEventListener("pointercancel", endDrag);
 }
 
-initTheme();
 whenReady(() => {
+  initTheme();
   loadLang(() => {
     root = createRoot(document.getElementById("root")!);
     root.render(<App />);

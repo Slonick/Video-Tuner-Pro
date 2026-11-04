@@ -6,7 +6,6 @@
 export type SpeedScope = "channel" | "site" | "global" | null;
 
 function latestChannelKey<T>(channelKeys: string[], entries: Record<string, T>): string | null {
-  if (!channelKeys.length) return null;
   const available = new Set(channelKeys);
   let latest: string | null = null;
   for (const key of Object.keys(entries)) {

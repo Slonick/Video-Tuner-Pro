@@ -65,9 +65,21 @@ test("the first-open guide can be dismissed and stays dismissed", async ({
     .poll(async () => (await readStored(serviceWorker, "popupGuideSeen")).popupGuideSeen)
     .toBe(true);
 
+  // Closing removes the popup frame; reopening builds a fresh one.
   await page.keyboard.press("Escape");
+  await expect.poll(() => popup.isDetached()).toBe(true);
   await page.keyboard.press("KeyO");
-  await expect(popup.getByRole("dialog", { name: "Quick tour" })).toHaveCount(0);
+  let reopened: Frame | undefined;
+  await expect
+    .poll(() => {
+      reopened = page
+        .frames()
+        .find((f) => f.url().includes("/popup/popup.html") && !f.isDetached());
+      return !!reopened;
+    })
+    .toBe(true);
+  await reopened!.locator("#speedUp").waitFor();
+  await expect(reopened!.getByRole("dialog", { name: "Quick tour" })).toHaveCount(0);
 });
 
 test("a quick-row preset sets the video speed", async ({ page, serviceWorker }) => {
@@ -245,7 +257,10 @@ test("auto-slow and compressor controls persist their real popup interactions", 
 
   await popup.locator(".autoslow-section .sec-main").click();
   await expect(popup.locator(".autoslow-section")).not.toHaveClass(/is-overlay/);
-  await popup.waitForTimeout(350); // let the closing FLIP release pointer interception
+  // The closing FLIP keeps the card over its neighbours until the animation ends.
+  await expect
+    .poll(() => popup.locator(".autoslow-section").evaluate((el) => el.getAnimations().length))
+    .toBe(0);
   await popup.locator(".audio-section .sec-main").click();
   await expect(popup.locator("#audioBody")).toHaveClass(/open/);
   await popup.locator("#audioCompToggle").click();

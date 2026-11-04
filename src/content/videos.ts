@@ -60,9 +60,11 @@ function hookVideoPlay(el: HTMLVideoElement): void {
   );
 }
 
+// The scans have already checked their root against our own UI, so only media pays
+// for the ownership checks — a feed or chat subtree is mostly plain elements.
 function addMedia(el: Element): boolean {
-  if (isOwnNode(el)) return false;
   if (el instanceof HTMLVideoElement) {
+    if (isOwnNode(el)) return false;
     if (
       el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]") &&
       !el.hasAttribute(ADOPTED_VIEWER_VIDEO)
@@ -80,8 +82,12 @@ function addMedia(el: Element): boolean {
     hookVideoPlay(el);
     return true;
   }
-  if (el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")) return false;
   if (el instanceof HTMLAudioElement) {
+    if (
+      isOwnNode(el) ||
+      el.closest("[data-vtp-viewer-overlay],[data-vtp-launcher],[data-vtp-badge]")
+    )
+      return false;
     if (trackedAudios.has(el)) return false;
     trackedAudios.add(el);
     return true;
@@ -109,15 +115,19 @@ function handleShadowAttached(event: Event): void {
     return;
   }
   const host = event.target;
-  if (!(host instanceof Element) || isOwnNode(host) || !host.shadowRoot) return;
+  if (!(host instanceof Element) || !host.shadowRoot) return;
   rememberShadowHostCandidate(host);
   // Observe even an empty root: the MAIN-world bridge dispatches synchronously
   // from attachShadow(), before player code normally appends the media element.
   if (handleShadow(host, true)) onMediaChange();
 }
 
+// Only actual hosts and custom elements (attachShadow is open to those, plus a few
+// plain containers players rarely use): remembering every element would let a large
+// page or a busy chat push the real player hosts out of the bounded list.
 function rememberShadowHostCandidate(el: Element): void {
-  if (isOwnNode(el)) return;
+  if (!el.shadowRoot && !el.localName.includes("-")) return;
+  if (el.shadowRoot && isOwnNode(el)) return;
   const existing = shadowHostCandidateRefs.get(el);
   if (existing?.active) return;
   const candidate = { ref: new WeakRef(el), active: true };
@@ -132,26 +142,13 @@ function rememberShadowHostCandidate(el: Element): void {
   shadowHostCandidateCursor = (shadowHostCandidateCursor + 1) % MAX_SHADOW_HOST_CANDIDATES;
 }
 
-// Walk `root` once, registering any media and recursing through open shadow roots
-// (including `root`'s own shadow root, which querySelectorAll can't reach). Returns
-// whether any NEW media element was registered (used to decide whether a re-apply
-// is warranted). Bounded by the size of `root` — a freshly-added chat message costs
-// the chat message, not the whole page.
+// Walk the elements under `root` once, registering any media and recursing through
+// open shadow roots. Returns whether any NEW media element was registered (used to
+// decide whether a re-apply is warranted). Bounded by the size of `root` — a
+// freshly-added chat message costs the chat message, not the whole page.
 function scanTree(root: ParentNode, observeEmptyRoots = false): boolean {
   let added = false;
-  if (root instanceof Element) {
-    if (isOwnNode(root)) return false;
-    rememberShadowHostCandidate(root);
-    if (addMedia(root)) added = true;
-    if (handleShadow(root, observeEmptyRoots)) added = true;
-  }
-  let all: NodeListOf<Element>;
-  try {
-    all = root.querySelectorAll("*");
-  } catch (e) {
-    return added;
-  }
-  for (const el of all) {
+  for (const el of root.querySelectorAll("*")) {
     rememberShadowHostCandidate(el);
     if (addMedia(el)) added = true;
     if (handleShadow(el, observeEmptyRoots)) added = true;
@@ -168,37 +165,27 @@ function scanAddedElement(root: Element): boolean {
   // inserted into the document. Its attach event cannot bubble to our listener,
   // so observe that root now and catch media appended later.
   if (handleShadow(root, true)) added = true;
-  try {
-    // Light-DOM selectors cannot see media inside a descendant's shadow root.
-    // Inspect each element in this newly-added subtree once so a pre-populated
-    // web-component player is registered immediately instead of waiting for the
-    // periodic reconcile backstop.
-    for (const el of root.querySelectorAll("*")) {
-      rememberShadowHostCandidate(el);
-      if (addMedia(el)) added = true;
-      if (handleShadow(el, true)) added = true;
-    }
-  } catch (e) {
-    /* inaccessible subtree */
-  }
+  // Light-DOM selectors cannot see media inside a descendant's shadow root.
+  // Inspect each element in this newly-added subtree once so a pre-populated
+  // web-component player is registered immediately instead of waiting for the
+  // periodic reconcile backstop.
+  if (scanTree(root, true)) added = true;
   return added;
 }
 
 function scanDirectMedia(root: ParentNode): boolean {
   let added = false;
-  try {
-    for (const media of root.querySelectorAll("video,audio")) {
-      if (addMedia(media)) added = true;
-    }
-  } catch (e) {
-    /* inaccessible root */
+  for (const media of root.querySelectorAll("video,audio")) {
+    if (addMedia(media)) added = true;
   }
   return added;
 }
 
 function scanKnownShadowHosts(): boolean {
   let added = false;
-  let write = 0;
+  // The nested scans remember (and may evict) candidates during this walk, so
+  // compact only afterwards: compacting the live list mid-walk could overwrite a
+  // fresh entry that stays marked active — and would then never be remembered again.
   for (const candidate of shadowHostCandidates) {
     const host = candidate.ref.deref();
     if (!host || !host.isConnected || isOwnNode(host)) {
@@ -206,7 +193,10 @@ function scanKnownShadowHosts(): boolean {
       continue;
     }
     if (handleShadow(host)) added = true;
-    shadowHostCandidates[write++] = candidate;
+  }
+  let write = 0;
+  for (const candidate of shadowHostCandidates) {
+    if (candidate.active) shadowHostCandidates[write++] = candidate;
   }
   shadowHostCandidates.length = write;
   shadowHostCandidateCursor = write % MAX_SHADOW_HOST_CANDIDATES;

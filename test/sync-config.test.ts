@@ -72,6 +72,16 @@ describe("normalizeConfig", () => {
   it("defaults missing categories to synced", () => {
     expect(normalizeConfig(undefined)).toEqual(DEFAULT_SYNC);
     expect(normalizeConfig({})).toEqual(DEFAULT_SYNC);
+    expect(normalizeConfig(null)).toEqual(DEFAULT_SYNC);
+  });
+  it("syncs every category by default (pre-feature behaviour)", () => {
+    expect(normalizeConfig(undefined)).toEqual({
+      speeds: true,
+      delays: true,
+      audio: true,
+      shortcuts: true,
+      general: true,
+    });
   });
   it("respects explicit booleans and ignores junk", () => {
     const cfg = normalizeConfig({ speeds: false, audio: false, bogus: 1, delays: "no" });

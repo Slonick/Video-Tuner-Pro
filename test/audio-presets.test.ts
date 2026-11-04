@@ -43,11 +43,23 @@ describe("compressor presets", () => {
     expect(new Set(shapes).size).toBe(3);
     expect(COMP_PRESET_DEFAULTS.every((p) => p.pin)).toBe(true);
   });
+
+  it("labels the shipped defaults Voice / Night / Movie", () => {
+    expect(normalizeCompPresets(undefined).map((p) => p.nameKey)).toEqual([
+      "presetVoice",
+      "presetNight",
+      "presetMovie",
+    ]);
+  });
 });
 
 describe("normalizeCompPresets", () => {
   it("returns the defaults when nothing is stored", () => {
     expect(normalizeCompPresets(undefined)).toEqual(COMP_PRESET_DEFAULTS);
+  });
+
+  it("treats a stored null like nothing stored", () => {
+    expect(normalizeCompPresets(null)).toEqual(COMP_PRESET_DEFAULTS);
   });
 
   it("validates a stored list: clamps params, coerces pin, drops empty names", () => {
@@ -120,5 +132,26 @@ describe("normalizeCompPresets", () => {
     expect(out[0].gain).toBe(24); // clamped to the [0,24] ceiling
     expect(out[1].gain).toBeUndefined(); // non-numeric → no override
     expect(out[2].gain).toBeUndefined(); // absent → no override
+  });
+
+  it("treats a null preset gain as no override", () => {
+    const out = normalizeCompPresets([
+      { threshold: -50, knee: 20, ratio: 5, attack: 0, release: 0.3, gain: null, pin: false },
+    ]);
+    expect(out[0].gain).toBeUndefined();
+  });
+
+  it("keeps a stored string nameKey and drops a non-string one", () => {
+    const out = normalizeCompPresets([
+      { threshold: -50, knee: 20, ratio: 5, attack: 0, release: 0.3, nameKey: "presetNight" },
+      { threshold: -50, knee: 20, ratio: 5, attack: 0, release: 0.3, nameKey: 42 },
+    ]);
+    expect(out[0].nameKey).toBe("presetNight");
+    expect(out[1].nameKey).toBeUndefined();
+  });
+
+  it("fills missing params of an extra preset from the voice profile", () => {
+    const out = normalizeCompPresets([{}, {}, {}, {}]);
+    expect(out[3]).toMatchObject({ threshold: -60, knee: 30, ratio: 10, attack: 0, release: 1 });
   });
 });

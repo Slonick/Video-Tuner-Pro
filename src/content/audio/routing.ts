@@ -4,7 +4,7 @@ import { alog } from "../platform/log.js";
 import { translationActive } from "./translation.js";
 import { applyAudioComp } from "./compressor.js";
 import type { AudioGraph } from "./types.js";
-import { listenerOptions } from "../lifecycle.js";
+import { contentSignal, listenerOptions } from "../lifecycle.js";
 
 let audioCtx: AudioContext | null = null;
 export const audioGraphs = new WeakMap<HTMLVideoElement, AudioGraph>();
@@ -14,6 +14,25 @@ const audioSkipReasons = new WeakMap<HTMLVideoElement, string>();
 let audioGestureHooked = false;
 let lastAudioSkip: string | null = null; // why the most recent setupGraph() bailed
 let lastNotRoutableLog: string | null = null; // throttles the "not routable yet" diagnostic log
+// Weak handles to every graph built — audioGraphs can't be enumerated at teardown.
+const builtGraphs = new Set<WeakRef<AudioGraph>>();
+
+// On shutdown (extension update/reload) the orphaned instance can no longer adjust
+// its graphs, and the new one can't capture those elements again (capturing is
+// one-way). Wire each source straight to the output so the page sounds as if we were
+// never there, rather than through a compressor frozen at its old settings.
+contentSignal.addEventListener("abort", () => {
+  for (const ref of builtGraphs) {
+    const g = ref.deref();
+    if (!g) continue;
+    try {
+      g.source.disconnect();
+      g.source.connect(g.source.context.destination);
+    } catch (e) {
+      /* context closed */
+    }
+  }
+});
 
 export function audioContext(): AudioContext | null {
   return audioCtx;
@@ -30,28 +49,18 @@ function rememberSkip(video: HTMLVideoElement, reason: string): void {
   lastAudioSkip = reason;
 }
 
+// Only reached when canRouteAudio() said no, so outside VOT there is no srcObject and
+// no blob:/data: source — what's left is an unresolved/loading URL or a cross-origin one.
 function rememberUnroutable(video: HTMLVideoElement): void {
-  const currentSrc = video.currentSrc || "";
-  const rawSrc = video.src || "";
-  const resolvedSrc =
-    currentSrc || rawSrc.startsWith("blob:") || rawSrc.startsWith("data:")
-      ? currentSrc || rawSrc
-      : "";
   rememberSkip(
     video,
-    translationActive()
-      ? "vot"
-      : !sourceReady(video) || (!resolvedSrc && !video.srcObject)
-        ? "loading"
-        : "cors",
+    translationActive() ? "vot" : !video.currentSrc || !sourceReady(video) ? "loading" : "cors",
   );
-  const sig = (currentSrc || rawSrc || "") + "|" + !!video.srcObject;
+  const src = video.currentSrc || video.src;
+  const sig = src + "|" + !!video.srcObject;
   if (sig !== lastNotRoutableLog) {
     lastNotRoutableLog = sig;
-    alog("audio: not routable yet —", {
-      currentSrc: video.currentSrc || video.src || "",
-      hasSrcObject: !!video.srcObject,
-    });
+    alog("audio: not routable yet —", { currentSrc: src, hasSrcObject: !!video.srcObject });
   }
 }
 
@@ -61,8 +70,8 @@ function rememberUnroutable(video: HTMLVideoElement): void {
 function canRouteAudio(video: HTMLVideoElement): boolean {
   if (translationActive()) return false; // don't grab a new source mid-translation
   if (video.srcObject) return true;
-  const src = video.currentSrc || "";
-  const rawSrc = video.src || "";
+  const src = video.currentSrc;
+  const rawSrc = video.src;
   if (src.startsWith("blob:") || src.startsWith("data:")) return true;
   if (!src) {
     if (rawSrc.startsWith("blob:") || rawSrc.startsWith("data:")) return true;
@@ -95,11 +104,8 @@ export function resumeAudioCtx(): void {
 export function hookAudioGesture(): void {
   if (audioGestureHooked) return;
   audioGestureHooked = true;
-  const resume = () => {
-    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
-  };
-  document.addEventListener("click", resume, listenerOptions({ capture: true, passive: true }));
-  document.addEventListener("keydown", resume, listenerOptions({ capture: true, passive: true }));
+  document.addEventListener("click", resumeAudioCtx, listenerOptions(true));
+  document.addEventListener("keydown", resumeAudioCtx, listenerOptions(true));
 }
 
 function ensureAudioCtx(): AudioContext | null {
@@ -108,7 +114,7 @@ function ensureAudioCtx(): AudioContext | null {
     const AC = window.AudioContext || window.webkitAudioContext;
     audioCtx = AC ? new AC() : null;
   } catch (e) {
-    audioCtx = null;
+    /* blocked by the browser or page policy */
   }
   const ctx = audioCtx;
   if (ctx) {
@@ -123,7 +129,6 @@ function ensureAudioCtx(): AudioContext | null {
       },
       listenerOptions(),
     );
-    resumeAudioCtx();
   }
   return audioCtx;
 }
@@ -184,10 +189,12 @@ export function setupGraph(video: HTMLVideoElement): AudioGraph | null {
   const g: AudioGraph = { source, comp, gain, limiter, analyserIn };
   audioGraphs.set(video, g);
   audioGraphCount += 1;
+  for (const ref of builtGraphs) if (!ref.deref()) builtGraphs.delete(ref);
+  builtGraphs.add(new WeakRef(g));
   audioSkipReasons.delete(video);
   lastAudioSkip = null;
   // Routed audio goes silent if the context is suspended, so resume on play.
-  video.addEventListener("playing", resumeAudioCtx, listenerOptions({ passive: true }));
+  video.addEventListener("playing", resumeAudioCtx, listenerOptions());
   alog("audio: compression graph engaged on a video");
   return g;
 }

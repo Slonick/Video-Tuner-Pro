@@ -68,7 +68,7 @@ test.describe("Options · General", () => {
     const radios = page.locator("#langGrid [role=radio]"); // system, en, ru, ...
     await radios.nth(2).click();
     await expect.poll(async () => (await readStored(serviceWorker, "uiLang")).uiLang).toBe("ru");
-    await page.waitForLoadState("domcontentloaded");
+    await page.reload();
     await expect(page.locator("#langGrid [role=radio]").nth(2)).toHaveAttribute(
       "aria-checked",
       "true",
@@ -262,13 +262,16 @@ test.describe("Options · Keys", () => {
   test("a duplicate key is rejected", async ({ context, extensionId, serviceWorker }) => {
     const opt = await openExtensionPage(context, extensionId, OPTIONS);
     await opt.locator("#nav-speed").click(); // Keys lives under the Speed group
-    await opt.locator("#keyReset").click();
+    const reset = opt.locator("#keyReset");
+    await reset.click();
+    await expect(reset).toHaveClass(/\bcapturing\b/);
     await opt.keyboard.press("KeyA"); // KeyA already belongs to "slower" → rejected
-    // reset keeps its default; give the rejection flash time to settle.
-    await opt.waitForTimeout(300);
-    expect((await readStored(serviceWorker, "keymap")).keymap ?? {}).not.toMatchObject({
-      reset: "KeyA",
-    });
+    // A rejected key leaves capture armed, so the next free key binds. Had KeyA
+    // been accepted, capture would have closed and KeyJ would never land.
+    await opt.keyboard.press("KeyJ");
+    await expect
+      .poll(async () => (await readStored(serviceWorker, "keymap")).keymap)
+      .toMatchObject({ reset: "KeyJ", slower: "KeyA" });
   });
 
   test("Backspace unbinds an action", async ({ context, extensionId, serviceWorker }) => {

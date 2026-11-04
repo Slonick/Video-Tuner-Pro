@@ -18,8 +18,10 @@ import {
   type Action,
   type Keymap,
 } from "../../shared/keymap.js";
+import { normalizeSpeedStep, STEP_DEFAULT } from "../../shared/presets.js";
 import { msg } from "../../popup/i18n.js";
 import { Group } from "../Group.js";
+import { useCaptureGuard } from "../useCaptureGuard.js";
 import { Button } from "../../ui/Button.js";
 import { Slider } from "../../ui/Slider.js";
 import { Switch } from "../../ui/Switch.js";
@@ -44,6 +46,8 @@ export function Keys() {
   const [capturing, setCapturing] = useState<Action | null>(null);
   const [seekStep, setSeekStep] = useState<number>(SEEK_STEP_DEFAULT);
   const [dupe, setDupe] = useState<Action | null>(null);
+  // The slower/faster labels name the configured step ("Slower (−5%)").
+  const [stepPct, setStepPct] = useState(STEP_DEFAULT);
   // Live refs so the global keydown handler (bound once) sees current state.
   const capRef = useRef<Action | null>(null);
   const mapRef = useRef<Keymap>(keymap);
@@ -56,18 +60,24 @@ export function Keys() {
   mapRef.current = keymap;
 
   const loadKeys = useCallback(() => {
-    STORE.get(["keymap", "presetKeys", "seekStep"], (r) => {
+    STORE.get(["keymap", "presetKeys", "seekStep", "speedStep"], (r) => {
       const km = normalizeKeymap(r.keymap);
       for (const a of ACTIONS) if (km[a]) lastKey.current[a] = km[a];
       setKeymap(km);
       presetKeysRef.current = Array.isArray(r.presetKeys) ? r.presetKeys : [];
       setSeekStep(normalizeSeekStep(r.seekStep));
+      setStepPct(normalizeSpeedStep(r.speedStep));
     });
   }, []);
 
   useEffect(loadKeys, [loadKeys]);
 
-  useEffect(() => subscribe(["keymap", "presetKeys", "seekStep"], loadKeys), [loadKeys]);
+  useEffect(
+    () => subscribe(["keymap", "presetKeys", "seekStep", "speedStep"], loadKeys),
+    [loadKeys],
+  );
+
+  useCaptureGuard(capturing !== null, () => setCapturing(null));
 
   useEffect(() => {
     const reject = (a: Action) => {
@@ -157,7 +167,7 @@ export function Keys() {
       <div className="key-rows" id="keyRows">
         {ROWS.map(({ action, labelKey }) => (
           <div className="key-row" key={action}>
-            <span className="key-label">{msg(labelKey)}</span>
+            <span className="key-label">{msg(labelKey, String(stepPct))}</span>
             <span className="key-ctrl">
               <Button
                 id={"key" + action[0].toUpperCase() + action.slice(1)}
@@ -179,7 +189,7 @@ export function Keys() {
               <Switch
                 checked={!!keymap[action]}
                 onChange={(on) => toggleEnabled(action, on)}
-                ariaLabel={msg(labelKey)}
+                ariaLabel={msg(labelKey, String(stepPct))}
               />
             </span>
           </div>

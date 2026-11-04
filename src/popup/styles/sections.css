@@ -21,6 +21,7 @@
        yields to it, like manual speed yields to Live-sync. */
   &.audio-locked {
     .meter,
+    .preset-block,
     .sync-body,
     .switch {
       opacity: 0.4;

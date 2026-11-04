@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { cornerReadout, fitCanvas, levelMark, smoothLine } from "../src/popup/graphs/draw-util.js";
 import { drawAudio } from "../src/popup/graphs/audio-meter.js";
 import { drawAutoSlow } from "../src/popup/graphs/autoslow-graph.js";
@@ -43,13 +43,6 @@ function canvas(w = 320, h = 80): HTMLCanvasElement {
   return el;
 }
 
-function input(id: string, value: string): void {
-  const el = document.createElement("input");
-  el.id = id;
-  el.value = value;
-  document.body.appendChild(el);
-}
-
 function graph() {
   const aCanvas = canvas();
   const bCanvas = canvas();
@@ -64,12 +57,6 @@ function graph() {
     ascx,
   };
 }
-
-beforeEach(() => {
-  document.body.innerHTML = "";
-  input("syncTarget", "5");
-  input("acThreshold", "-24");
-});
 
 describe("fitCanvas", () => {
   it("resizes the backing store when devicePixelRatio changes without a CSS resize", () => {
@@ -150,7 +137,7 @@ describe("drawing utilities", () => {
 describe("latency and buffer graph", () => {
   it("shows a live-only hint for ordinary videos", () => {
     const { g, bcx } = graph();
-    drawBuffer(g, 10_000);
+    drawBuffer(g, 10_000, 5);
     expect(bcx.fillText).toHaveBeenCalledWith("Live streams only", 160, 40);
   });
 
@@ -163,7 +150,7 @@ describe("latency and buffer graph", () => {
     g.bufBitrateShown = 2_500_000;
     g.bufHist.push({ t: 9_000, v: 10, a: 7 }, { t: 9_500, v: 12, a: 8 });
 
-    drawBuffer(g, 10_000);
+    drawBuffer(g, 10_000, 5);
 
     expect(bcx.createLinearGradient).toHaveBeenCalled();
     expect(bcx.gradient.addColorStop).toHaveBeenCalled();
@@ -179,8 +166,9 @@ describe("latency and buffer graph", () => {
     g.bufBitrateShown = 640_000;
     g.bufHist.push({ t: 9_000, v: 3 }, { t: 9_500, v: 4 });
 
-    drawBuffer(g, 10_000);
+    drawBuffer(g, 10_000, 5);
 
+    expect(bcx.fillText).toHaveBeenCalledWith("5s", expect.any(Number), expect.any(Number));
     expect(bcx.fillText).toHaveBeenCalledWith("≈ 640 kbps", 3, 78);
     expect(bcx.fillText).toHaveBeenCalledWith("⚠ Low buffer — catch-up limited", 317, 78);
   });
@@ -189,26 +177,27 @@ describe("latency and buffer graph", () => {
 describe("audio graph", () => {
   it("shows disabled and waiting states instead of a fake −100 dB reading", () => {
     const { g, acx } = graph();
-    drawAudio(g, 1_000);
+    drawAudio(g, 1_000, -24);
     expect(acx.fillText).toHaveBeenCalledWith("Compression off", expect.any(Number), 40);
 
     acx.fillText.mockClear();
     g.audioEnabled = true;
-    drawAudio(g, 1_000);
+    drawAudio(g, 1_000, -24);
     expect(acx.fillText).toHaveBeenCalledWith("Waiting for audio…", expect.any(Number), 40);
   });
 
-  it("draws input, output, threshold highlight and labelled readout", () => {
+  it("draws input, output, threshold line + highlight and labelled readout", () => {
     const { g, acx } = graph();
     g.audioActive = true;
     g.audioEnabled = true;
     g.compAnim = 1;
     g.audioHist.push({ t: 900, in: -12, out: -20 }, { t: 950, in: -8, out: -18 });
 
-    drawAudio(g, 1_000);
+    drawAudio(g, 1_000, -24);
 
     expect(acx.createLinearGradient).toHaveBeenCalled();
     expect(acx.setLineDash).toHaveBeenCalledWith([3, 3]);
+    expect(acx.fillText).toHaveBeenCalledWith("−24 dB", expect.any(Number), expect.any(Number));
     expect(acx.fillText).toHaveBeenCalledWith("Out", expect.any(Number), expect.any(Number));
     expect(acx.fillText).toHaveBeenCalledWith("In", expect.any(Number), expect.any(Number));
   });

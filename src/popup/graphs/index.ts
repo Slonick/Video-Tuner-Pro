@@ -1,4 +1,4 @@
-import { createGraphState, A_WINDOW, BUF_WINDOW, AS_WINDOW } from "./state.js";
+import { createGraphState, A_WINDOW, BUF_WINDOW, AS_WINDOW, type GraphGuides } from "./state.js";
 import { now } from "./draw-util.js";
 import { drawAudio } from "./audio-meter.js";
 import { drawBuffer } from "./latency-graph.js";
@@ -7,11 +7,13 @@ import { startPoll } from "./poll.js";
 
 // Drive the audio + buffer canvases. `getTabId` supplies the tab to poll (the
 // popup resolves it asynchronously); `onTranslating` reports VOT state up to React
-// so the audio card can lock itself. Returns a teardown that stops the rAF + poll.
+// so the audio card can lock itself; `getGuides` supplies the threshold / target
+// lines. Returns a teardown that stops the rAF + poll.
 export function setupGraphs(
   getTabId: () => number | null,
   onTranslating: (on: boolean) => void,
   onBlocked: (reason: string | null) => void,
+  getGuides: () => GraphGuides,
 ): () => void {
   const aCanvas = document.getElementById("audioMeter") as HTMLCanvasElement | null;
   const bCanvas = document.getElementById("bufferMeter") as HTMLCanvasElement | null;
@@ -86,8 +88,9 @@ export function setupGraphs(
     } else if (g.asHist.length) {
       g.asHist.length = 0;
     }
-    drawAudio(g, t);
-    drawBuffer(g, t);
+    const guides = getGuides();
+    drawAudio(g, t, guides.threshold);
+    drawBuffer(g, t, guides.target);
     drawAutoSlow(g, t);
     schedule(active);
   }

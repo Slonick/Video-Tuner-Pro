@@ -26,6 +26,9 @@ describe("normalizeSiteEntry", () => {
     ["localhost", "localhost"],
     ["127.0.0.1:3000", "127.0.0.1"],
     ["[::1]:8080", "[::1]"],
+    ["example.com/out?to=https://other.org", "example.com"],
+    ["s3://bucket.example.com", "bucket.example.com"],
+    ["stream.example.com", "stream.example.com"],
   ];
   it.each(cases)("%s → %s", (raw, expected) => {
     expect(normalizeSiteEntry(raw)).toBe(expected);
@@ -43,6 +46,7 @@ describe("normalizeSiteEntry", () => {
     "exa$mple.com",
     "a..b.com",
     "a.com,b.com",
+    "a*.example.com",
   ])("ignores the garbage entry %j", (raw) => {
     expect(normalizeSiteEntry(raw)).toBeNull();
   });

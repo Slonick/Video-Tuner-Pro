@@ -65,15 +65,18 @@ export function Tooltip({ trigger, content, side = "top", bubbleClassName }: Pro
     if (!open) return;
     const reposition = () => place();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      e.preventDefault(); // handled: the embedded overlay must not close on it as well
+      setOpen(false);
     };
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
-    window.addEventListener("keydown", onKey);
+    // Capture, so this runs before the overlay's Escape listener on document.
+    window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [open, place]);
 

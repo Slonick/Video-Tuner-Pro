@@ -7,6 +7,9 @@
 import { STORE, whenReady } from "../shared/store.js";
 import {
   STORED_MAP_NAMES,
+  safeKey,
+  validPosition,
+  validStoredMapValue,
   type StoredMapMutation,
   type StoredMapName,
 } from "../shared/map-mutation.js";
@@ -40,7 +43,13 @@ const RED_ICON = {
   48: "icons/icon-red-48.png",
   128: "icons/icon-red-128.png",
 };
+// Which frame drives each tab's toolbar badge, mirrored into storage.session: the
+// worker is unloaded when idle, and one that forgot the owner would let any frame,
+// e.g. an ad iframe, take over the badge.
+const BADGE_OWNERS_KEY = "badgeOwners";
 const badgeOwners = new Map<number, number>();
+let badgeOwnersLoaded = false;
+const badgeOwnersWaiters: Array<() => void> = [];
 const videoFrameOwners = new Map<number, { frameId?: number; expires: number }>();
 const VIDEO_FRAME_CACHE_MS = 5000;
 const VIDEO_FRAME_MISS_CACHE_MS = 1500;
@@ -50,59 +59,25 @@ interface VideoFrameProbe {
   score?: number;
 }
 
-const storedMapNames = new Set<string>(STORED_MAP_NAMES);
+const storedMapNames = new Set<unknown>(STORED_MAP_NAMES);
 const storedMapQueues = new Map<StoredMapName, Promise<void>>();
 
-function safeKey(key: string): boolean {
-  return !!key && key !== "__proto__" && key !== "constructor" && key !== "prototype";
-}
-
-function finite(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function validPosition(value: unknown): value is { fx: number; fy: number } {
-  if (!value || typeof value !== "object") return false;
-  const position = value as Record<string, unknown>;
-  return (
-    finite(position.fx) &&
-    finite(position.fy) &&
-    position.fx >= 0 &&
-    position.fx <= 1 &&
-    position.fy >= 0 &&
-    position.fy <= 1
-  );
-}
-
-function validStoredMapValue(map: StoredMapName, value: unknown): boolean {
-  if (map === "domains" || map === "channels") return finite(value) && value >= 0.1 && value <= 16;
-  if (map === "syncTargets" || map === "syncTargetChannels")
-    return finite(value) && value >= 1 && value <= 30;
-  if (map === "autoSlowSites" || map === "autoSlowChannels") {
-    if (!value || typeof value !== "object") return false;
-    const target = (value as Record<string, unknown>).target;
-    return finite(target) && target >= 3 && target <= 12;
-  }
-  if (map === "viewerAutoSites" || map === "viewerAutoChannels") {
-    return value === "off" || value === "normal" || value === "theater";
-  }
-  if (map === "viewerFitSites" || map === "viewerFitChannels") {
-    return value === "contain" || value === "cover" || value === "fill";
-  }
-  if (map === "badgePinned") return typeof value === "boolean";
-  return validPosition(value);
-}
-
-function validStoredMapMutation(msg: unknown): StoredMapMutation | null {
-  if (!msg || typeof msg !== "object") return null;
-  const raw = msg as Record<string, unknown>;
-  if (typeof raw.map !== "string" || !storedMapNames.has(raw.map)) return null;
+function validStoredMapMutation(raw: Record<string, unknown>): Required<StoredMapMutation> | null {
+  if (!storedMapNames.has(raw.map)) return null;
   const map = raw.map as StoredMapName;
   const set: Record<string, unknown> = {};
   if (raw.set && typeof raw.set === "object") {
     for (const [key, value] of Object.entries(raw.set as Record<string, unknown>)) {
       if (safeKey(key) && validStoredMapValue(map, value)) {
-        set[key] = value;
+        // A dragged spot needs no more than sub-pixel precision, while a raw double
+        // costs ~18 characters per axis in a per-site map that must fit one 8 KB item.
+        set[key] = validPosition(value)
+          ? {
+              ...value,
+              fx: Math.round(value.fx * 1e4) / 1e4,
+              fy: Math.round(value.fy * 1e4) / 1e4,
+            }
+          : value;
       }
     }
   }
@@ -114,7 +89,7 @@ function validStoredMapMutation(msg: unknown): StoredMapMutation | null {
   return { map, set, remove, clear };
 }
 
-function mutateStoredMap(mutation: StoredMapMutation): Promise<boolean> {
+function mutateStoredMap(mutation: Required<StoredMapMutation>): Promise<boolean> {
   const run = () =>
     new Promise<boolean>((resolve) => {
       whenReady(() => {
@@ -123,11 +98,9 @@ function mutateStoredMap(mutation: StoredMapMutation): Promise<boolean> {
           return;
         }
         STORE.get([mutation.map], (result) => {
-          const current = {
-            ...((result[mutation.map] || {}) as Record<string, number>),
-          };
-          for (const key of mutation.remove || []) delete current[key];
-          Object.assign(current, mutation.set || {});
+          const current = { ...(result[mutation.map] as Record<string, number>) };
+          for (const key of mutation.remove) delete current[key];
+          Object.assign(current, mutation.set);
           const finish = (ok?: boolean) => resolve(ok !== false);
           if (Object.keys(current).length) STORE.set({ [mutation.map]: current }, finish);
           else STORE.remove(mutation.map, finish);
@@ -135,7 +108,7 @@ function mutateStoredMap(mutation: StoredMapMutation): Promise<boolean> {
       });
     });
   const queue = storedMapQueues.get(mutation.map) || Promise.resolve();
-  const result = queue.then(run, run);
+  const result = queue.then(run);
   storedMapQueues.set(
     mutation.map,
     result.then(
@@ -158,11 +131,43 @@ function call(fn: () => unknown): void {
   }
 }
 
-function reset(tabId?: number): void {
-  if (typeof tabId === "number") {
-    badgeOwners.delete(tabId);
-    videoFrameOwners.delete(tabId);
+function loadBadgeOwners(): void {
+  const done = (saved?: unknown) => {
+    if (saved) {
+      for (const [tabId, frameId] of Object.entries(saved)) {
+        if (typeof frameId === "number") badgeOwners.set(Number(tabId), frameId);
+      }
+    }
+    badgeOwnersLoaded = true;
+    while (badgeOwnersWaiters.length) badgeOwnersWaiters.shift()!();
+  };
+  try {
+    api.storage.session.get(BADGE_OWNERS_KEY, (items) => {
+      void api.runtime.lastError;
+      done(items?.[BADGE_OWNERS_KEY]);
+    });
+  } catch (e) {
+    done();
   }
+}
+loadBadgeOwners();
+
+// Run fn once the saved owners are back in memory (at once from then on), so no
+// ownership decision is made against a freshly restarted worker's empty map.
+function withBadgeOwners(fn: () => void): void {
+  if (badgeOwnersLoaded) fn();
+  else badgeOwnersWaiters.push(fn);
+}
+
+function saveBadgeOwners(): void {
+  call(() => api.storage.session.set({ [BADGE_OWNERS_KEY]: Object.fromEntries(badgeOwners) }));
+}
+
+function reset(tabId: number): void {
+  withBadgeOwners(() => {
+    if (badgeOwners.delete(tabId)) saveBadgeOwners();
+  });
+  videoFrameOwners.delete(tabId);
   call(() => api.action.setBadgeText({ text: "", tabId }));
   call(() => api.action.setIcon({ path: DEFAULT_ICON, tabId }));
 }
@@ -193,10 +198,6 @@ function findVideoFrame(tabId: number, done: (frameId?: number) => void): void {
   const cached = videoFrameOwners.get(tabId);
   if (cached && cached.expires > Date.now()) {
     done(cached.frameId);
-    return;
-  }
-  if (!api.scripting?.executeScript) {
-    done(undefined);
     return;
   }
   let settled = false;
@@ -268,8 +269,57 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     call(() => api.runtime.openOptionsPage());
     return;
   }
+  // The page-world quality loader (through its frame's content script) needs the
+  // adapter bundle. Injecting it into exactly that frame keeps it out of
+  // web_accessible_resources, whose URL would identify the extension to every page.
+  if (msg && msg.action === "injectQualityBridge") {
+    const tabId = sender.tab?.id;
+    const frameId = sender.frameId;
+    if (typeof tabId !== "number" || typeof frameId !== "number") {
+      sendResponse({ ok: false });
+      return;
+    }
+    let settled = false;
+    const reply = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      try {
+        sendResponse({ ok });
+      } catch (e) {
+        /* frame went away before the injection finished */
+      }
+    };
+    try {
+      const result = api.scripting.executeScript(
+        {
+          target: { tabId, frameIds: [frameId] },
+          world: "MAIN",
+          files: ["quality-inject.js"],
+        },
+        () => reply(!api.runtime.lastError),
+      ) as unknown as Promise<unknown> | undefined;
+      if (result && typeof result.then === "function") {
+        void result.then(
+          () => reply(true),
+          () => reply(false),
+        );
+      }
+    } catch (e) {
+      reply(false);
+    }
+    return true;
+  }
+  // The on-video button inside an embedded player asks for the overlay: like a toolbar
+  // click it opens in the top frame, not clipped inside the embed.
+  if (msg && msg.action === "toggleOverlay") {
+    const tabId = sender.tab?.id;
+    if (typeof tabId === "number")
+      call(() => api.tabs.sendMessage(tabId, { action: "toggleOverlay" }, { frameId: 0 }));
+    return;
+  }
   // The embedded overlay popup can't resolve its host tab via tabs.query on Firefox,
-  // so it asks who it's in — the background has it from sender.tab.
+  // so it asks who it's in — the background has it from sender.tab. (A subframe's
+  // content script asks too when it can't see the top origin: site settings key by it.)
   if (msg && msg.action === "whoami") {
     const t = sender.tab;
     sendResponse({ tab: t ? { id: t.id, url: t.url } : undefined });
@@ -279,7 +329,6 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // can't call tabs.sendMessage). Forward to the host tab and pipe the reply back.
   if (msg && msg.action === "relayToTab" && typeof msg.tabId === "number") {
     const tabId = msg.tabId;
-    const owner = badgeOwners.get(tabId);
     const routeVideo = msg.route === "video";
     const finish = (resp: unknown) => {
       try {
@@ -310,36 +359,36 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         finish(undefined);
       }
     };
-    try {
+    withBadgeOwners(() => {
+      const owner = badgeOwners.get(tabId);
       if (routeVideo) findVideoFrame(tabId, (frameId) => relay(frameId ?? owner));
       else relay(owner);
-    } catch (e) {
-      try {
-        sendResponse(undefined);
-      } catch (x) {
-        /* ignore */
-      }
-    }
+    });
     return true; // sendResponse fires asynchronously
   }
   if (!msg || msg.action !== "icon" || !sender.tab) return;
   const tabId = sender.tab.id;
   if (typeof tabId !== "number") return;
   const frameId = typeof sender.frameId === "number" ? sender.frameId : 0;
-  if (msg.clear) {
+  withBadgeOwners(() => {
     const owner = badgeOwners.get(tabId);
-    if (owner == null || owner === frameId) reset(tabId);
-    return;
-  }
-  const owner = badgeOwners.get(tabId);
-  if (frameId !== 0 && owner != null && owner !== frameId) return;
-  badgeOwners.set(tabId, frameId);
-  call(() => api.action.setBadgeText({ text: msg.text || "", tabId }));
-  call(() => api.action.setBadgeBackgroundColor({ color: "#0a84ff", tabId }));
-  if (api.action.setBadgeTextColor) {
+    if (msg.clear) {
+      // Unknown owner: nothing claimed the badge since it was last reset (or a restarted
+      // worker couldn't read it back). Only the top frame may clear then, not e.g. an ad
+      // iframe whose video went away.
+      if (owner === frameId || (owner == null && frameId === 0)) reset(tabId);
+      return;
+    }
+    if (frameId !== 0 && owner != null && owner !== frameId) return;
+    if (owner !== frameId) {
+      badgeOwners.set(tabId, frameId);
+      saveBadgeOwners();
+    }
+    call(() => api.action.setBadgeText({ text: msg.text || "", tabId }));
+    call(() => api.action.setBadgeBackgroundColor({ color: "#0a84ff", tabId }));
     call(() => api.action.setBadgeTextColor({ color: "#ffffff", tabId }));
-  }
-  call(() => api.action.setIcon({ path: msg.live ? RED_ICON : DEFAULT_ICON, tabId }));
+    call(() => api.action.setIcon({ path: msg.live ? RED_ICON : DEFAULT_ICON, tabId }));
+  });
   return false; // no async response (only relayToTab keeps the channel open)
 });
 
@@ -350,7 +399,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // store, PDF viewer) have nothing to host it, so a click there is simply a no-op.
 if (api.action && api.action.onClicked) {
   api.action.onClicked.addListener((tab) => {
-    const tabId = tab?.id;
+    const tabId = tab.id;
     if (typeof tabId !== "number") return;
     call(() => api.tabs.sendMessage(tabId, { action: "toggleOverlay" }, { frameId: 0 }));
   });
@@ -374,10 +423,9 @@ if (api.tabs && api.tabs.onRemoved) {
 // so it keeps working without a refresh. The MAIN-world probes also publish fresh
 // DOM bridges (YouTube/HLS quality, latency), so they must be refreshed too.
 function reinjectOpenTabs(): void {
-  if (!api.scripting || !api.tabs) return;
   call(() =>
     api.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
-      for (const tab of tabs || []) {
+      for (const tab of tabs) {
         if (tab.id == null) continue;
         const tabId = tab.id as number;
         call(() =>
@@ -407,28 +455,31 @@ function reinjectOpenTabs(): void {
   );
 }
 
+// Chrome's url query also matches a tab by the page it is still loading, leaving out
+// the URL of the one it shows when that's out of reach (e.g. the new-tab page).
 function shouldInjectLatencyBridge(url?: string): boolean {
   if (!url) return false;
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return (
-      host === "twitch.tv" ||
-      host.endsWith(".twitch.tv") ||
-      host === "youtube.com" ||
-      host.endsWith(".youtube.com") ||
-      host === "kick.com" ||
-      host.endsWith(".kick.com") ||
-      host === "w.tv" ||
-      host.endsWith(".w.tv")
-    );
-  } catch (e) {
-    return false;
-  }
+  const host = new URL(url).hostname.toLowerCase();
+  return (
+    host === "twitch.tv" ||
+    host.endsWith(".twitch.tv") ||
+    host === "youtube.com" ||
+    host.endsWith(".youtube.com") ||
+    host === "youtube-nocookie.com" ||
+    host.endsWith(".youtube-nocookie.com") ||
+    host === "kick.com" ||
+    host.endsWith(".kick.com") ||
+    host === "w.tv" ||
+    host.endsWith(".w.tv")
+  );
 }
 
+// Only an install or an update orphans running scripts; after a browser start or a
+// browser update every page loads fresh with the manifest's content scripts.
 if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
-  api.runtime.onInstalled.addListener(reinjectOpenTabs);
-  if (api.runtime.onStartup) api.runtime.onStartup.addListener(reinjectOpenTabs);
+  api.runtime.onInstalled.addListener((details) => {
+    if (details.reason === "install" || details.reason === "update") reinjectOpenTabs();
+  });
 }
 
 // First-run seeding: persist the shipped global defaults — playback speed 100%
@@ -438,8 +489,8 @@ if (api.runtime && api.runtime.onInstalled && api.scripting && api.tabs) {
 // never clobbers an existing (or already-synced) value. syncTargetGlobal also
 // defers to the legacy `liveSyncTarget` global, which loadSpeed still honours.
 if (api.runtime && api.runtime.onInstalled) {
-  api.runtime.onInstalled.addListener((details?: { reason?: string }) => {
-    if (details?.reason && details.reason !== "install") return;
+  api.runtime.onInstalled.addListener((details) => {
+    if (details.reason !== "install") return;
     whenReady(() => {
       STORE.get(["globalSpeed", "syncTargetGlobal", "liveSyncTarget"], (r) => {
         const seed: Record<string, unknown> = {};
@@ -499,7 +550,7 @@ function runUpdateCheck(): void {
       }),
     );
   } else {
-    // Firefox: no update API — compare the manifest against AMO's latest.
+    // Firefox: no requestUpdateCheck — compare the manifest against AMO's latest.
     void fetchAmoLatest().then((latest) => {
       if (latest == null) return; // network blip: leave the last result untouched
       recordUpdate(cmpVersion(latest, currentVersion()) > 0, latest);
@@ -509,10 +560,11 @@ function runUpdateCheck(): void {
 
 // Chrome stages an update while we're running and fires this; record it so the
 // header marker appears (with the new version when known). We don't reload —
-// Chrome applies the staged update on its next idle anyway.
-if (api.runtime && api.runtime.onUpdateAvailable) {
+// Chrome applies the staged update on its next idle anyway. Firefox fires it too,
+// but there merely listening defers the update until the browser restarts.
+if (hasUpdateApi() && api.runtime.onUpdateAvailable) {
   api.runtime.onUpdateAvailable.addListener((details) => {
-    recordUpdate(true, details?.version);
+    recordUpdate(true, details.version);
   });
 }
 

@@ -149,17 +149,17 @@ test("compression and auto-slow stay active together while playback keeps advanc
   const before = await page
     .locator("#v")
     .evaluate((video) => (video as HTMLVideoElement).currentTime);
-  await page.waitForTimeout(750);
+  await expect
+    .poll(() => page.locator("#v").evaluate((video) => (video as HTMLVideoElement).currentTime))
+    .toBeGreaterThan(before);
   const playback = await page.locator("#v").evaluate((element) => {
     const video = element as HTMLVideoElement;
     return {
-      currentTime: video.currentTime,
       playbackRate: video.playbackRate,
       paused: video.paused,
       error: video.error?.code ?? null,
     };
   });
-  expect(playback.currentTime).toBeGreaterThan(before);
   expect(playback.playbackRate).toBeGreaterThan(0);
   expect(playback.paused).toBe(false);
   expect(playback.error).toBeNull();

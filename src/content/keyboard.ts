@@ -29,6 +29,7 @@ import {
 } from "./viewer.js";
 import { listenerOptions } from "./lifecycle.js";
 
+// Parsed preset chords, reused across keydowns until the stored keys change.
 let cachedPresetKeys: (string | null)[] | null = null;
 let cachedPresetChords: (KeyChord | null)[] = [];
 
@@ -80,43 +81,18 @@ function seekBy(video: HTMLVideoElement, delta: number): void {
 document.addEventListener(
   "keydown",
   (e) => {
-    if (e.defaultPrevented) return;
+    // An unbound action is "" — a code-less (synthetic / IME) key must not match it.
+    if (e.defaultPrevented || !e.code) return;
     if (S.siteDisabled || !S.keyboardEnabled || !ctxValid()) return;
     const { slower, faster, reset, toggle, hold, overlay, viewer, theater, chat, rewind, advance } =
       S.keymap;
-    const oneShotRepeat =
-      e.repeat &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey &&
-      !e.shiftKey &&
-      (e.code === reset ||
-        e.code === toggle ||
-        e.code === overlay ||
-        e.code === viewer ||
-        e.code === theater ||
-        e.code === chat);
-    if (oneShotRepeat) return;
-    // A preset whose assigned chord matches this exact event (may use modifiers).
-    let preset: number | undefined;
-    const chords = presetChords();
-    for (let i = 0; i < chords.length; i++) {
-      if (eventMatchesChord(chords[i], e)) {
-        preset = S.presets[i];
-        break;
-      }
-    }
     // Action keys are bare position keys (Shift only, to double the step) — never
     // with Ctrl/Cmd/Alt, so browser/site chords are left alone.
+    const bare = !e.ctrlKey && !e.metaKey && !e.altKey;
     const stepKey =
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey &&
-      (e.code === slower || e.code === faster || e.code === rewind || e.code === advance);
+      bare && (e.code === slower || e.code === faster || e.code === rewind || e.code === advance);
     const plainActionKey =
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey &&
+      bare &&
       !e.shiftKey &&
       (e.code === reset ||
         e.code === toggle ||
@@ -125,10 +101,16 @@ document.addEventListener(
         e.code === viewer ||
         e.code === theater ||
         e.code === chat);
-    const actionKey = !e.ctrlKey && !e.metaKey && !e.altKey && (stepKey || plainActionKey);
+    // One-shot keys ignore auto-repeat; held step keys keep stepping, and the hold
+    // branch below ignores its own repeats.
+    if (e.repeat && plainActionKey && e.code !== hold) return;
+    // A preset whose assigned chord matches this exact event (may use modifiers).
+    const presetAt = presetChords().findIndex((chord) => eventMatchesChord(chord, e));
+    const preset = presetAt < 0 ? undefined : S.presets[presetAt];
+    const actionKey = stepKey || plainActionKey;
     if (preset === undefined && !actionKey) return;
     // composedPath()[0] pierces shadow DOM to the real target; deepActive() does the same for focus.
-    const target = (typeof e.composedPath === "function" && e.composedPath()[0]) || e.target;
+    const target = e.composedPath()[0];
     if (typingIn(target) || typingIn(deepActive())) return;
     const viewerAction = e.code === viewer || e.code === theater;
     if (viewerAction && !S.viewerAutoEnabled) return;
@@ -136,6 +118,9 @@ document.addEventListener(
     // controls misleadingly appear to cover the host page. Leave the site's key
     // untouched there; embedded players can still use native Picture-in-Picture.
     if (viewerAction && window.top !== window) return;
+    // The overlay popup is top-frame only too (clipped in an embed while acting on the
+    // whole tab); the on-video button there asks the top frame to open it instead.
+    if (e.code === overlay && preset === undefined && window.top !== window) return;
     if (!primaryVideo() && !viewerAnchorVideo() && !(viewerAction && viewerFormat())) return; // nothing to act on
     // The chat key acts only inside an open viewer on a chat-capable live page —
     // otherwise leave the site's own key (e.g. YouTube's C = captions) alone.
@@ -144,7 +129,7 @@ document.addEventListener(
 
     e.preventDefault();
     if (preset !== undefined) {
-      if (!e.repeat) setSpeed(preset, false, true);
+      if (!e.repeat) setSpeed(preset, true);
       return;
     }
     if (e.code === overlay) {
@@ -168,17 +153,17 @@ document.addEventListener(
       if (!S.holdActive) {
         S.holdActive = true;
         S.holdPrev = S.currentSpeed;
-        setSpeed(S.holdSpeed, false, true);
+        setSpeed(S.holdSpeed, true);
       }
       return;
     }
     if (e.code === toggle) {
       // At 1× → restore the last remembered speed; otherwise remember and drop to 1×.
       if (Math.abs(S.currentSpeed - 1) < 1e-3) {
-        if (S.toggleMemory != null) setSpeed(S.toggleMemory, false, true);
+        if (S.toggleMemory != null) setSpeed(S.toggleMemory, true);
       } else {
         S.toggleMemory = S.currentSpeed;
-        setSpeed(1, false, true);
+        setSpeed(1, true);
       }
       return;
     }
@@ -190,9 +175,9 @@ document.addEventListener(
       return;
     }
     const step = e.shiftKey ? S.speedStep * 2 : S.speedStep;
-    if (e.code === faster) setSpeed(S.currentSpeed + step, false, true);
-    else if (e.code === slower) setSpeed(S.currentSpeed - step, false, true);
-    else if (e.code === reset) resetToSaved();
+    if (e.code === faster) setSpeed(S.currentSpeed + step, true);
+    else if (e.code === slower) setSpeed(S.currentSpeed - step, true);
+    else resetToSaved();
   },
   listenerOptions(true),
 );
@@ -200,7 +185,7 @@ document.addEventListener(
 function releaseHold(): void {
   if (!S.holdActive) return;
   S.holdActive = false;
-  setSpeed(S.holdPrev, false, true);
+  setSpeed(S.holdPrev, true);
 }
 
 function releaseHoldOnWindowBlur(): void {

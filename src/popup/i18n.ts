@@ -4,7 +4,7 @@
 // override. Missing keys in a partial translation fall back to English.
 import { api } from "./platform/browser.js";
 import { STORE } from "../shared/store.js";
-import { resolveLocale, type Lang, type Locale } from "../shared/i18n-config.js";
+import { resolveLocale, type Locale } from "../shared/i18n-config.js";
 
 import en from "../_locales/en/messages.json";
 import ru from "../_locales/ru/messages.json";
@@ -18,7 +18,9 @@ import uk from "../_locales/uk/messages.json";
 import zh_CN from "../_locales/zh_CN/messages.json";
 
 type Bundle = Record<string, { message: string }>;
-const MESSAGES = { en, ru, de, es, fr, hi, ja, pt_BR, uk, zh_CN } as Record<Locale, Bundle>;
+// Annotated, not cast, so a locale added to LOCALES without its bundle here fails
+// the type check instead of leaving msg() with no bundle at runtime.
+const MESSAGES: Record<Locale, Bundle> = { en, ru, de, es, fr, hi, ja, pt_BR, uk, zh_CN };
 
 // Guarded — getUILanguage exists in every real extension context, but a dead
 // context (or a test harness without it) shouldn't throw at module load.
@@ -47,7 +49,7 @@ export const msg = (key: string, subs?: string | string[]): string => {
 // run cb so callers can (re)localize and build their sections in that language.
 export function loadLang(cb: () => void): void {
   STORE.get(["uiLang"], (r) => {
-    active = MESSAGES[resolveLocale((r.uiLang as Lang) || "system", uiLanguage())];
+    active = MESSAGES[resolveLocale(r.uiLang, uiLanguage())];
     cb();
   });
 }

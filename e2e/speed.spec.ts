@@ -7,10 +7,16 @@ test.beforeEach(async ({ serviceWorker }) => {
   await clearStorage(serviceWorker);
 });
 
-test("the extension loads and the content script controls the page video", async ({ page }) => {
+test("the extension loads and the content script controls the page video", async ({
+  page,
+  serviceWorker,
+}) => {
   await page.goto("/");
   // Content script runs at document_start and applies the default 1× speed.
   await expect.poll(() => rate(page)).toBe(1);
+  // 1× is also the browser default, so prove the script is live and owns the video.
+  await sendToContent(serviceWorker, "setSpeed", { speed: 1.25 });
+  await expect.poll(() => rate(page)).toBeCloseTo(1.25, 2);
 });
 
 test("keyboard shortcuts change the video playback rate", async ({ page }) => {

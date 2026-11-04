@@ -67,15 +67,17 @@ export function settleCatchupRate(
 
 // True when we're clearly behind the live edge but the buffer is too thin to
 // catch up at all (not even the smallest 5% step) — latency will stay high
-// until the buffer refills, which the UI warns about.
+// until the buffer refills, which the UI warns about. Needs a latency reading:
+// on the buffer fallback the lag IS the buffer, which can't be both large and thin.
 export function catchupBufferLimited(
   latency: number | null,
   buffer: number,
   target: number,
   reserve: number,
 ): boolean {
-  const lag = latency != null ? latency : buffer;
   return (
-    lag > target + CATCHUP_START && buffer < catchupBufferFloor(latency, target, reserve) + 0.05
+    latency != null &&
+    latency > target + CATCHUP_START &&
+    buffer < catchupBufferFloor(latency, target, reserve) + 0.05
   );
 }

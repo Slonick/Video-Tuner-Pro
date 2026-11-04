@@ -152,7 +152,7 @@ export const KEYS_BY_CATEGORY: Record<Category, string[]> = CATEGORIES.reduce(
 // category present, missing ones defaulting to synced.
 export function normalizeConfig(raw: unknown): SyncConfig {
   const cfg = { ...DEFAULT_SYNC };
-  if (raw && typeof raw === "object") {
+  if (raw) {
     for (const c of CATEGORIES) {
       const v = (raw as Record<string, unknown>)[c];
       if (typeof v === "boolean") cfg[c] = v;

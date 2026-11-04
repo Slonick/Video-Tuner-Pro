@@ -52,6 +52,17 @@ describe("primaryVideo", () => {
     expect(primaryVideo()).toBeNull();
   });
 
+  it("ignores a video that is too narrow or too short", () => {
+    vid(30, 400, false);
+    vid(400, 30, false);
+    expect(primaryVideo()).toBeNull();
+  });
+
+  it("accepts a video of exactly 40×40", () => {
+    const smallest = vid(40, 40, false);
+    expect(primaryVideo()).toBe(smallest);
+  });
+
   it("prefers a similarly sized playing video over a paused one", () => {
     const paused = vid(1000, 1000, true);
     const playing = vid(800, 600, false);
@@ -63,6 +74,12 @@ describe("primaryVideo", () => {
     const main = vid(1000, 1000, true);
     vid(160, 90, false);
     expect(primaryVideo()).toBe(main);
+  });
+
+  it("lets a playing video of exactly a quarter of the largest area win", () => {
+    vid(1000, 1000, true);
+    const quarter = vid(500, 500, false);
+    expect(primaryVideo()).toBe(quarter);
   });
 
   it("ignores videos inside the extension viewer overlay", () => {
@@ -160,5 +177,10 @@ describe("DRM detection", () => {
     const v = vid(640, 360, false);
     Object.defineProperty(v, "mediaKeys", { value: {}, configurable: true });
     expect(isDrmVideo(v)).toBe(true);
+  });
+
+  it("treats a missing video as unprotected", () => {
+    expect(isDrmVideo(null)).toBe(false);
+    expect(isDrmVideo(undefined)).toBe(false);
   });
 });

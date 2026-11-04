@@ -14,6 +14,9 @@ describe("rmsToDb", () => {
   it("below the noise floor → -100", () => {
     expect(rmsToDb([1e-6, 1e-6])).toBe(-100);
   });
+  it("exactly at the floor amplitude still floors (the cut-off is exclusive)", () => {
+    expect(rmsToDb([0.0000158, 0.0000158, 0.0000158, 0.0000158])).toBe(-100);
+  });
 });
 
 describe("deriveOutDb", () => {

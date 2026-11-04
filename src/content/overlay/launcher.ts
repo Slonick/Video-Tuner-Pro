@@ -7,7 +7,7 @@
 import { S } from "../state.js";
 import { getDomain } from "../core/domain.js";
 import { badgeFraction } from "../core/badge-pos.js";
-import { mutateStoredMap } from "../../shared/map-mutation.js";
+import { mutateStoredMap, validPosition } from "../../shared/map-mutation.js";
 import { api, ctxValid } from "../platform/browser.js";
 import {
   addFullscreenChangeListener,
@@ -18,6 +18,7 @@ import { i18n } from "../platform/i18n.js";
 import { isDrmVideo, primaryVideo } from "../videos.js";
 import {
   VIEWER_LAYOUT_EVENT,
+  VIEWER_RAISE_EVENT,
   toggleViewer,
   exitViewer,
   viewerAnchorVideo,
@@ -64,6 +65,7 @@ let radialEnableTimer: Timer | undefined;
 let radialFrame = 0;
 let backdrop: HTMLDivElement | null = null;
 let frame: HTMLIFrameElement | null = null;
+let frameOrigin = ""; // the origin our popup's messages arrive from (see openPopup)
 // Panel-drag state. The press starts inside the popup iframe, which captures the
 // pointer and posts the gesture here; we recompute the clamped centre on each move.
 let pdSX = 0,
@@ -137,9 +139,29 @@ function syncHostPopover(active: boolean): void {
   }
 }
 
+// The viewer re-showed its player above every open popover — re-append ours.
+function raiseHostPopover(): void {
+  const popoverHost = host as PopoverHost | null;
+  try {
+    if (!popoverHost?.matches(":popover-open")) return;
+    popoverHost.hidePopover?.();
+    popoverHost.showPopover?.();
+  } catch {}
+}
+
 function syncTopLayerAttr(): void {
   if (open || radialOpen) document.documentElement.setAttribute(LAUNCHER_TOP_LAYER_ATTR, "");
   else document.documentElement.removeAttribute(LAUNCHER_TOP_LAYER_ATTR);
+}
+
+// The native viewer lifts the site's own player into the top layer; the host has to
+// be there too to stay visible: while its button can show, and while the popup is
+// open (one opened from the toolbar icon or the hotkey has no button).
+function syncHostLift(anchor = viewerAnchorVideo()): void {
+  const native = !!(
+    anchor as (HTMLElement & { hasAttribute?: (name: string) => boolean }) | null
+  )?.hasAttribute?.(NATIVE_VIEWER_SURFACE_ATTR);
+  syncHostPopover(native && (open || eligible()));
 }
 
 function fabLabel(): string {
@@ -184,6 +206,9 @@ function eligible(): boolean {
 // the stored fraction stays put, so the button returns to its usual place the
 // instant the chat stops being in the way.
 function avoidViewerChat(left: number, top: number, r: DOMRect): { left: number; top: number } {
+  // Chat surfaces exist only inside an open viewer; skip the document-wide query
+  // that would otherwise run on every pointer frame.
+  if (!viewerFormat()) return { left, top };
   const pad = 8;
   const sel = "[data-vtp-viewer-chat-side],[data-vtp-viewer-chat-panel]";
   for (const el of document.querySelectorAll<HTMLElement>(sel)) {
@@ -550,17 +575,13 @@ function positionPanel(): void {
   frame.style.left = cx + "px";
   frame.style.top = cy + "px";
 
-  if (p) {
+  // Clamp for display only: a smaller window or a taller panel must not overwrite
+  // the spot the user dragged to. Only a value no drag can produce (older versions
+  // persisted malformed ones) is replaced by where the panel actually landed.
+  if (p && !validPosition(p)) {
     const healed = { fx: cx / window.innerWidth, fy: cy / window.innerHeight };
-    if (
-      !Number.isFinite(p.fx) ||
-      !Number.isFinite(p.fy) ||
-      Math.abs(healed.fx - p.fx) > 0.0001 ||
-      Math.abs(healed.fy - p.fy) > 0.0001
-    ) {
-      S.overlayPanelPos = healed;
-      savePanelPos(healed.fx, healed.fy);
-    }
+    S.overlayPanelPos = healed;
+    savePanelPos(healed.fx, healed.fy);
   }
 }
 
@@ -602,7 +623,10 @@ function panelDragMove(sx: number, sy: number): void {
 }
 
 function panelDragEnd(moved: boolean): void {
-  if (moved) savePanelPos(pdCx / window.innerWidth, pdCy / window.innerHeight);
+  if (!moved) return;
+  const pos = { fx: pdCx / window.innerWidth, fy: pdCy / window.innerHeight };
+  S.overlayPanelPos = pos;
+  savePanelPos(pos.fx, pos.fy);
 }
 
 // The overlay iframe must declare the host's USED color-scheme to stay transparent
@@ -638,7 +662,13 @@ function openPopup(): void {
     // Resolve the extension URL before mutating any UI state. An orphaned content
     // script (after an extension reload) or an unrelated page `browser` global
     // must not leave a transparent backdrop and a permanently "open" FAB behind.
-    popupUrl = api.runtime.getURL("popup/popup.html") + overlaySchemeHash();
+    // `host` lets the popup address its messages to this page alone (Firefox before
+    // 148 has no location.ancestorOrigins to read it from).
+    const popupPage = api.runtime.getURL("popup/popup.html");
+    popupUrl = `${popupPage}?host=${encodeURIComponent(location.origin)}${overlaySchemeHash()}`;
+    // The frame commits at the extension's own origin, not at the per-session alias
+    // host getURL hands out for page-loadable resources (use_dynamic_url).
+    frameOrigin = api.runtime.getURL("").replace(/\/$/, "");
   } catch (error) {
     console.error("[Video Tuner] unable to open embedded popup", error);
     return;
@@ -661,12 +691,11 @@ function openPopup(): void {
     backdrop.addEventListener("pointerdown", closePopup);
     shadow.append(backdrop);
   }
-  // Recreate the iframe on every open so it always loads the current popup/popup.html
-  // — the toolbar popup is recreated by the browser each open; this mirrors that. The
-  // old frame is removed first to drop its document (timers, graph samplers) and avoid
-  // leaks. frameH (module-level) carries the last reported height across opens so the
-  // panel starts at its real size with no flicker; layoutFrame() refits it.
-  if (frame) frame.remove();
+  // A fresh iframe on every open, so it always loads the current popup/popup.html —
+  // the toolbar popup is recreated by the browser each open; this mirrors that
+  // (closePopup drops the old one). frameH (module-level) carries the last reported
+  // height across opens so the panel starts at its real size with no flicker;
+  // layoutFrame() refits it.
   frame = document.createElement("iframe");
   // Chrome makes the overlay iframe TRANSPARENT only when its color-scheme matches
   // the host's used scheme; a mismatch paints an opaque backdrop. And the host's
@@ -695,6 +724,7 @@ function openPopup(): void {
   frame.style.display = "block";
   backdrop.style.display = "block"; // cached backdrop is hidden on close — re-show it
   syncTopLayerAttr();
+  syncHostLift();
   layoutFrame();
   positionPanel();
   // Entrance: the panel scales up + fades in about its centre (the translate keeps
@@ -718,20 +748,31 @@ function closePopup(): void {
   openedWithoutVideo = false;
   fab?.setAttribute("data-popup-open", "false"); // morphs the icon ✕ → play
   syncFabExpanded();
-  if (frame) frame.style.display = "none";
+  // Drop the document, don't just hide it: a hidden popup keeps polling the tab
+  // through the service worker until the page unloads.
+  frame?.remove();
+  frame = null;
   if (backdrop) backdrop.style.display = "none";
   syncTopLayerAttr();
+  syncHostLift();
   flashFab(); // resume the auto-hide countdown
 }
 
 function togglePopup(): void {
+  // Inside an embedded player the popup would be clipped to the frame while acting
+  // on the whole tab, so the top frame opens it instead, as for the toolbar icon.
+  if (window.top !== window) {
+    if (ctxValid()) void api.runtime.sendMessage({ action: "toggleOverlay" }).catch(() => {});
+    return;
+  }
   if (open) closePopup();
   else openPopup();
 }
 
-// Open/close the overlay popup from the toolbar icon or the keyboard, independent of
-// the launcher button's visibility setting — mounts the machinery on demand so it
-// works even when the button is turned off, and on pages without any video.
+// Open/close the overlay popup from the toolbar icon, the keyboard or an embedded
+// player's button, independent of the launcher button's visibility setting — mounts
+// the machinery on demand so it works even when the button is turned off, and on
+// pages without any video.
 export function toggleOverlayPopup(): void {
   if (!ctxValid()) return;
   // The tick backs off to 30s on video-less pages, so don't trust a host the page
@@ -1040,6 +1081,10 @@ function radialButton(svg: string, label: string, onClick: () => void): HTMLButt
   return b;
 }
 
+function finite(n: unknown): n is number {
+  return Number.isFinite(n);
+}
+
 function hookMouse(): void {
   if (mouseHooked) return;
   mouseHooked = true;
@@ -1059,11 +1104,12 @@ function hookMouse(): void {
     flashFab();
   });
   // The embedded popup reports its content height (so the iframe grows like the
-  // real popup) and asks to close on Escape. Only trust messages from our frame.
+  // real popup) and asks to close on Escape. Only trust messages from our frame,
+  // and only while it still holds our popup (the page could navigate it elsewhere).
   window.addEventListener(
     "message",
     (e) => {
-      if (!frame || e.source !== frame.contentWindow) return;
+      if (!frame || e.source !== frame.contentWindow || e.origin !== frameOrigin) return;
       const d = e.data as {
         type?: string;
         height?: number;
@@ -1075,13 +1121,11 @@ function hookMouse(): void {
       } | null;
       if (!d || d.type !== "vtp-overlay") return;
       if (d.close) closePopup();
-      else if (d.drag === "start" && typeof d.sx === "number" && typeof d.sy === "number")
-        panelDragStart(d.sx, d.sy);
-      else if (d.drag === "move" && typeof d.sx === "number" && typeof d.sy === "number")
-        panelDragMove(d.sx, d.sy);
+      else if (d.drag === "start" && finite(d.sx) && finite(d.sy)) panelDragStart(d.sx, d.sy);
+      else if (d.drag === "move" && finite(d.sx) && finite(d.sy)) panelDragMove(d.sx, d.sy);
       else if (d.drag === "end") panelDragEnd(d.moved === true);
       else if (d.drag === "reset") resetPanelPos();
-      else if (typeof d.height === "number" && d.height > 0) {
+      else if (finite(d.height) && d.height > 0) {
         frameH = Math.round(d.height);
         layoutFrame();
         // The popup reports its real height after first paint. Re-clamp the
@@ -1159,14 +1203,14 @@ function hideFab(): void {
 
 // The button is hidden, but a popup opened from the toolbar icon or the hotkey stays
 // up (both are independent of the button). Keep its host attached to the right parent
-// (e.g. on entering fullscreen) and only hide the button.
+// (e.g. on entering fullscreen) and lifted above a native viewer; only hide the button.
 function hideFabKeepPopup(): void {
   hideFab();
-  syncHostPopover(false);
   if (open && host) {
     const parent = fullscreenOverlayHost();
     if (host.parentNode !== parent) parent.appendChild(host);
   }
+  syncHostLift(); // after the move: detaching a popover hides it
 }
 
 function resetDetachedHost(): void {
@@ -1229,11 +1273,7 @@ export function updateLauncher(snapshot: { primary?: HTMLVideoElement | null } =
   hookMouse();
   const parent = fullscreenOverlayHost();
   if (host && host.parentNode !== parent) parent.appendChild(host);
-  syncHostPopover(
-    !!(
-      viewerAnchor as (HTMLElement & { hasAttribute?: (name: string) => boolean }) | null
-    )?.hasAttribute?.(NATIVE_VIEWER_SURFACE_ATTR),
-  );
+  syncHostLift(viewerAnchor);
   if (fabVideo && !dragging && (!paused || viewerAnchor)) positionFab(fabVideo);
   // The viewer can close behind our back (Esc, backdrop click) — refresh an
   // open menu so its pressed states and exit item stay honest.
@@ -1242,3 +1282,4 @@ export function updateLauncher(snapshot: { primary?: HTMLVideoElement | null } =
 }
 
 document.addEventListener(VIEWER_LAYOUT_EVENT, () => updateLauncher(), listenerOptions());
+document.addEventListener(VIEWER_RAISE_EVENT, raiseHostPopover, listenerOptions());

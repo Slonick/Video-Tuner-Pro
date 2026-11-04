@@ -111,20 +111,26 @@ export function mountSideChat(overlay: HTMLElement, cb: SideChatCallbacks): Side
     const startX = e.clientX;
     const startW = col.getBoundingClientRect().width;
     let lastW = Math.round(startW);
+    let moved = false;
+    // One controller per gesture: whichever of pointerup/pointercancel ends it
+    // drops all three listeners, so no leftover handler replays on a later one.
+    const gesture = new AbortController();
     const move = (ev: PointerEvent): void => {
+      moved = true;
       lastW = Math.round(
         Math.min(SIDE_CHAT_MAX, Math.max(SIDE_CHAT_MIN, startW + (startX - ev.clientX))),
       );
       cb.onResize(lastW);
     };
     const up = (): void => {
-      grip.removeEventListener("pointermove", move);
-      cb.onResizeEnd(lastW);
+      gesture.abort();
+      if (moved) cb.onResizeEnd(lastW); // a plain press saves nothing
     };
+    const opt = { signal: gesture.signal };
     grip.setPointerCapture(e.pointerId);
-    grip.addEventListener("pointermove", move);
-    grip.addEventListener("pointerup", up, { once: true });
-    grip.addEventListener("pointercancel", up, { once: true });
+    grip.addEventListener("pointermove", move, opt);
+    grip.addEventListener("pointerup", up, opt);
+    grip.addEventListener("pointercancel", up, opt);
   });
   col.append(fallback, frame, grip);
   overlay.appendChild(col);
