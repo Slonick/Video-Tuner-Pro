@@ -3,7 +3,14 @@
 // tab's video. Playwright clicks the controls inside that frame and asserts the
 // real <video> responds. A standalone popup tab can't resolve a video tab; this
 // is the faithful path.
-import { test, expect, setStorage, clearAll, readStored } from "./fixtures/extension.js";
+import {
+  test,
+  expect,
+  setStorage,
+  clearAll,
+  readStored,
+  popupActive,
+} from "./fixtures/extension.js";
 import type { Frame, Page } from "@playwright/test";
 
 const rate = (page: Page) =>
@@ -36,7 +43,7 @@ async function openPopup(page: Page, playVideo = false): Promise<Frame> {
       return !!frame;
     })
     .toBe(true);
-  await frame!.locator("#speedUp").waitFor();
+  await popupActive(frame!);
   await frameSettled(page, frame!);
   return frame!;
 }
@@ -104,7 +111,7 @@ test("the first-open guide can be dismissed and stays dismissed", async ({
       return !!reopened;
     })
     .toBe(true);
-  await reopened!.locator("#speedUp").waitFor();
+  await popupActive(reopened!);
   await expect(reopened!.getByRole("dialog", { name: "Quick tour" })).toHaveCount(0);
 });
 
