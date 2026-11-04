@@ -22,7 +22,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           cp -r src /tmp/src-new
-          rm -rf /tmp/src-old && mkdir /tmp/src-old && git archive 7bea309 src | tar -x -C /tmp/src-old
+          rm -rf /tmp/src-old && mkdir /tmp/src-old && git archive 2087433 src | tar -x -C /tmp/src-old
           run() {
             rm -rf src && cp -r "$1" src
             node build.mjs >/dev/null
