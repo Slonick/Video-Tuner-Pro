@@ -41,14 +41,13 @@ export function App() {
   );
 
   // A disabled site unmounts the cards so their hooks stop messaging and polling
-  // the dormant content script; the site card then is the whole popup. The cards
-  // also wait for the tab: a click before it is known would be sent nowhere.
+  // the dormant content script; the site card then is the whole popup.
   return (
     <>
       <GlassBackdrop />
       <Header />
       <SiteToggle domain={tab?.domain ?? ""} rule={site.rule} onChange={site.setDisabled} />
-      {tab && site.loaded && site.rule === null && <PopupCards tab={tab} />}
+      {site.rule === null && <PopupCards tab={tab} />}
     </>
   );
 }
@@ -104,7 +103,9 @@ function PopupCards({ tab }: { tab: ActiveTab | null }) {
 
   return (
     <>
-      <div className="popup-grid">
+      {/* Laid out at once so the panel keeps its height, but inert until the tab is
+          known: a click before then would be sent to no tab and silently lost. */}
+      <div className="popup-grid" inert={!tab}>
         <div className="group-label">
           <span>{msg("groupVideo") || "Video"}</span>
         </div>

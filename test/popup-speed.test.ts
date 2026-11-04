@@ -28,12 +28,13 @@ describe("speed buttons & readout", () => {
     expect(readout()).toBe("100%");
   });
 
-  it("offers no speed controls until the tab is known, so an early click can't be lost", async () => {
+  it("keeps the controls inert until the tab is known, so an early click can't be lost", async () => {
     const { resolveTab, lastCall } = await mountApp({ tab: YT, deferTab: true });
-    expect(document.getElementById("speedUp")).toBeNull();
+    expect(byId("speedUp").closest("[inert]")).not.toBeNull();
 
     resolveTab();
     await flush();
+    expect(byId("speedUp").closest("[inert]")).toBeNull();
     click("speedUp");
     await flush();
     expect(lastCall("setSpeed")).toMatchObject({ speed: 1.05 });
