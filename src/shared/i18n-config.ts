@@ -23,19 +23,25 @@ export const LOCALE_NAMES: Record<Locale, string> = {
   zh_CN: "中文 (简体)",
 };
 
+export function isLocale(value: unknown): value is Locale {
+  return (LOCALES as readonly unknown[]).includes(value);
+}
+
 // Map a chosen language (or the browser UI language, when "system") to a bundled
-// locale, falling back to English for anything we don't ship.
-export function resolveLocale(lang: Lang, uiLanguage: string): Locale {
-  if (lang !== "system") return lang;
-  const lc = uiLanguage.toLowerCase().replace("_", "-");
+// locale, falling back to English for anything we don't ship. The choice comes
+// from storage, so a value this build doesn't ship (a newer version's locale
+// arriving by sync, a hand-edited backup) counts as "system".
+export function resolveLocale(lang: unknown, uiLanguage: string): Locale {
+  if (isLocale(lang)) return lang;
+  const lc = uiLanguage.toLowerCase();
   if (lc.startsWith("pt")) return "pt_BR";
   if (lc.startsWith("zh")) return "zh_CN";
   const two = lc.slice(0, 2);
-  return (LOCALES as readonly string[]).includes(two) ? (two as Locale) : "en";
+  return isLocale(two) ? two : "en";
 }
 
 export function getLang(cb: (lang: Lang) => void): void {
-  STORE.get(["uiLang"], (r) => cb((r.uiLang as Lang) || "system"));
+  STORE.get(["uiLang"], (r) => cb(isLocale(r.uiLang) ? r.uiLang : "system"));
 }
 
 export function setLang(lang: Lang, done?: () => void): void {

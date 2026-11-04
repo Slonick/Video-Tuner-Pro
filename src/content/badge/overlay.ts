@@ -7,7 +7,7 @@ import { ctxValid } from "../platform/browser.js";
 import { i18n } from "../platform/i18n.js";
 import { fullscreenOverlayHost } from "../platform/fullscreen.js";
 import { primaryVideo } from "../videos.js";
-import { VIEWER_LAYOUT_EVENT, viewerAnchorVideo } from "../viewer.js";
+import { VIEWER_LAYOUT_EVENT, VIEWER_RAISE_EVENT, viewerAnchorVideo } from "../viewer.js";
 import { onStreamPage } from "../live/detection.js";
 import { catchupBufferLimited } from "../live/catchup.js";
 import { forwardBuffer, streamLatency } from "../live/metrics.js";
@@ -97,6 +97,16 @@ function syncBadgePopover(active: boolean): void {
     host.removeAttribute(BADGE_POPOVER_ATTR);
     host.removeAttribute("popover");
   }
+}
+
+// The viewer re-showed its player above every open popover — re-append ours.
+function raiseBadgePopover(): void {
+  const host = badgeHost as PopoverHost | null;
+  try {
+    if (!host?.matches(":popover-open")) return;
+    host.hidePopover?.();
+    host.showPopover?.();
+  } catch {}
 }
 
 // True if a node is our badge — the observer ignores our writes so they don't
@@ -443,5 +453,6 @@ export function updateTimeBadge(
 }
 
 document.addEventListener(VIEWER_LAYOUT_EVENT, scheduleTimeBadgeUpdate, listenerOptions());
+document.addEventListener(VIEWER_RAISE_EVENT, raiseBadgePopover, listenerOptions());
 window.addEventListener("resize", scheduleTimeBadgeUpdate, listenerOptions({ passive: true }));
 window.addEventListener("scroll", scheduleTimeBadgeUpdate, listenerOptions({ passive: true }));

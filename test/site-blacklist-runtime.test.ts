@@ -20,10 +20,14 @@ function video(rate: number): HTMLVideoElement {
   return v;
 }
 
-async function boot(settings: Record<string, unknown>) {
+async function boot(
+  settings: Record<string, unknown>,
+  beforeImport?: (chrome: typeof globalThis.chrome) => void,
+) {
   vi.resetModules();
   const chrome = createMockChrome({ settings });
   globals.chrome = chrome;
+  beforeImport?.(chrome);
   const { teardown } = await import("../src/content/index.js");
   const { S } = await import("../src/content/state.js");
   return { chrome, S, teardown };
@@ -141,5 +145,92 @@ describe("content script on a blacklisted site", () => {
     expect(S.siteDisabled).toBe(false);
     expect(v.playbackRate).toBe(1.5);
     expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+});
+
+// A player iframe belongs to the page embedding it — the site the popup shows, switches
+// off and remembers speeds for — not to the player's own host.
+describe("content script in an embedded player", () => {
+  const realTop = Object.getOwnPropertyDescriptor(window, "top");
+
+  // A youtube.com player framed by news.example. Chromium (and Firefox 148+) list the
+  // embedder in ancestorOrigins; older Firefox has none.
+  function embed(ancestorOrigins?: string[]): void {
+    vi.stubGlobal("location", {
+      hostname: "www.youtube.com",
+      pathname: "/embed/abc",
+      search: "",
+      hash: "",
+      href: "https://www.youtube.com/embed/abc",
+      ancestorOrigins,
+    });
+    Object.defineProperty(window, "top", { value: {}, configurable: true });
+  }
+
+  // Without ancestorOrigins the frame asks the background for its tab (whoami); hold
+  // that reply back until the test gives it.
+  function holdWhoami(chrome: typeof globalThis.chrome): (tabUrl: string) => void {
+    let reply: ((response: unknown) => void) | undefined;
+    const send = chrome.runtime.sendMessage;
+    vi.spyOn(chrome.runtime, "sendMessage").mockImplementation(((...args: unknown[]) => {
+      const [msg, cb] = args as [{ action?: string } | undefined, typeof reply];
+      if (msg?.action === "whoami") reply = cb;
+      else Reflect.apply(send, chrome.runtime, args);
+    }) as unknown as typeof chrome.runtime.sendMessage);
+    return (tabUrl) => reply?.({ tab: { id: 1, url: tabUrl } });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (realTop) Object.defineProperty(window, "top", realTop);
+  });
+
+  it("is switched off with the page embedding it", async () => {
+    embed(["https://www.news.example"]);
+    const v = video(2);
+    const { S, teardown } = await boot({ siteBlacklist: ["news.example"], globalSpeed: 1.5 });
+    stop = teardown;
+
+    expect(S.siteDisabled).toBe(true);
+    expect(v.playbackRate).toBe(2);
+  });
+
+  it("stays on when only its own host is listed, at the speed saved for the embedding page", async () => {
+    embed(["https://www.news.example"]);
+    const v = video(1);
+    const { S, teardown } = await boot({
+      siteBlacklist: ["youtube.com"],
+      domains: { "news.example": 1.25, "youtube.com": 2 },
+    });
+    stop = teardown;
+
+    expect(S.siteDisabled).toBe(false);
+    expect(v.playbackRate).toBe(1.25);
+  });
+
+  it("without ancestorOrigins, leaves the page alone until the background names the tab", async () => {
+    embed();
+    const v = video(2);
+    let answer: (tabUrl: string) => void = () => {};
+    const { chrome, S, teardown } = await boot(
+      { siteBlacklist: ["news.example"], domains: { "news.example": 1.25, "youtube.com": 1.75 } },
+      (c) => {
+        answer = holdWhoami(c);
+      },
+    );
+    stop = teardown;
+    v.dispatchEvent(new Event("loadedmetadata"));
+    v.dispatchEvent(new Event("play"));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(v.playbackRate).toBe(2);
+
+    answer("https://www.news.example/article");
+    expect(S.siteDisabled).toBe(true);
+    expect(v.playbackRate).toBe(2);
+
+    // Switched back on: the embedding page's saved speed applies, not the player host's.
+    writeBlacklist(chrome, []);
+    expect(S.siteDisabled).toBe(false);
+    expect(v.playbackRate).toBe(1.25);
   });
 });

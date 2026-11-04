@@ -1,9 +1,9 @@
 // Content script entry. Imported modules register their own listeners/samplers
 // as a side effect of being imported.
 import { api, ctxValid } from "./platform/browser.js";
-import { STORE, OUR_AREAS, whenReady } from "./platform/storage.js";
+import { STORE, routedChanges, whenReady } from "./platform/storage.js";
 import { clamp, clampTarget } from "./core/clamp.js";
-import { getDomain } from "./core/domain.js";
+import { getDomain, whenDomainReady } from "./core/domain.js";
 import {
   resolveSpeed,
   resolveSyncTarget,
@@ -14,6 +14,7 @@ import {
 } from "./core/resolve.js";
 import { normalizePresetSet } from "../shared/presets.js";
 import { isSiteBlacklisted, normalizeSiteList } from "../shared/site-blacklist.js";
+import { QUALITY_BRIDGE_LOAD_EVENT, QUALITY_BRIDGE_READY_EVENT } from "../shared/dom-events.js";
 import { S } from "./state.js";
 import { applyAll, reassertRate, resetMedia } from "./speed.js";
 import { controlLive } from "./live/sync.js";
@@ -33,7 +34,12 @@ import {
 } from "./viewer.js";
 import { REGISTRY_KEYS, loadRegistry, applyRegistryChanges } from "./settings/registry.js";
 import { audioSamplingReady, recordAudioSample, A_HIST_MS } from "./audio/metering.js";
-import { autoSlowSample, AUTOSLOW_MS, releaseAutoSlow } from "./audio/autoslow.js";
+import {
+  autoSlowSample,
+  autoSlowSamplingReady,
+  AUTOSLOW_MS,
+  releaseAutoSlow,
+} from "./audio/autoslow.js";
 import { applyResolvedAutoSlowFromStore } from "./audio/autoslow-config.js";
 import { applyResolvedViewerAutoFromStore } from "./viewer-auto.js";
 import { applyResolvedViewerFitFromStore } from "./viewer-fit.js";
@@ -75,17 +81,40 @@ if (window.top === window && api.runtime?.onMessage) {
 // overlay chat panel (marked by a URL hash), where it restyles the chat page.
 initChatFrameSkin();
 
-try {
-  const getURL = api.runtime?.getURL;
-  if (typeof getURL === "function") {
-    document.documentElement.setAttribute(
-      "data-vtp-quality-bridge-url",
-      getURL("quality-inject.js"),
-    );
-  }
-} catch (e) {
-  /* orphaned or mocked extension context */
-}
+// The MAIN-world quality loader asks for its heavy bridge the first time the viewer
+// wants quality data; the background injects it into this frame. One request at a
+// time and none after a success, so a page can't make us spam injections.
+let qualityBridgeRequested = false;
+document.addEventListener(
+  QUALITY_BRIDGE_LOAD_EVENT,
+  () => {
+    if (qualityBridgeRequested) return;
+    qualityBridgeRequested = true;
+    let settled = false;
+    const finish = (response?: { ok?: boolean } | null) => {
+      if (settled) return;
+      settled = true;
+      void api.runtime.lastError;
+      if (response?.ok !== true) {
+        qualityBridgeRequested = false;
+        return;
+      }
+      document.dispatchEvent(new Event(QUALITY_BRIDGE_READY_EVENT));
+    };
+    try {
+      const result = api.runtime.sendMessage(
+        { action: "injectQualityBridge" },
+        finish,
+      ) as unknown as Promise<{ ok?: boolean } | undefined> | undefined;
+      if (result && typeof result.then === "function") {
+        void result.then(finish, () => finish(null));
+      }
+    } catch (e) {
+      finish(null);
+    }
+  },
+  listenerOptions(),
+);
 
 let liveTick: ReturnType<typeof setTimeout> | null = null;
 let audioSampler: ReturnType<typeof setInterval> | null = null;
@@ -165,8 +194,10 @@ function syncBufferSampler(stream = onStreamPage()) {
   }
 }
 
-function syncAutoSlowSampler(): void {
-  if (S.autoSlowEnabled && !document.hidden) {
+// Only while the main video feeds an analyser: without one every sample would just
+// hand the rate back, and the timer would run in every frame of every visible tab.
+function syncAutoSlowSampler(primary?: HTMLVideoElement | null): void {
+  if (S.autoSlowEnabled && !document.hidden && autoSlowSamplingReady(primary)) {
     if (autoSlowSampler == null) autoSlowSampler = setInterval(autoSlowSample, AUTOSLOW_MS);
   } else if (autoSlowSampler != null) {
     clearInterval(autoSlowSampler);
@@ -214,6 +245,9 @@ function startRuntime(): void {
     document.addEventListener("DOMContentLoaded", startObserver, listenerOptions());
   }
   if (!document.hidden) startTimers();
+  // A media event before the first settings read only noted its badge flash: nothing
+  // may touch the page's media until the site is known to be on.
+  if (mediaShouldFlashBadge) scheduleMediaPass(false);
 }
 
 // Flip the per-site kill switch (S.siteDisabled). Going inert hands the page back as
@@ -413,8 +447,9 @@ function preferKnownChannelKeys(keys: string[]): string[] {
 }
 
 // Wait for the selective-sync config so the first resolve reads each setting from
-// the area it actually lives in (an opted-out category is in local, not sync).
-whenReady(loadSpeed);
+// the area it actually lives in (an opted-out category is in local, not sync) — and,
+// in a subframe, for the tab's host, which picks the blacklist entry and site values.
+whenDomainReady(() => whenReady(loadSpeed));
 
 // Steady background tick: re-assert speed and drive live-sync (a backstop — most
 // re-applies are now event-driven). Self-reschedules so the cadence can back off on
@@ -441,6 +476,7 @@ function tick() {
   updateTimeBadge({ video: primary, stream });
   updateLauncher({ primary });
   syncAudioSampler();
+  syncAutoSlowSampler(primary);
   const keys = channelKeys();
   if (keys.length && !sameChannelKeys(lastChannelKeys, keys))
     reresolve(preferKnownChannelKeys(keys));
@@ -476,7 +512,7 @@ function wake(delay = 0) {
 
 function scheduleMediaPass(flashBadgeAfterApply: boolean): void {
   mediaShouldFlashBadge = mediaShouldFlashBadge || flashBadgeAfterApply;
-  if (mediaScheduled) return;
+  if (mediaScheduled || !running) return; // not before the first settings read (startRuntime)
   mediaScheduled = true;
   requestAnimationFrame(() => {
     mediaScheduled = false;
@@ -617,7 +653,8 @@ window.addEventListener(
       teardown();
       return;
     }
-    if (S.siteDisabled) return;
+    // Off, or the first settings read is pending — tracking starts with a full scan.
+    if (!running) return;
     if (reconcile()) scheduleReapply();
   },
   listenerOptions({ once: true }),
@@ -625,10 +662,10 @@ window.addEventListener(
 
 // React instantly when settings change in the popup.
 function handleStorageChange(
-  changes: Record<string, chrome.storage.StorageChange>,
+  areaChanges: Record<string, chrome.storage.StorageChange>,
   area: string,
 ): void {
-  if (!OUR_AREAS.has(area)) return;
+  const changes = routedChanges(areaChanges, area);
   if (changes.siteBlacklist) {
     const wasDisabled = S.siteDisabled;
     setSiteDisabled(
@@ -646,7 +683,9 @@ function handleStorageChange(
         | undefined) || {};
     S.overlayPanelPos = map[getDomain()] || null;
   }
-  if (S.siteDisabled) return;
+  // Off, or the first settings read is still pending — it reads every value fresh, and
+  // nothing may touch the page's media before it says the site is on.
+  if (!running) return;
   if (changes.liveSync) S.liveSyncEnabled = !!changes.liveSync.newValue;
   // Any allowed-delay scope key changed → re-resolve the chain (also re-runs
   // controlLive). The legacy liveSyncTarget is folded in as the old global.

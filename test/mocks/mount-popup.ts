@@ -64,6 +64,8 @@ interface MountOptions {
   settings?: Record<string, unknown>;
   replies?: Record<string, unknown>;
   failSetKeys?: string[];
+  // Hold the active-tab lookup until `resolveTab()` (the popup's first moments).
+  deferTab?: boolean;
 }
 
 export interface Mounted {
@@ -72,6 +74,7 @@ export interface Mounted {
   saved: () => Record<string, unknown>;
   lastCall: (action: string) => Record<string, unknown> | undefined;
   emitRuntimeMessage: (msg: Record<string, unknown>, sender?: Record<string, unknown>) => void;
+  resolveTab: () => void;
 }
 
 let root: Root | null = null;
@@ -168,6 +171,17 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
     }
     cb?.(undefined);
   }) as unknown as typeof chrome.runtime.sendMessage);
+  let pendingTab: (() => void) | null = null;
+  if (opts.deferTab) {
+    const nativeQuery = chrome.tabs.query.bind(chrome.tabs);
+    vi.spyOn(chrome.tabs, "query").mockImplementation(((
+      q: chrome.tabs.QueryInfo,
+      cb: (tabs: chrome.tabs.Tab[]) => void,
+    ) => {
+      pendingTab = () => nativeQuery(q, cb);
+    }) as unknown as typeof chrome.tabs.query);
+  }
+  const resolveTab = () => act(() => pendingTab?.());
 
   // Re-import the popup graph fresh so platform/browser's `api` binds to this mock.
   vi.resetModules();
@@ -206,5 +220,5 @@ export async function mountApp(opts: MountOptions = {}): Promise<Mounted> {
     });
   };
 
-  return { replies, sendSpy, saved, lastCall, emitRuntimeMessage };
+  return { replies, sendSpy, saved, lastCall, emitRuntimeMessage, resolveTab };
 }

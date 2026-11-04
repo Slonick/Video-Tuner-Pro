@@ -89,6 +89,31 @@ describe("persist", () => {
     persistGlobalAutoSlow({ target: 9 });
     expect(get(["autoSlowGlobal"]).autoSlowGlobal).toEqual({ target: 9 });
   });
+
+  it.each<[string, typeof persistSiteAutoSlow]>([
+    ["site", persistSiteAutoSlow],
+    ["channel", persistChannelAutoSlow],
+    ["global", persistGlobalAutoSlow],
+  ])("refuses a %s write from a subframe and reports failure", (_scope, persist) => {
+    h.keys = ["UC1"];
+    Object.defineProperty(window, "top", { value: {}, configurable: true });
+    const done = vi.fn();
+
+    persist({ target: 8 }, done);
+    persist({ target: 8 }); // no callback: still a quiet no-op
+
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(done).toHaveBeenCalledWith(false);
+    expect(sites()).toEqual({});
+    expect(channels()).toEqual({});
+    expect(get(["autoSlowGlobal"]).autoSlowGlobal).toBeUndefined();
+  });
+
+  it("reports failure when there is no channel to write", () => {
+    const done = vi.fn();
+    persistChannelAutoSlow({ target: 6 }, done);
+    expect(done).toHaveBeenCalledWith(false);
+  });
 });
 
 // Only the TARGET resolves per scope now; the enable is a separate global flag.
@@ -115,6 +140,15 @@ describe("applyResolvedAutoSlowFromStore", () => {
     applyResolvedAutoSlowFromStore();
     expect(S.autoSlowScope).toBe(null);
     expect(S.autoSlowTarget).toBe(6);
+  });
+
+  it("falls back to the global bundle and confirms once resolved", () => {
+    STORE.set({ autoSlowGlobal: { target: 9 } });
+    const done = vi.fn();
+    applyResolvedAutoSlowFromStore(done);
+    expect(S.autoSlowTarget).toBe(9);
+    expect(S.autoSlowScope).toBe("global");
+    expect(done).toHaveBeenCalledWith(true);
   });
 });
 
@@ -163,6 +197,57 @@ describe("resetAutoSlowScope", () => {
     expect(done).toHaveBeenCalledWith(false);
     expect(channels()).toEqual({ UC1: { target: 6 } });
   });
+
+  it("re-resolves to the next scope in the chain and confirms", () => {
+    STORE.set({ autoSlowSites: { localhost: { target: 8 } }, autoSlowGlobal: { target: 7 } });
+    applyResolvedAutoSlowFromStore();
+    expect(S.autoSlowScope).toBe("site");
+    const done = vi.fn();
+
+    resetAutoSlowScope("site", done);
+
+    expect(S.autoSlowScope).toBe("global");
+    expect(S.autoSlowTarget).toBe(7);
+    expect(done).toHaveBeenCalledWith(true);
+  });
+
+  it("reports a failed clear without re-resolving", () => {
+    STORE.set({ autoSlowSites: { localhost: { target: 8 } } });
+    applyResolvedAutoSlowFromStore();
+    const failing = (_msg: unknown, reply?: (r: unknown) => void) => reply?.({ success: false });
+    const send = vi.spyOn(globalThis.chrome.runtime, "sendMessage");
+    send.mockImplementation(failing as never);
+    try {
+      const done = vi.fn();
+      resetAutoSlowScope("site", done);
+      expect(done).toHaveBeenCalledTimes(1);
+      expect(done).toHaveBeenCalledWith(false);
+      expect(sites()).toEqual({ localhost: { target: 8 } });
+      expect(S.autoSlowScope).toBe("site");
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it("tolerates a missing callback when a clear fails asynchronously", () => {
+    vi.useFakeTimers();
+    const failing = (_msg: unknown, reply?: (r: unknown) => void) => {
+      setTimeout(() => reply?.({ success: false }), 0);
+    };
+    const send = vi.spyOn(globalThis.chrome.runtime, "sendMessage");
+    send.mockImplementation(failing as never);
+    try {
+      resetAutoSlowScope("site");
+      expect(() => vi.runAllTimers()).not.toThrow();
+    } finally {
+      send.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("tolerates a missing callback when there is no channel to clear", () => {
+    expect(() => resetAutoSlowScope("channel")).not.toThrow();
+  });
 });
 
 describe("setAutoSlowPreview", () => {
@@ -185,6 +270,30 @@ describe("dead extension context", () => {
       expect(done).toHaveBeenNthCalledWith(1, false);
       expect(done).toHaveBeenNthCalledWith(2, false);
       expect(get(["autoSlowGlobal"]).autoSlowGlobal).toBeUndefined();
+    } finally {
+      runtime.id = saved;
+    }
+  });
+
+  it("refuses channel writes and scope clears, tolerating missing callbacks, when the runtime id disappears", () => {
+    STORE.set({ autoSlowSites: { localhost: { target: 8 } } });
+    h.keys = ["UC1"];
+    const done = vi.fn();
+    const runtime = globalThis.chrome.runtime as { id?: string };
+    const saved = runtime.id;
+    runtime.id = undefined;
+    try {
+      persistChannelAutoSlow({ target: 7 }, done);
+      resetAutoSlowScope("site", done);
+      expect(done).toHaveBeenNthCalledWith(1, false);
+      expect(done).toHaveBeenNthCalledWith(2, false);
+      expect(channels()).toEqual({});
+      expect(sites()).toEqual({ localhost: { target: 8 } });
+      expect(() => {
+        resetAutoSlowScope("site");
+        applyResolvedAutoSlowFromStore();
+        persistGlobalAutoSlow({ target: 8 });
+      }).not.toThrow();
     } finally {
       runtime.id = saved;
     }

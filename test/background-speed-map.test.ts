@@ -13,21 +13,24 @@ const h = vi.hoisted(() => ({
     key: string;
     callback: (items: Record<string, unknown>) => void;
   }>,
+  writeOk: true,
+  getError: null as Error | null,
 }));
 
 vi.mock("../src/shared/store.js", () => ({
   STORE: {
     get(keys: string[], callback: (items: Record<string, unknown>) => void) {
+      if (h.getError) throw h.getError;
       const key = keys[0];
       h.pendingGets.push({ key, callback });
     },
     set(obj: Record<string, Record<string, number>>, callback?: (ok?: boolean) => void) {
-      Object.assign(h.values, obj);
-      callback?.(true);
+      if (h.writeOk) Object.assign(h.values, obj);
+      callback?.(h.writeOk);
     },
     remove(key: string, callback?: (ok?: boolean) => void) {
-      delete h.values[key];
-      callback?.(true);
+      if (h.writeOk) delete h.values[key];
+      callback?.(h.writeOk);
     },
   },
   whenReady(callback: () => void) {
@@ -51,12 +54,20 @@ const flush = async () => {
   await Promise.resolve();
 };
 
+// Answers the oldest queued read with what storage holds for the key it asked for.
+function answerGet() {
+  const { key, callback } = h.pendingGets.shift()!;
+  callback(key in h.values ? { [key]: { ...h.values[key] } } : {});
+}
+
 describe("background stored-map mutations", () => {
   beforeEach(async () => {
     vi.resetModules();
     h.listener = null;
     h.values = { domains: { existing: 1 } };
     h.pendingGets = [];
+    h.writeOk = true;
+    h.getError = null;
     (globalThis as unknown as { browser?: unknown }).browser = undefined;
     (globalThis as unknown as { chrome: unknown }).chrome = {
       runtime: {
@@ -148,6 +159,21 @@ describe("background stored-map mutations", () => {
     expect(h.pendingGets).toHaveLength(0);
   });
 
+  it("rounds a dragged position to four decimals before storing it", async () => {
+    const position = { fx: 0.123456789, fy: 0.333333333 };
+    h.listener?.(
+      { action: "mutateStoredMap", map: "badgePos", set: { "one.example": position } },
+      {},
+      () => {},
+    );
+
+    await flush();
+    h.pendingGets.shift()!.callback({});
+    await flush();
+
+    expect(h.values.badgePos).toEqual({ "one.example": { fx: 0.1235, fy: 0.3333 } });
+  });
+
   it("serializes clearing a whole map with adjacent writes", async () => {
     h.values.domains = { old: 1 };
     const responses: unknown[] = [];
@@ -169,5 +195,95 @@ describe("background stored-map mutations", () => {
 
     expect(h.values.domains).toEqual({ fresh: 1.5 });
     expect(responses).toEqual([{ success: true }, { success: true }]);
+  });
+
+  it.each([
+    ["an unknown map", { map: "evil", set: { "a.example": { fx: 0.5, fy: 0.5 } } }],
+    ["only unsafe keys to remove", { map: "domains", remove: [5, "__proto__", ""] }],
+    ["nothing to write", { map: "domains", set: null }],
+  ])("rejects a mutation with %s without touching storage", async (_case, mutation) => {
+    const responses: unknown[] = [];
+    h.listener?.({ action: "mutateStoredMap", ...mutation }, {}, (response) =>
+      responses.push(response),
+    );
+
+    expect(responses).toEqual([{ success: false }]);
+    await flush();
+    expect(h.pendingGets).toHaveLength(0);
+  });
+
+  it("removes the listed entries, skipping keys that are not safe strings", async () => {
+    h.values.domains = { "gone.example": 1.5, "5": 2, "kept.example": 1.25 };
+    const responses: unknown[] = [];
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", remove: ["gone.example", 5] },
+      {},
+      (response) => responses.push(response),
+    );
+
+    await flush();
+    answerGet();
+
+    await vi.waitFor(() => expect(responses).toEqual([{ success: true }]));
+    expect(h.values.domains).toEqual({ "5": 2, "kept.example": 1.25 });
+  });
+
+  it("drops the whole map once its last entry is removed", async () => {
+    h.values.domains = { "only.example": 1.5 };
+    const responses: unknown[] = [];
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", remove: ["only.example"] },
+      {},
+      (response) => responses.push(response),
+    );
+
+    await flush();
+    answerGet();
+
+    await vi.waitFor(() => expect(responses).toEqual([{ success: true }]));
+    expect(h.values).not.toHaveProperty("domains");
+  });
+
+  it("reports a write or a clear that storage refused", async () => {
+    h.writeOk = false;
+    const responses: unknown[] = [];
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", set: { "one.example": 1.25 } },
+      {},
+      (response) => responses.push(response),
+    );
+    await flush();
+    answerGet();
+    await vi.waitFor(() => expect(responses).toEqual([{ success: false }]));
+
+    h.listener?.({ action: "mutateStoredMap", map: "domains", clear: true }, {}, (response) =>
+      responses.push(response),
+    );
+
+    await vi.waitFor(() => expect(responses).toEqual([{ success: false }, { success: false }]));
+    expect(h.values.domains).toEqual({ existing: 1 });
+  });
+
+  it("answers a write whose storage read throws, then keeps serving the map", async () => {
+    h.getError = new Error("Extension context invalidated.");
+    const responses: unknown[] = [];
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", set: { "one.example": 1.25 } },
+      {},
+      (response) => responses.push(response),
+    );
+    await vi.waitFor(() => expect(responses).toEqual([{ success: false }]));
+
+    h.getError = null;
+    h.listener?.(
+      { action: "mutateStoredMap", map: "domains", set: { "two.example": 1.5 } },
+      {},
+      (response) => responses.push(response),
+    );
+    await flush();
+    answerGet();
+
+    await vi.waitFor(() => expect(responses).toEqual([{ success: false }, { success: true }]));
+    expect(h.values.domains).toEqual({ existing: 1, "two.example": 1.5 });
   });
 });

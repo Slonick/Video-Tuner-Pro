@@ -5,7 +5,9 @@ export function forwardBuffer(video: HTMLVideoElement): number {
   const t = video.currentTime;
   try {
     for (let i = 0; i < b.length; i++) {
-      if (t >= b.start(i) - 0.25 && t <= b.end(i) + 0.25) return b.end(i) - t;
+      // A range ending at or behind the playhead has nothing ahead of it; the next one
+      // may start within the tolerance (a tiny gap the player is about to jump).
+      if (t >= b.start(i) - 0.25 && t < b.end(i)) return b.end(i) - t;
     }
   } catch (e) {
     /* ignore */

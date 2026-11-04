@@ -23,6 +23,12 @@ const I_SIDE =
 const I_OVERLAY =
   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="6" y="11" width="8" height="6" rx="1.5" fill="currentColor" stroke="none" opacity=".85"/></svg>';
 
+// Static, trusted icon markup via DOMParser — the AMO linter flags innerHTML.
+function appendIcon(el: HTMLElement, svg: string): void {
+  const body = new DOMParser().parseFromString(svg, "text/html").body;
+  while (body.firstChild) el.appendChild(body.firstChild);
+}
+
 export interface ChatFab {
   host: HTMLElement;
   // Pin the button inside the video box's top-right corner. `right` is the
@@ -91,7 +97,7 @@ export function mountChatFab(
   fab.className = "fab";
   fab.title = i18n("chatModeLabel") || "Stream chat";
   fab.setAttribute("aria-label", i18n("chatModeLabel") || "Stream chat");
-  fab.innerHTML = I_CHAT;
+  appendIcon(fab, I_CHAT);
   const mkMode = (
     cls: string,
     svg: string,
@@ -102,7 +108,7 @@ export function mountChatFab(
     b.className = `mode ${cls}`;
     b.title = label;
     b.setAttribute("aria-label", label);
-    b.innerHTML = svg;
+    appendIcon(b, svg);
     b.addEventListener("click", () => setMode(mode));
     return b;
   };

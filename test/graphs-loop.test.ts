@@ -17,6 +17,8 @@ function canvas(id: string): HTMLCanvasElement {
   return el;
 }
 
+const guides = () => ({ threshold: -60, target: 5 });
+
 describe("setupGraphs", () => {
   it("does not start polling when the required canvases are not mounted yet", async () => {
     const startPoll = vi.fn(() => () => {});
@@ -27,6 +29,7 @@ describe("setupGraphs", () => {
       () => 1,
       () => {},
       () => {},
+      guides,
     );
     stop();
 
@@ -59,6 +62,7 @@ describe("setupGraphs", () => {
       () => 1,
       () => {},
       () => {},
+      guides,
     );
     await vi.advanceTimersByTimeAsync(1000);
     stop();
@@ -95,6 +99,7 @@ describe("setupGraphs", () => {
       () => 1,
       () => {},
       () => {},
+      guides,
     );
     await vi.advanceTimersByTimeAsync(100);
     const frames = drawAudio.mock.calls.length;
@@ -107,6 +112,47 @@ describe("setupGraphs", () => {
     expect(drawAutoSlow).toHaveBeenCalledTimes(frames);
     expect(cancel).toHaveBeenCalled();
     expect(drawAudio.mock.calls.length).toBe(frames);
+  });
+
+  // The threshold / target sliders are React state, not form inputs — the frame
+  // must draw whatever the getter currently reports, not a DOM read.
+  it("draws the guide lines from the latest getter values", async () => {
+    vi.useFakeTimers();
+    const drawAudio = vi.fn();
+    const drawBuffer = vi.fn();
+    vi.doMock("../src/popup/graphs/audio-meter.js", () => ({ drawAudio }));
+    vi.doMock("../src/popup/graphs/latency-graph.js", () => ({ drawBuffer }));
+    vi.doMock("../src/popup/graphs/autoslow-graph.js", () => ({ drawAutoSlow: vi.fn() }));
+    vi.doMock("../src/popup/graphs/poll.js", () => ({ startPoll: () => () => {} }));
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn((cb: FrameRequestCallback) => Number(setTimeout(() => cb(Date.now()), 16))),
+    );
+    vi.stubGlobal(
+      "cancelAnimationFrame",
+      vi.fn((id: number) => clearTimeout(id)),
+    );
+    canvas("audioMeter");
+    canvas("bufferMeter");
+    const current = { threshold: -30, target: 7 };
+
+    const { setupGraphs } = await import("../src/popup/graphs/index.js");
+    const stop = setupGraphs(
+      () => 1,
+      () => {},
+      () => {},
+      () => current,
+    );
+    await vi.advanceTimersByTimeAsync(20);
+    expect(drawAudio.mock.calls.at(-1)?.[2]).toBe(-30);
+    expect(drawBuffer.mock.calls.at(-1)?.[2]).toBe(7);
+
+    current.threshold = -12;
+    current.target = 15;
+    await vi.advanceTimersByTimeAsync(300);
+    stop();
+    expect(drawAudio.mock.calls.at(-1)?.[2]).toBe(-12);
+    expect(drawBuffer.mock.calls.at(-1)?.[2]).toBe(15);
   });
 
   // The audio/speech windows are short (6s/8s), so a throttled sample makes the
@@ -158,6 +204,7 @@ describe("setupGraphs", () => {
       () => 1,
       () => {},
       () => {},
+      guides,
     );
     await vi.advanceTimersByTimeAsync(16 * 10);
     stop();

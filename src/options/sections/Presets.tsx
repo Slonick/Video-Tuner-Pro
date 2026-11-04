@@ -222,6 +222,8 @@ export function Presets() {
               onDragStart={(e) => {
                 setDragIdx(i);
                 e.dataTransfer.effectAllowed = "move";
+                // Firefox won't start a drag whose dataTransfer carries no data.
+                e.dataTransfer.setData("text/plain", String(i));
               }}
               onDragOver={(e) => {
                 e.preventDefault();

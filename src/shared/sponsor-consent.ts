@@ -23,17 +23,12 @@ function firefoxPermissions(): FirefoxPermissionsApi | null {
       };
     }
   ).browser;
-  const manifest = browser?.runtime?.getManifest?.();
+  if (!browser) return null;
+  const manifest = browser.runtime?.getManifest?.();
   const browserSettings = manifest?.browser_specific_settings;
-  if (
-    !browserSettings ||
-    typeof browserSettings !== "object" ||
-    !(browserSettings as { gecko?: unknown }).gecko
-  ) {
-    return null;
-  }
-  const candidate = browser?.permissions;
-  if (!candidate || typeof candidate !== "object") return null;
+  if (!browserSettings || !(browserSettings as { gecko?: unknown }).gecko) return null;
+  const candidate = browser.permissions;
+  if (!candidate) return null;
   const permissions = candidate as Partial<FirefoxPermissionsApi>;
   if (
     typeof permissions.getAll !== "function" ||

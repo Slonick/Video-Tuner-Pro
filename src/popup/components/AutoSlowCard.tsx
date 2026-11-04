@@ -36,6 +36,7 @@ export const AutoSlowCard = memo(function AutoSlowCard({
   const slotRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const k = useAutoSlowKnobs();
+  const locked = live || blocked;
   // Openable even when off — the target rate + knobs are still worth configuring;
   // only a locked card (live stream / no audio access) can't be.
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !live && !blocked);
@@ -69,7 +70,13 @@ export const AutoSlowCard = memo(function AutoSlowCard({
           {live && (
             <InfoTip warn id="autoSlowLiveWarn" label="Live stream" tip={msg("autoSlowLiveNote")} />
           )}
-          <StoredToggle id="autoSlowToggle" storageKey="autoSlowEnabled" defaultOn={false} />
+          <StoredToggle
+            id="autoSlowToggle"
+            storageKey="autoSlowEnabled"
+            defaultOn={false}
+            ariaLabel={msg("autoSlowLabel") || "Auto-slow dense speech"}
+            disabled={live}
+          />
         </div>
 
         <div className="meter autoslow always">
@@ -104,6 +111,7 @@ export const AutoSlowCard = memo(function AutoSlowCard({
             max={12}
             step={0.5}
             value={a.target}
+            disabled={locked}
             ariaLabel={msg("meterTarget") || "Target rate"}
             ariaValueText={`${a.target.toFixed(1)} /s`}
             onChange={(v) => a.setTarget(v)}
@@ -153,8 +161,10 @@ export const AutoSlowCard = memo(function AutoSlowCard({
                 step={5}
                 value={k.floor}
                 animate={false}
+                disabled={locked}
                 fmt={(v) => Math.round(v) + "%"}
-                onChange={k.setFloor}
+                onChange={k.previewFloor}
+                onCommit={k.setFloor}
               />
               <ParamSlider
                 id="asKnee"
@@ -167,8 +177,10 @@ export const AutoSlowCard = memo(function AutoSlowCard({
                 tickStep={0.5}
                 value={k.knee}
                 animate={false}
+                disabled={locked}
                 fmt={(v) => "±" + v.toFixed(1) + " /s"}
-                onChange={k.setKnee}
+                onChange={k.previewKnee}
+                onCommit={k.setKnee}
               />
             </div>
           </div>

@@ -61,7 +61,13 @@ export const LiveSyncCard = memo(function LiveSyncCard({ sync: ls, live, forceOp
               <span className="switch-sub">{msg("syncSubtitle")}</span>
             </span>
           </Button>
-          <Switch id="liveSyncToggle" checked={ls.enabled} onChange={onToggle} />
+          <Switch
+            id="liveSyncToggle"
+            checked={ls.enabled}
+            ariaLabel={msg("syncTitle")}
+            disabled={!live}
+            onChange={onToggle}
+          />
         </div>
 
         <div className="meter buffer always">
@@ -96,6 +102,7 @@ export const LiveSyncCard = memo(function LiveSyncCard({ sync: ls, live, forceOp
             max={30}
             step={1}
             value={ls.target}
+            disabled={!live}
             ariaLabel={msg("allowedDelay") || "Allowed delay"}
             ariaValueText={`${ls.target} ${msg("secondsShort")}`}
             onChange={(v) => ls.previewTarget(v)}
@@ -139,7 +146,13 @@ export const LiveSyncCard = memo(function LiveSyncCard({ sync: ls, live, forceOp
             <div className="list-group">
               <div className="extra-row">
                 <span>{msg("onStreamLabel")}</span>
-                <StoredToggle id="onStreamToggle" storageKey="streamBadge" defaultOn />
+                <StoredToggle
+                  id="onStreamToggle"
+                  storageKey="streamBadge"
+                  defaultOn
+                  ariaLabel={msg("onStreamLabel")}
+                  disabled={!live}
+                />
               </div>
 
               {/* Super theater for streams — its own setting (superTheaterStream),
@@ -154,6 +167,8 @@ export const LiveSyncCard = memo(function LiveSyncCard({ sync: ls, live, forceOp
                   id="superTheaterToggleStream"
                   storageKey="superTheaterStream"
                   defaultOn={false}
+                  ariaLabel={msg("superTheaterLabel")}
+                  disabled={!live}
                 />
               </div>
             </div>

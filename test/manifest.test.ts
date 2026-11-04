@@ -5,6 +5,13 @@ interface Manifest {
   version?: string;
   permissions?: string[];
   content_security_policy?: { extension_pages?: string };
+  content_scripts?: Array<{
+    matches?: string[];
+    js?: string[];
+    run_at?: string;
+    all_frames?: boolean;
+    world?: string;
+  }>;
   web_accessible_resources?: Array<{
     resources?: string[];
     use_dynamic_url?: boolean;
@@ -44,11 +51,24 @@ describe("extension manifest hardening", () => {
     );
   });
 
-  it("serves exposed resources through a per-session dynamic URL", () => {
-    const exposed = manifest.web_accessible_resources?.find((entry) =>
-      entry.resources?.includes("quality-inject.js"),
-    );
-    expect(exposed?.use_dynamic_url).toBe(true);
+  it("exposes only the overlay popup to pages, through a per-session dynamic URL", () => {
+    const exposed = manifest.web_accessible_resources ?? [];
+    expect(exposed.flatMap((entry) => entry.resources ?? [])).toEqual(["popup/popup.html"]);
+    expect(exposed.every((entry) => entry.use_dynamic_url === true)).toBe(true);
+  });
+
+  it("injects every content script at document_start in all frames, in the right world", () => {
+    const entry = (file: string) => manifest.content_scripts?.find((cs) => cs.js?.includes(file));
+    for (const file of ["content.js", "inject.js", "page-bridge.js"]) {
+      expect(entry(file)?.run_at, file).toBe("document_start");
+      expect(entry(file)?.all_frames, file).toBe(true);
+    }
+    expect(entry("content.js")?.world).toBeUndefined();
+    expect(entry("content.js")?.matches).toEqual(["<all_urls>"]);
+    expect(entry("page-bridge.js")?.world).toBe("MAIN");
+    expect(entry("page-bridge.js")?.matches).toEqual(["<all_urls>"]);
+    expect(entry("inject.js")?.world).toBe("MAIN");
+    expect(entry("inject.js")?.matches?.length).toBeGreaterThan(0);
   });
 
   it("declares SponsorBlock browsing data as optional in Firefox", () => {

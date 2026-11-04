@@ -37,14 +37,6 @@ export function isYouTube(hostname: string = location.hostname): boolean {
   return /(^|\.)youtube(-nocookie)?\.com$/.test(hostname) || hostname === "youtu.be";
 }
 
-export function hasNativeSponsorBlock(root: ParentNode = document): boolean {
-  return !!(
-    root.querySelector("#sponsorblock-document-script") ||
-    root.querySelector("#previewbar.sbNotInvidious") ||
-    root.querySelector("#sponsorBlockDurationAfterSkips")
-  );
-}
-
 // The watch-page video id ("v" param, /shorts/, /embed/, youtu.be short links).
 export function youTubeVideoId(href: string = location.href): string | null {
   try {

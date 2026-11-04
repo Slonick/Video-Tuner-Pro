@@ -54,8 +54,8 @@ export const STEP_MAX = 50;
 // "holdSpeed" (integer percent); default 200% (2×).
 export const HOLD_SPEED_DEFAULT = 200;
 
-function clampPct(v: number, fallback: number): number {
-  if (!Number.isFinite(v)) return fallback;
+// Callers pass only finite values.
+function clampPct(v: number): number {
   const stepped = Math.round(v / STEP) * STEP;
   return Math.min(PRESET_MAX, Math.max(PRESET_MIN, stepped));
 }
@@ -78,27 +78,15 @@ export function normalizeSpeedStep(raw: unknown): number {
 // Coerce a stored hold-speed value into the preset range (default 200%, snap 5%).
 export function normalizeHoldSpeed(raw: unknown): number {
   const n = Number(raw);
-  if (!Number.isFinite(n)) return HOLD_SPEED_DEFAULT;
-  const stepped = Math.round(n / STEP) * STEP;
-  return Math.min(PRESET_MAX, Math.max(PRESET_MIN, stepped));
-}
-
-// How many presets a stored value yields: the count of finite entries, clamped to
-// [MIN_PRESETS, MAX_PRESETS]; the defaults' length when nothing valid is stored.
-function presetCount(values: number[]): number {
-  if (!values.length) return DEFAULT_PRESETS.length;
-  return Math.min(MAX_PRESETS, Math.max(MIN_PRESETS, values.length));
+  return Number.isFinite(n) ? clampPct(n) : HOLD_SPEED_DEFAULT;
 }
 
 // Coerce stored/user input into a clean, sorted percent list (1…MAX_PRESETS
 // values). Empty/invalid input falls back to the defaults.
 export function normalizePresets(raw: unknown): number[] {
   const arr = Array.isArray(raw) ? raw.map(Number).filter(Number.isFinite) : [];
-  const src = arr.length ? arr : DEFAULT_PRESETS;
-  const n = presetCount(arr);
-  const out: number[] = [];
-  for (let i = 0; i < n; i++) out.push(clampPct(Number(src[i]), DEFAULT_PRESETS[i] ?? 100));
-  return out.sort((a, b) => a - b);
+  const src = arr.length ? arr.slice(0, MAX_PRESETS) : DEFAULT_PRESETS;
+  return src.map(clampPct).sort((a, b) => a - b);
 }
 
 // A single stored key spec → a clean chord string, or null if missing/invalid.
@@ -117,28 +105,31 @@ export function normalizePresetSet(
   rawKeys: unknown,
   rawPins?: unknown,
 ): { presets: number[]; keys: (string | null)[]; pinned: boolean[] } {
-  const pRaw = Array.isArray(rawPresets) ? rawPresets.map(Number).filter(Number.isFinite) : [];
-  const pSrc = pRaw.length ? pRaw : DEFAULT_PRESETS;
-  const n = presetCount(pRaw);
+  // Keep each value's stored index: keys and pins are lockstep arrays, so a dropped
+  // non-numeric entry must not shift the others onto the wrong preset.
+  const entries = Array.isArray(rawPresets)
+    ? rawPresets.map((v, i) => ({ v: Number(v), i })).filter((e) => Number.isFinite(e.v))
+    : [];
+  const src = entries.length
+    ? entries.slice(0, MAX_PRESETS)
+    : DEFAULT_PRESETS.map((v, i) => ({ v, i }));
   const kSrc = Array.isArray(rawKeys) ? rawKeys : DEFAULT_PRESET_KEYS;
   // No stored pins → seed the default pinned values (by value); otherwise honor
   // exactly what's stored.
-  const hasPins = Array.isArray(rawPins);
-  const bSrc = hasPins ? (rawPins as unknown[]) : [];
-  const rows = [];
-  for (let i = 0; i < n; i++) {
-    const pct = clampPct(Number(pSrc[i]), DEFAULT_PRESETS[i] ?? 100);
-    rows.push({
+  const storedPins = Array.isArray(rawPins) ? rawPins : null;
+  const rows = src.map(({ v, i }) => {
+    const pct = clampPct(v);
+    return {
       pct,
       key: normalizeOneKey(kSrc[i]),
-      pin: hasPins ? bSrc[i] === true : DEFAULT_PINNED_VALUES.includes(pct),
-    });
-  }
+      pin: storedPins ? storedPins[i] === true : DEFAULT_PINNED_VALUES.includes(pct),
+    };
+  });
   rows.sort((a, b) => a.pct - b.pct);
-  const seen = new Set<string>();
+  const seen = new Set<string | null>();
   for (const r of rows) {
-    if (r.key && seen.has(r.key)) r.key = null;
-    else if (r.key) seen.add(r.key);
+    if (seen.has(r.key)) r.key = null;
+    else seen.add(r.key);
   }
   let pins = 0;
   for (const r of rows) {

@@ -1,6 +1,6 @@
-// Options page entry. Apply the theme right away, then — once the selective-sync
-// config has loaded and the saved language is applied — render the React app so
-// every section reads from the right storage area in the chosen language.
+// Options page entry. Once the selective-sync config has loaded, apply the theme
+// and the saved language, then render the React app so every section (and the
+// theme) reads from the right storage area in the chosen language.
 //
 // Layout mirrors macOS System Settings: a sidebar of grouped sections on the left,
 // the selected group's cards on the right. The eight cards collapse into four nav
@@ -137,8 +137,8 @@ function Options() {
   );
 }
 
-initTheme();
 whenReady(() => {
+  initTheme();
   loadLang(() => {
     document.title = msg("optPageTitle") || "Video Tuner Pro — Settings";
     ensureGlassFilter(document);

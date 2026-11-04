@@ -1,4 +1,11 @@
-import { test, expect, clearAll, setStorage, sendToContent } from "./fixtures/extension.js";
+import {
+  test,
+  expect,
+  clearAll,
+  setStorage,
+  sendToContent,
+  uiMessage,
+} from "./fixtures/extension.js";
 
 // The pop-out viewer against a Boosty-shaped page (viewer.html): sticky header,
 // fixed modal, player guts in an open shadow root. The viewer must render the
@@ -68,6 +75,17 @@ async function ready(page: import("@playwright/test").Page) {
 async function readyLiveWithQuality(page: import("@playwright/test").Page) {
   await page.goto("/live.html");
   await page.waitForSelector("[data-vtp-badge]", { state: "attached" });
+}
+
+// Auto-open runs from the media play handlers and mounts the overlay
+// synchronously; two frames after play() settles it has had every chance to.
+async function afterFrames(page: import("@playwright/test").Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
 }
 
 async function measureVideoCadence(
@@ -233,6 +251,7 @@ test("auto-open dismissal follows SPA media routes on a reused video element", a
 
   // Closing wins for the current media route.
   await replay();
+  await afterFrames(page);
   await expect(page.locator("[data-vtp-viewer-overlay]")).toHaveCount(0);
 
   // A SPA navigation reusing the same <video> is a new auto-open opportunity.
@@ -245,6 +264,7 @@ test("auto-open dismissal follows SPA media routes on a reused video element", a
   // Returning to a route dismissed earlier in this page session stays dismissed.
   await page.evaluate(() => history.pushState({}, "", "/viewer.html"));
   await replay();
+  await afterFrames(page);
   await expect(page.locator("[data-vtp-viewer-overlay]")).toHaveCount(0);
 });
 
@@ -324,14 +344,16 @@ test("the launcher exposes a clickable native Picture-in-Picture action", async 
   await setStorage(serviceWorker, { overlayButton: "always" });
   await ready(page);
 
-  const launcher = page.getByRole("button", { name: "Open Video Tuner" });
+  const launcher = page.getByRole("button", {
+    name: await uiMessage(serviceWorker, "overlayBtnAria"),
+  });
   // The launcher is intentionally non-interactive while hidden. Moving across
   // the video is the real user gesture that reveals it before the FAB can receive
   // hover/click events.
   await page.mouse.move(500, 250);
   await expect(launcher).toHaveCSS("pointer-events", "auto");
   await launcher.hover();
-  const pip = page.getByRole("button", { name: "Picture in Picture" });
+  const pip = page.getByRole("button", { name: await uiMessage(serviceWorker, "viewerPiPAria") });
   await expect(pip).toBeVisible();
   await pip.click();
   await expect(pip).toBeHidden();
@@ -345,21 +367,23 @@ test("launcher radial buttons switch viewer formats and close it", async ({
   await setStorage(serviceWorker, { overlayButton: "always" });
   await ready(page);
   const launcherHost = page.locator("#vtp-launcher-host");
-  const launcher = launcherHost.getByRole("button", { name: "Open Video Tuner" });
+  const launcher = launcherHost.getByRole("button", {
+    name: await uiMessage(serviceWorker, "overlayBtnAria"),
+  });
 
   await page.mouse.move(500, 250);
   await launcher.hover();
-  await clickLauncherAction(page, "Pop out video");
+  await clickLauncherAction(page, await uiMessage(serviceWorker, "viewerBtnAria"));
   await expect.poll(() => state(page)).toMatchObject({ attr: "normal", overlay: true });
 
   await page.mouse.move(500, 250);
   await launcher.hover();
-  await clickLauncherAction(page, "Pop out in theater format");
+  await clickLauncherAction(page, await uiMessage(serviceWorker, "viewerTheaterAria"));
   await expect.poll(() => state(page)).toMatchObject({ attr: "theater", overlay: true });
 
   await page.mouse.move(500, 250);
   await launcher.hover();
-  await clickLauncherAction(page, "Close the pop-out viewer");
+  await clickLauncherAction(page, await uiMessage(serviceWorker, "viewerCloseAria"));
   await expect.poll(() => state(page)).toMatchObject({ attr: null, overlay: false });
 });
 
@@ -370,7 +394,17 @@ test("off launcher mode hides clicks while the keyboard popup still works", asyn
   await setStorage(serviceWorker, { overlayButton: "off" });
   await ready(page);
   await page.mouse.move(500, 250);
-  await expect(page.getByRole("button", { name: "Open Video Tuner" })).toHaveCount(0);
+  const fab = page.getByRole("button", { name: await uiMessage(serviceWorker, "overlayBtnAria") });
+  await afterFrames(page);
+  await expect(fab).toHaveCount(0);
+  // Positive control: the same hover shows the button once the mode allows it;
+  // switching back to off leaves it mounted but invisible and unclickable.
+  await setStorage(serviceWorker, { overlayButton: "always" });
+  await page.mouse.move(510, 260);
+  await expect(fab).toBeVisible();
+  await setStorage(serviceWorker, { overlayButton: "off" });
+  await expect(fab).toHaveCSS("opacity", "0");
+  await expect(fab).toHaveCSS("pointer-events", "none");
 
   await page.keyboard.press("KeyO");
   await page.waitForFunction(
@@ -441,6 +475,29 @@ test("a launcher click paints the popup above the lifted native Viewer surface",
   await expect(popupFrame!.locator("body")).toBeVisible();
 });
 
+test("with the launcher off, the hotkey popup still paints above the native Viewer", async ({
+  page,
+  serviceWorker,
+}) => {
+  await setStorage(serviceWorker, { overlayButton: "off" });
+  await ready(page);
+  await page.keyboard.press("KeyV");
+  await expect.poll(() => state(page)).toMatchObject({ attr: "normal", nativePlayer: true });
+
+  await page.keyboard.press("KeyO");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const host = document.querySelector("#vtp-launcher-host");
+        return {
+          popup: host?.shadowRoot?.querySelector("iframe") instanceof HTMLIFrameElement,
+          hostInTopLayer: host?.matches(":popover-open") ?? false,
+        };
+      }),
+    )
+    .toEqual({ popup: true, hostInTopLayer: true });
+});
+
 test("the lifted player keeps the site's native controls interactive", async ({ page }) => {
   await ready(page);
   await page.keyboard.press("KeyT");
@@ -449,7 +506,11 @@ test("the lifted player keeps the site's native controls interactive", async ({ 
   await expect.poll(() => page.evaluate(() => document.body.dataset.nativeControl)).toBe("clicked");
 });
 
-test("live viewer keeps a compact bar and compact quality label", async ({ page }) => {
+test("live viewer keeps a compact bar and compact quality label", async ({
+  page,
+  serviceWorker,
+}) => {
+  const liveLabel = await uiMessage(serviceWorker, "viewerLiveLabel");
   await readyLiveWithQuality(page);
   await page.keyboard.press("KeyT");
   await expect(page.locator("[data-vtp-viewer-overlay]")).toBeVisible();
@@ -474,7 +535,7 @@ test("live viewer keeps a compact bar and compact quality label", async ({ page 
     .toMatchObject({
       live: true,
       label: "1440p",
-      time: "LIVE",
+      time: liveLabel,
       qualityVisible: true,
     });
   const barWidth = await page.evaluate(() => {
@@ -516,28 +577,33 @@ test("an SPA transition from live to a near-end VOD restores time and seek", asy
         { once: true },
       );
     });
+    const seeked = new Promise((resolve) =>
+      video.addEventListener("seeked", resolve, { once: true }),
+    );
     video.currentTime = Math.max(0, video.duration - 4);
+    await seeked;
   });
 
   const status = (await sendToContent(serviceWorker, "getSpeed")) as { live?: boolean };
   expect(status.live).toBe(false);
-  await page.waitForTimeout(250);
+  await afterFrames(page);
 
+  const seekLabel = await uiMessage(serviceWorker, "viewerSeekAria");
   await page.keyboard.press("KeyV");
   await expect.poll(() => state(page)).toMatchObject({ attr: "normal", overlay: true, bar: true });
   await expect
     .poll(() =>
-      page.evaluate(() => {
+      page.evaluate((seekLabel) => {
         const overlay = document.querySelector("[data-vtp-viewer-overlay]");
         const shadow = (Array.from(overlay?.children ?? []) as HTMLElement[]).find((el) =>
           el.shadowRoot?.querySelector(".bar"),
         )?.shadowRoot;
-        const seek = shadow?.querySelector<HTMLInputElement>('input[aria-label="Seek"]');
+        const seek = shadow?.querySelector<HTMLInputElement>(`input[aria-label="${seekLabel}"]`);
         return {
           time: shadow?.querySelector(".time")?.textContent?.trim() || "",
           seekDisplay: seek ? getComputedStyle(seek).display : "missing",
         };
-      }),
+      }, seekLabel),
     )
     .toMatchObject({
       time: expect.stringMatching(/^\d+:\d{2} \/ \d+:\d{2}$/),

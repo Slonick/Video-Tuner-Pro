@@ -159,6 +159,26 @@ describe("audioLevels", () => {
     expect(m.translationCalls).toBe(0);
   });
 
+  it("ignores gain-reduction readouts that aren't numbers (legacy AudioParam-style)", () => {
+    const v = {} as HTMLVideoElement;
+    m.primary = v;
+    m.graphs.set(v, {
+      ...makeGraph(0),
+      comp: { reduction: { value: -3 } },
+      limiter: { reduction: { value: -8 } },
+    });
+    const r = audioLevels();
+    expect(r.out).toBeCloseTo(r.in!, 6);
+  });
+
+  it("a graph without a limiter stage reports input + compressor reduction", () => {
+    const v = {} as HTMLVideoElement;
+    m.primary = v;
+    const { comp, analyserIn } = makeGraph(-3);
+    m.graphs.set(v, { comp, analyserIn });
+    expect(audioLevels().out).toBeCloseTo(-9.02, 1);
+  });
+
   it("history step is 150 ms", () => {
     expect(A_HIST_MS).toBe(150);
   });
@@ -199,5 +219,28 @@ describe("recordAudioSample", () => {
     m.ctx = { state: "running" };
     for (let i = 0; i < 60; i++) recordAudioSample();
     expect(audioLevelHist.length).toBe(48);
+  });
+
+  it("records nothing once the extension context is gone (orphaned after an update)", () => {
+    const v = {} as HTMLVideoElement;
+    m.primary = v;
+    m.graphs.set(v, makeGraph(-3));
+    m.ctx = { state: "running" };
+    const runtime = globalThis.chrome.runtime as { id?: string }; // id is read-only in the typings
+    const savedId = runtime.id;
+    runtime.id = undefined;
+    try {
+      recordAudioSample();
+    } finally {
+      runtime.id = savedId;
+    }
+    expect(audioLevelHist.length).toBe(0);
+  });
+
+  it("starts empty on a freshly loaded page", async () => {
+    // A fresh module instance: beforeEach empties the statically imported history.
+    vi.resetModules();
+    const fresh = await import("../src/content/audio/metering.js");
+    expect(fresh.audioLevelHist).toEqual([]);
   });
 });

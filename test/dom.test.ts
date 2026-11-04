@@ -20,4 +20,13 @@ describe("streamLatency (reads data-vtp-latency)", () => {
     document.documentElement.setAttribute("data-vtp-latency", "nope");
     expect(streamLatency()).toBeNull();
   });
+  it("is null while the document has no root element", () => {
+    const root = document.documentElement;
+    document.removeChild(root); // e.g. mid document.open()
+    try {
+      expect(streamLatency()).toBeNull();
+    } finally {
+      document.appendChild(root);
+    }
+  });
 });

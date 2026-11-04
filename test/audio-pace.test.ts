@@ -54,6 +54,100 @@ describe("SyllableMeter", () => {
     m.reset();
     expect(m.rate()).toBe(0);
   });
+
+  it("starts counting again after reset()", () => {
+    const speech = (t: number) => 0.02 + 0.1 * (0.5 + 0.5 * Math.sin((2 * Math.PI * 4 * t) / 1000));
+    const m = new SyllableMeter();
+    for (let t = 0; t <= 2000; t += PACE.SAMPLE_MS) m.push(speech(t), t);
+    m.reset();
+    for (let t = 5000; t <= 7000; t += PACE.SAMPLE_MS) m.push(speech(t), t);
+    expect(m.rate()).toBeGreaterThan(3.5);
+    expect(m.rate()).toBeLessThan(4.5);
+  });
+
+  it("reports the rate over the elapsed time while the window fills, on a real clock", () => {
+    // Date.now()-sized timestamps; 2 s of 4 Hz speech must read ≈4 syll/s, not be
+    // diluted over the still-unfilled 4 s window.
+    const m = new SyllableMeter();
+    for (let t = 100_000; t <= 102_000; t += PACE.SAMPLE_MS) {
+      m.push(0.02 + 0.1 * (0.5 + 0.5 * Math.sin((2 * Math.PI * 4 * t) / 1000)), t);
+    }
+    expect(m.rate()).toBeGreaterThan(3.5);
+    expect(m.rate()).toBeLessThan(4.5);
+  });
+
+  it("reports nothing until more than 250 ms has been measured", () => {
+    const m = new SyllableMeter();
+    m.push(0.2, 0); // the tone's onset is one nucleus
+    m.push(0.2, 125);
+    m.push(0.2, 250);
+    expect(m.rate()).toBe(0);
+    m.push(0.2, 280);
+    expect(m.rate()).toBeCloseTo(1 / 0.28, 6);
+  });
+
+  it("gates out syllable-rate modulation too quiet to be speech", () => {
+    // The same 4 Hz envelope: peaking under the 0.003 energy floor it is silence,
+    // ten times louder it is speech.
+    expect(runEnvelope(4, 3, 0.001, 0.0015)).toBe(0);
+    expect(runEnvelope(4, 3, 0.01, 0.015)).toBeGreaterThan(3.5);
+  });
+
+  it("treats an envelope sitting exactly on the energy floor as silence", () => {
+    // A first reading of r puts the envelope at r × 0.3: 0.01 lands exactly on the
+    // 0.003 floor, a hair louder clears it.
+    const onset = (rms: number) => {
+      const m = new SyllableMeter();
+      m.push(rms, 0);
+      m.push(0, 150);
+      m.push(0, 300);
+      return m.rate();
+    };
+    expect(onset(0.01)).toBe(0);
+    expect(onset(0.011)).toBeCloseTo(1 / 0.3, 6);
+  });
+
+  it("counts a rise that pauses exactly at zero once, when it goes positive", () => {
+    const a = PACE.HP_ALPHA;
+    const m = new SyllableMeter();
+    m.push(0.5, 0); // onset: one nucleus
+    m.push(0, 100); // high-pass dips to a·(a·0.5 − 0.5)
+    m.push(-a * (a * 0.5 - 0.5), 200); // cancels the dip: high-pass is exactly 0
+    m.push(0.2, 300); // now it goes positive: the second nucleus
+    expect(m.rate()).toBeCloseTo(2 / 0.3, 6);
+  });
+
+  it("counts every syllable of isolated bursts, including the first after silence", () => {
+    const m = new SyllableMeter();
+    // 210 ms of silence, then five 120 ms syllables 360 ms apart.
+    for (let t = 0; t <= 1980; t += PACE.SAMPLE_MS) {
+      const k = t - 210;
+      m.push(k >= 0 && k < 5 * 360 && k % 360 < 120 ? 0.1 : 0, t);
+    }
+    expect(m.rate()).toBeCloseTo(5 / 1.98, 6);
+  });
+
+  it("keeps a nucleus for exactly one window, then forgets it", () => {
+    const m = new SyllableMeter();
+    // A steady tone registers only its onset, at t = 0.
+    for (let t = 0; t <= 4000; t += 40) m.push(0.2, t);
+    expect(m.rate()).toBeCloseTo(1 / 4, 6); // still inside the 4 s window at t = 4000
+    m.push(0.2, 4040);
+    expect(m.rate()).toBe(0);
+  });
+
+  it("treats rising crossings closer than the refractory gap as one syllable", () => {
+    // Alternating loud/quiet samples put a rising crossing on every other sample.
+    const alternate = (dt: number, endMs: number) => {
+      const m = new SyllableMeter();
+      for (let t = 0, i = 0; t <= endMs; t += dt, i++) m.push(i % 2 ? 0 : 0.2, t);
+      return m.rate();
+    };
+    // Every 60 ms is inside the 70 ms gap: only every other one counts (26 in 3 s).
+    expect(alternate(30, 3000)).toBeCloseTo(26 / 3, 6);
+    // Every 70 ms is exactly the gap: each one counts (44 in 3.01 s).
+    expect(alternate(35, 3010)).toBeCloseTo(44 / 3.01, 6);
+  });
 });
 
 describe("suggestEffectiveSpeed", () => {
@@ -95,6 +189,22 @@ describe("suggestEffectiveSpeed", () => {
 
   it("does nothing when the user is already watching below the floor", () => {
     expect(suggestEffectiveSpeed(12, 0.8, 0.8, 1)).toBe(0.8);
+  });
+
+  it("leaves the speed alone without a measured speed or any detected speech", () => {
+    expect(suggestEffectiveSpeed(8, 0, 2, 1)).toBe(2); // no playback speed to divide by
+    expect(suggestEffectiveSpeed(0, 2, 2, 1)).toBe(2);
+    expect(suggestEffectiveSpeed(0, 2, 2, 1, 6, 2)).toBe(2);
+  });
+
+  it("holds the perceived rate at the target above the soft-knee band", () => {
+    // perceived 16 at 2× → intrinsic 8, p = 16 ≥ target + knee (8) → q = 6 → 6/8 = 0.75×.
+    expect(suggestEffectiveSpeed(16, 2, 2, 0.5, 6, 2)).toBeCloseTo(0.75, 9);
+  });
+
+  it("bends quadratically across the knee", () => {
+    // intrinsic 3, p = 6 (mid-band, 2 into it) → q = 6 − 2²/8 = 5.5 → 5.5/3 ≈ 1.83×.
+    expect(suggestEffectiveSpeed(6, 2, 2, 1, 6, 2)).toBeCloseTo(5.5 / 3, 9);
   });
 });
 

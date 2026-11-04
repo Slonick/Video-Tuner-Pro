@@ -27,7 +27,6 @@ function hasLiveRuntime(candidate: ExtensionApi | undefined): candidate is Exten
 export function getExtensionApi(): ExtensionApi {
   const root = globalThis as ExtensionGlobals;
   if (hasLiveRuntime(root.browser)) return root.browser;
-  if (hasLiveRuntime(root.chrome)) return root.chrome;
   if (root.chrome) return root.chrome;
   if (root.browser) return root.browser;
   throw new Error("Extension API unavailable");

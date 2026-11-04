@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE, subscribe } from "../../shared/store.js";
 import { msg } from "../../popup/i18n.js";
 import { Group } from "../Group.js";
+import { useCaptureGuard } from "../useCaptureGuard.js";
 import { StoredToggle } from "../../popup/components/StoredToggle.js";
 import { Slider } from "../../ui/Slider.js";
 import { Button } from "../../ui/Button.js";
@@ -44,10 +45,15 @@ import {
 } from "../../shared/keymap.js";
 
 interface Row {
+  // Stable React key: a blur commit re-sorts the rows, and index keys would hand a
+  // click that lands mid-re-sort to whichever row slid into that slot.
+  id: number;
   pct: number;
   key: string | null;
   pin: boolean;
 }
+
+let nextRowId = 0;
 
 const snap = (v: number) => Math.round(v / 5) * 5;
 
@@ -96,7 +102,12 @@ export function SpeedPresets() {
       ["speedPresets", "presetKeys", "presetPins", "speedMax", "speedStep", "holdSpeed", "keymap"],
       (r) => {
         const set = normalizePresetSet(r.speedPresets, r.presetKeys, r.presetPins);
-        const loaded = set.presets.map((pct, i) => ({ pct, key: set.keys[i], pin: set.pinned[i] }));
+        const loaded = set.presets.map((pct, i) => ({
+          id: nextRowId++,
+          pct,
+          key: set.keys[i],
+          pin: set.pinned[i],
+        }));
         setRows(loaded);
         setFields(loaded.map((row) => String(row.pct)));
         setSpeedMax(normalizeSpeedMax(r.speedMax));
@@ -153,6 +164,8 @@ export function SpeedPresets() {
     };
   }, [commitRows]);
 
+  useCaptureGuard(capturing !== null, () => setCapturing(null));
+
   if (!rows) return null;
 
   const pinnedCount = rows.filter((r) => r.pin).length;
@@ -187,10 +200,13 @@ export function SpeedPresets() {
   };
 
   const commitField = (i: number) => {
-    const raw = Number(fields[i]);
-    const v = Number.isFinite(raw)
-      ? Math.min(PRESET_MAX, Math.max(PRESET_MIN, snap(raw)))
-      : rows[i].pct;
+    const text = fields[i].trim();
+    const raw = Number(text);
+    // An emptied field reverts (Number("") is 0, which would clamp to the 25% floor).
+    const v =
+      text !== "" && Number.isFinite(raw)
+        ? Math.min(PRESET_MAX, Math.max(PRESET_MIN, snap(raw)))
+        : rows[i].pct;
     commitRows(rows.map((r, j) => (j === i ? { ...r, pct: v } : r)));
   };
 
@@ -203,7 +219,7 @@ export function SpeedPresets() {
     if (rows.length >= MAX_PRESETS) return;
     const last = rows.length ? rows[rows.length - 1].pct : 100;
     const pct = Math.min(PRESET_MAX, Math.max(PRESET_MIN, last + 25));
-    commitRows([...rows, { pct, key: null, pin: false }]);
+    commitRows([...rows, { id: nextRowId++, pct, key: null, pin: false }]);
   };
 
   const removePreset = (i: number) => {
@@ -219,6 +235,7 @@ export function SpeedPresets() {
     setCapturing(null);
     commitRows(
       DEFAULT_PRESETS.map((pct, i) => ({
+        id: nextRowId++,
         pct,
         key: DEFAULT_PRESET_KEYS[i],
         pin: DEFAULT_PINNED_VALUES.includes(pct),
@@ -298,8 +315,8 @@ export function SpeedPresets() {
       <div className="opt-divider" />
 
       <div className="preset-rows">
-        {fields.map((val, i) => (
-          <div className="preset-row" key={i}>
+        {rows.map((row, i) => (
+          <div className="preset-row" key={row.id}>
             <Button
               className={"preset-pin" + (rows[i].pin ? " is-pinned" : "")}
               title={msg("optPresetPinHint") || "Pin to the collapsed quick row"}
@@ -316,7 +333,7 @@ export function SpeedPresets() {
               min={PRESET_MIN}
               max={PRESET_MAX}
               step={5}
-              value={val}
+              value={fields[i]}
               onChange={(e) => {
                 const f = fields.slice();
                 f[i] = e.target.value;

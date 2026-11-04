@@ -22,6 +22,9 @@ describe("decideCatchupSpeed — stepped ramp", () => {
     expect(decideCatchupSpeed({ ...base, latency: 12.1 })).toBe(1.1); // excess ≥7s
     expect(decideCatchupSpeed({ ...base, latency: 19.1 })).toBe(1.15); // excess ≥14s
   });
+  it("engages at exactly 1s past the allowed delay (the deadband's edge)", () => {
+    expect(decideCatchupSpeed({ ...base, latency: 6 })).toBe(1.05); // excess exactly 1s
+  });
   it("matches the spec example: target 3 → 110% from 10s, 115% from 17s", () => {
     const t3 = { ...base, target: 3 };
     expect(decideCatchupSpeed({ ...t3, latency: 9.9 })).toBe(1.05);
@@ -78,6 +81,16 @@ describe("catchupBufferLimited (the UI warning)", () => {
   it("a larger reserve warns sooner (the cushion is wider)", () => {
     expect(catchupBufferLimited(30, 4, 5, 3)).toBe(false); // 4s clears the 3s reserve
     expect(catchupBufferLimited(30, 4, 5, 5)).toBe(true); // but not the 5s reserve
+  });
+  it("needs the lag to be more than 2s past the allowed delay", () => {
+    expect(catchupBufferLimited(7, 1.0, 5, 3)).toBe(false); // exactly 2s past: not yet
+    expect(catchupBufferLimited(7.5, 1.0, 5, 3)).toBe(true);
+  });
+  it("quiet from one 5% step's worth of buffer above the reserve — that step can still run", () => {
+    expect(catchupBufferLimited(30, 1.05, 5, 1)).toBe(false);
+    expect(decideCatchupSpeed({ ...base, latency: 30, buffer: 1.05, reserve: 1 })).toBe(1.05);
+    expect(catchupBufferLimited(30, 1.04, 5, 1)).toBe(true);
+    expect(decideCatchupSpeed({ ...base, latency: 30, buffer: 1.04, reserve: 1 })).toBe(1);
   });
 });
 

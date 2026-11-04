@@ -10,6 +10,8 @@ const h = vi.hoisted(() => ({
   removeListener: vi.fn(),
   signal: null as unknown as AbortSignal,
   abortListener: null as (() => void) | null,
+  ready: true,
+  readyWaiters: [] as Array<() => void>,
 }));
 
 vi.mock("../src/content/platform/browser.js", () => ({
@@ -25,7 +27,10 @@ vi.mock("../src/content/platform/browser.js", () => ({
   },
 }));
 vi.mock("../src/content/platform/storage.js", () => ({
-  OUR_AREAS: new Set(["sync", "local"]),
+  // Default routing: every key lives in sync, so only sync-area changes are routed.
+  routedChanges: (changes: Record<string, unknown>, area: string) =>
+    area === "sync" ? changes : {},
+  whenReady: (cb: () => void) => (h.ready ? cb() : h.readyWaiters.push(cb)),
   STORE: {
     get: (_keys: string[], callback: (values: Record<string, unknown>) => void) =>
       callback(h.values),
@@ -49,6 +54,8 @@ beforeEach(() => {
   h.storageListener = null;
   h.removeListener.mockClear();
   h.abortListener = null;
+  h.ready = true;
+  h.readyWaiters = [];
   h.signal = {
     addEventListener: (_type: string, listener: () => void) => {
       h.abortListener = listener;
@@ -100,7 +107,7 @@ describe("super-theater lifecycle", () => {
     expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(true);
   });
 
-  it("reacts only to our storage areas and theater keys", async () => {
+  it("reacts only to routed storage changes of the theater keys", async () => {
     h.values = { superTheater: false, superTheaterStream: false };
     await load();
     expect(h.storageListener).toEqual(expect.any(Function));
@@ -109,10 +116,25 @@ describe("super-theater lifecycle", () => {
     h.storageListener!({ superTheater: { newValue: true } }, "managed");
     expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(false);
 
+    // The stale copy in the area the key doesn't route to (another device's edit).
+    h.storageListener!({ superTheater: { newValue: true } }, "local");
+    expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(false);
+
     h.storageListener!({ unrelated: { newValue: true } }, "sync");
     expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(false);
 
     h.storageListener!({ superTheater: { newValue: true } }, "sync");
+    expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(true);
+  });
+
+  it("reads the setting only once the sync config has loaded", async () => {
+    h.ready = false;
+    h.values = { superTheater: true, superTheaterStream: false };
+    await load();
+    expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(false);
+
+    h.ready = true;
+    h.readyWaiters.splice(0).forEach((cb) => cb());
     expect(document.documentElement.hasAttribute("vtp-super-theater")).toBe(true);
   });
 

@@ -29,6 +29,8 @@ import {
   refreshViewerBackdrop,
   fmtTime,
   VIEWER_LAYOUT_EVENT,
+  VIEWER_RAISE_EVENT,
+  applyViewerChatMode,
   canCycleViewerChat,
   cycleViewerChatMode,
 } from "../src/content/viewer.js";
@@ -97,6 +99,22 @@ function setSeekable(v: HTMLVideoElement, start: number, end: number): void {
   });
 }
 
+// jsdom has no Popover API — give a player wrapper the part the viewer uses.
+function stubPopover(el: HTMLElement): { open: () => boolean } {
+  let open = false;
+  const matches = el.matches.bind(el);
+  el.matches = (selector: string) => (selector === ":popover-open" ? open : matches(selector));
+  Object.assign(el, {
+    showPopover: () => {
+      open = true;
+    },
+    hidePopover: () => {
+      open = false;
+    },
+  });
+  return { open: () => open };
+}
+
 function installCapture(v: HTMLVideoElement): {
   stop: ReturnType<typeof vi.fn>;
   stream: MediaStream;
@@ -159,6 +177,12 @@ function setWebkitFullscreen(el: Element | null): void {
   Object.defineProperty(document, "webkitFullscreenElement", { value: el, configurable: true });
 }
 
+// Teardown handles for patches tests install, so a failing assertion can't leak
+// a quality bridge or a patched prototype into the next test.
+let bridges = new AbortController();
+const nativeAnimate = Element.prototype.animate;
+const nativeRect = Element.prototype.getBoundingClientRect;
+
 beforeEach(() => {
   exitViewer();
   document.body.innerHTML = "";
@@ -184,6 +208,21 @@ afterEach(async () => {
   vi.useRealTimers();
   exitViewer();
   if (hasNativeSurface) await settleNativeViewerExit();
+  bridges.abort();
+  bridges = new AbortController();
+  vi.restoreAllMocks();
+  if (nativeAnimate) {
+    Object.defineProperty(Element.prototype, "animate", {
+      value: nativeAnimate,
+      configurable: true,
+    });
+  } else {
+    delete (Element.prototype as { animate?: Element["animate"] }).animate;
+  }
+  Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+    value: nativeRect,
+    configurable: true,
+  });
 });
 
 function installQualityBridge(
@@ -194,63 +233,79 @@ function installQualityBridge(
   ],
 ) {
   const picks: string[] = [];
-  document.addEventListener("vtp-quality-request", (e) => {
-    const d = (e as CustomEvent).detail;
-    document.dispatchEvent(
-      new CustomEvent("vtp-quality-response", {
-        detail: { requestId: d.requestId, options, current: "auto" },
-      }),
-    );
-  });
-  document.addEventListener("vtp-quality-set", (e) => {
-    const d = (e as CustomEvent).detail;
-    picks.push(d.qualityId);
-    document.dispatchEvent(
-      new CustomEvent("vtp-quality-response", {
-        detail: {
-          requestId: d.requestId,
-          options: options.map((o) => ({ ...o, current: o.id === d.qualityId })),
-          current: d.qualityId,
-        },
-      }),
-    );
-  });
+  document.addEventListener(
+    "vtp-quality-request",
+    (e) => {
+      const d = (e as CustomEvent).detail;
+      document.dispatchEvent(
+        new CustomEvent("vtp-quality-response", {
+          detail: { requestId: d.requestId, options, current: "auto" },
+        }),
+      );
+    },
+    { signal: bridges.signal },
+  );
+  document.addEventListener(
+    "vtp-quality-set",
+    (e) => {
+      const d = (e as CustomEvent).detail;
+      picks.push(d.qualityId);
+      document.dispatchEvent(
+        new CustomEvent("vtp-quality-response", {
+          detail: {
+            requestId: d.requestId,
+            options: options.map((o) => ({ ...o, current: o.id === d.qualityId })),
+            current: d.qualityId,
+          },
+        }),
+      );
+    },
+    { signal: bridges.signal },
+  );
   return picks;
 }
 
 function installDelayedQualityBridge() {
-  document.addEventListener("vtp-quality-request", (e) => {
-    const d = (e as CustomEvent).detail;
-    document.dispatchEvent(
-      new CustomEvent("vtp-quality-response", {
-        detail: {
-          requestId: d.requestId,
-          options: [
-            { id: "auto", label: "Auto", current: true },
-            { id: "1", label: "720p" },
-          ],
-          current: "auto",
-        },
-      }),
-    );
-  });
-  document.addEventListener("vtp-quality-set", (e) => {
-    const d = (e as CustomEvent).detail;
-    setTimeout(() => {
+  document.addEventListener(
+    "vtp-quality-request",
+    (e) => {
+      const d = (e as CustomEvent).detail;
       document.dispatchEvent(
         new CustomEvent("vtp-quality-response", {
           detail: {
             requestId: d.requestId,
             options: [
-              { id: "auto", label: "Auto" },
-              { id: "1", label: "720p", current: true },
+              { id: "auto", label: "Auto", current: true },
+              { id: "1", label: "720p" },
             ],
-            current: "1",
+            current: "auto",
           },
         }),
       );
-    }, 20);
-  });
+    },
+    { signal: bridges.signal },
+  );
+  document.addEventListener(
+    "vtp-quality-set",
+    (e) => {
+      const d = (e as CustomEvent).detail;
+      setTimeout(() => {
+        document.dispatchEvent(
+          new CustomEvent("vtp-quality-response", {
+            detail: {
+              requestId: d.requestId,
+              options: [
+                { id: "auto", label: "Auto" },
+                { id: "1", label: "720p", current: true },
+              ],
+              current: "1",
+            },
+          }),
+        );
+      }, 20);
+    },
+    { signal: bridges.signal },
+  );
 }
 
 function installBackdropMirror(v: HTMLVideoElement) {
@@ -555,6 +610,48 @@ describe("toggleViewer — lifecycle", () => {
     }
   });
 
+  it("settles an open animation on the layout current when it lands", async () => {
+    vi.useFakeTimers();
+    const { v } = makeVideo();
+    h.primary = v;
+    Object.defineProperty(Element.prototype, "animate", {
+      value: vi.fn(
+        () => ({ onfinish: null, oncancel: null, cancel: vi.fn() }) as unknown as Animation,
+      ),
+      configurable: true,
+    });
+    Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+      value: function (this: Element) {
+        if (
+          this instanceof HTMLElement &&
+          this.parentElement?.hasAttribute("data-vtp-viewer-overlay")
+        )
+          return { left: 80, top: 40, width: 480, height: 270, right: 560, bottom: 310 } as DOMRect;
+        return nativeRect.call(this);
+      },
+      configurable: true,
+    });
+    const width = window.innerWidth;
+    // The normal box a (width - 200) viewport gets for a 720p video.
+    const resizedBox = Math.round(
+      Math.min((width - 200) * 0.86, window.innerHeight * 0.86 * (1280 / 720)),
+    );
+    try {
+      toggleViewer("normal");
+      await flush();
+      const shell = v.parentElement as HTMLElement;
+      // A resize lands while the box is still flying in.
+      Object.defineProperty(window, "innerWidth", { value: width - 200, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+      await vi.advanceTimersByTimeAsync(600);
+      expect(shell.style.width).toBe(`${resizedBox}px`);
+    } finally {
+      Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+      exitViewer();
+      await vi.advanceTimersByTimeAsync(700);
+    }
+  });
+
   it("does not dispatch an extra layout event on the next animation frame", async () => {
     vi.useFakeTimers();
     const { v } = makeVideo();
@@ -729,6 +826,22 @@ describe("toggleViewer — lifecycle", () => {
     overlay.focus();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true }));
     expect(barButtons()[0].matches(":focus")).toBe(true);
+  });
+
+  it("neither traps Tab nor claims modality while a lifted native player has the controls", async () => {
+    const { wrap, v } = makeVideo();
+    wrap.getBoundingClientRect = v.getBoundingClientRect;
+    stubPopover(wrap);
+    h.primary = v;
+    await openViewer("normal");
+    expect(wrap.hasAttribute("data-vtp-viewer-player")).toBe(true);
+    const overlay = overlayEl()!;
+
+    expect(overlay.getAttribute("role")).toBe("dialog");
+    expect(overlay.hasAttribute("aria-modal")).toBe(false);
+    const tab = new KeyboardEvent("keydown", { key: "Tab", cancelable: true });
+    document.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(false);
   });
 
   it("lets the launcher top layer handle Escape before the viewer", async () => {
@@ -929,6 +1042,36 @@ describe("control bar", () => {
 
       expect(chapterMarks()).toHaveLength(2);
       expect((chapterMarks()[0] as HTMLElement).style.width).toBe("25%");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("leaves chapters to a lifted native player's own seek bar", async () => {
+    vi.stubGlobal("location", { hostname: "www.youtube.com" });
+    try {
+      let src = "blob:first";
+      const { wrap, v } = makeVideo(100);
+      wrap.getBoundingClientRect = v.getBoundingClientRect;
+      stubPopover(wrap);
+      Object.defineProperty(v, "currentSrc", { get: () => src, configurable: true });
+      const chapters = document.createElement("div");
+      chapters.className = "ytp-chapters-container";
+      const chapter = document.createElement("div");
+      const measure = vi.fn(() => ({ width: 50 }) as DOMRect);
+      chapter.getBoundingClientRect = measure;
+      chapters.append(chapter);
+      document.body.append(chapters);
+      h.primary = v;
+
+      await openViewer("normal");
+      src = "blob:second";
+      v.dispatchEvent(new Event("durationchange"));
+      await flush();
+
+      expect(wrap.hasAttribute("data-vtp-viewer-player")).toBe(true);
+      // Reading them forces a layout, and nothing here would draw them.
+      expect(measure).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -2033,6 +2176,86 @@ describe("auto pop-out on play", () => {
     }
   });
 
+  it("re-raises everything lifted above a re-shown player, in stacking order", async () => {
+    const { wrap, v } = makeVideo();
+    wrap.getBoundingClientRect = v.getBoundingClientRect;
+    const order: string[] = [];
+    let playerOpen = false;
+    const matches = wrap.matches.bind(wrap);
+    wrap.matches = (s: string) => (s === ":popover-open" ? playerOpen : matches(s));
+    Object.assign(wrap, {
+      showPopover: () => {
+        playerOpen = true;
+        order.push("player");
+      },
+      hidePopover: () => {
+        playerOpen = false;
+      },
+    });
+    // A page dialog layer (Twitch's menus) lifted earlier in the session.
+    const layer = document.createElement("div");
+    layer.setAttribute("data-vtp-viewer-dialog", "");
+    let layerOpen = true;
+    const layerMatches = layer.matches.bind(layer);
+    layer.matches = (s: string) => (s === ":popover-open" ? layerOpen : layerMatches(s));
+    Object.assign(layer, {
+      showPopover: () => {
+        layerOpen = true;
+        order.push("dialog layer");
+      },
+      hidePopover: () => {
+        layerOpen = false;
+      },
+    });
+    document.body.append(layer);
+    const raised = () => order.push("badge + launcher");
+    document.addEventListener(VIEWER_RAISE_EVENT, raised);
+    h.primary = v;
+    try {
+      await openViewer("theater");
+      order.length = 0;
+
+      // The page force-closes the player popover; the viewer puts it back on top.
+      playerOpen = false;
+      const toggle = Object.assign(new Event("toggle"), { newState: "closed" });
+      wrap.dispatchEvent(toggle);
+
+      expect(order).toEqual(["player", "dialog layer", "badge + launcher"]);
+    } finally {
+      document.removeEventListener(VIEWER_RAISE_EVENT, raised);
+    }
+  });
+
+  it("a close after the page moved on inside the viewer also dismisses what plays now", async () => {
+    vi.useFakeTimers();
+    const route = {
+      hostname: "www.youtube.com",
+      pathname: "/watch",
+      search: "?v=video-ddddd",
+      href: "https://www.youtube.com/watch?v=video-ddddd",
+    };
+    vi.stubGlobal("location", route);
+    try {
+      S.viewerAuto = "theater";
+      const { v } = makeVideo();
+      await v.play();
+      await vi.advanceTimersByTimeAsync(251);
+      expect(viewerFormat()).toBe("theater");
+
+      // YouTube's Next inside the viewer: the same <video>, the next video id.
+      route.search = "?v=video-eeeee";
+      route.href = "https://www.youtube.com/watch?v=video-eeeee";
+      exitViewer();
+
+      v.pause();
+      await v.play();
+      await vi.advanceTimersByTimeAsync(251);
+      expect(viewerFormat()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("reopens after the page yanks the video out of an automatic viewer", async () => {
     vi.useFakeTimers();
     // The reopen-retry budget is per media identity — give this test its own.
@@ -2309,6 +2532,22 @@ describe("guard", () => {
     expect(overlayEl()).toBeNull();
     expect(v.isConnected).toBe(false);
   });
+
+  it("exits a lifted native player whose overlay left the page", async () => {
+    vi.useFakeTimers();
+    const { wrap, v } = makeVideo();
+    wrap.getBoundingClientRect = v.getBoundingClientRect;
+    const popover = stubPopover(wrap);
+    h.primary = v;
+    await openViewer("theater");
+    expect(popover.open()).toBe(true);
+
+    overlayEl()!.remove(); // e.g. a newer content script cleaned up after this one
+    await vi.advanceTimersByTimeAsync(600);
+    expect(viewerFormat()).toBeNull();
+    expect(popover.open()).toBe(false);
+    expect(wrap.hasAttribute("data-vtp-viewer-player")).toBe(false);
+  });
 });
 
 describe("viewer chat — side mode", () => {
@@ -2429,6 +2668,69 @@ describe("viewer chat — side mode", () => {
     const w = Math.round(Math.min(window.innerWidth * 0.86, window.innerHeight * 0.86 * ar));
     expect(shellEl()!.style.width).toBe(`${w}px`);
     expect(chatCol()).toBeNull();
+  });
+
+  it("does not restart the chat reflow on the storage echo of its own change", async () => {
+    vi.useFakeTimers();
+    atTwitchLive();
+    const animations: Animation[] = [];
+    Object.defineProperty(Element.prototype, "animate", {
+      value: vi.fn(() => {
+        const anim = { onfinish: null, oncancel: null, cancel: vi.fn() } as unknown as Animation;
+        animations.push(anim);
+        return anim;
+      }),
+      configurable: true,
+    });
+    // The video shell's box follows the gutter the layout reserves for the column.
+    Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+      value: function (this: Element) {
+        if (this instanceof HTMLElement && this.querySelector(":scope > video")) {
+          const width = window.innerWidth - (parseFloat(this.style.right) || 0);
+          return { left: 0, top: 0, width, height: 600, right: width, bottom: 600 } as DOMRect;
+        }
+        return nativeRect.call(this);
+      },
+      configurable: true,
+    });
+    try {
+      const { v } = makeVideo();
+      h.primary = v;
+      setViewerState("theater", true);
+      await vi.advanceTimersByTimeAsync(600); // the enter animation lands
+
+      const fab = document.querySelector("[data-vtp-viewer-chat-fab]")!.shadowRoot!;
+      fab.querySelector<HTMLButtonElement>(".m-side")!.click();
+      expect(shellEl()!.style.right).toBe("340px");
+      const reflow = animations.at(-1)!;
+      const started = animations.length;
+
+      applyViewerChatMode(); // the storage echo of that same write
+      expect(reflow.cancel).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(started);
+    } finally {
+      exitViewer();
+      await vi.advanceTimersByTimeAsync(700);
+    }
+  });
+
+  it("follows a side width saved in another tab", async () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    const { v } = makeVideo();
+    h.primary = v;
+    setViewerState("theater", true);
+    await flush();
+    expect(chatCol()!.style.width).toBe("340px");
+
+    try {
+      S.viewerChatSideWidths = { "twitch.tv": { theater: 420 } };
+      applyViewerChatMode(); // that tab's storage change reaching this one
+      expect(chatCol()!.style.width).toBe("420px");
+      expect(shellEl()!.style.right).toBe("420px");
+    } finally {
+      S.viewerChatSideWidths = {};
+    }
   });
 });
 

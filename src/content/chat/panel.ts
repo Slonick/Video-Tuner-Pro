@@ -227,26 +227,33 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
   });
   tint.addEventListener("change", saveTint);
 
-  // Grab-head drag. Pointer capture keeps the move alive outside the panel.
+  // Grab-head drag. Pointer capture keeps the move alive outside the panel. Each
+  // gesture owns its listeners through one AbortController, so no end handler
+  // outlives it to replay on a later gesture; a plain click saves nothing.
   head.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;
     const r = host.getBoundingClientRect();
+    let moved = false;
+    const gesture = new AbortController();
     const move = (ev: PointerEvent): void => {
+      moved = true;
       host.style.left = `${Math.round(r.left + ev.clientX - startX)}px`;
       host.style.top = `${Math.round(r.top + ev.clientY - startY)}px`;
     };
     const up = (): void => {
-      head.removeEventListener("pointermove", move);
+      gesture.abort();
+      if (!moved) return;
       clampPos();
       persistSpot();
     };
+    const opt = { signal: gesture.signal };
     head.setPointerCapture(e.pointerId);
-    head.addEventListener("pointermove", move);
-    head.addEventListener("pointerup", up, { once: true });
-    head.addEventListener("pointercancel", up, { once: true });
+    head.addEventListener("pointermove", move, opt);
+    head.addEventListener("pointerup", up, opt);
+    head.addEventListener("pointercancel", up, opt);
   });
 
   // Corner resize; the final size and the re-derived anchor persist per site.
@@ -257,7 +264,10 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
     const startX = e.clientX;
     const startY = e.clientY;
     const r = host.getBoundingClientRect();
+    let moved = false;
+    const gesture = new AbortController();
     const move = (ev: PointerEvent): void => {
+      moved = true;
       const w2 = Math.round(
         Math.min(
           CHAT_PANEL_WIDTH_MAX,
@@ -274,13 +284,14 @@ export function mountChatPanel(overlay: HTMLElement, cb: ChatPanelCallbacks): Ch
       host.style.height = `${h2}px`;
     };
     const up = (): void => {
-      grip.removeEventListener("pointermove", move);
-      persistSpot();
+      gesture.abort();
+      if (moved) persistSpot();
     };
+    const opt = { signal: gesture.signal };
     grip.setPointerCapture(e.pointerId);
-    grip.addEventListener("pointermove", move);
-    grip.addEventListener("pointerup", up, { once: true });
-    grip.addEventListener("pointercancel", up, { once: true });
+    grip.addEventListener("pointermove", move, opt);
+    grip.addEventListener("pointerup", up, opt);
+    grip.addEventListener("pointercancel", up, opt);
   });
 
   return {

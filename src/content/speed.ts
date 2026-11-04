@@ -100,7 +100,7 @@ function applyResolvedNow(
     S.userSpeed = speed;
     return;
   }
-  setSpeed(speed, false, false);
+  setSpeed(speed);
 }
 
 // Reset just the manual change: re-take the saved speed by priority, deleting
@@ -195,7 +195,6 @@ function setNonLiveVideoRate(video: HTMLVideoElement, primaryLive = activePrimar
 // sampler calls this when the factor moves, so a slowdown takes effect without
 // waiting for the next 1s tick.
 export function reapplyPrimaryRate(): void {
-  if (S.siteDisabled) return;
   const v = primaryVideo();
   if (v && !isLive(v)) setNonLiveVideoRate(v);
 }
@@ -269,17 +268,13 @@ function applyToAudio(audio: HTMLAudioElement): void {
 // tick.
 const AUDIO_RATE_ATTR = "data-vtp-audiorate";
 function publishAudioRate(): void {
-  try {
-    const root = document.documentElement;
-    if (!root) return;
-    if (S.audioSpeedEnabled && !S.siteDisabled) {
-      const v = String(S.currentSpeed);
-      if (root.getAttribute(AUDIO_RATE_ATTR) !== v) root.setAttribute(AUDIO_RATE_ATTR, v);
-    } else if (root.hasAttribute(AUDIO_RATE_ATTR)) {
-      root.removeAttribute(AUDIO_RATE_ATTR);
-    }
-  } catch (e) {
-    /* ignore */
+  const root = document.documentElement;
+  if (!root) return;
+  if (S.audioSpeedEnabled && !S.siteDisabled) {
+    const v = String(S.currentSpeed);
+    if (root.getAttribute(AUDIO_RATE_ATTR) !== v) root.setAttribute(AUDIO_RATE_ATTR, v);
+  } else {
+    root.removeAttribute(AUDIO_RATE_ATTR); // a no-op, with no mutation record, once it's gone
   }
 }
 
@@ -312,8 +307,14 @@ export function applyAll(
   if (S.siteDisabled) return;
   const videos = snapshot.videos ?? collectVideos();
   const primary = snapshot.primary !== undefined ? snapshot.primary : primaryVideoFrom(videos);
+  // No primary video: fall back to the page verdict, as the tick and
+  // activePrimaryIsLive do — otherwise the two paths fight over the rate.
   const primaryLive =
-    snapshot.primaryLive !== undefined ? snapshot.primaryLive : primary ? isLive(primary) : false;
+    snapshot.primaryLive !== undefined
+      ? snapshot.primaryLive
+      : primary
+        ? isLive(primary)
+        : onStreamPage();
   videos.forEach((v) => applyToVideo(v, primaryLive, v === primary ? primaryLive : undefined));
   videos.forEach(probeLive); // sample media edge for generic live detection
   applyAudioComp(videos, primary);
@@ -322,7 +323,7 @@ export function applyAll(
   updateBadge();
 }
 
-export function setSpeed(speed: number, persist?: boolean, manual?: boolean): void {
+export function setSpeed(speed: number, manual?: boolean): void {
   if (S.siteDisabled) return;
   // Streams ignore manual speed entirely — they're governed by Live-sync.
   if (manual && activePrimaryIsLive()) return;
@@ -330,7 +331,6 @@ export function setSpeed(speed: number, persist?: boolean, manual?: boolean): vo
   S.userSpeed = S.currentSpeed; // remember it as the intended non-live speed
   if (manual) S.speedManual = true;
   applyAll();
-  if (persist) persistDomainSpeed(S.currentSpeed);
   updateTimeBadge();
   flashBadge(); // the badge flashes the new speed as feedback
 }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 // messaging.ts registers one runtime.onMessage listener at import. Capture it via
 // a mocked api, then invoke each action and assert the right speed.ts call + the
@@ -10,7 +10,6 @@ const h = vi.hoisted(() => ({
     | ((req: unknown, sender: unknown, send: (r?: unknown) => void) => boolean),
   hasVideo: true,
   onStream: false,
-  channel: "UCabc" as string | null,
   channelKeys: ["UCabc"] as string[],
   channelName: "Cool Channel",
   drm: false,
@@ -29,7 +28,6 @@ vi.mock("../src/content/platform/browser.js", () => ({
 }));
 vi.mock("../src/content/channel.js", () => ({
   channelKeys: () => h.channelKeys,
-  currentChannel: () => h.channel,
   currentChannelName: () => h.channelName,
 }));
 vi.mock("../src/content/videos.js", () => ({
@@ -45,6 +43,7 @@ const speed = vi.hoisted(() => ({
   persistChannelSpeed: vi.fn(),
   persistGlobalSpeed: vi.fn(),
   resetScope: vi.fn(),
+  resetToSaved: vi.fn(),
 }));
 vi.mock("../src/content/speed.js", () => speed);
 const target = vi.hoisted(() => ({
@@ -53,6 +52,7 @@ const target = vi.hoisted(() => ({
   persistChannelTarget: vi.fn(),
   persistGlobalTarget: vi.fn(),
   resetTargetScope: vi.fn(),
+  applyResolvedTargetFromStore: vi.fn(),
 }));
 vi.mock("../src/content/live/target.js", () => target);
 vi.mock("../src/content/monitor.js", () => ({ monitorData: () => ({ mock: "monitor" }) }));
@@ -60,7 +60,10 @@ vi.mock("../src/content/audio/metering.js", () => ({
   audioLevelHist: [{ in: -10, out: -12 }],
   A_HIST_MS: 150,
 }));
-vi.mock("../src/content/bitrate.js", () => ({ bufferLevelHist: [] }));
+const bitrate = vi.hoisted(() => ({
+  bufferLevelHist: [] as { at: number; v: number; a: number | null }[],
+}));
+vi.mock("../src/content/bitrate.js", () => bitrate);
 const autoslow = vi.hoisted(() => ({
   persistSiteAutoSlow: vi.fn(),
   persistChannelAutoSlow: vi.fn(),
@@ -139,10 +142,10 @@ beforeEach(() => {
   viewerFit.resetViewerFitScope.mockImplementation(okWrite);
   h.hasVideo = true;
   h.onStream = false;
-  h.channel = "UCabc";
   h.channelKeys = ["UCabc"];
   h.channelName = "Cool Channel";
   h.drm = false;
+  bitrate.bufferLevelHist.length = 0;
   S.currentSpeed = 1.0;
   try {
     Object.defineProperty(window, "top", { value: window, configurable: true });
@@ -155,7 +158,7 @@ describe("setSpeed action", () => {
   it("applies a manual speed and replies from the video frame", () => {
     S.currentSpeed = 1.5;
     const { ret, resp, called } = send({ action: "setSpeed", speed: 1.5 });
-    expect(speed.setSpeed).toHaveBeenCalledWith(1.5, false, true);
+    expect(speed.setSpeed).toHaveBeenCalledWith(1.5, true);
     expect(ret).toBe(true);
     expect(called).toBe(true);
     expect(resp).toEqual({ success: true, speed: 1.5, live: false });
@@ -169,6 +172,18 @@ describe("setSpeed action", () => {
     expect(ret).toBe(true);
     expect(called).toBe(true);
     expect(resp).toEqual({ success: false, speed: 1.25, live: false });
+  });
+
+  it("rejects non-finite numeric speeds (Firefox's structured clone keeps NaN/Infinity)", () => {
+    S.currentSpeed = 1.25;
+    for (const bad of [NaN, Infinity]) {
+      expect(send({ action: "setSpeed", speed: bad }).resp).toEqual({
+        success: false,
+        speed: 1.25,
+        live: false,
+      });
+    }
+    expect(speed.setSpeed).not.toHaveBeenCalled();
   });
 });
 
@@ -184,6 +199,12 @@ describe("remember / reset by scope", () => {
   it("remember without a number falls back to the current speed", () => {
     S.currentSpeed = 1.3;
     send({ action: "remember", scope: "site" });
+    expect(speed.persistDomainSpeed).toHaveBeenCalledWith(1.3, expect.any(Function));
+  });
+
+  it("remember saves the current speed instead of a non-finite one", () => {
+    S.currentSpeed = 1.3;
+    send({ action: "remember", scope: "site", speed: Infinity });
     expect(speed.persistDomainSpeed).toHaveBeenCalledWith(1.3, expect.any(Function));
   });
 
@@ -256,13 +277,18 @@ describe("getSpeed", () => {
   });
 
   it("returns every channel key alias so the popup can match old saved values", () => {
-    h.channel = "channel/UCabc";
     h.channelKeys = ["channel/UCabc", "@cool"];
     const { resp } = send({ action: "getSpeed" });
     expect(resp).toMatchObject({
       channel: "channel/UCabc",
       channelKeys: ["channel/UCabc", "@cool"],
     });
+  });
+
+  it("reports no channel off a channel page", () => {
+    h.channelKeys = [];
+    const { resp } = send({ action: "getSpeed" });
+    expect(resp).toMatchObject({ channel: null, channelKeys: [] });
   });
 
   it("includes DRM status only when the active video is protected", () => {
@@ -351,6 +377,20 @@ describe("getMonitor / getHistory", () => {
     expect(resp.buffer).toEqual([]);
     expect(resp.autoSlow).toEqual([[7, 1.4]]);
     expect(resp.autoSlowStep).toBe(100);
+  });
+
+  it("getHistory sends buffer samples as [age, level, ahead or null], rounded to 0.01", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    bitrate.bufferLevelHist.push({ at: 9_000, v: 2.3456, a: 1.2345 }, { at: 9_500, v: 3, a: null });
+    const { resp } = send({ action: "getHistory" });
+    vi.useRealTimers();
+    expect(resp).toMatchObject({
+      buffer: [
+        [1000, 2.35, 1.23],
+        [500, 3, null],
+      ],
+    });
   });
 });
 
@@ -482,6 +522,95 @@ describe("viewer frame actions", () => {
     });
     expect(send({ action: "resetViewerFit", scope: "site" }).resp).toEqual({ success: false });
   });
+
+  it("setViewerState answers with a failure when the viewer throws", () => {
+    viewer.setViewerState.mockImplementationOnce(() => {
+      throw new Error("no player");
+    });
+    expect(send({ action: "setViewerState", mode: "theater" })).toEqual({
+      ret: true,
+      resp: { success: false },
+      called: true,
+    });
+  });
+
+  it("setViewerState reports off once the viewer has closed", () => {
+    viewer.viewerFormat.mockReturnValueOnce(null);
+    expect(send({ action: "setViewerState", mode: "off" }).resp).toEqual({
+      success: true,
+      mode: "off",
+    });
+    expect(viewer.setViewerState).toHaveBeenCalledWith("off", false);
+  });
+
+  it("getViewerState reports the open viewer format, or off when none is open", () => {
+    viewer.viewerFormat.mockReturnValueOnce("theater");
+    expect(send({ action: "getViewerState" }).resp).toEqual({ mode: "theater" });
+    viewer.viewerFormat.mockReturnValueOnce(null);
+    expect(send({ action: "getViewerState" }).resp).toEqual({ mode: "off" });
+  });
+
+  it("rememberViewerAuto persists into the requested scope", () => {
+    send({ action: "rememberViewerAuto", scope: "channel", mode: "theater" });
+    send({ action: "rememberViewerAuto", scope: "global", mode: "normal" });
+    send({ action: "rememberViewerAuto", scope: "site", mode: "theater" });
+    expect(viewerAuto.persistChannelViewerAuto.mock.calls.map((c) => c[0])).toEqual(["theater"]);
+    expect(viewerAuto.persistGlobalViewerAuto.mock.calls.map((c) => c[0])).toEqual(["normal"]);
+    expect(viewerAuto.persistSiteViewerAuto.mock.calls.map((c) => c[0])).toEqual(["theater"]);
+  });
+
+  it("rememberViewerAuto saves an unknown mode as off", () => {
+    expect(send({ action: "rememberViewerAuto", scope: "site", mode: "fullscreen" }).resp).toEqual({
+      success: true,
+      mode: "off",
+    });
+    expect(viewerAuto.persistSiteViewerAuto).toHaveBeenCalledWith("off", expect.any(Function));
+  });
+
+  it("rememberViewerFit persists into the requested scope", () => {
+    send({ action: "rememberViewerFit", scope: "channel", mode: "cover" });
+    send({ action: "rememberViewerFit", scope: "global", mode: "fill" });
+    send({ action: "rememberViewerFit", scope: "site", mode: "cover" });
+    expect(viewerFit.persistChannelViewerFit.mock.calls.map((c) => c[0])).toEqual(["cover"]);
+    expect(viewerFit.persistGlobalViewerFit.mock.calls.map((c) => c[0])).toEqual(["fill"]);
+    expect(viewerFit.persistSiteViewerFit.mock.calls.map((c) => c[0])).toEqual(["cover"]);
+  });
+
+  it("rememberViewerFit keeps cover/fill and saves anything else as contain", () => {
+    for (const mode of ["cover", "fill", "stretch", undefined]) {
+      send({ action: "rememberViewerFit", scope: "site", mode });
+    }
+    expect(viewerFit.persistSiteViewerFit.mock.calls.map((c) => c[0])).toEqual([
+      "cover",
+      "fill",
+      "contain",
+      "contain",
+    ]);
+  });
+
+  it("getViewerAuto replies with the resolved mode, its scope and the channel", () => {
+    S.viewerAuto = "theater";
+    S.viewerAutoScope = "channel";
+    expect(send({ action: "getViewerAuto" }).resp).toEqual({
+      mode: "theater",
+      scope: "channel",
+      channel: "UCabc",
+      channelKeys: ["UCabc"],
+      channelName: "Cool Channel",
+    });
+  });
+
+  it("getViewerFit replies with the resolved fit, its scope and the channel", () => {
+    S.viewerFit = "fill";
+    S.viewerFitScope = "global";
+    expect(send({ action: "getViewerFit" }).resp).toEqual({
+      mode: "fill",
+      scope: "global",
+      channel: "UCabc",
+      channelKeys: ["UCabc"],
+      channelName: "Cool Channel",
+    });
+  });
 });
 
 describe("unknown actions", () => {
@@ -520,5 +649,93 @@ describe("replyFromVideoFrame fallback", () => {
     vi.advanceTimersByTime(60);
     expect(called).toBe(true); // deferred reply fired
     vi.useRealTimers();
+  });
+});
+
+describe("scoped save/reset messages for every setting", () => {
+  // Writes settle in a storage callback after the listener has returned, so the
+  // listener must return true to keep the popup's message channel open.
+  it.each<[string, Record<string, unknown>, Mock, unknown]>([
+    [
+      "remember",
+      { scope: "site", speed: 1.2 },
+      speed.persistDomainSpeed,
+      { success: true, speed: 1.2 },
+    ],
+    ["reset", { scope: "site" }, speed.resetScope, { success: true }],
+    ["resetToSaved", {}, speed.resetToSaved, { success: true }],
+    [
+      "rememberTarget",
+      { scope: "site", target: 8 },
+      target.persistSiteTarget,
+      { success: true, target: 8 },
+    ],
+    ["resetTarget", { scope: "site" }, target.resetTargetScope, { success: true }],
+    ["resetTargetToSaved", {}, target.applyResolvedTargetFromStore, { success: true }],
+    [
+      "rememberAutoSlow",
+      { scope: "site", target: 6 },
+      autoslow.persistSiteAutoSlow,
+      { success: true },
+    ],
+    ["resetAutoSlow", { scope: "site" }, autoslow.resetAutoSlowScope, { success: true }],
+    ["resetAutoSlowToSaved", {}, autoslow.applyResolvedAutoSlowFromStore, { success: true }],
+    [
+      "rememberViewerAuto",
+      { scope: "site", mode: "theater" },
+      viewerAuto.persistSiteViewerAuto,
+      { success: true, mode: "theater" },
+    ],
+    ["resetViewerAuto", { scope: "site" }, viewerAuto.resetViewerAutoScope, { success: true }],
+    ["resetViewerAutoToSaved", {}, viewerAuto.applyResolvedViewerAutoFromStore, { success: true }],
+    [
+      "rememberViewerFit",
+      { scope: "site", mode: "fill" },
+      viewerFit.persistSiteViewerFit,
+      { success: true, mode: "fill" },
+    ],
+    ["resetViewerFit", { scope: "site" }, viewerFit.resetViewerFitScope, { success: true }],
+    ["resetViewerFitToSaved", {}, viewerFit.applyResolvedViewerFitFromStore, { success: true }],
+  ])("%s keeps the channel open until the write settles", (action, extra, write, reply) => {
+    let settle: (() => void) | undefined;
+    write.mockImplementationOnce((...args: unknown[]) => {
+      const done = args[args.length - 1];
+      if (typeof done === "function") settle = () => done(true);
+    });
+    const replies: unknown[] = [];
+    const ret = h.listener!({ action, ...extra }, {}, (r?: unknown) => {
+      replies.push(r);
+    });
+    expect(ret).toBe(true);
+    expect(replies).toEqual([]);
+    settle?.();
+    expect(replies).toEqual([reply]);
+  });
+
+  it.each<[string, Record<string, unknown>, Mock]>([
+    ["rememberTarget", { scope: "site", target: 8 }, target.persistSiteTarget],
+    ["resetTarget", { scope: "site" }, target.resetTargetScope],
+    ["rememberAutoSlow", { scope: "site", target: 6 }, autoslow.persistSiteAutoSlow],
+    ["resetAutoSlow", { scope: "site" }, autoslow.resetAutoSlowScope],
+    ["rememberViewerAuto", { scope: "site", mode: "normal" }, viewerAuto.persistSiteViewerAuto],
+    ["resetViewerAuto", { scope: "site" }, viewerAuto.resetViewerAutoScope],
+    ["rememberViewerFit", { scope: "site", mode: "cover" }, viewerFit.persistSiteViewerFit],
+    ["resetViewerFit", { scope: "site" }, viewerFit.resetViewerFitScope],
+  ])("%s is left to the top frame (a subframe stays silent)", (action, extra, write) => {
+    Object.defineProperty(window, "top", { value: {}, configurable: true });
+    expect(send({ action, ...extra })).toEqual({ ret: false, resp: undefined, called: false });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Mock]>([
+    ["reset", speed.resetScope],
+    ["resetTarget", target.resetTargetScope],
+    ["resetAutoSlow", autoslow.resetAutoSlowScope],
+    ["resetViewerAuto", viewerAuto.resetViewerAutoScope],
+    ["resetViewerFit", viewerFit.resetViewerFitScope],
+  ])("%s resets channel/global as asked and anything else as site", (action, reset) => {
+    for (const scope of ["channel", "global", "site", undefined, "tab"]) send({ action, scope });
+    const scopes = reset.mock.calls.map((c) => c[0]);
+    expect(scopes).toEqual(["channel", "global", "site", "site", "site"]);
   });
 });

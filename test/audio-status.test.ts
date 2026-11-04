@@ -60,4 +60,15 @@ describe("engageAudio", () => {
     vi.advanceTimersByTime(10000);
     expect(m.apply).toHaveBeenCalledTimes(7);
   });
+
+  it("re-engaging cancels the pending retry instead of running a second retry loop", () => {
+    m.apply.mockReturnValue(skipped("cors"));
+    engageAudio();
+    vi.advanceTimersByTime(250);
+    engageAudio(); // the toggle flipped again mid-retry
+    vi.advanceTimersByTime(250); // when the first loop's retry was due
+    expect(m.apply).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(10000);
+    expect(m.apply).toHaveBeenCalledTimes(8); // 1 + a fresh 7-attempt budget
+  });
 });

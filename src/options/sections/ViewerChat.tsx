@@ -76,11 +76,6 @@ function ChatScalar({ spec }: { spec: ScalarSpec }) {
     return subscribe([spec.key], read);
   }, [spec]);
   const label = msg(spec.labelKey) || spec.labelFallback;
-  const onChange = (n: number) => {
-    const c = clampSpec(spec, n);
-    setV(c);
-    STORE.set({ [spec.key]: c });
-  };
   return (
     <div className="opt-field opt-field-block">
       <span className="opt-field-label">{label}</span>
@@ -93,7 +88,8 @@ function ChatScalar({ spec }: { spec: ScalarSpec }) {
           step={spec.step}
           value={v}
           ariaLabel={label}
-          onChange={onChange}
+          onChange={(n) => setV(clampSpec(spec, n))}
+          onCommit={(n) => STORE.set({ [spec.key]: clampSpec(spec, n) })}
         />
         <b className="opt-param-val">{spec.fmt(v)}</b>
       </div>

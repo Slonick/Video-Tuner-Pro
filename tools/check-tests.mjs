@@ -21,7 +21,7 @@ const focused = [];
 for (const path of files) {
   const source = readFileSync(path, "utf8");
   for (const [index, line] of source.split("\n").entries()) {
-    if (/\b(?:describe|suite|test|it)\.only\s*\(/.test(line)) {
+    if (/\b(?:describe|suite|test|it)(?:\.\w+)*\.only\b/.test(line)) {
       focused.push(`${path}:${index + 1}: ${line.trim()}`);
     }
   }

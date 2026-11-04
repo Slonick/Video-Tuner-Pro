@@ -149,19 +149,49 @@ describe("refreshTracked (mid-playback bridge changes)", () => {
     expect(a.playbackRate).toBe(2);
   });
 
-  it("releases a finished detached audio element until it plays again", () => {
+  it.each(["pause", "ended", "emptied", "abort", "error"])(
+    "releases a detached audio element on %s until it plays again",
+    (type) => {
+      publish("2");
+      const a = new Audio();
+      captureOnPlay(a);
+      expect(a.playbackRate).toBe(2);
+
+      a.dispatchEvent(new Event(type));
+      publish("3");
+      refreshTracked();
+      expect(a.playbackRate).toBe(2);
+
+      captureOnPlay(a);
+      expect(a.playbackRate).toBe(3);
+    },
+  );
+
+  it.each(["pause", "ended", "emptied", "abort"])(
+    "keeps an element that is playing again when a queued %s arrives",
+    (type) => {
+      publish("2");
+      const a = new Audio();
+      captureOnPlay(a);
+      Object.defineProperty(a, "paused", { value: false, configurable: true });
+
+      a.dispatchEvent(new Event(type)); // e.g. src swapped, then play() called at once
+      publish("3");
+      refreshTracked();
+      expect(a.playbackRate).toBe(3);
+    },
+  );
+
+  it("releases an element whose source failed even though it never paused", () => {
     publish("2");
     const a = new Audio();
     captureOnPlay(a);
-    expect(a.playbackRate).toBe(2);
+    Object.defineProperty(a, "paused", { value: false, configurable: true });
 
-    a.dispatchEvent(new Event("ended"));
+    a.dispatchEvent(new Event("error"));
     publish("3");
     refreshTracked();
     expect(a.playbackRate).toBe(2);
-
-    captureOnPlay(a);
-    expect(a.playbackRate).toBe(3);
   });
 
   it("stops refreshing tracked audio after a newer bridge version takes ownership", () => {
@@ -208,7 +238,9 @@ describe("install", () => {
   });
 
   it("runs the previous bridge cleanup when taking ownership", () => {
-    const cleanup = vi.fn();
+    const previous = (window as typeof window & { __vtpAudioBridgeCleanup?: () => void })
+      .__vtpAudioBridgeCleanup;
+    const cleanup = vi.fn(() => previous?.());
     (
       window as typeof window & {
         __vtpAudioBridgeInstalled?: boolean | string;
@@ -264,6 +296,39 @@ describe("install", () => {
       (window as typeof window & { __vtpAudioBridgeInstalled?: unknown }).__vtpAudioBridgeInstalled,
     ).toBe("newer-bridge");
   });
+
+  it("wraps the page's current play() on re-install, keeping a page wrapper in the chain", () => {
+    const win = window as typeof window & {
+      __vtpAudioBridgeInstalled?: boolean | string;
+      __vtpAudioBridgeCleanup?: () => void;
+    };
+    const proto = HTMLMediaElement.prototype;
+    win.__vtpAudioBridgeCleanup?.(); // hand play() back to what it was before the bridge
+    const original = proto.play;
+    try {
+      install();
+      const bridged = proto.play;
+      const pageWrapper = vi.fn(function (this: HTMLMediaElement) {
+        return bridged.call(this);
+      });
+      proto.play = pageWrapper; // the page wraps play() over our hook
+      win.__vtpAudioBridgeInstalled = "older-bridge"; // an update ships a new bridge
+      install();
+      publish("2");
+      const a = new Audio();
+      try {
+        a.play();
+      } catch (e) {
+        /* ignore jsdom 'not implemented' */
+      }
+
+      expect(pageWrapper).toHaveBeenCalledTimes(1);
+      expect(a.playbackRate).toBe(2);
+    } finally {
+      win.__vtpAudioBridgeCleanup?.();
+      proto.play = original;
+    }
+  });
 });
 
 describe("the patched play() hook (install ran on import)", () => {
@@ -276,5 +341,32 @@ describe("the patched play() hook (install ran on import)", () => {
       /* ignore jsdom 'not implemented' */
     }
     expect(a.playbackRate).toBe(2);
+  });
+
+  it("releases an element whose play() was refused (it stays paused, no event fires)", () => {
+    publish("2");
+    const a = new Audio(); // jsdom's play() never starts playback, like a blocked autoplay
+    try {
+      a.play();
+    } catch (e) {
+      /* ignore jsdom 'not implemented' */
+    }
+    publish("3");
+    refreshTracked();
+    expect(a.playbackRate).toBe(2);
+  });
+
+  it("keeps tracking an element whose play() started playback", () => {
+    publish("2");
+    const a = new Audio();
+    Object.defineProperty(a, "paused", { value: false, configurable: true });
+    try {
+      a.play();
+    } catch (e) {
+      /* ignore jsdom 'not implemented' */
+    }
+    publish("3");
+    refreshTracked();
+    expect(a.playbackRate).toBe(3);
   });
 });

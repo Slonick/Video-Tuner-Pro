@@ -74,4 +74,16 @@ describe("audio-rate bridge (isolated → MAIN world)", () => {
     resetAudios();
     expect(attr()).toBeNull();
   });
+
+  it("skips the bridge while the page has no root element (document.open)", () => {
+    S.audioSpeedEnabled = true;
+    const root = document.documentElement;
+    root.remove();
+    try {
+      expect(() => applyAll()).not.toThrow();
+      expect(() => resetAudios()).not.toThrow();
+    } finally {
+      document.appendChild(root);
+    }
+  });
 });

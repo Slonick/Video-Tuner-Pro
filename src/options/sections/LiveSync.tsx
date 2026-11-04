@@ -40,11 +40,8 @@ export function LiveSync() {
             tickStep={1}
             value={reserve}
             ariaLabel={msg("optLiveSyncReserve") || "Buffer reserve"}
-            onChange={(v) => {
-              const n = clampNum(v, 1, 10, 3);
-              setReserve(n);
-              STORE.set({ liveSyncBufferReserve: n });
-            }}
+            onChange={(v) => setReserve(clampNum(v, 1, 10, 3))}
+            onCommit={(v) => STORE.set({ liveSyncBufferReserve: clampNum(v, 1, 10, 3) })}
           />
           <p className="opt-param-hint">
             {msg("optLiveSyncReserveHint") ||

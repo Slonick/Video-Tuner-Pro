@@ -29,6 +29,13 @@ export interface AutoSlowSample {
   speed: number;
 }
 
+// The user-set guide lines, from the cards' React state (the Slider has no form
+// value to read back from the DOM).
+export interface GraphGuides {
+  threshold: number; // compressor threshold (dB) — audio meter
+  target: number; // live-sync allowed delay (s) — latency graph
+}
+
 export interface GraphState {
   aCanvas: HTMLCanvasElement;
   acx: CanvasRenderingContext2D; // audio meter

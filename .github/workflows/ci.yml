@@ -30,7 +30,10 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
+      # Keep the token out of .git/config, where npm's install scripts could read it.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
@@ -58,6 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
@@ -114,6 +119,8 @@ jobs:
     container: mcr.microsoft.com/playwright:v1.61.0-jammy
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:

@@ -1,11 +1,13 @@
 // MAIN-world bootstrap for the quality bridge. Keep this at document_start so
 // player constructors can still be hooked, but defer the heavy adapter bundle
 // until the viewer actually asks for quality data.
+import { QUALITY_BRIDGE_LOAD_EVENT, QUALITY_BRIDGE_READY_EVENT } from "../shared/dom-events.js";
+
 (function () {
   "use strict";
 
-  const LOADER_VERSION = "2026-07-08-lazy-quality";
-  const QUALITY_BRIDGE_VERSION = "2026-07-07-local-roots";
+  const LOADER_VERSION = "2026-11-04-background-inject";
+  const QUALITY_BRIDGE_VERSION = "2026-11-04-fresh-adapters";
   const win = window as typeof window & {
     __vtpQualityLoaderInstalled?: boolean | string;
     __vtpQualityLoaderCleanup?: () => void;
@@ -25,19 +27,15 @@
 
   const REQ = "vtp-quality-request";
   const SET = "vtp-quality-set";
-  const BRIDGE_URL_ATTR = "data-vtp-quality-bridge-url";
   const ROOT_REQ_ATTR = "data-vtp-quality-request";
   const ROOT_PICK_ATTR = "data-vtp-quality-pick";
   const MAX_CAPTURED_PLAYERS = 8;
   const MAX_CAPTURED_HLS = 8;
   const VIDEOLESS_PLAYER_TTL_MS = 30_000;
+  // Matches the viewer's own response timeout: past it nobody waits for the
+  // replay, and an unanswered load (no live content script) must not block retries.
+  const BRIDGE_LOAD_TIMEOUT_MS = 4000;
 
-  interface TrustedTypesLike {
-    createPolicy?: (
-      name: string,
-      rules: { createScriptURL: (url: string) => string },
-    ) => { createScriptURL: (url: string) => unknown };
-  }
   interface CapturedPlayer {
     player: unknown;
     video: HTMLVideoElement | null;
@@ -166,6 +164,13 @@
       return;
     }
     if (descriptor && "value" in descriptor) current = descriptor.value;
+    else if (descriptor) {
+      try {
+        current = win.IVSPlayer;
+      } catch (e) {
+        current = undefined;
+      }
+    }
     if (current !== undefined) hookIvsLibrary(current);
     try {
       Object.defineProperty(window, "IVSPlayer", {
@@ -244,83 +249,27 @@
   installIvsHook();
   installHlsHook();
 
-  function validBridgeUrl(url: string | null): string | null {
-    if (!url) return null;
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== "chrome-extension:" && parsed.protocol !== "moz-extension:")
-        return null;
-      return parsed.pathname.endsWith("/quality-inject.js") ? url : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  let runtimeBridgeUrl: string | null | undefined;
-
-  function bridgeUrl(): string | null {
-    const attrUrl = validBridgeUrl(document.documentElement.getAttribute(BRIDGE_URL_ATTR));
-    if (attrUrl) return attrUrl;
-    if (runtimeBridgeUrl !== undefined) return runtimeBridgeUrl;
-    const runtime = (
-      globalThis as typeof globalThis & {
-        chrome?: { runtime?: { getURL?: (path: string) => string } };
-        browser?: { runtime?: { getURL?: (path: string) => string } };
-      }
-    ).chrome?.runtime;
-    const resolved =
-      (
-        runtime?.getURL ||
-        (
-          globalThis as typeof globalThis & {
-            browser?: { runtime?: { getURL?: (path: string) => string } };
-          }
-        ).browser?.runtime?.getURL
-      )?.("quality-inject.js") || null;
-    runtimeBridgeUrl = validBridgeUrl(resolved);
-    return runtimeBridgeUrl;
-  }
-
-  let trustedPolicy:
-    | {
-        createScriptURL: (url: string) => unknown;
-      }
-    | null
-    | undefined;
-
-  function bridgeScriptUrl(url: string): string | unknown {
-    const tt = (globalThis as typeof globalThis & { trustedTypes?: TrustedTypesLike }).trustedTypes;
-    if (!tt?.createPolicy) return url;
-    if (trustedPolicy === undefined) {
-      try {
-        trustedPolicy = tt.createPolicy("video-tuner-quality-loader", {
-          createScriptURL: (value) => value,
-        });
-      } catch (e) {
-        trustedPolicy = null;
-      }
-    }
-    return trustedPolicy?.createScriptURL(url) ?? url;
-  }
-
+  // The bridge isn't web-accessible: ask the isolated content script to have the
+  // background inject it into this frame, then wait for its ready signal.
   function loadBridge(): Promise<void> {
     if (bridgeLoaded()) return Promise.resolve();
     if (loading) return loading;
-    const url = bridgeUrl();
-    if (!url) return Promise.reject(new Error("quality bridge URL is unavailable"));
     const promise = new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      (script as unknown as { src: string | unknown }).src = bridgeScriptUrl(url);
-      script.async = false;
-      script.onload = () => {
-        script.remove();
+      const stop = () => {
+        clearTimeout(timer);
+        document.removeEventListener(QUALITY_BRIDGE_READY_EVENT, onReady);
+      };
+      const onReady = () => {
+        if (!bridgeLoaded()) return;
+        stop();
         resolve();
       };
-      script.onerror = () => {
-        script.remove();
+      const timer = setTimeout(() => {
+        stop();
         reject(new Error("quality bridge failed to load"));
-      };
-      (document.head || document.documentElement || document.body).appendChild(script);
+      }, BRIDGE_LOAD_TIMEOUT_MS);
+      document.addEventListener(QUALITY_BRIDGE_READY_EVENT, onReady);
+      document.dispatchEvent(new Event(QUALITY_BRIDGE_LOAD_EVENT));
     }).finally(() => {
       loading = null;
     });

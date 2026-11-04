@@ -76,8 +76,7 @@ export const IS_MAC =
   typeof navigator !== "undefined" &&
   /mac/i.test(
     (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
-      navigator.platform ||
-      "",
+      navigator.platform,
   );
 
 // A key "chord": a bindable code plus optional Shift, the primary modifier (mod =
@@ -183,36 +182,30 @@ export function chordLabel(spec: string | null, mac: boolean = IS_MAC): string {
 // deliberate "unbound" (the action is disabled); invalid or duplicate bindings
 // fall back to the default when that default does not collide with a user binding.
 export function normalizeKeymap(raw: unknown): Keymap {
-  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const out: Keymap = { ...DEFAULT_KEYMAP };
   const legacy = !!raw && typeof raw === "object";
+  const src = legacy ? (raw as Record<string, unknown>) : {};
+  const out = {} as Keymap;
   const used = new Set<string>();
 
   for (let i = 0; i < ACTIONS.length; i++) {
     const a = ACTIONS[i];
     const code = src[a];
-    const defaultOwner =
-      typeof code === "string" && isBindableCode(code)
-        ? ACTIONS.find((action) => DEFAULT_KEYMAP[action] === code)
-        : null;
-    const laterOwnerRaw = defaultOwner ? src[defaultOwner] : undefined;
-    const laterOwnerNeedsOwnDefault =
-      laterOwnerRaw !== "" &&
-      (typeof laterOwnerRaw !== "string" ||
-        !isBindableCode(laterOwnerRaw) ||
-        laterOwnerRaw === code);
-    const laterDefaultOwnerNeedsCode =
-      !!defaultOwner &&
-      ACTIONS.indexOf(defaultOwner) > i &&
-      laterOwnerNeedsOwnDefault &&
-      (laterOwnerRaw !== undefined || (a === "slower" && defaultOwner === "faster"));
+    const defaultOwner = ACTIONS.find((action) => DEFAULT_KEYMAP[action] === code);
+    const ownerRaw = defaultOwner ? src[defaultOwner] : undefined;
+    const ownerNeedsOwnDefault =
+      ownerRaw !== "" &&
+      (typeof ownerRaw !== "string" || !isBindableCode(ownerRaw) || ownerRaw === code);
+    // Yield `code` to the action whose default it is when that owner will fall back to
+    // it. An earlier owner has already claimed it, so `used` rejects `code` either way.
+    const yieldToOwner =
+      ownerNeedsOwnDefault && (ownerRaw !== undefined || defaultOwner === "faster");
     if (code === "") {
       out[a] = ""; // explicitly unbound — the action does nothing
     } else if (
       typeof code === "string" &&
       isBindableCode(code) &&
       !used.has(code) &&
-      !laterDefaultOwnerNeedsCode
+      !yieldToOwner
     ) {
       out[a] = code;
     } else if (legacy && (a === "viewer" || a === "theater" || a === "chat") && !(a in src)) {
@@ -223,7 +216,7 @@ export function normalizeKeymap(raw: unknown): Keymap {
       const fallback = DEFAULT_KEYMAP[a];
       out[a] = fallback && !used.has(fallback) ? fallback : "";
     }
-    if (out[a]) used.add(out[a]); // an unbound "" never reserves a code
+    used.add(out[a]);
   }
   return out;
 }

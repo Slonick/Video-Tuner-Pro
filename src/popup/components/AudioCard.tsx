@@ -80,6 +80,7 @@ export const AudioCard = memo(function AudioCard({
   // Openable even when off — there are presets to view/edit; only a locked card
   // (VOT translation / no audio access) can't be configured.
   const { open, toggle, setOpen } = useCardOverlay(sectionRef, slotRef, !translating && !blocked);
+  const locked = translating || blocked;
   useEffect(() => {
     if (forceOpen !== undefined) setOpen(forceOpen);
   }, [forceOpen, setOpen]);
@@ -125,7 +126,13 @@ export const AudioCard = memo(function AudioCard({
           {translating && (
             <InfoTip warn id="audioVotWarn" label="Translation active" tip={msg("audioVotNote")} />
           )}
-          <Switch id="audioCompToggle" checked={a.enabled} onChange={onToggle} />
+          <Switch
+            id="audioCompToggle"
+            checked={a.enabled}
+            ariaLabel={msg("audioTitle")}
+            disabled={translating}
+            onChange={onToggle}
+          />
         </div>
 
         <div className="meter audio always">
@@ -167,6 +174,7 @@ export const AudioCard = memo(function AudioCard({
                     (a.activePreset === i ? " active" : "")
                   }
                   data-preset={i}
+                  disabled={locked}
                   onClick={() => a.applyPreset(i)}
                 >
                   {presetLabel(p, i)}
@@ -192,6 +200,7 @@ export const AudioCard = memo(function AudioCard({
                   tickStep={row.tickStep}
                   value={a.comp.values[row.key]}
                   animate={a.comp.animate}
+                  disabled={locked}
                   fmt={row.fmt}
                   onChange={(v) => a.setParam(row.key, v)}
                 />
@@ -207,6 +216,7 @@ export const AudioCard = memo(function AudioCard({
                 tickStep={6}
                 value={a.gain}
                 animate={false}
+                disabled={locked}
                 fmt={dB}
                 onChange={a.setGain}
               />

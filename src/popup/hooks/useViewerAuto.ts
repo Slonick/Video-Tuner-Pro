@@ -60,7 +60,9 @@ export function useViewerAuto(
 
   const [mode, setModeState] = useState<ViewerAutoMode>("off");
   const [pageMode, setPageModeState] = useState<ViewerAutoMode>("off");
-  const [enabled, setEnabledState] = useState(false);
+  // Matches the stored default (on unless explicitly false) so the card doesn't
+  // render locked and flip on once storage answers.
+  const [enabled, setEnabledState] = useState(true);
   const modeRef = useRef<ViewerAutoMode>("off");
   const pageModeRef = useRef<ViewerAutoMode>("off");
   const pageModeRequestId = useRef(0);

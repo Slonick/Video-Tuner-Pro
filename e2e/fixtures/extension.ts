@@ -27,6 +27,9 @@ export const test = base.extend<{
         // Let media autoplay and the AudioContext start without a gesture so the
         // compressor graph can engage in headless.
         "--autoplay-policy=no-user-gesture-required",
+        // English UI where the platform honours it (Linux/Windows); macOS ignores
+        // --lang, so locale-sensitive specs match labels through uiMessage().
+        "--lang=en",
       ],
     });
     await use(context);
@@ -87,6 +90,13 @@ export async function setStorage(sw: Worker, obj: Record<string, unknown>): Prom
 }
 export async function clearStorage(sw: Worker): Promise<void> {
   await sw.evaluate(() => chrome.storage.sync.clear());
+}
+
+// The extension's UI string for `key` in the browser's own locale. Specs match
+// labels through this rather than English literals: Chrome on macOS takes its UI
+// language from the OS and ignores --lang, so a literal fails on a non-English host.
+export async function uiMessage(sw: Worker, key: string): Promise<string> {
+  return sw.evaluate((k) => chrome.i18n.getMessage(k), key);
 }
 
 // The routed store (shared/store.ts) splits keys between sync and local; the

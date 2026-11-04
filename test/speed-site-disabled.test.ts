@@ -43,7 +43,8 @@ import {
 } from "../src/content/speed.js";
 import { applyAudioComp } from "../src/content/audio/compressor.js";
 import { updateBadge } from "../src/content/badge/icon.js";
-import { updateTimeBadge } from "../src/content/badge/overlay.js";
+import { updateTimeBadge, flashBadge } from "../src/content/badge/overlay.js";
+import { probeLive } from "../src/content/live/detection.js";
 
 const ATTR = "data-vtp-audiorate";
 const attr = () => document.documentElement.getAttribute(ATTR);
@@ -116,7 +117,7 @@ describe("speed on a blacklisted site", () => {
     const v = media<HTMLVideoElement>("video", 2);
     h.videos = [v];
 
-    setSpeed(3, true, true);
+    setSpeed(3, true);
 
     expect(S.currentSpeed).toBe(1.5);
     expect(S.speedManual).toBe(false);
@@ -209,5 +210,91 @@ describe("resetMedia (the hand-back when a running page is switched off)", () =>
 
     expect(() => resetMedia()).not.toThrow();
     expect(ok.playbackRate).toBe(1);
+  });
+});
+
+describe("applyAll and setSpeed side effects on an enabled site", () => {
+  it("samples every video for live detection and hands them to the compressor", () => {
+    const main = media<HTMLVideoElement>("video", 1);
+    const other = media<HTMLVideoElement>("video", 1);
+    h.videos = [main, other];
+
+    applyAll();
+
+    const probed = vi.mocked(probeLive).mock.calls.map(([v]) => v);
+    expect(probed).toHaveLength(2);
+    expect(probed[0]).toBe(main);
+    expect(probed[1]).toBe(other);
+    expect(applyAudioComp).toHaveBeenCalledOnce();
+    expect(vi.mocked(applyAudioComp).mock.calls[0][0]).toBe(h.videos);
+    expect(vi.mocked(applyAudioComp).mock.calls[0][1]).toBe(main);
+  });
+
+  it("setSpeed refreshes the time badge and flashes the new speed", () => {
+    setSpeed(2);
+
+    expect(updateTimeBadge).toHaveBeenCalledOnce();
+    expect(flashBadge).toHaveBeenCalledOnce();
+  });
+});
+
+describe("audio on an enabled site", () => {
+  beforeEach(() => {
+    S.audioSpeedEnabled = true;
+  });
+
+  it("re-asserts the speed when the page's player changes an <audio> rate", () => {
+    const a = media<HTMLAudioElement>("audio", 1);
+    h.audios = [a];
+    applyAll();
+
+    a.playbackRate = 1;
+    a.dispatchEvent(new Event("ratechange"));
+
+    expect(a.playbackRate).toBe(1.5);
+  });
+
+  it("re-applies the current speed when an <audio> starts or loads", () => {
+    const a = media<HTMLAudioElement>("audio", 1);
+    h.audios = [a];
+    applyAll();
+
+    S.currentSpeed = 2;
+    a.dispatchEvent(new Event("play"));
+    expect(a.playbackRate).toBe(2);
+
+    S.currentSpeed = 2.5;
+    a.dispatchEvent(new Event("loadeddata"));
+    expect(a.playbackRate).toBe(2.5);
+  });
+
+  it("wires an <audio> only once however often applyAll runs", () => {
+    const a = media<HTMLAudioElement>("audio", 1);
+    const wire = vi.spyOn(a, "addEventListener");
+    h.audios = [a];
+
+    applyAll();
+    const wired = wire.mock.calls.length;
+    applyAll();
+
+    expect(wired).toBeGreaterThan(0);
+    expect(wire.mock.calls.length).toBe(wired);
+  });
+
+  it("publishes the audio-rate bridge only when the rate actually changes", () => {
+    const writes = new MutationObserver(() => {});
+    writes.observe(document.documentElement, { attributes: true, attributeFilter: [ATTR] });
+    try {
+      applyAll();
+      applyAll(); // same speed: no second write for the page world's attribute observer
+      expect(writes.takeRecords()).toHaveLength(1);
+
+      S.currentSpeed = 2;
+      applyAll();
+      expect(writes.takeRecords()).toHaveLength(1);
+      expect(attr()).toBe("2");
+    } finally {
+      writes.disconnect();
+    }
   });
 });

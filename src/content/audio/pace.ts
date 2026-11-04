@@ -117,14 +117,15 @@ export function suggestEffectiveSpeed(
   target: number = PACE.TARGET_RATE,
   softKnee: number = 0,
 ): number {
-  if (effSpeed <= 0 || userSpeed <= 0) return userSpeed;
+  if (effSpeed <= 0) return userSpeed;
   const intrinsic = perceivedRate / effSpeed;
   if (intrinsic <= 0) return userSpeed;
   const p = intrinsic * userSpeed; // perceived density at the user's full speed
   const D = softKnee;
   let q: number; // compressed comfort ceiling
-  if (D <= 0 || p <= target - D) {
-    q = Math.min(p, target); // hard clamp, or below the knee → untouched
+  // softKnee 0 empties the knee band, so the first two branches are a hard clamp.
+  if (p <= target - D) {
+    q = p; // below the knee → untouched
   } else if (p >= target + D) {
     q = target; // above the knee → fully held at the ceiling
   } else {

@@ -94,6 +94,13 @@ build and diff `dist/firefox/` against the package under review.
 - `npm run format` / `npm run format:check` — Prettier (write / verify).
 - `npm test` — unit tests (Vitest). `npm run test:coverage` enforces the coverage
   thresholds; `npm run test:e2e` builds and runs the Playwright end-to-end suite.
+- `npm run test:mutation` — mutation testing (Stryker) of the logic core: shared,
+  background and the content speed/keyboard/live/audio/media modules. It checks
+  that the unit tests fail when that logic is broken. Incremental, so reruns only
+  touch changed code; the HTML report lands in `reports/mutation/`. Slow, so it's
+  not part of CI. Mutants in module-level code (tables, regexes) are credited to no
+  single test, so incremental mode keeps their old result after tests are added:
+  run `npx stryker run --force` to recheck everything.
 - `npm run screenshot [scenario]` — render the popup with mocked data to a PNG
   (`.screenshots/`) via headless Chrome. Scenarios: audio, live, vot, idle, promo.
 - `npm run bench` — micro-benchmark the media-collection strategies in real

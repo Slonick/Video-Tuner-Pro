@@ -64,7 +64,6 @@ export function applyAudioComp(
   }
   const list = videos || collectVideos();
   const main = primary !== undefined ? primary : primaryVideo();
-  let streamPage: boolean | undefined;
   let engaged = 0,
     skipped = 0,
     reason: string | null = null;
@@ -81,11 +80,9 @@ export function applyAudioComp(
       // needs it we capture nothing, rather than permanently holding the page's single
       // audio-capture slot (createMediaElementSource is one-shot, can't be released)
       // and blocking other audio extensions on every page.
-      if (S.autoSlowEnabled && v === main && streamPage === undefined) {
-        streamPage = onStreamPage();
-      }
-      const need =
-        S.audioCompEnabled || (S.autoSlowEnabled && v === main && !streamPage && !isLive(v));
+      const autoSlowPrimary = S.autoSlowEnabled && v === main;
+      const streamPage = autoSlowPrimary && onStreamPage();
+      const need = S.audioCompEnabled || (autoSlowPrimary && !streamPage && !isLive(v));
       if (!need) continue;
       g = setupGraph(v);
       if (!g) {

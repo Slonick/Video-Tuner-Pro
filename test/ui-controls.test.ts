@@ -285,4 +285,32 @@ describe("Tooltip", () => {
     act(() => trigger.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
     expect(document.querySelector('[role="tooltip"]')).toBeNull();
   });
+
+  it("takes the Escape that closes it, so the embedded overlay stays open", () => {
+    act(() =>
+      root!.render(
+        createElement(Tooltip, {
+          trigger: createElement("button", { id: "esc-trigger" }, "Help"),
+          content: "Tip",
+        }),
+      ),
+    );
+    const trigger = document.getElementById("esc-trigger")!;
+    act(() => trigger.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+    // The embedded popup closes the whole overlay on an Escape nothing else handled.
+    let overlayClosed = false;
+    const overlay = (e: KeyboardEvent) => {
+      overlayClosed = e.key === "Escape" && !e.defaultPrevented;
+    };
+    document.addEventListener("keydown", overlay);
+    act(() =>
+      trigger.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      ),
+    );
+    document.removeEventListener("keydown", overlay);
+
+    expect(document.querySelector('[role="tooltip"]')).toBeNull();
+    expect(overlayClosed).toBe(false);
+  });
 });

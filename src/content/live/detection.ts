@@ -81,7 +81,7 @@ let dvrSeenAt = 0;
 const dvrState = new WeakMap<HTMLVideoElement, DvrState>();
 
 function currentPageKey(): string {
-  return `${location.hostname || ""}${location.pathname || ""}${location.search || ""}`;
+  return `${location.hostname}${location.pathname}${location.search}`;
 }
 
 function dvrActive(video: HTMLVideoElement): boolean {
@@ -105,22 +105,18 @@ function publishedAtLiveHead(): boolean {
 }
 
 function seekableDistanceFromHead(video: HTMLVideoElement): number | null {
-  try {
-    const ranges = video.seekable;
-    if (!ranges?.length) return null;
-    const end = ranges.end(ranges.length - 1);
-    const distance = end - video.currentTime;
-    return Number.isFinite(distance) ? Math.max(0, distance) : null;
-  } catch {
-    return null;
-  }
+  const ranges = video.seekable;
+  if (!ranges.length) return null;
+  const end = ranges.end(ranges.length - 1);
+  const distance = end - video.currentTime;
+  return Number.isFinite(distance) ? Math.max(0, distance) : null;
 }
 
 function atLiveHead(video: HTMLVideoElement): boolean {
   if (publishedAtLiveHead()) return true;
   if (isYouTube()) {
     const player =
-      (video.closest && video.closest(".html5-video-player")) ||
+      video.closest(".html5-video-player") ||
       document.querySelector(".html5-video-player") ||
       document;
     const badge = player.querySelector<HTMLElement>(".ytp-live-badge");
@@ -138,8 +134,7 @@ function hasUnderlyingLiveSignal(video: HTMLVideoElement): boolean {
   if (liveProbe.get(video)?.live) return true;
   if (!isYouTube()) return false;
   const player =
-    (video.closest && video.closest(".html5-video-player")) ||
-    document.querySelector(".html5-video-player");
+    video.closest(".html5-video-player") || document.querySelector(".html5-video-player");
   return !!(
     player?.classList.contains("ytp-live") || player?.querySelector(".ytp-time-display.ytp-live")
   );
@@ -155,7 +150,6 @@ export function trackDvr(video: HTMLVideoElement): void {
   const pageKey = currentPageKey();
   if (state && state.pageKey !== pageKey) {
     if (state.active) dvrSeenAt = 0;
-    dvrState.delete(video);
     state = undefined;
   }
   if (!state) {
@@ -211,7 +205,7 @@ export function resetDvrFor(video: HTMLVideoElement, force = false): void {
 // normal VOD isn't misflagged during its initial load. 1e7 s (~115 days) matches
 // the sentinel cutoff streamEnd already uses.
 function unboundedDuration(d: number): boolean {
-  return d > 1e7;
+  return d >= 1e7;
 }
 
 function finiteVodDuration(d: number): boolean {
@@ -223,11 +217,10 @@ export function isLive(video: HTMLVideoElement): boolean {
   // (YouTube's getVideoData().isLive) to data-vtp-live — authoritative when
   // present, so it wins over the duration/DOM heuristics below.
   const flag = document.documentElement.getAttribute("data-vtp-live");
+  // A live broadcast you've scrubbed back from is a recording, not a stream,
+  // until you return to the live edge (see trackDvr).
   if (dvrActive(video)) return false;
   if (isKnownVodPage()) return false;
-  // YouTube DVR: a live broadcast you've scrubbed back from is a recording, not a
-  // stream, until you return to the live edge (see trackDvr/dvrMode).
-  if (isYouTube() && flag === "1") return true;
   if (flag === "1") return true;
 
   // YouTube live (including DVR streams) reports a FINITE, growing duration, so
@@ -240,8 +233,7 @@ export function isLive(video: HTMLVideoElement): boolean {
     // still carries ytp-live classes and a badge, and a global query would let
     // those leak onto an unrelated (e.g. inline-preview) video.
     const player =
-      (video.closest && video.closest(".html5-video-player")) ||
-      document.querySelector(".html5-video-player");
+      video.closest(".html5-video-player") || document.querySelector(".html5-video-player");
     if (player) {
       if (player.classList.contains("ytp-live")) return true;
       if (player.querySelector(".ytp-time-display.ytp-live")) return true;
@@ -275,11 +267,6 @@ export function isLive(video: HTMLVideoElement): boolean {
       return true;
     }
   }
-
-  // Otherwise a real finite duration is a VOD. Some VOD players briefly look
-  // unbounded while metadata/quality reloads settle; probeLive clears those
-  // samples as soon as the finite edge stops growing like a live stream.
-  if (finiteVodDuration(video.duration)) return false;
   return false;
 }
 
@@ -307,23 +294,17 @@ function resetProbeToFinite(video: HTMLVideoElement, probe: LiveProbe, now = Dat
 
 function streamEnd(v: HTMLVideoElement): number {
   let end = 0;
-  try {
-    const sk = v.seekable; // some players (Twitch) report a huge sentinel here
-    if (sk && sk.length) {
-      const e = sk.end(sk.length - 1);
-      if (isFinite(e) && e < 1e7) end = Math.max(end, e);
-    }
-    const bf = v.buffered;
-    if (bf && bf.length) end = Math.max(end, bf.end(bf.length - 1));
-    if (isFinite(v.duration) && v.duration < 1e7) end = Math.max(end, v.duration);
-  } catch (e) {
-    /* ignore */
+  const sk = v.seekable; // some players (Twitch) report a huge sentinel here
+  if (sk.length) {
+    const e = sk.end(sk.length - 1);
+    if (isFinite(e) && e < 1e7) end = Math.max(end, e);
   }
+  const bf = v.buffered;
+  if (bf.length) end = Math.max(end, bf.end(bf.length - 1));
   return end;
 }
 
 export function probeLive(v: HTMLVideoElement): void {
-  if (!v) return;
   const t = Date.now();
   if (unboundedDuration(v.duration)) {
     liveProbe.set(v, {
@@ -423,10 +404,7 @@ export function liveVideo(): HTMLVideoElement | null {
 // flickers (quality switches momentarily report a finite duration on Twitch).
 export function onStreamPage(live?: HTMLVideoElement | null): boolean {
   const pageKey = currentPageKey();
-  if (liveSeenPageKey && liveSeenPageKey !== pageKey) {
-    liveSeenAt = 0;
-    liveSeenPageKey = "";
-  }
+  if (liveSeenPageKey !== pageKey) liveSeenAt = 0;
   if (live === undefined ? liveVideo() : live) {
     liveSeenAt = Date.now();
     liveSeenPageKey = pageKey;
@@ -434,7 +412,6 @@ export function onStreamPage(live?: HTMLVideoElement | null): boolean {
   }
   if (document.documentElement.getAttribute("data-vtp-live") === "0") {
     liveSeenAt = 0;
-    liveSeenPageKey = "";
     return false;
   }
   if (Date.now() - dvrSeenAt < 6000) return false; // scrubbed back into the DVR buffer

@@ -26,6 +26,7 @@ const fx = vi.hoisted(() => ({
   audioSamplingReady: false,
   recordAudioSample: vi.fn(),
   autoSlowSample: vi.fn(),
+  autoSlowSamplingReady: false,
   ctxValid: true,
   addStorageListener: vi.fn(),
   readyCallback: null as (() => void) | null,
@@ -37,12 +38,13 @@ const fx = vi.hoisted(() => ({
   live: null as HTMLVideoElement | null,
   resolveSpeed: vi.fn(),
   onStream: false,
+  sendMessage: vi.fn(),
 }));
 
 vi.mock("../src/content/platform/browser.js", () => ({
   api: {
     runtime: {
-      getURL: (path: string) => `chrome-extension://vtp/${path}`,
+      sendMessage: fx.sendMessage,
     },
     storage: {
       onChanged: {
@@ -63,7 +65,7 @@ vi.mock("../src/content/platform/storage.js", () => ({
     set: vi.fn(),
     remove: vi.fn(),
   },
-  OUR_AREAS: new Set(["sync", "local"]),
+  routedChanges: (changes: Record<string, unknown>) => changes,
   whenReady: (fn: () => void) => {
     fx.readyCallback = fn;
   },
@@ -72,7 +74,10 @@ vi.mock("../src/content/core/clamp.js", () => ({
   clamp: (n: number) => n,
   clampTarget: (n: number) => n,
 }));
-vi.mock("../src/content/core/domain.js", () => ({ getDomain: () => "example.com" }));
+vi.mock("../src/content/core/domain.js", () => ({
+  getDomain: () => "example.com",
+  whenDomainReady: (fn: () => void) => fn(),
+}));
 vi.mock("../src/content/core/resolve.js", () => ({
   resolveSpeed: fx.resolveSpeed,
   resolveSyncTarget: (
@@ -151,6 +156,7 @@ vi.mock("../src/content/audio/metering.js", () => ({
 }));
 vi.mock("../src/content/audio/autoslow.js", () => ({
   autoSlowSample: fx.autoSlowSample,
+  autoSlowSamplingReady: () => fx.autoSlowSamplingReady,
   AUTOSLOW_MS: 1000,
   releaseAutoSlow: fx.releaseAutoSlow,
 }));
@@ -184,6 +190,7 @@ vi.mock("../src/content/channel.js", () => ({
 }));
 
 import { STORE } from "../src/content/platform/storage.js";
+import { QUALITY_BRIDGE_LOAD_EVENT, QUALITY_BRIDGE_READY_EVENT } from "../src/shared/dom-events.js";
 
 async function loadIndex(): Promise<void> {
   vi.resetModules();
@@ -221,10 +228,10 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   teardownIndex = null;
-  document.documentElement.removeAttribute("data-vtp-quality-bridge-url");
   fx.onStream = false;
   fx.ctxValid = true;
   fx.audioSamplingReady = false;
+  fx.autoSlowSamplingReady = false;
   fx.live = null;
   fx.keys = [];
   fx.videos = [];
@@ -285,16 +292,53 @@ describe("content media events", () => {
     expect(fx.maybeAutoOpenPlayingPrimary).toHaveBeenCalled();
   });
 
-  it("publishes the MAIN-world quality bridge URL for the lazy loader", async () => {
+  it("asks the background for the quality bridge only when the page loader needs it", async () => {
     await loadIndex();
+    const ready = vi.fn();
+    document.addEventListener(QUALITY_BRIDGE_READY_EVENT, ready);
+    try {
+      expect(document.documentElement.hasAttribute("data-vtp-quality-bridge-url")).toBe(false);
+      expect(fx.sendMessage).not.toHaveBeenCalled();
 
-    expect(document.documentElement.getAttribute("data-vtp-quality-bridge-url")).toBe(
-      "chrome-extension://vtp/quality-inject.js",
-    );
+      fx.sendMessage.mockImplementationOnce((_msg, done) => done({ ok: false }));
+      document.dispatchEvent(new Event(QUALITY_BRIDGE_LOAD_EVENT));
+      expect(ready).not.toHaveBeenCalled();
+
+      fx.sendMessage.mockImplementationOnce((_msg, done) => done({ ok: true }));
+      document.dispatchEvent(new Event(QUALITY_BRIDGE_LOAD_EVENT));
+      expect(ready).toHaveBeenCalledTimes(1);
+
+      document.dispatchEvent(new Event(QUALITY_BRIDGE_LOAD_EVENT));
+      expect(fx.sendMessage).toHaveBeenCalledTimes(2);
+      expect(fx.sendMessage).toHaveBeenLastCalledWith(
+        { action: "injectQualityBridge" },
+        expect.any(Function),
+      );
+    } finally {
+      document.removeEventListener(QUALITY_BRIDGE_READY_EVENT, ready);
+    }
+  });
+
+  it("touches no media before the first settings read, then replays the pending pass", async () => {
+    vi.mocked(STORE.get).mockImplementation((_keys, cb) => cb({}));
+    await loadIndex(); // the settings read has not landed yet
+
+    media(false).dispatchEvent(new Event("play"));
+    fx.storageListener?.({ globalSpeed: { newValue: 2 } }, "sync");
+    await nextFrame();
+    expect(fx.applyAll).not.toHaveBeenCalled();
+    expect(fx.controlLive).not.toHaveBeenCalled();
+    expect(fx.flashBadge).not.toHaveBeenCalled();
+
+    fx.readyCallback?.(); // the site is on
+    expect(fx.applyAll).toHaveBeenCalledTimes(1);
+    await nextFrame();
+    expect(fx.flashBadge).toHaveBeenCalledTimes(1); // the early autoplay still surfaces the badge
   });
 
   it("coalesces a burst of media events into one apply pass", async () => {
-    await loadIndex();
+    await bootIndex();
+    vi.clearAllMocks(); // forget the boot pass
     const v = media(false);
 
     v.dispatchEvent(new Event("loadedmetadata"));
@@ -311,7 +355,8 @@ describe("content media events", () => {
   });
 
   it("surfaces the badge when duration arrives after autoplay has already started", async () => {
-    await loadIndex();
+    await bootIndex();
+    vi.clearAllMocks();
 
     media(false).dispatchEvent(new Event("durationchange"));
     await nextFrame();
@@ -323,9 +368,11 @@ describe("content media events", () => {
   });
 
   it("does not flash the badge for idle metadata changes", async () => {
-    await loadIndex();
+    await bootIndex();
+    vi.clearAllMocks();
 
     media(true).dispatchEvent(new Event("durationchange"));
+    await nextFrame();
 
     expect(fx.updateTimeBadge).not.toHaveBeenCalled();
     expect(fx.flashBadge).not.toHaveBeenCalled();
@@ -333,7 +380,8 @@ describe("content media events", () => {
 
   it("does not keep a live badge awake on repeated duration changes", async () => {
     fx.onStream = true;
-    await loadIndex();
+    await bootIndex();
+    vi.clearAllMocks();
 
     media(false).dispatchEvent(new Event("durationchange"));
     await nextFrame();
@@ -345,7 +393,7 @@ describe("content media events", () => {
   });
 
   it("does not surface page-originated media state changes as badge notices", async () => {
-    await loadIndex();
+    await bootIndex();
     const v = media(false);
 
     v.dispatchEvent(new Event("play"));
@@ -363,7 +411,7 @@ describe("content media events", () => {
   });
 
   it("closes an active viewer when the viewer feature is disabled", async () => {
-    await loadIndex();
+    await bootIndex();
     const { S } = await import("../src/content/state.js");
     S.viewerAutoEnabled = false;
 
@@ -504,6 +552,7 @@ describe("content graph samplers", () => {
   it("runs the auto-slow sampler only while auto-slow is enabled", async () => {
     await bootIndex();
     const { S } = await import("../src/content/state.js");
+    fx.autoSlowSamplingReady = true;
 
     await vi.advanceTimersByTimeAsync(3000);
     expect(fx.autoSlowSample).not.toHaveBeenCalled();
@@ -518,6 +567,26 @@ describe("content graph samplers", () => {
     expect(fx.autoSlowSample).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(3000);
     expect(fx.autoSlowSample).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs the auto-slow sampler only while the main video feeds an audio graph", async () => {
+    await bootIndex();
+    const { S } = await import("../src/content/state.js");
+    fx.videos = [media(false)];
+    S.autoSlowEnabled = true;
+    fx.storageListener?.({ autoSlowEnabled: { newValue: true } }, "sync");
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fx.autoSlowSample).not.toHaveBeenCalled();
+
+    fx.autoSlowSamplingReady = true; // the main video got routed through Web Audio
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fx.autoSlowSample).toHaveBeenCalled();
+
+    fx.autoSlowSamplingReady = false;
+    await vi.advanceTimersByTimeAsync(1000);
+    const callsAfterStop = fx.autoSlowSample.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fx.autoSlowSample).toHaveBeenCalledTimes(callsAfterStop);
   });
 });
 
@@ -590,6 +659,24 @@ describe("content site blacklist", () => {
     // Nothing of ours ran here, so the page's own playback rate is left alone.
     expect(fx.resetMedia).not.toHaveBeenCalled();
     expect(fx.updateBadge).toHaveBeenCalled(); // only to clear a toolbar badge, if any
+  });
+
+  it("writes nothing for media events that arrive before the first settings read", async () => {
+    vi.mocked(STORE.get).mockImplementation((_keys, cb) => cb({ siteBlacklist: OFF }));
+    await loadIndex(); // the settings read has not landed yet
+    const v = media(false);
+    fx.videos = [v];
+    v.dispatchEvent(new Event("loadedmetadata"));
+    v.dispatchEvent(new Event("play"));
+    window.dispatchEvent(new Event("load"));
+    await nextFrame();
+
+    fx.readyCallback?.(); // …and it says this site is off
+    await nextFrame();
+
+    expect(fx.applyAll).not.toHaveBeenCalled();
+    expect(fx.controlLive).not.toHaveBeenCalled();
+    expect(fx.reconcile).not.toHaveBeenCalled();
   });
 
   it("a tab regaining focus does not restart a blacklisted page", async () => {

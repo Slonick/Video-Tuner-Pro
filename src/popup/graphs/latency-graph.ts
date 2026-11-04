@@ -1,7 +1,6 @@
 // The latency graph: a scrolling time graph of latency-to-broadcaster (or
 // buffered-ahead seconds where latency isn't exposed), with the allowed-delay
 // target line and the download bitrate.
-import { byId } from "../dom.js";
 import { msg } from "../i18n.js";
 import { col, fitCanvas, smoothLine, levelMark, cornerReadout } from "./draw-util.js";
 import { BUF_WINDOW } from "./state.js";
@@ -12,7 +11,7 @@ function fmtBitrate(bps: number | null): string | null {
   return bps >= 1e6 ? (bps / 1e6).toFixed(1) + " Mbps" : Math.round(bps / 1e3) + " kbps";
 }
 
-export function drawBuffer(g: GraphState, t: number): void {
+export function drawBuffer(g: GraphState, t: number, target: number): void {
   const bcx = g.bcx;
   const { w, h } = fitCanvas(g.bCanvas, bcx);
   if (!w) return;
@@ -29,7 +28,6 @@ export function drawBuffer(g: GraphState, t: number): void {
     bcx.textBaseline = "alphabetic";
     return;
   }
-  const target = Number(byId<HTMLInputElement>("syncTarget").value);
   // Latency = accent line/value, buffer-ahead = green. When the site exposes
   // latency both are shown; otherwise the single series IS the buffer (green).
   const LAT_COL = col("--accent", "#0a84ff");
@@ -44,9 +42,8 @@ export function drawBuffer(g: GraphState, t: number): void {
   const halfAmp = gh / 2 - 1;
   // Each half scales to its OWN peak (plus the target so the dashed line stays in
   // view) — small values still fill the graph instead of hugging the centre.
-  const tgt = Number.isNaN(target) ? 0 : target;
-  let latMx = tgt,
-    bufMx = tgt;
+  let latMx = target,
+    bufMx = target;
   for (const p of g.bufHist)
     if (t - p.t <= BUF_WINDOW) {
       if (hasAhead) {
@@ -113,7 +110,7 @@ export function drawBuffer(g: GraphState, t: number): void {
     yT: number,
     yEdge: number,
   ): void => {
-    if (Number.isNaN(target) || pts.length < 2) return;
+    if (pts.length < 2) return;
     const grad = bcx.createLinearGradient(0, yT, 0, yEdge);
     grad.addColorStop(0, "rgba(255,159,10,0.10)");
     grad.addColorStop(1, "rgba(255,159,10,0.7)");
@@ -170,10 +167,8 @@ export function drawBuffer(g: GraphState, t: number): void {
       fillArea((p) => p.a, -1, ampBuf, BUF_COL, "rgba(48,209,88,0.16)"); // buffer ↑
     }
     // Target mirrored on both halves (each at its own scale).
-    if (!Number.isNaN(target)) {
-      target2(mid + ampLat(target));
-      target2(mid - ampBuf(target));
-    }
+    target2(mid + ampLat(target));
+    target2(mid - ampBuf(target));
     if (g.bufHist.length) {
       cornerReadout(bcx, [
         // Buffer on top, latency below — matching the graph (buffer fills up, latency
@@ -208,7 +203,7 @@ export function drawBuffer(g: GraphState, t: number): void {
       bcx.stroke();
       overTarget(pts, bottom, bottom - ampFull(target), bottom - gh);
     }
-    if (!Number.isNaN(target)) target2(bottom - ampFull(target));
+    target2(bottom - ampFull(target));
     if (g.bufHist.length) {
       cornerReadout(bcx, [
         { label: msg("meterBuffer") || "Buffer", value: fmtS(v), color: BUF_COL },

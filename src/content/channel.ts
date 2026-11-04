@@ -162,8 +162,12 @@ const SITES: Site[] = [
   },
 ];
 
-let cachedKeyUrl = "";
-let cachedKeys: string[] | null = null;
+// The keys last read, and the page they were read on. Page-derived keys (YouTube's
+// owner link, a Twitch VOD's broadcaster) are re-read on every call: right after an
+// in-page navigation the markup can still show the previous video's owner, and a
+// cached read would freeze that. This only bridges a re-render that briefly drops the
+// owner markup on the same page.
+let last: { url: string; keys: string[] } | undefined;
 
 function siteFor(host: string): Site | null {
   return SITES.find((s) => s.host.test(host)) ?? null;
@@ -176,8 +180,8 @@ function clean(login: string, site: Site): string | null {
 }
 
 // First path segment of an href ("/<login>/…" → login), cleaned. Null otherwise.
-function loginFromHref(href: string, site: Site): string | null {
-  const m = href.match(/^\/([^/?#]+)/);
+function loginFromHref(href: string | null | undefined, site: Site): string | null {
+  const m = href?.match(/^\/([^/?#]+)/);
   return m ? clean(m[1], site) : null;
 }
 
@@ -185,23 +189,17 @@ function loginFromHref(href: string, site: Site): string | null {
 // isn't a channel page. The first segment is the login at any depth; reserved
 // routes return null. Twitch VODs (no channel in the URL) fall back to a DOM link.
 function siteLogin(site: Site): string | null {
-  const first = window.location.pathname.split("/").filter(Boolean)[0] || "";
-  if (site.handle) {
-    if (first.startsWith("@")) {
-      const c = clean(first.slice(1), site);
-      if (c) return c;
-    }
-  } else if (first) {
-    const c = clean(first, site);
-    if (c) return c;
-  }
+  let first = window.location.pathname.split("/").filter(Boolean)[0] || "";
+  if (site.handle) first = first.startsWith("@") ? first.slice(1) : "";
+  const login = clean(first, site);
+  if (login) return login;
   if (site.linkSel && (!site.linkPath || site.linkPath.test(window.location.pathname))) {
     // The video-info bar shows the broadcaster name (h1.tw-title on a Twitch VOD);
     // its lower-cased form is the login when they differ only in capitalization.
     // Only accept text shaped like a login, so a localized display name with
     // spaces/punctuation doesn't become a bogus key.
     for (const s of site.nameSel) {
-      const t = document.querySelector<HTMLElement>(s)?.textContent?.trim() || "";
+      const t = document.querySelector<HTMLElement>(s)?.textContent.trim() || "";
       if (/^[A-Za-z0-9_]{2,30}$/.test(t)) {
         const c = clean(t, site);
         if (c) return c;
@@ -209,7 +207,7 @@ function siteLogin(site: Site): string | null {
     }
     for (const s of site.linkSel) {
       const lg = loginFromHref(
-        document.querySelector<HTMLAnchorElement>(s)?.getAttribute("href") || "",
+        document.querySelector<HTMLAnchorElement>(s)?.getAttribute("href"),
         site,
       );
       if (lg) return lg;
@@ -218,10 +216,7 @@ function siteLogin(site: Site): string | null {
     const a = document
       .querySelector<HTMLElement>('img[class*="avatar" i]')
       ?.closest<HTMLAnchorElement>('a[href^="/"]');
-    if (a) {
-      const lg = loginFromHref(a.getAttribute("href") || "", site);
-      if (lg) return lg;
-    }
+    return loginFromHref(a?.getAttribute("href"), site);
   }
   return null;
 }
@@ -232,11 +227,9 @@ function siteLogin(site: Site): string | null {
 // other site has a single key: "<ns>:<login>" (login lower-cased, so /XQC and /xqc
 // share one entry).
 export function channelKeys(): string[] {
-  const cacheUrl = `${window.location.hostname}${window.location.pathname}${window.location.search || ""}`;
-  if (cachedKeyUrl === cacheUrl && cachedKeys) return [...cachedKeys];
+  const url = `${window.location.hostname}${window.location.pathname}${window.location.search}`;
   const h = window.location.hostname;
-  let keys: string[] = [];
-  let cacheable = true;
+  let keys: string[];
   if (YT_HOST.test(h)) {
     if (!YT_WATCH.test(window.location.pathname)) return [];
     let id: string | null = null,
@@ -265,16 +258,16 @@ export function channelKeys(): string[] {
       }
     }
     keys = [id, handle].filter((k): k is string => k != null);
-    cacheable = !!id;
   } else {
     const site = siteFor(h);
     if (!site) return [];
     const login = siteLogin(site);
     keys = login ? [site.ns + ":" + login] : [];
   }
-  if (keys.length && cacheable) {
-    cachedKeyUrl = cacheUrl;
-    cachedKeys = keys;
+  if (keys.length) {
+    last = { url, keys };
+  } else if (last?.url === url) {
+    keys = last.keys;
   }
   return [...keys];
 }
@@ -288,7 +281,6 @@ export function currentSiteLogin(): string | null {
 }
 
 export function sameChannelIdentity(a: string[], b: string[]): boolean {
-  if (!a.length || !b.length) return false;
   const previous = new Set(a);
   return b.some((k) => previous.has(k));
 }
@@ -297,13 +289,6 @@ export function sameChannelKeys(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const previous = new Set(a);
   return b.every((k) => previous.has(k));
-}
-
-// The canonical channel key (for saving + change-tracking): the stable id when
-// present, else the handle / login. A value saved under the other form is still
-// matched at lookup, so it survives whichever link the page happens to expose.
-export function currentChannel(): string | null {
-  return channelKeys()[0] ?? null;
 }
 
 // The channel's display name (not the @handle / login), for the popup header.
