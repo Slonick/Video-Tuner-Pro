@@ -241,5 +241,8 @@
   "optChatHeightLabel": { "message": "Altura do painel" },
   "optChatInputLabel": { "message": "Campo de mensagem" },
   "optChatInputHint": { "message": "Mostrar a caixa de envio no chat sobreposto." },
-  "optKeyChat": { "message": "Modo do chat" }
+  "optKeyChat": { "message": "Modo do chat" },
+  "optKeyRewind": { "message": "Voltar" },
+  "optKeyAdvance": { "message": "Avançar" },
+  "optSeekStep": { "message": "Duração do salto" }
 }

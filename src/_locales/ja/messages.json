@@ -241,5 +241,8 @@
   "optChatHeightLabel": { "message": "パネルの高さ" },
   "optChatInputLabel": { "message": "メッセージ入力欄" },
   "optChatInputHint": { "message": "オーバーレイチャットに送信欄を表示します。" },
-  "optKeyChat": { "message": "チャットモード" }
+  "optKeyChat": { "message": "チャットモード" },
+  "optKeyRewind": { "message": "戻る" },
+  "optKeyAdvance": { "message": "進む" },
+  "optSeekStep": { "message": "スキップ秒数" }
 }

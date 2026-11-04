@@ -410,6 +410,19 @@ describe("Options · Keys", () => {
     expect(km.reset).toBe("KeyR");
   });
 
+  it("seek step slider persists, and reset-to-defaults clears it", async () => {
+    const { get } = await mountOptions({});
+    const [thumb] = thumbsIn(sectionWith("#keyRows"), ".opt-param");
+    sliderKey(thumb, "End");
+    await flush();
+    expect(get(["seekStep"]).seekStep).toBe(60);
+    await confirmText(
+      document.querySelector("#keyRows ~ .card-actions .confirm-btn") as HTMLElement,
+    );
+    expect(get(["seekStep"]).seekStep).toBeUndefined();
+    expect(thumb.getAttribute("aria-valuenow")).toBe("10");
+  });
+
   it("names the configured speed step on the slower/faster rows", async () => {
     await mountOptions({ speedStep: 10 });
     const label = byId("keySlower").closest(".key-row")!.querySelector(".key-label")!;

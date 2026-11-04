@@ -1,11 +1,16 @@
 // Keyboard-shortcut editor: click an action's key, then press the new one.
-// Stores KeyboardEvent.code values under "keymap"; the content listener picks it
-// up live. Mirrors the old keys.ts behaviour.
+// Stores KeyboardEvent.code values under "keymap" and the rewind/advance jump
+// under "seekStep"; the content listener picks both up live. Mirrors the old
+// keys.ts behaviour.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE, subscribe } from "../../shared/store.js";
 import {
   normalizeKeymap,
+  normalizeSeekStep,
   DEFAULT_KEYMAP,
+  SEEK_STEP_DEFAULT,
+  SEEK_STEP_MIN,
+  SEEK_STEP_MAX,
   isBindableCode,
   codeLabel,
   ACTIONS,
@@ -18,6 +23,7 @@ import { msg } from "../../popup/i18n.js";
 import { Group } from "../Group.js";
 import { useCaptureGuard } from "../useCaptureGuard.js";
 import { Button } from "../../ui/Button.js";
+import { Slider } from "../../ui/Slider.js";
 import { Switch } from "../../ui/Switch.js";
 import { ConfirmButton } from "../../ui/ConfirmButton.js";
 
@@ -27,6 +33,8 @@ const ROWS: Array<{ action: Action; labelKey: string }> = [
   { action: "reset", labelKey: "optKeyReset" },
   { action: "toggle", labelKey: "optKeyToggle" },
   { action: "hold", labelKey: "optKeyHold" },
+  { action: "rewind", labelKey: "optKeyRewind" },
+  { action: "advance", labelKey: "optKeyAdvance" },
   { action: "overlay", labelKey: "optKeyOverlay" },
   { action: "viewer", labelKey: "optKeyViewer" },
   { action: "theater", labelKey: "optKeyTheater" },
@@ -36,6 +44,7 @@ const ROWS: Array<{ action: Action; labelKey: string }> = [
 export function Keys() {
   const [keymap, setKeymap] = useState<Keymap>({ ...DEFAULT_KEYMAP });
   const [capturing, setCapturing] = useState<Action | null>(null);
+  const [seekStep, setSeekStep] = useState<number>(SEEK_STEP_DEFAULT);
   const [dupe, setDupe] = useState<Action | null>(null);
   // The slower/faster labels name the configured step ("Slower (−5%)").
   const [stepPct, setStepPct] = useState(STEP_DEFAULT);
@@ -51,18 +60,22 @@ export function Keys() {
   mapRef.current = keymap;
 
   const loadKeys = useCallback(() => {
-    STORE.get(["keymap", "presetKeys", "speedStep"], (r) => {
+    STORE.get(["keymap", "presetKeys", "seekStep", "speedStep"], (r) => {
       const km = normalizeKeymap(r.keymap);
       for (const a of ACTIONS) if (km[a]) lastKey.current[a] = km[a];
       setKeymap(km);
       presetKeysRef.current = Array.isArray(r.presetKeys) ? r.presetKeys : [];
+      setSeekStep(normalizeSeekStep(r.seekStep));
       setStepPct(normalizeSpeedStep(r.speedStep));
     });
   }, []);
 
   useEffect(loadKeys, [loadKeys]);
 
-  useEffect(() => subscribe(["keymap", "presetKeys", "speedStep"], loadKeys), [loadKeys]);
+  useEffect(
+    () => subscribe(["keymap", "presetKeys", "seekStep", "speedStep"], loadKeys),
+    [loadKeys],
+  );
 
   useCaptureGuard(capturing !== null, () => setCapturing(null));
 
@@ -115,8 +128,17 @@ export function Keys() {
   const resetDefaults = () => {
     const next = { ...DEFAULT_KEYMAP };
     setKeymap(next);
+    setSeekStep(SEEK_STEP_DEFAULT);
     setCapturing(null);
     STORE.set({ keymap: next });
+    STORE.remove(["seekStep"]);
+  };
+
+  const previewSeekStep = (raw: number) => setSeekStep(normalizeSeekStep(raw));
+  const commitSeekStep = (raw: number) => {
+    const v = normalizeSeekStep(raw);
+    setSeekStep(v);
+    STORE.set({ seekStep: v });
   };
 
   // Enable/disable an action via its switch. Off → remember the key, then unbind it
@@ -172,6 +194,24 @@ export function Keys() {
             </span>
           </div>
         ))}
+      </div>
+      <div className="opt-param">
+        <div className="opt-param-row">
+          <span>{msg("optSeekStep") || "Seek step"}</span>
+          <b className="opt-param-val">
+            {seekStep} {msg("secondsShort") || "s"}
+          </b>
+        </div>
+        <Slider
+          className="opt-slider"
+          min={SEEK_STEP_MIN}
+          max={SEEK_STEP_MAX}
+          step={1}
+          value={seekStep}
+          ariaLabel={msg("optSeekStep") || "Seek step"}
+          onChange={previewSeekStep}
+          onCommit={commitSeekStep}
+        />
       </div>
       <div className="card-actions">
         <ConfirmButton

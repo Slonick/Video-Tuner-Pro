@@ -3,7 +3,7 @@
 // write live on this single object (loadSpeed/onChanged set them, the speed/live/
 // audio/badge modules read — and a couple write — them).
 import { DEFAULT_PRESETS, DEFAULT_PRESET_KEYS } from "../shared/presets.js";
-import { DEFAULT_KEYMAP, type Keymap } from "../shared/keymap.js";
+import { DEFAULT_KEYMAP, SEEK_STEP_DEFAULT, type Keymap } from "../shared/keymap.js";
 
 export const S = {
   // The per-site kill switch (stored `siteBlacklist` matches this host): every
@@ -40,12 +40,14 @@ export const S = {
   // two stay sorted together so a key follows its speed.
   presets: DEFAULT_PRESETS.map((p) => p / 100) as number[],
   presetKeys: [...DEFAULT_PRESET_KEYS] as (string | null)[],
-  // Remappable shortcut keys (e.code values) for speed, overlay and viewer actions.
+  // Remappable shortcut keys (e.code values) for speed, seek, overlay and viewer actions.
   keymap: { ...DEFAULT_KEYMAP } as Keymap,
   // How much one slower/faster press changes the speed (fraction; Shift doubles).
   speedStep: 0.05,
   // The speed the hold key applies while pressed (fraction).
   holdSpeed: 2.0,
+  // Seconds one rewind/advance press jumps (Shift doubles).
+  seekStep: SEEK_STEP_DEFAULT,
   // The last non-1× speed, remembered so `toggle` can restore it.
   toggleMemory: null as number | null,
   // Hold-key bookkeeping: whether it's down, and the speed to restore on release.

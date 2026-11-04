@@ -12,6 +12,7 @@ import {
 } from "../src/shared/presets.js";
 import {
   normalizeKeymap,
+  normalizeSeekStep,
   isBindableCode,
   codeLabel,
   formatChord,
@@ -105,6 +106,16 @@ describe("normalizeHoldSpeed", () => {
   });
 });
 
+describe("normalizeSeekStep", () => {
+  it("defaults to 10 s and clamps whole seconds to [1, 60]", () => {
+    expect(normalizeSeekStep(undefined)).toBe(10);
+    expect(normalizeSeekStep("abc")).toBe(10);
+    expect(normalizeSeekStep(0)).toBe(1);
+    expect(normalizeSeekStep(999)).toBe(60);
+    expect(normalizeSeekStep(4.6)).toBe(5);
+  });
+});
+
 describe("normalizeKeymap", () => {
   it("defaults missing/invalid bindings", () => {
     expect(normalizeKeymap(undefined)).toEqual(DEFAULT_KEYMAP);
@@ -163,6 +174,18 @@ describe("normalizeKeymap", () => {
     expect(km.reset).toBe("KeyO");
     expect(km.overlay).toBe("");
   });
+  it("binds Q / E seek keys for an existing stored keymap", () => {
+    const km = normalizeKeymap({ slower: "KeyJ", faster: "KeyK", chat: "" });
+    expect(km.rewind).toBe("KeyQ");
+    expect(km.advance).toBe("KeyE");
+  });
+  it("leaves a seek key unbound when the user already uses its default", () => {
+    const km = normalizeKeymap({ slower: "KeyQ", reset: "KeyE" });
+    expect(km.slower).toBe("KeyQ");
+    expect(km.reset).toBe("KeyE");
+    expect(km.rewind).toBe("");
+    expect(km.advance).toBe("");
+  });
   it("ships the documented default bindings on a fresh install", () => {
     expect(normalizeKeymap(undefined)).toEqual({
       slower: "KeyA",
@@ -174,6 +197,8 @@ describe("normalizeKeymap", () => {
       viewer: "KeyV",
       theater: "KeyT",
       chat: "KeyC",
+      rewind: "KeyQ",
+      advance: "KeyE",
     });
   });
   it("treats a stored null like nothing stored", () => {
