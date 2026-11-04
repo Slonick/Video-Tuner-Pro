@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   clampGlassOpacity,
   applyGlassOpacity,
@@ -23,6 +23,68 @@ describe("ensureGlassFilter", () => {
     const sr = document.createElement("div").attachShadow({ mode: "open" });
     ensureGlassFilter(sr);
     expect(sr.querySelector("svg")).toBeTruthy();
+  });
+});
+
+describe("ensureGlassFilter output", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const freshDoc = () => document.implementation.createHTMLDocument("t");
+
+  it("builds a turbulence → blur → displacement chain that refracts the backdrop", () => {
+    const doc = freshDoc();
+    ensureGlassFilter(doc);
+    const filter = doc.querySelector("filter#vtp-glass")!;
+    const chain = [...filter.children].map((el) => ({
+      name: el.localName,
+      in: el.getAttribute("in"),
+      in2: el.getAttribute("in2"),
+      result: el.getAttribute("result"),
+    }));
+    expect(chain).toEqual([
+      { name: "feTurbulence", in: null, in2: null, result: "noise" },
+      { name: "feGaussianBlur", in: "noise", in2: null, result: "soft" },
+      { name: "feDisplacementMap", in: "SourceGraphic", in2: "soft", result: null },
+    ]);
+  });
+
+  it("puts the filter in <body> and the card backdrop rule in <head> of a document", () => {
+    const doc = freshDoc();
+    ensureGlassFilter(doc);
+    expect(doc.querySelector("svg")!.parentNode).toBe(doc.body);
+    const style = doc.querySelector("style")!;
+    expect(style.parentNode).toBe(doc.head);
+    const css = style.textContent!.replace(/\s+/g, "");
+    expect(css).toContain(".sync-section,.card,.metercanvas{");
+    expect(css).toContain(
+      "-webkit-backdrop-filter:blur(var(--card-blur))saturate(var(--glass-saturate))!important;",
+    );
+    expect(css).toContain(
+      ";backdrop-filter:blur(var(--card-blur))saturate(var(--glass-saturate))url(#vtp-glass)!important;",
+    );
+  });
+
+  it("adds no card rule to a shadow root (its callers style inline)", () => {
+    const sr = document.createElement("div").attachShadow({ mode: "open" });
+    ensureGlassFilter(sr);
+    expect(sr.querySelector("svg")!.parentNode).toBe(sr);
+    expect(sr.querySelector("style")).toBeNull();
+  });
+
+  it("injects nothing when the filter markup fails to parse", () => {
+    const RealParser = DOMParser;
+    vi.stubGlobal(
+      "DOMParser",
+      class {
+        parseFromString() {
+          return new RealParser().parseFromString("<parsererror/>", "application/xml");
+        }
+      },
+    );
+    const doc = freshDoc();
+    ensureGlassFilter(doc);
+    expect(doc.body.children).toHaveLength(0);
+    expect(doc.querySelector("style")).toBeNull();
   });
 });
 

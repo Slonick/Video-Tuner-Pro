@@ -12,7 +12,7 @@
 // internals, so we describe narrow shapes for exactly the fields we read.
 (function () {
   "use strict";
-  const BRIDGE_VERSION = "2026-07-10-current-youtube-live";
+  const BRIDGE_VERSION = "2026-11-04-lean-probe";
   const win = window as typeof window & {
     __vtpLatencyBridgeInstalled?: boolean | string;
     __vtpLatencyBridgeCleanup?: () => void;
@@ -95,10 +95,9 @@
   // The fiber a React element carries under its `__reactFiber$…` (or legacy
   // `__reactInternalInstance$…`) key.
   function fiberOf(el: Element): Fiber | null {
-    const rec = el as unknown as Record<string, unknown>;
-    for (const k in rec) {
+    for (const k of Object.keys(el)) {
       if (k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")) {
-        return (rec[k] as Fiber) ?? null;
+        return ((el as unknown as Record<string, unknown>)[k] as Fiber) ?? null;
       }
     }
     return null;
@@ -159,6 +158,7 @@
   let twitchScanDelay = 5000;
   const TWITCH_SCAN_INITIAL_MS = 5000;
   const TWITCH_SCAN_MAX_MS = 60000;
+  let twitchScanHref = "";
   function resetTwitchScanBackoff(): void {
     nextTwitchScanAt = 0;
     twitchScanDelay = TWITCH_SCAN_INITIAL_MS;
@@ -168,11 +168,19 @@
     let lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
     if (lat == null) {
       const now = Date.now();
+      // An in-page navigation (VOD → live) may bring a new player: look right away
+      // instead of waiting out a backoff earned on the previous page.
+      if (location.href !== twitchScanHref) {
+        twitchScanHref = location.href;
+        resetTwitchScanBackoff();
+      }
       if (now < nextTwitchScanAt) return null;
       twitchPlayer = findTwitchPlayer();
-      if (twitchPlayer) {
+      lat = twitchPlayer ? twitchLatencyOf(twitchPlayer) : null;
+      // A player with no latency (VOD, clip, ad) backs off as well: rescanning would
+      // only find the same player again.
+      if (lat != null) {
         resetTwitchScanBackoff();
-        lat = twitchLatencyOf(twitchPlayer);
       } else {
         nextTwitchScanAt = now + twitchScanDelay;
         twitchScanDelay = Math.min(twitchScanDelay * 2, TWITCH_SCAN_MAX_MS);
@@ -265,22 +273,30 @@
     return null;
   }
   function findHls(): HlsLike | null {
-    const roots = Array.from(document.querySelectorAll("video"));
-    for (const el of roots) {
-      const fromNode = findHlsInValue(el, new WeakSet<object>(), 3, { n: 300 });
-      if (fromNode) return fromNode;
+    // Neighbouring ancestors share most of their fiber chain (and videos their
+    // ancestors), so each element and fiber is scanned once per pass rather than once
+    // per ancestor. A repeat would only redo the same bounded walk from the same root.
+    const elements = new WeakSet<Element>();
+    const fibers = new WeakSet<Fiber>();
+    for (const el of Array.from(document.querySelectorAll("video"))) {
       let cur: Element | null = el;
       for (let depth = 0; depth < 30 && cur; depth++) {
-        const fromElementProps = findHlsInValue(cur, new WeakSet<object>(), 3, { n: 300 });
-        if (fromElementProps) return fromElementProps;
+        if (!elements.has(cur)) {
+          elements.add(cur);
+          const fromElementProps = findHlsInValue(cur, new WeakSet<object>(), 3, { n: 300 });
+          if (fromElementProps) return fromElementProps;
+        }
         let f = fiberOf(cur);
         for (let i = 0; i < 60 && f; i++) {
-          const p = f.memoizedProps || f.stateNode?.props;
-          const fromProps = findHlsInValue(p, new WeakSet<object>(), 5, { n: 1200 });
-          if (fromProps) return fromProps;
-          const s = f.memoizedState;
-          const fromState = findHlsInValue(s, new WeakSet<object>(), 5, { n: 1200 });
-          if (fromState) return fromState;
+          if (!fibers.has(f)) {
+            fibers.add(f);
+            const p = f.memoizedProps || f.stateNode?.props;
+            const fromProps = findHlsInValue(p, new WeakSet<object>(), 5, { n: 1200 });
+            if (fromProps) return fromProps;
+            const s = f.memoizedState;
+            const fromState = findHlsInValue(s, new WeakSet<object>(), 5, { n: 1200 });
+            if (fromState) return fromState;
+          }
           f = f.return ?? null;
         }
         cur = cur.parentElement;
@@ -399,9 +415,8 @@
   // "false" needs care: before playback starts (and while an ad plays) isLive
   // is false even on a live stream — publishing "0" then would silence the
   // whole live UI. Only trust it once the player is actually on the content.
-  function youtubeIsLive(): boolean | null {
+  function youtubeIsLive(yp: YouTubePlayer | null): boolean | null {
     try {
-      const yp = youtubePlayer();
       if (!yp || typeof yp.getVideoData !== "function") return null;
       if (yp.classList.contains("ad-showing") || yp.classList.contains("ad-interrupting"))
         return null;
@@ -417,14 +432,12 @@
   }
 
   // YouTube's #movie_player exposes "Live Latency" via getStatsForNerds(); a live
-  // stream's distance behind the seekable edge is the same thing as a fallback
-  // (guarded so it never fires on VODs).
+  // stream's distance behind the seekable edge is the same thing as a fallback.
+  // Called only for a live stream: a VOD has no live latency to read.
   let statsLatRaw = ""; // last raw stats value, to spot a frozen readout
   let statsLatChangedAt = 0;
-  function youtubeLatency(): number | null {
+  function youtubeLatency(yp: YouTubePlayer): number | null {
     try {
-      const yp = youtubePlayer();
-      if (!yp) return null;
       let statsLat: number | null = null;
       if (typeof yp.getStatsForNerds === "function") {
         const s = yp.getStatsForNerds() || {};
@@ -451,7 +464,7 @@
       // mouse movement), freezing the readout. A value stuck for a few seconds is
       // stale — fall through to the progress-state distance behind the live edge.
       if (statsLat != null && Date.now() - statsLatChangedAt < 3000) return statsLat;
-      if (youtubeIsLive() && typeof yp.getProgressState === "function") {
+      if (typeof yp.getProgressState === "function") {
         const p = yp.getProgressState() || {};
         const d = (p.seekableEnd ?? NaN) - (p.current ?? NaN);
         if (isFinite(d) && d > 0) return d;
@@ -474,9 +487,12 @@
     }
     try {
       const tw = twitchLatency();
-      const yt = tw == null ? youtubeLatency() : null;
-      const live = youtubeIsLive();
-      const lat = tw != null ? tw : (yt ?? (IS_YOUTUBE ? null : hlsLatency()));
+      // One player lookup per tick: it reads layout to skip hidden players.
+      const yp = youtubePlayer();
+      const live = youtubeIsLive(yp);
+      const yt = tw == null && yp && live === true ? youtubeLatency(yp) : null;
+      // Twitch and YouTube publish their own latency; hls.js is the generic fallback.
+      const lat = tw != null ? tw : (yt ?? (IS_YOUTUBE || IS_TWITCH ? null : hlsLatency()));
       const root = document.documentElement;
       if (!root) return;
       setAttrIfChanged(root, ATTR, lat != null ? (Math.round(lat * 10) / 10).toFixed(1) : null);

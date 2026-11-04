@@ -4,7 +4,7 @@
 // Iridium, which is open source) does the rest, and only ever matches while
 // YouTube itself is in theater / full-bleed mode.
 import { api } from "./platform/browser.js";
-import { STORE, OUR_AREAS } from "./platform/storage.js";
+import { STORE, routedChanges, whenReady } from "./platform/storage.js";
 import { onStreamPage } from "./live/detection.js";
 import { contentSignal } from "./lifecycle.js";
 import { S } from "./state.js";
@@ -82,8 +82,12 @@ function effectiveKey(): "superTheater" | "superTheaterStream" {
 // Also how index.ts re-evaluates the layout when the site is switched off or on.
 export function syncSuperTheater(): void {
   if (!isYouTube()) return;
-  const key = effectiveKey();
-  STORE.get([key], (r) => applySuperTheater(r[key] === true));
+  // Not before the sync config loads: until then the router reads the default
+  // (synced) area, and that reply could land after the correct one.
+  whenReady(() => {
+    const key = effectiveKey();
+    STORE.get([key], (r) => applySuperTheater(r[key] === true));
+  });
 }
 
 if (isYouTube()) {
@@ -97,8 +101,8 @@ if (isYouTube()) {
     attributeFilter: ["data-vtp-live"],
   });
   const onStorageChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-    if (!OUR_AREAS.has(area)) return;
-    if (changes.superTheater || changes.superTheaterStream) syncSuperTheater();
+    const routed = routedChanges(changes, area);
+    if (routed.superTheater || routed.superTheaterStream) syncSuperTheater();
   };
   api.storage.onChanged.addListener(onStorageChange);
   contentSignal.addEventListener(

@@ -14,7 +14,6 @@ beforeEach(() => {
   vi.resetModules();
   document.body.innerHTML = "";
   document.documentElement.removeAttribute("data-vtp-quality-response");
-  document.documentElement.removeAttribute("data-vtp-quality-debug");
   delete (window as typeof window & { Hls?: unknown }).Hls;
   delete (window as typeof window & { IVSPlayer?: unknown }).IVSPlayer;
   window.CSS ||= {} as CSS;
@@ -28,14 +27,14 @@ beforeEach(() => {
 
 function waitForResponse(requestId: string): Promise<QualityResponse> {
   return new Promise((resolve) => {
-    document.addEventListener(
-      "vtp-quality-response",
-      (e) => {
-        const detail = (e as CustomEvent).detail as QualityResponse;
-        if (detail.requestId === requestId) resolve(detail);
-      },
-      { once: true },
-    );
+    // Not `once`: a reply to another request must not drop this listener.
+    const onResponse = (e: Event) => {
+      const detail = (e as CustomEvent).detail as QualityResponse;
+      if (detail.requestId !== requestId) return;
+      document.removeEventListener("vtp-quality-response", onResponse);
+      resolve(detail);
+    };
+    document.addEventListener("vtp-quality-response", onResponse);
   });
 }
 
@@ -202,24 +201,6 @@ describe("quality-inject request cost", () => {
     expect(queryAll.mock.calls.filter(([selector]) => selector === "*")).toHaveLength(1);
   });
 
-  it("does not collect debug details on ordinary unsupported requests", async () => {
-    await import("../src/content/quality-inject.js");
-
-    const video = document.createElement("video");
-    video.setAttribute("data-vtp-quality-id", "v1");
-    document.body.append(video);
-
-    const response = waitForResponse("r-no-debug");
-    document.dispatchEvent(
-      new CustomEvent("vtp-quality-request", {
-        detail: { requestId: "r-no-debug", videoId: "v1" },
-      }),
-    );
-
-    await response;
-    expect(document.documentElement.getAttribute("data-vtp-quality-debug")).toBeNull();
-  });
-
   it("does not rescan React roots repeatedly for the same unsupported video", async () => {
     await import("../src/content/quality-inject.js");
 
@@ -325,29 +306,6 @@ describe("quality-inject request cost", () => {
     );
 
     expect(await second).not.toBeNull();
-  });
-
-  it("collects unsupported-player debug details only when explicitly requested", async () => {
-    await import("../src/content/quality-inject.js");
-
-    const video = document.createElement("video");
-    video.setAttribute("data-vtp-quality-id", "v1");
-    document.body.append(video);
-    document.documentElement.setAttribute("data-vtp-quality-debug", "1");
-
-    const response = waitForResponse("r-debug");
-    document.dispatchEvent(
-      new CustomEvent("vtp-quality-request", {
-        detail: { requestId: "r-debug", videoId: "v1" },
-      }),
-    );
-
-    await response;
-    expect(
-      JSON.parse(document.documentElement.getAttribute("data-vtp-quality-debug") || "{}"),
-    ).toMatchObject({
-      adapter: false,
-    });
   });
 
   it("caps captured IVS-like players", async () => {
@@ -662,6 +620,38 @@ describe("quality-inject React-hosted player adapter", () => {
     expect(player.setQuality).toHaveBeenCalledWith(qualities[1], false);
   });
 
+  it("shows an IVS pick only until the player reports it or returns to auto", async () => {
+    await import("../src/content/quality-inject.js");
+
+    const qualities = [{ height: 360 }, { height: 720 }];
+    const player = {
+      auto: false,
+      selected: qualities[0],
+      getQualities: () => qualities,
+      getQuality: () => player.selected,
+      setQuality: vi.fn(),
+      isAutoQualityMode: () => player.auto,
+      setAutoQualityMode: (enabled: boolean) => {
+        player.auto = enabled;
+      },
+    };
+    const root = document.createElement("div") as HTMLDivElement & { __reactFiber$vtp?: unknown };
+    root.__reactFiber$vtp = { memoizedProps: { mediaPlayerInstance: player } };
+    videoWithRoot(root);
+
+    await setQuality("::720:::1");
+    expect((await requestQuality("switching")).current).toBe("::720:::1");
+
+    player.selected = qualities[1];
+    expect((await requestQuality("switched")).current).toBe("::720:::1");
+
+    player.selected = qualities[0];
+    expect((await requestQuality("page-pick")).current).toBe("::360:::0");
+
+    player.auto = true;
+    expect((await requestQuality("page-auto")).current).toBe("auto");
+  });
+
   it("reaches deeply nested React player internals", async () => {
     await import("../src/content/quality-inject.js");
 
@@ -761,6 +751,28 @@ describe("quality-inject generic player adapters", () => {
     await setQuality("2");
     expect(shaka.configure).toHaveBeenCalledWith({ abr: { enabled: false } });
     expect(shaka.selectVariantTrack).toHaveBeenCalledWith(tracks[1], true);
+  });
+
+  it("reports the Shaka track that is active now, not when the player was found", async () => {
+    await import("../src/content/quality-inject.js");
+    let activeId = 1;
+    const shaka = {
+      getVariantTracks: () =>
+        [1, 2].map((id) => ({ id, height: id * 360, active: id === activeId })),
+      configure: vi.fn(),
+      selectVariantTrack: (track: { id: number }) => {
+        activeId = track.id;
+      },
+    };
+    const root = document.createElement("div") as HTMLDivElement & { __reactFiber$vtp?: unknown };
+    root.__reactFiber$vtp = { memoizedProps: { shakaPlayer: shaka } };
+    videoWithRoot(root);
+
+    expect((await requestQuality("before")).current).toBe("1");
+
+    await setQuality("2");
+
+    expect((await requestQuality("after")).current).toBe("2");
   });
 
   it("reads and sets Vidstack qualities", async () => {

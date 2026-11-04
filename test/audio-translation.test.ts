@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { S } from "../src/content/state.js";
 import { translationActive, compOn } from "../src/content/audio/translation.js";
 
@@ -39,6 +39,23 @@ describe("translationActive", () => {
   it("true while a translation is actively playing (data-status=success)", () => {
     mountVot("success");
     expect(translationActive()).toBe(true);
+  });
+
+  it("searches the document once per synchronous pass", async () => {
+    const query = vi.spyOn(document, "querySelector");
+    try {
+      translationActive();
+      translationActive();
+      compOn();
+      expect(query).toHaveBeenCalledTimes(1);
+
+      mountVot("success");
+      await Promise.resolve(); // the next pass looks again
+      expect(translationActive()).toBe(true);
+      expect(query).toHaveBeenCalledTimes(2);
+    } finally {
+      query.mockRestore();
+    }
   });
 });
 

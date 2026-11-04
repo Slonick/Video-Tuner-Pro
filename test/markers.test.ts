@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   isYouTube,
-  hasNativeSponsorBlock,
   youTubeVideoId,
   parseTimestampList,
   chapterStartsFromWidths,
@@ -25,22 +24,6 @@ describe("isYouTube / youTubeVideoId", () => {
     expect(youTubeVideoId("https://youtu.be/dQw4w9WgXcQ?t=10")).toBe("dQw4w9WgXcQ");
     expect(youTubeVideoId("https://www.youtube.com/feed/history")).toBeNull();
     expect(youTubeVideoId("not a url")).toBeNull();
-  });
-});
-
-describe("hasNativeSponsorBlock", () => {
-  it("detects SponsorBlock DOM markers", () => {
-    document.body.innerHTML = '<div id="sponsorblock-document-script"></div>';
-    expect(hasNativeSponsorBlock()).toBe(true);
-    document.body.innerHTML = '<ul id="previewbar" class="sbNotInvidious"></ul>';
-    expect(hasNativeSponsorBlock()).toBe(true);
-    document.body.innerHTML = '<span id="sponsorBlockDurationAfterSkips">(27:46)</span>';
-    expect(hasNativeSponsorBlock()).toBe(true);
-  });
-
-  it("ignores unrelated sponsor-looking page content", () => {
-    document.body.innerHTML = '<div id="sponsor-button"></div>';
-    expect(hasNativeSponsorBlock()).toBe(false);
   });
 });
 

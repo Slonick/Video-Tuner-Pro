@@ -24,6 +24,15 @@ describe("resolveLocale", () => {
     expect(resolveLocale("system", "")).toBe("en");
   });
 
+  // A stored choice this build doesn't ship (a newer version's locale arriving by
+  // sync, a hand-edited backup) must not resolve to a bundle that doesn't exist.
+  it("treats an unknown or malformed stored choice as system", () => {
+    expect(resolveLocale("it", "de")).toBe("de");
+    expect(resolveLocale("it", "ko")).toBe("en");
+    expect(resolveLocale(42, "ru-RU")).toBe("ru");
+    expect(resolveLocale(undefined, "fr")).toBe("fr");
+  });
+
   it("ships a native name for every selectable locale", () => {
     for (const code of LOCALES) expect(LOCALE_NAMES[code]).toBeTruthy();
   });
@@ -55,5 +64,14 @@ describe("language preference storage", () => {
       lang = l;
     });
     expect(lang).toBe("ja");
+  });
+
+  it("getLang reports system for a stored language this build doesn't ship", async () => {
+    const { getLang } = await fresh({ uiLang: "it" });
+    let lang: string | undefined;
+    getLang((l) => {
+      lang = l;
+    });
+    expect(lang).toBe("system");
   });
 });

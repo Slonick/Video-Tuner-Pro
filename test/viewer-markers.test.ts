@@ -18,7 +18,6 @@ vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
 vi.mock("../src/content/markers.js", () => ({
   isYouTube: () => true,
   youTubeVideoId: () => "abc",
-  hasNativeSponsorBlock: () => false,
   SPONSOR_COLORS: { sponsor: "#00d400" },
   readYouTubeChapters: () => h.chapters,
   fetchSponsorSegments: vi.fn().mockResolvedValue([{ start: 10, end: 20, category: "sponsor" }]),

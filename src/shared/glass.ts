@@ -61,7 +61,7 @@ export function ensureGlassFilter(root: Document | ShadowRoot): void {
   // this filter is a static, trusted SVG string anyway. parseFromString builds it in
   // the SVG namespace; appendChild adopts the node into the target document.
   const svg = new DOMParser().parseFromString(FILTER_SVG, "image/svg+xml").documentElement;
-  if (!svg || svg.tagName === "parsererror") return;
+  if (svg.tagName === "parsererror") return;
   const host = root instanceof Document ? (root.body ?? root.documentElement) : root;
   host.appendChild(svg);
   if (root instanceof Document) {

@@ -14,7 +14,7 @@
     video: HTMLVideoElement | null;
   }
 
-  const BRIDGE_VERSION = "2026-07-07-local-roots";
+  const BRIDGE_VERSION = "2026-11-04-fresh-adapters";
   const win = window as typeof window & {
     __vtpQualityBridgeInstalled?: boolean | string;
     __vtpQualityBridgeCleanup?: () => void;
@@ -45,7 +45,6 @@
   const ROOT_VIDEO_ATTR = "data-vtp-quality-video";
   const ROOT_PICK_ATTR = "data-vtp-quality-pick";
   const ROOT_RESP_ATTR = "data-vtp-quality-response";
-  const ROOT_DEBUG_ATTR = "data-vtp-quality-debug";
   const MAX_CAPTURED_PLAYERS = 8;
   const MAX_CAPTURED_HLS = 8;
   const VIDEOLESS_PLAYER_TTL_MS = 30_000;
@@ -181,6 +180,13 @@
       return;
     }
     if (descriptor && "value" in descriptor) current = descriptor.value;
+    else if (descriptor) {
+      try {
+        current = win.IVSPlayer;
+      } catch (e) {
+        current = undefined;
+      }
+    }
     if (current !== undefined) hookIvsLibrary(current);
     try {
       Object.defineProperty(window, "IVSPlayer", {
@@ -688,14 +694,15 @@
         ? (o as unknown as ShakaLike)
         : null;
     });
-    const tracks = (shaka?.getVariantTracks?.() || []).filter((t) => t.type !== "audio");
-    if (!shaka || tracks.length < 2) return null;
+    const tracks = (): ShakaTrack[] =>
+      (shaka?.getVariantTracks?.() || []).filter((t) => t.type !== "audio");
+    if (!shaka || tracks().length < 2) return null;
     return {
       options() {
         const current = this.current();
         return [
           { id: "auto", label: "Auto", current: current === "auto" },
-          ...tracks.map((track) => ({
+          ...tracks().map((track) => ({
             id: String(track.id),
             label: labelFromHeight(track.height, track.bandwidth),
             current: String(track.id) === current,
@@ -703,14 +710,14 @@
         ];
       },
       current() {
-        const active = tracks.find((t) => t.active);
+        const active = tracks().find((t) => t.active);
         return active ? String(active.id) : "auto";
       },
       set(id: string) {
         const auto = id === "auto";
         shaka.configure?.({ abr: { enabled: auto } });
         if (!auto) {
-          const track = tracks.find((t) => String(t.id) === id);
+          const track = tracks().find((t) => String(t.id) === id);
           if (track) shaka.selectVariantTrack?.(track, true);
         }
       },
@@ -1035,11 +1042,16 @@
           }),
         ];
       },
+      // manualCurrent bridges the gap until the player switches; once it reports
+      // that pick, or auto mode, the player's own state is authoritative again.
       current() {
-        if (manualCurrent) return manualCurrent;
-        const auto = player.isAutoQualityMode?.();
-        if (auto) return "auto";
-        return idForQuality(player.getQuality?.());
+        if (player.isAutoQualityMode?.()) {
+          manualCurrent = null;
+          return "auto";
+        }
+        const reported = idForQuality(player.getQuality?.());
+        if (reported === manualCurrent) manualCurrent = null;
+        return manualCurrent ?? reported;
       },
       set(id: string) {
         if (id === "auto") {
@@ -1093,102 +1105,11 @@
     }
   }
 
-  function debugFor(v: HTMLVideoElement, adapter: Adapter | null): string {
-    const now = (): number => window.performance?.now?.() ?? Date.now();
-    const started = now();
-    const seen = new WeakSet<object>();
-    const queue = rootsFor(v)
-      .filter(isObj)
-      .map((value) => ({ value, depth: 0, path: "video" }));
-    const hits: Array<Record<string, unknown>> = [];
-    const preferred = [
-      "hls",
-      "hlsjs",
-      "hlsInstance",
-      "dash",
-      "dashjs",
-      "shaka",
-      "player",
-      "mediaPlayer",
-      "mediaPlayerInstance",
-      "videoPlayer",
-      "tech_",
-      "vhs",
-      "api",
-      "value",
-    ];
-    let budget = 80;
-    while (queue.length && budget-- > 0) {
-      const { value, depth, path } = queue.shift()!;
-      if (seen.has(value)) continue;
-      seen.add(value);
-      const levels = read(value, "levels");
-      const hit: Record<string, unknown> = { path };
-      let matched = false;
-      if (Array.isArray(levels)) {
-        hit.levels = levels.length;
-        hit.currentLevel = read(value, "currentLevel");
-        hit.hasMedia = !!read(value, "media");
-        matched = true;
-      }
-      if (typeof read(value, "qualityLevels") === "function") {
-        hit.videoJs = true;
-        matched = true;
-      }
-      if (typeof read(value, "getVariantTracks") === "function") {
-        hit.shaka = true;
-        matched = true;
-      }
-      if (typeof read(value, "getBitrateInfoListFor") === "function") {
-        hit.dash = true;
-        matched = true;
-      }
-      if (
-        typeof read(value, "getQualities") === "function" ||
-        typeof read(value, "setQuality") === "function"
-      ) {
-        hit.qualityMethods = {
-          get: typeof read(value, "getQualities") === "function",
-          set: typeof read(value, "setQuality") === "function",
-        };
-        matched = true;
-      }
-      if (matched) hits.push(hit);
-      if (depth >= 2) continue;
-      for (const key of preferred) {
-        const child = read(value, key);
-        if (isObj(child)) queue.push({ value: child, depth: depth + 1, path: `${path}.${key}` });
-      }
-    }
-    return JSON.stringify({
-      adapter: !!adapter,
-      ms: Math.round((now() - started) * 10) / 10,
-      capturedPlayers: (win.__vtpQualityPlayers || []).map((entry) => {
-        const player = entry.player as Record<string, unknown>;
-        return {
-          ctor: isObj(player) ? player.constructor?.name : typeof player,
-          video: entry.video
-            ? {
-                w: entry.video.videoWidth,
-                h: entry.video.videoHeight,
-                paused: entry.video.paused,
-              }
-            : null,
-          hasQualities: typeof player.getQualities === "function",
-          hasQuality: typeof player.getQuality === "function",
-          hasSetQuality: typeof player.setQuality === "function",
-        };
-      }),
-      hits: hits.slice(0, 20),
-    });
-  }
-
   async function respond(
     requestId: string,
     adapter: Adapter | null,
     presetOptions?: QualityOption[],
     presetCurrent?: string,
-    debugVideoId?: unknown,
   ): Promise<void> {
     if (!isActiveBridge()) return;
     const options = presetOptions || (adapter ? await adapter.options() : []);
@@ -1203,25 +1124,6 @@
       current,
     };
     document.documentElement.setAttribute(ROOT_RESP_ATTR, JSON.stringify(payload));
-    const debugEnabled = document.documentElement.getAttribute(ROOT_DEBUG_ATTR) === "1";
-    if (debugEnabled && (!adapter || options.length < 2)) {
-      try {
-        const video = videoById(
-          debugVideoId ?? document.documentElement.getAttribute(ROOT_VIDEO_ATTR),
-        );
-        if (video) {
-          const debug = debugFor(video, adapter);
-          document.documentElement.setAttribute(ROOT_DEBUG_ATTR, debug);
-        }
-      } catch (e) {
-        document.documentElement.setAttribute(
-          ROOT_DEBUG_ATTR,
-          JSON.stringify({ error: String(e) }),
-        );
-      }
-    } else {
-      document.documentElement.removeAttribute(ROOT_DEBUG_ATTR);
-    }
     document.dispatchEvent(new CustomEvent(RESP, { detail: payload }));
   }
 
@@ -1247,16 +1149,10 @@
         if (!isActiveBridge()) return;
         const current = d.qualityId;
         const selected = before.map((opt) => ({ ...opt, current: opt.id === current }));
-        await respond(
-          d.requestId,
-          adapter,
-          selected.length ? selected : undefined,
-          current,
-          d.videoId,
-        );
+        await respond(d.requestId, adapter, selected.length ? selected : undefined, current);
         return;
       }
-      await respond(d.requestId, adapter, undefined, undefined, d.videoId);
+      await respond(d.requestId, adapter);
     } finally {
       inflightRequests.delete(requestKey);
     }

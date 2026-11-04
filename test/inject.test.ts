@@ -450,4 +450,111 @@ describe("MAIN-world live probe", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(hlsReads.mock.calls.length).toBeGreaterThan(secondScanReads);
   });
+
+  it("does not scan generic HLS internals on Twitch", async () => {
+    vi.stubGlobal("location", { hostname: "www.twitch.tv" });
+    const video = document.createElement("video") as HTMLVideoElement & { hls?: unknown };
+    const hlsReads = vi.fn(() => null);
+    Object.defineProperty(video, "hls", { get: hlsReads, configurable: true, enumerable: true });
+    document.body.append(video);
+
+    await loadInject();
+
+    expect(hlsReads).not.toHaveBeenCalled();
+  });
+
+  it("keeps backing off Twitch player scans while the found player reports no latency", async () => {
+    vi.stubGlobal("location", { hostname: "www.twitch.tv" });
+    const player = { getLiveLatency: vi.fn(() => null) }; // a VOD, clip or ad
+    const fiberReads = vi.fn(() => ({ memoizedProps: { mediaPlayerInstance: player } }));
+    const video = document.createElement("video");
+    Object.defineProperty(video, "__reactFiber$vtp", {
+      get: fiberReads,
+      configurable: true,
+      enumerable: true,
+    });
+    document.body.append(video);
+
+    await loadInject();
+    const firstScanReads = fiberReads.mock.calls.length;
+    expect(firstScanReads).toBeGreaterThan(0);
+
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(fiberReads).toHaveBeenCalledTimes(firstScanReads);
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBeNull();
+  });
+
+  it("rescans for a Twitch player right after an in-page navigation", async () => {
+    vi.stubGlobal("location", {
+      hostname: "www.twitch.tv",
+      href: "https://www.twitch.tv/videos/1",
+    });
+    const player = { getLiveLatency: vi.fn(() => null) };
+    const fiberReads = vi.fn(() => ({ memoizedProps: { mediaPlayerInstance: player } }));
+    const video = document.createElement("video");
+    Object.defineProperty(video, "__reactFiber$vtp", {
+      get: fiberReads,
+      configurable: true,
+      enumerable: true,
+    });
+    document.body.append(video);
+
+    await loadInject();
+    const firstScanReads = fiberReads.mock.calls.length;
+    vi.stubGlobal("location", { hostname: "www.twitch.tv", href: "https://www.twitch.tv/chan" });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fiberReads.mock.calls.length).toBeGreaterThan(firstScanReads);
+  });
+
+  it("scans a fiber shared by several ancestors once per HLS pass", async () => {
+    vi.stubGlobal("location", { hostname: "kick.com" });
+    const probe = vi.fn(() => null);
+    const sharedProps = {};
+    Object.defineProperty(sharedProps, "probe", { get: probe, enumerable: true });
+    const shared = { memoizedProps: sharedProps };
+    const outer = document.createElement("div");
+    const mid = document.createElement("div");
+    const video = document.createElement("video");
+    for (const el of [outer, mid, video]) {
+      (el as unknown as Record<string, unknown>).__reactFiber$vtp = {
+        memoizedProps: {},
+        return: shared,
+      };
+    }
+    mid.append(video);
+    outer.append(mid);
+    document.body.append(outer);
+
+    await loadInject();
+
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it("looks the YouTube player up once per tick and skips stats for nerds on a VOD", async () => {
+    const player = makeYoutubePlayer(640, 360, false) as HTMLElement & {
+      getStatsForNerds?: () => Record<string, unknown>;
+    };
+    const stats = vi.fn(() => ({ live_latency: "3.0" }));
+    player.getStatsForNerds = stats;
+    const queryAll = vi.spyOn(document, "querySelectorAll");
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("0");
+    expect(stats).not.toHaveBeenCalled();
+    expect(queryAll.mock.calls.filter(([sel]) => sel === ".html5-video-player")).toHaveLength(1);
+    queryAll.mockRestore();
+  });
+
+  it("reads the live latency from stats for nerds on a YouTube live stream", async () => {
+    const player = makeYoutubePlayer(640, 360, true) as HTMLElement & {
+      getStatsForNerds?: () => Record<string, unknown>;
+    };
+    player.getStatsForNerds = () => ({ live_latency: "3.24" });
+
+    await loadInject();
+
+    expect(document.documentElement.getAttribute("data-vtp-live")).toBe("1");
+    expect(document.documentElement.getAttribute("data-vtp-latency")).toBe("3.2");
+  });
 });

@@ -27,7 +27,6 @@ let lastApplyAt = -Infinity;
 let lastDenseAt = -Infinity; // last time the perceived rate was at/over the ceiling
 let lastProbeAt = -Infinity;
 let cachedPrimary: HTMLVideoElement | null = null;
-let cachedBlocked = true;
 
 // Playback speed sampled each tick, kept over the same trailing window as the
 // syllable meter. The perceived rate is a ~4 s average, so to recover a stable
@@ -47,7 +46,6 @@ function pushSpeed(s: number, now: number): void {
   }
 }
 function windowSpeed(): number {
-  if (!speedV.length) return 0;
   let sum = 0;
   for (const s of speedV) sum += s;
   return sum / speedV.length;
@@ -75,14 +73,19 @@ export function releaseAutoSlow(): void {
   release();
 }
 
+// The sampler only has something to measure while the primary video feeds an
+// analyser; the content entry runs it only then.
+export function autoSlowSamplingReady(primary = primaryVideo()): boolean {
+  return !!primary && !!audioGraphs.get(primary)?.analyserIn;
+}
+
 function primaryForAutoSlow(now: number): HTMLVideoElement | null {
   if (now - lastProbeAt >= PRIMARY_CACHE_MS) {
     const v = primaryVideo();
-    cachedPrimary = v;
-    cachedBlocked = !v || isLive(v) || onStreamPage() || v.paused;
+    cachedPrimary = !v || isLive(v) || onStreamPage() || v.paused ? null : v;
     lastProbeAt = now;
   }
-  return cachedBlocked ? null : cachedPrimary;
+  return cachedPrimary;
 }
 
 // One sample tick (scheduled at PACE.SAMPLE_MS by the content entry). Reads the
@@ -117,7 +120,8 @@ export function autoSlowSample(): void {
   }
 
   const an = g.analyserIn;
-  if (!buf || buf.length !== an.fftSize) buf = new Float32Array(an.fftSize);
+  // Every input analyser shares one fftSize (routing.ts), so one buffer fits all.
+  if (!buf) buf = new Float32Array(an.fftSize);
   an.getFloatTimeDomainData(buf);
 
   // ~23 ms RMS window — the high-pass detector reads the envelope's modulation, not peaks.
@@ -129,14 +133,13 @@ export function autoSlowSample(): void {
   lastApplyAt = now;
 
   const user = S.currentSpeed;
-  if (user <= 0) return;
   if (!appliedEff) appliedEff = user * S.autoSlowFactor;
 
   const target = S.autoSlowTarget; // comfort ceiling in syll/s — the graph's target line
   const rate = meter.rate();
   // Divide the windowed rate by the windowed speed (see speedT/speedV above) so the
   // intrinsic estimate stays steady through a speed change instead of oscillating.
-  const measSpeed = windowSpeed() || appliedEff;
+  const measSpeed = windowSpeed();
   const desired = suggestEffectiveSpeed(
     rate,
     measSpeed,
@@ -153,18 +156,20 @@ export function autoSlowSample(): void {
 
   const stepDown = rampStep(S.autoSlowReaction, REACTION_RANGE[0], REACTION_RANGE[1]);
   const stepUp = rampStep(S.autoSlowEaseBack, EASEBACK_RANGE[0], EASEBACK_RANGE[1]);
-  const span = user || 1;
   if (desired < appliedEff) {
-    appliedEff = Math.max(desired, appliedEff - stepDown * span); // slow briskly
+    appliedEff = Math.max(desired, appliedEff - stepDown * user); // slow briskly
   } else if (!holding) {
-    appliedEff = Math.min(desired, appliedEff + stepUp * span); // recover gently, after the hold
+    appliedEff = Math.min(desired, appliedEff + stepUp * user); // recover gently, after the hold
   }
   // Stay within [floor, user] even if the user just changed speed mid-slowdown —
   // we never speed up past their setting, nor below the floor.
   appliedEff = Math.min(user, Math.max(Math.min(S.autoSlowFloor, user), appliedEff));
 
   const factor = appliedEff / user;
-  if (Math.abs(factor - S.autoSlowFactor) > 0.005) {
+  // The 0.005 dead-band stops jitter, but must not strand the ease-back a hair
+  // below the user's speed: always land exactly on 1 once recovered.
+  const recovered = factor === 1 && S.autoSlowFactor !== 1;
+  if (recovered || Math.abs(factor - S.autoSlowFactor) > 0.005) {
     S.autoSlowFactor = factor;
     reapplyPrimaryRate();
   }

@@ -5,8 +5,14 @@
 // regression where overlay chat parked a permanent "unavailable" panel when the
 // popout URL wasn't buildable yet (YouTube's video id arriving after navigation).
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type * as MapMutation from "../src/shared/map-mutation.js";
 
+const fx = vi.hoisted(() => ({ mutate: vi.fn() }));
 vi.mock("../src/content/platform/i18n.js", () => ({ i18n: () => "" }));
+vi.mock("../src/shared/map-mutation.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof MapMutation>()),
+  mutateStoredMap: fx.mutate,
+}));
 
 import { S } from "../src/content/state.js";
 import {
@@ -66,6 +72,7 @@ beforeEach(() => {
   S.viewerChatMode = "off";
   S.viewerChatPanelSites = {};
   S.viewerChatSideWidths = {};
+  fx.mutate.mockClear();
 });
 
 afterEach(() => {
@@ -218,5 +225,91 @@ describe("viewer chat facade", () => {
     expect(sideEl()).toBeNull();
     expect(panelEl()).toBeNull();
     expect(fabEl()).toBeNull();
+  });
+
+  it("reports whether the viewer needs a new layout pass", () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    mountViewerChat(ctx());
+    layoutSideChat({ fill: true, width: 340 }); // the viewer's layout pass
+    expect(updateViewerChat()).toBe(false); // e.g. the storage echo of our own write
+
+    S.viewerChatSideWidths = { "twitch.tv": { theater: 420 } }; // saved in another tab
+    expect(updateViewerChat()).toBe(true);
+    layoutSideChat({ fill: true, width: 420 });
+    expect(updateViewerChat()).toBe(false);
+
+    S.viewerChatMode = "overlay";
+    expect(updateViewerChat()).toBe(true);
+    expect(updateViewerChat()).toBe(false);
+  });
+
+  it("saves the side width once per real drag, through the background's map write", () => {
+    atTwitchLive();
+    S.viewerChatMode = "side";
+    mountViewerChat(ctx());
+    const col = sideEl() as HTMLElement;
+    col.getBoundingClientRect = () => ({ width: 340 }) as DOMRect;
+    const grip = col.lastElementChild as HTMLElement;
+    const fire = (type: string, x: number) =>
+      grip.dispatchEvent(new MouseEvent(type, { button: 0, clientX: x }));
+
+    fire("pointerdown", 500);
+    fire("pointerup", 500);
+    expect(fx.mutate).not.toHaveBeenCalled(); // a plain press
+
+    fire("pointerdown", 500);
+    fire("pointermove", 440);
+    fire("pointerup", 440);
+    expect(fx.mutate).toHaveBeenCalledTimes(1);
+    expect(fx.mutate).toHaveBeenCalledWith(
+      "viewerChatSideWidths",
+      { "twitch.tv": { theater: 400 } },
+      [],
+    );
+    expect(S.viewerChatSideWidths).toEqual({ "twitch.tv": { theater: 400 } });
+
+    // The finished gesture took its cancel handler along: a stray cancel saves nothing.
+    fire("pointercancel", 0);
+    expect(fx.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the panel spot once per real drag, through the background's map write", () => {
+    atTwitchLive();
+    S.viewerChatMode = "overlay";
+    mountViewerChat(ctx());
+    layoutChatPanel({ left: 60, top: 30, right: 660, bottom: 400, width: 600, height: 370 });
+    const head = panelEl()!.shadowRoot!.querySelector<HTMLElement>(".head")!;
+    const fire = (type: string, x: number, y: number) =>
+      head.dispatchEvent(new MouseEvent(type, { button: 0, clientX: x, clientY: y }));
+
+    fire("pointerdown", 100, 100);
+    fire("pointerup", 100, 100);
+    expect(fx.mutate).not.toHaveBeenCalled(); // a plain click
+
+    fire("pointerdown", 100, 100);
+    fire("pointermove", 140, 120);
+    fire("pointerup", 140, 120);
+    expect(fx.mutate).toHaveBeenCalledTimes(1);
+    const [map, set] = fx.mutate.mock.calls[0];
+    expect(map).toBe("viewerChatPanelSites");
+    expect(Object.keys(set)).toEqual(["twitch.tv"]);
+
+    fire("pointercancel", 0, 0);
+    expect(fx.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("builds the on-video toggle's icons without innerHTML", () => {
+    atTwitchLive();
+    const innerHTML = vi.spyOn(Element.prototype, "innerHTML", "set");
+    try {
+      mountViewerChat(ctx());
+      const buttons = fabEl()!.shadowRoot!.querySelectorAll("button");
+      expect(buttons).toHaveLength(3);
+      for (const b of buttons) expect(b.querySelector("svg")).not.toBeNull();
+      expect(innerHTML).not.toHaveBeenCalled();
+    } finally {
+      innerHTML.mockRestore();
+    }
   });
 });

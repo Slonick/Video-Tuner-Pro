@@ -2,7 +2,7 @@
 // the frame holding the video replies, with the top frame as a deferred fallback.
 import { api } from "./platform/browser.js";
 import { getDomain } from "./core/domain.js";
-import { channelKeys, currentChannel, currentChannelName } from "./channel.js";
+import { channelKeys, currentChannelName } from "./channel.js";
 import { clamp, clampTarget } from "./core/clamp.js";
 import { S } from "./state.js";
 import { hasVideos, isDrmVideo, primaryVideo } from "./videos.js";
@@ -105,29 +105,17 @@ function actInVideoFrame(
   return true;
 }
 
-function currentDrmProtected(): boolean {
-  try {
-    return isDrmVideo(primaryVideo());
-  } catch (e) {
-    return false;
-  }
-}
-
 function channelInfo(): { channel: string | null; channelKeys: string[]; channelName: string } {
   const keys = channelKeys();
   return {
-    channel: keys[0] ?? currentChannel(),
+    channel: keys[0] ?? null,
     channelKeys: keys,
     channelName: currentChannelName(),
   };
 }
 
 function topFrame(): boolean {
-  try {
-    return window.top === window;
-  } catch {
-    return false;
-  }
+  return window.top === window;
 }
 
 function replySaved(sendResponse: (response?: unknown) => void, extra?: Record<string, unknown>) {
@@ -136,7 +124,7 @@ function replySaved(sendResponse: (response?: unknown) => void, extra?: Record<s
 
 api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "setSpeed") {
-    if (typeof request.speed !== "number" || !Number.isFinite(request.speed)) {
+    if (!Number.isFinite(request.speed)) {
       return replyFromVideoFrame(sendResponse, () => ({
         success: false,
         speed: S.currentSpeed,
@@ -144,7 +132,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }));
     }
     // Every frame applies it; only the video frame answers.
-    setSpeed(request.speed, false, true);
+    setSpeed(request.speed, true);
     return replyFromVideoFrame(sendResponse, () => ({
       success: true,
       speed: S.currentSpeed,
@@ -153,10 +141,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.action === "remember") {
     if (!topFrame()) return false;
-    const speed =
-      typeof request.speed === "number" && Number.isFinite(request.speed)
-        ? clamp(request.speed)
-        : S.currentSpeed;
+    const speed = Number.isFinite(request.speed) ? clamp(request.speed) : S.currentSpeed;
     const done = replySaved(sendResponse, { speed });
     if (request.scope === "channel") persistChannelSpeed(speed, done);
     else if (request.scope === "global") persistGlobalSpeed(speed, done);
@@ -183,7 +168,7 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
       scope: S.speedScope,
       live: onStreamPage(),
       viewerSupported: topFrame(),
-      ...(currentDrmProtected() ? { drm: true } : {}),
+      ...(isDrmVideo(primaryVideo()) ? { drm: true } : {}),
     }));
   }
   // --- Live-sync allowed delay (buffer target), per scope — mirrors speed above.

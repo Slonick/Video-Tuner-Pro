@@ -62,7 +62,10 @@ function PopupCards({ tab }: { tab: ActiveTab | null }) {
   const audio = useAudioCompressor();
   const [translating, setTranslating] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState<string | null>(null);
-  useGraphs(tab?.tabId ?? null, setTranslating, setAudioBlocked);
+  useGraphs(tab?.tabId ?? null, setTranslating, setAudioBlocked, {
+    threshold: audio.comp.values.threshold,
+    target: sync.target,
+  });
 
   // First-open walkthrough: show it once, the first time the popup opens, then
   // remember it's been seen.

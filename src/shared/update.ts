@@ -1,7 +1,8 @@
 // Update checking. Both stores auto-update the extension on their own schedule;
 // this only surfaces a "new version available" marker in the popup header.
-// Chrome reports it via requestUpdateCheck/onUpdateAvailable; Firefox has neither,
-// so we detect a newer version by comparing the manifest against the public AMO API.
+// Chrome reports it via requestUpdateCheck/onUpdateAvailable; Firefox has no
+// requestUpdateCheck, so we detect a newer version by comparing the manifest
+// against the public AMO API.
 import { getExtensionApi } from "./extension-api.js";
 
 // Persisted by the background check, read by the popup header.
@@ -16,11 +17,12 @@ export const UPDATE_PERIOD_MIN = 360; // 6h — matches the stores' own cadence
 const AMO_ADDON_ID = "video-speed-controller-pro@slonick.dev";
 const AMO_API_URL = `https://addons.mozilla.org/api/v5/addons/addon/${AMO_ADDON_ID}/`;
 
-// Chrome ships requestUpdateCheck/onUpdateAvailable; Firefox ships neither.
+// Chrome ships requestUpdateCheck; Firefox doesn't. (Firefox does have
+// onUpdateAvailable, but listening to it defers the update until a browser restart.)
 export function hasUpdateApi(): boolean {
   try {
     const api = getExtensionApi();
-    return typeof api?.runtime?.requestUpdateCheck === "function";
+    return typeof api.runtime.requestUpdateCheck === "function";
   } catch {
     return false;
   }
@@ -33,8 +35,8 @@ export function cmpVersion(a: string, b: string): number {
   const pb = b.split(".");
   const n = Math.max(pa.length, pb.length);
   for (let i = 0; i < n; i++) {
-    const da = parseInt(pa[i] ?? "0", 10) || 0;
-    const db = parseInt(pb[i] ?? "0", 10) || 0;
+    const da = parseInt(pa[i], 10) || 0;
+    const db = parseInt(pb[i], 10) || 0;
     if (da !== db) return da - db;
   }
   return 0;
@@ -43,7 +45,7 @@ export function cmpVersion(a: string, b: string): number {
 export function currentVersion(): string {
   try {
     const api = getExtensionApi();
-    return api?.runtime?.getManifest().version ?? "0";
+    return api.runtime.getManifest().version ?? "0";
   } catch {
     return "0";
   }

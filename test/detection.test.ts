@@ -19,6 +19,31 @@ function vid(over: Partial<HTMLVideoElement> = {}): HTMLVideoElement {
   } as unknown as HTMLVideoElement;
 }
 
+// Like the DOM's TimeRanges, an index past the last range throws instead of
+// quietly returning an edge. `spans` stays live, so a test can move an edge.
+function timeRanges(spans: [number, number][]): TimeRanges {
+  const edge = (i: number, side: 0 | 1) => {
+    if (i < 0 || i >= spans.length) throw new DOMException("Index out of range", "IndexSizeError");
+    return spans[i][side];
+  };
+  return {
+    get length() {
+      return spans.length;
+    },
+    start: (i: number) => edge(i, 0),
+    end: (i: number) => edge(i, 1),
+  } as TimeRanges;
+}
+
+function liveElement(width: number, height: number): HTMLVideoElement {
+  const video = document.createElement("video");
+  Object.defineProperty(video, "duration", { value: Infinity, configurable: true });
+  Object.defineProperty(video, "paused", { value: false, configurable: true });
+  video.getBoundingClientRect = () =>
+    ({ width, height, left: 0, top: 0, right: width, bottom: height }) as DOMRect;
+  return video;
+}
+
 describe("isLive", () => {
   it("infinite duration → live", () => {
     expect(isLive(vid({ duration: Infinity }))).toBe(true);
@@ -32,6 +57,9 @@ describe("isLive", () => {
   it("Firefox's huge sentinel duration → live", () => {
     expect(isLive(vid({ duration: 9.2e12 }))).toBe(true);
   });
+  it("a duration right at the 1e7 s sentinel cutoff → live", () => {
+    expect(isLive(vid({ duration: 1e7 }))).toBe(true);
+  });
   it("NaN duration (VOD before metadata) → not live", () => {
     expect(isLive(vid({ duration: NaN }))).toBe(false);
   });
@@ -43,6 +71,25 @@ describe("VK Live routing", () => {
     expect(isVkLiveChannelPage("live.vkvideo.ru", "/have_contact/record/id")).toBe(false);
     expect(isVkLiveChannelPage("live.vkvideo.ru", "/app")).toBe(false);
     expect(isVkLiveChannelPage("vkvideo.ru", "/have_contact")).toBe(false);
+  });
+
+  it.each([
+    "app",
+    "feed",
+    "search",
+    "settings",
+    "help",
+    "support",
+    "about",
+    "categories",
+    "category",
+    "following",
+  ])("never treats the reserved /%s page as a channel", (page) => {
+    expect(isVkLiveChannelPage("live.vkvideo.ru", `/${page}`)).toBe(false);
+  });
+
+  it("ignores hosts that only start with live.vkvideo.ru", () => {
+    expect(isVkLiveChannelPage("live.vkvideo.ru.example.com", "/have_contact")).toBe(false);
   });
 });
 
@@ -70,6 +117,16 @@ describe("isLive (Boosty routing)", () => {
 
     expect(isLive(vid({ duration: Infinity }))).toBe(true);
   });
+
+  it("keeps the generic live heuristics on a host that only starts with boosty.to", () => {
+    vi.stubGlobal("location", {
+      hostname: "boosty.to.example.com",
+      pathname: "/creator/posts/post-id",
+      search: "",
+    });
+
+    expect(isLive(vid({ duration: Infinity }))).toBe(true);
+  });
 });
 
 describe("isLive (authoritative VOD routes)", () => {
@@ -80,6 +137,7 @@ describe("isLive (authoritative VOD routes)", () => {
 
   it.each([
     ["www.twitch.tv", "/videos/2818975236"],
+    ["twitch.tv", "/videos/2818975236"],
     ["kick.com", "/fissure_cs_ru2/videos/122d2af5-37be-4229-8542-e2dd5300b995"],
     ["live.vkvideo.ru", "/have_contact/record/record-id"],
   ])("does not let a hidden live player override %s%s", (hostname, pathname) => {
@@ -87,6 +145,21 @@ describe("isLive (authoritative VOD routes)", () => {
     document.documentElement.setAttribute("data-vtp-live", "1");
 
     expect(isLive(vid({ duration: Infinity }))).toBe(false);
+  });
+
+  it.each([
+    ["twitch.tv.example.com", "/videos/2818975236"],
+    ["www.twitch.tv", "/streamer/videos/2818975236"],
+    ["kick.com.example.com", "/streamer/videos/video-id"],
+    ["kick.com", "/category/streamer/videos/video-id"],
+    ["example.com", "/streamer/record/record-id"],
+    ["live.vkvideo.ru.example.com", "/streamer/record/record-id"],
+    ["live.vkvideo.ru", "/catalog/streamer/record/record-id"],
+  ])("a live player stays live on the look-alike route %s%s", (hostname, pathname) => {
+    vi.stubGlobal("location", { hostname, pathname, search: "" });
+    document.documentElement.setAttribute("data-vtp-live", "1");
+
+    expect(isLive(vid({ duration: Infinity }))).toBe(true);
   });
 });
 
@@ -156,6 +229,27 @@ describe("liveVideo", () => {
 
     document.body.appendChild(player);
     expect(liveVideo()).toBe(player);
+  });
+
+  it.each([
+    [24, 360],
+    [640, 24],
+  ])("ignores a %i×%i live strip", (width, height) => {
+    document.body.appendChild(liveElement(width, height));
+    expect(liveVideo()).toBeNull();
+  });
+
+  it("accepts a live player of exactly 40×40", () => {
+    const player = liveElement(40, 40);
+    document.body.appendChild(player);
+    expect(liveVideo()).toBe(player);
+  });
+
+  it("prefers the largest of several playing live players", () => {
+    const main = liveElement(1280, 720);
+    const strip = liveElement(400, 100); // wider aspect ratio, far smaller area
+    document.body.append(main, strip);
+    expect(liveVideo()).toBe(main);
   });
 });
 
@@ -231,6 +325,44 @@ describe("live-page stickiness", () => {
     expect(liveVideo()).toBeNull();
     expect(onStreamPage()).toBe(false);
   });
+
+  it("stays on-stream through a brief flicker until 6 s after the stream was last seen", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    vi.stubGlobal("location", { hostname: "www.twitch.tv", pathname: "/flicker", search: "" });
+    const live = liveElement(640, 360);
+    document.body.append(live);
+    expect(onStreamPage()).toBe(true);
+
+    // A quality switch momentarily reports a finite duration.
+    Object.defineProperty(live, "duration", { value: 30, configurable: true });
+    vi.setSystemTime(15_999);
+    expect(onStreamPage()).toBe(true);
+    vi.setSystemTime(16_000);
+    expect(onStreamPage()).toBe(false);
+  });
+
+  it("a stream found through liveVideo() refreshes the sticky window too", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    vi.stubGlobal("location", { hostname: "www.twitch.tv", pathname: "/found", search: "" });
+    const live = liveElement(640, 360);
+    document.body.append(live);
+    expect(liveVideo()).toBe(live);
+
+    Object.defineProperty(live, "duration", { value: 30, configurable: true });
+    vi.setSystemTime(11_000);
+    expect(onStreamPage()).toBe(true);
+  });
+
+  it("trusts the caller's own live-video scan instead of rescanning the page", () => {
+    vi.stubGlobal("location", { hostname: "www.twitch.tv", pathname: "/explicit", search: "" });
+    document.body.append(liveElement(640, 360));
+    expect(onStreamPage(null)).toBe(false);
+
+    document.body.innerHTML = "";
+    expect(onStreamPage(liveElement(640, 360))).toBe(true);
+  });
 });
 
 describe("isLive (live signals are scoped to the video's own player)", () => {
@@ -281,6 +413,36 @@ describe("isLive (live signals are scoped to the video's own player)", () => {
 
     expect(isLive(video)).toBe(true);
   });
+
+  it("the player's ytp-live class alone marks a finite-duration video live", () => {
+    document.body.innerHTML = `<div class="html5-video-player ytp-live"><video></video></div>`;
+    const video = document.querySelector("video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 4774, configurable: true });
+
+    expect(isLive(video)).toBe(true);
+  });
+
+  it("the player's live time display alone marks a finite-duration video live", () => {
+    document.body.innerHTML =
+      `<div class="html5-video-player">` +
+      `<span class="ytp-time-display ytp-live"></span><video></video></div>`;
+    const video = document.querySelector("video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 4774, configurable: true });
+
+    expect(isLive(video)).toBe(true);
+  });
+
+  it.each([
+    ["youtube.com", true],
+    ["youtube.com.example.org", false],
+  ])("reads YouTube player markers on %s: %s", (hostname, live) => {
+    vi.stubGlobal("location", { hostname });
+    document.body.innerHTML = `<div class="html5-video-player ytp-live"><video></video></div>`;
+    const video = document.querySelector("video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 4774, configurable: true });
+
+    expect(isLive(video)).toBe(live);
+  });
 });
 
 describe("probeLive (generic real-time-edge detection)", () => {
@@ -291,6 +453,27 @@ describe("probeLive (generic real-time-edge detection)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  // The edge starts at 10 s in `grows`; the other range list holds `other`.
+  // `confirm` feeds the three 1x samples that make the edge live at t = 1500 ms.
+  function edgeVideo(grows: "buffered" | "seekable" = "buffered", other: [number, number][] = []) {
+    const edge: [number, number][] = [[0, 10]];
+    const v = vid(
+      grows === "buffered"
+        ? { buffered: timeRanges(edge), seekable: timeRanges(other) }
+        : { seekable: timeRanges(edge), buffered: timeRanges(other) },
+    );
+    const sample = (at: number, growth = 0) => {
+      edge[0][1] += growth;
+      vi.setSystemTime(at);
+      probeLive(v);
+    };
+    const confirm = () => {
+      sample(0);
+      for (const at of [500, 1000, 1500]) sample(at, 0.5);
+    };
+    return { v, sample, confirm };
+  }
 
   it("marks a video live after a few real-time-rate growth samples", () => {
     let edge = 10;
@@ -354,20 +537,16 @@ describe("probeLive (generic real-time-edge detection)", () => {
   });
 
   it("does not read buffered/seekable ranges for a stable finite VOD", () => {
-    const badRanges = {
-      length: 1,
-      start: () => 0,
-      end: () => {
-        throw new Error("finite VOD should not read media ranges");
-      },
-    } as unknown as TimeRanges;
-    const v = vid({ duration: 600, buffered: badRanges, seekable: badRanges });
+    const end = vi.fn(() => 600);
+    const ranges = { length: 1, start: () => 0, end } as unknown as TimeRanges;
+    const v = vid({ duration: 600, buffered: ranges, seekable: ranges });
 
     probeLive(v);
     vi.setSystemTime(1000);
     probeLive(v);
 
     expect(isLive(v)).toBe(false);
+    expect(end).not.toHaveBeenCalled();
   });
 
   it("clears a temporary live probe as soon as a finite VOD duration appears", () => {
@@ -392,6 +571,139 @@ describe("probeLive (generic real-time-edge detection)", () => {
     vi.setSystemTime(3000);
     expect(isLive(v)).toBe(false); // no background probe tick required
     probeLive(v);
+    expect(isLive(v)).toBe(false);
+  });
+
+  it.each([1e7, 9.2e12])(
+    "drops live at once when a VOD duration replaces a %d s sentinel on the same element",
+    (sentinel) => {
+      let duration = sentinel;
+      const v = vid();
+      Object.defineProperty(v, "duration", { configurable: true, get: () => duration });
+      probeLive(v);
+      expect(isLive(v)).toBe(true);
+
+      duration = 3600; // an SPA reuses the stream's element for a recording
+      expect(isLive(v)).toBe(false);
+    },
+  );
+
+  it("needs three consecutive real-time samples to confirm a live edge", () => {
+    const { v, sample } = edgeVideo();
+    sample(4000);
+    sample(4500, 0.5);
+    expect(isLive(v)).toBe(false);
+    sample(5000, 0.5);
+    expect(isLive(v)).toBe(false);
+    sample(5500, 0.5);
+    expect(isLive(v)).toBe(true);
+  });
+
+  it.each(["buffered", "seekable"] as const)("follows a growing %s edge alone", (grows) => {
+    const { v, confirm } = edgeVideo(grows);
+    confirm();
+    expect(isLive(v)).toBe(true);
+  });
+
+  it.each([1e7, 2 ** 30])("follows buffered growth past a %d s seekable sentinel", (sentinel) => {
+    const { v, confirm } = edgeVideo("buffered", [[0, sentinel]]);
+    confirm();
+    expect(isLive(v)).toBe(true);
+  });
+
+  it("follows a growing edge while the element reports a zero duration", () => {
+    const { v, confirm } = edgeVideo();
+    Object.defineProperty(v, "duration", { value: 0, configurable: true });
+    confirm();
+    expect(isLive(v)).toBe(true);
+  });
+
+  it.each([
+    [100, false],
+    [400, true],
+  ])("three 1x samples %i ms apart confirm a live edge: %s", (gap, live) => {
+    const { v, sample } = edgeVideo();
+    sample(0);
+    for (let i = 1; i <= 3; i++) sample(i * gap, gap / 1000);
+    expect(isLive(v)).toBe(live);
+  });
+
+  it.each([
+    ["0.3x", 0.375],
+    ["1.7x", 2.125],
+  ])("an edge growing at exactly %s is not real-time", (_, growth) => {
+    const { v, sample } = edgeVideo();
+    sample(0);
+    for (let i = 1; i <= 3; i++) sample(i * 1250, growth);
+    expect(isLive(v)).toBe(false);
+  });
+
+  it("a burst between real-time samples restarts the count", () => {
+    const { v, sample } = edgeVideo();
+    sample(0);
+    sample(500, 0.5);
+    sample(1000, 0.5);
+    sample(1500, 50); // a VOD filling its buffer far faster than real time
+    sample(2000, 0.5);
+    expect(isLive(v)).toBe(false);
+  });
+
+  it("forgets real-time growth evidence after 8 s without edge movement", () => {
+    const { v, sample } = edgeVideo();
+    sample(0);
+    sample(500, 0.5);
+    sample(1000, 0.5);
+    sample(9000);
+    sample(9500, 8.5); // one more segment, at 1x over the whole gap
+    expect(isLive(v)).toBe(false);
+  });
+
+  it.each([
+    ["stalls", 0],
+    ["only grows in bursts", 100],
+  ])("a confirmed edge that %s expires 8 s after its last real-time growth", (_, growth) => {
+    const { v, sample, confirm } = edgeVideo();
+    confirm();
+    sample(9100, growth);
+    expect(isLive(v)).toBe(true);
+    sample(9500, growth);
+    expect(isLive(v)).toBe(false);
+  });
+
+  it("keeps an Infinity-duration stream live while its duration briefly reads NaN", () => {
+    let duration = Infinity;
+    const v = vid();
+    Object.defineProperty(v, "duration", { configurable: true, get: () => duration });
+    vi.setSystemTime(1000);
+    probeLive(v);
+
+    duration = NaN; // the MediaSource is re-attached for a quality switch
+    expect(isLive(v)).toBe(true);
+  });
+
+  it("a live result cleared by isLive stays cleared when the duration blinks to NaN", () => {
+    const { v, confirm } = edgeVideo();
+    let duration = NaN;
+    Object.defineProperty(v, "duration", { configurable: true, get: () => duration });
+    confirm();
+    expect(isLive(v)).toBe(true);
+
+    duration = 3600;
+    expect(isLive(v)).toBe(false);
+    duration = NaN; // the recording reloads its MediaSource for a quality change
+    expect(isLive(v)).toBe(false);
+  });
+
+  it("a probe sample that sees the finite duration first clears the live result too", () => {
+    const { v, sample, confirm } = edgeVideo();
+    let duration = NaN;
+    Object.defineProperty(v, "duration", { configurable: true, get: () => duration });
+    confirm();
+    expect(isLive(v)).toBe(true);
+
+    duration = 3600;
+    sample(2000);
+    duration = NaN;
     expect(isLive(v)).toBe(false);
   });
 });

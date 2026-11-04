@@ -5,8 +5,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STORE, subscribe } from "../../shared/store.js";
 import { THEMES, type Theme, setTheme } from "../../shared/theme.js";
-import { LOCALES, LOCALE_NAMES, getLang, setLang, type Lang } from "../../shared/i18n-config.js";
-import { SYNC_MASTER_KEY, SYNC_META_KEY } from "../../shared/sync-config.js";
+import {
+  LOCALES,
+  LOCALE_NAMES,
+  getLang,
+  isLocale,
+  setLang,
+  type Lang,
+} from "../../shared/i18n-config.js";
+import { KEY_CATEGORY, SYNC_MASTER_KEY, SYNC_META_KEY } from "../../shared/sync-config.js";
+import {
+  STORED_MAP_NAMES,
+  safeKey,
+  validStoredMapValue,
+  type StoredMapName,
+} from "../../shared/map-mutation.js";
 import { SITE_BLACKLIST_KEY, normalizeSiteList } from "../../shared/site-blacklist.js";
 import { msg } from "../../popup/i18n.js";
 import { Group } from "../Group.js";
@@ -42,6 +55,30 @@ function hasPresetArrayMismatch(data: Record<string, unknown>): boolean {
     (Array.isArray(data.presetKeys) && data.presetKeys.length !== presets.length) ||
     (Array.isArray(data.presetPins) && data.presetPins.length !== presets.length)
   );
+}
+
+const MAP_NAMES = new Set<string>(STORED_MAP_NAMES);
+
+// What a backup may write: settings keys only (never another device's sync choices
+// or internal bookkeeping), a language this build ships, and only the map entries
+// their readers accept — so a stale or hand-edited file can't break the UIs.
+function importableSettings(file: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(file)) {
+    if (!Object.hasOwn(KEY_CATEGORY, key)) continue;
+    if (key === "uiLang") {
+      if (value === "system" || isLocale(value)) out[key] = value;
+    } else if (MAP_NAMES.has(key)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      const entries = Object.entries(value).filter(
+        ([k, v]) => safeKey(k) && validStoredMapValue(key as StoredMapName, v),
+      );
+      if (entries.length) out[key] = Object.fromEntries(entries);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 function ThemeSeg() {
@@ -173,11 +210,10 @@ function GlassOpacity() {
   useEffect(() => {
     STORE.get([GLASS_OPACITY_KEY], (r) => setV(clampGlassOpacity(r[GLASS_OPACITY_KEY])));
   }, []);
-  const onChange = (n: number) => {
+  const preview = (n: number) => {
     const c = clampGlassOpacity(n);
     setV(c);
     applyGlassOpacity(document.documentElement, c); // live preview on this page
-    STORE.set({ [GLASS_OPACITY_KEY]: c });
   };
   return (
     <div className="opt-glass-slider">
@@ -189,7 +225,8 @@ function GlassOpacity() {
         step={0.05}
         value={v}
         ariaLabel={msg("optGlassLabel") || "Glass opacity"}
-        onChange={onChange}
+        onChange={preview}
+        onCommit={(n) => STORE.set({ [GLASS_OPACITY_KEY]: clampGlassOpacity(n) })}
       />
       <b className="opt-param-val">{Math.round(v * 100)}%</b>
     </div>
@@ -229,7 +266,7 @@ export function Backup() {
 
   const flash = (set: (f: Flash) => void, key: string, ok: boolean) => {
     set({ key, ok });
-    timer.current = setTimeout(() => set(null), ok ? 1500 : 1500);
+    timer.current = setTimeout(() => set(null), 1500);
   };
 
   const doExport = () => {
@@ -250,6 +287,7 @@ export function Backup() {
 
   const doImport = (file: File) => {
     const reader = new FileReader();
+    reader.onerror = () => flash(setImp, "optImportError", false);
     reader.onload = () => {
       let parsed: unknown;
       try {
@@ -262,16 +300,16 @@ export function Backup() {
         flash(setImp, "optImportError", false);
         return;
       }
-      const data = { ...(parsed as Record<string, unknown>) };
-      delete data[SYNC_META_KEY]; // never import another device's sync choices
-      delete data[SYNC_MASTER_KEY];
-      if (hasPresetArrayMismatch(data)) {
+      const data = importableSettings(parsed as Record<string, unknown>);
+      // Nothing recognisable (an empty or unrelated file) must not go on to treat
+      // every current setting as stale and wipe it.
+      if (!Object.keys(data).length || hasPresetArrayMismatch(data)) {
         flash(setImp, "optImportError", false);
         return;
       }
       STORE.get(null, (current) => {
         const stale = Object.keys(current).filter(
-          (key) => key !== SYNC_META_KEY && key !== SYNC_MASTER_KEY && !(key in data),
+          (key) => Object.hasOwn(KEY_CATEGORY, key) && !(key in data),
         );
         const done = () => {
           flash(setImp, "optImportDone", true);
@@ -282,8 +320,7 @@ export function Backup() {
             done();
             return;
           }
-          const removeEverywhere = STORE.removeEverywhere?.bind(STORE) ?? STORE.remove.bind(STORE);
-          removeEverywhere(stale, (ok) => {
+          STORE.removeEverywhere(stale, (ok) => {
             if (ok === false) {
               flash(setImp, "optImportError", false);
               return;

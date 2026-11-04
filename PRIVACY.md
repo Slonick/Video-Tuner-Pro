@@ -1,6 +1,6 @@
 # Privacy Policy — Video Tuner Pro
 
-_Last updated: 2026-07-15_
+_Last updated: 2026-11-04_
 
 Video Tuner Pro ("the extension") is designed with privacy as a
 priority. This policy explains what the extension does and does not do with
@@ -10,7 +10,8 @@ your information.
 
 **The extension does not collect, sell, or send personal data to the developer.**
 It has no developer-operated servers, analytics, or third-party tracking. The
-optional SponsorBlock marker feature makes the limited request described below.
+optional SponsorBlock marker feature makes the limited request described below,
+and the Firefox version checks Mozilla's add-on site for new releases.
 
 ## What the extension stores
 
@@ -31,8 +32,10 @@ category on-device, clear saved settings, or uninstall the extension at any time
 - **storage** — to save your speed and Live-sync settings locally, as described
   above.
 - **scripting** — to restore the extension in already-open tabs after an extension
-  update and to locate the frame that owns the active video.
-- **alarms** — to periodically check whether a newer extension release is available.
+  update, to locate the frame that owns the active video, and to load the
+  player-quality helper into a page only once you open the Viewer there.
+- **alarms** — to periodically check whether a newer extension release is available
+  (on Firefox, through the add-on site request described below).
 - **Host access to all sites (`<all_urls>`)** — the extension must detect and
   control HTML5 `<video>` playback on whatever website you are watching. Page
   and video data are otherwise processed locally; the only optional external
@@ -52,6 +55,15 @@ content, analytics identifiers, or account credentials. Like any network
 service, SponsorBlock receives ordinary connection metadata such as the user's
 IP address. Responses are cached only in memory and are not stored permanently.
 Disabling SponsorBlock markers stops these requests.
+
+**Update check (Firefox only).** Firefox offers extensions no way to ask the
+browser whether an update is waiting, so the Firefox version requests its own
+public listing from Mozilla's add-on site (`addons.mozilla.org`) when it starts
+or is installed or updated, and then every 6 hours, to show a "new version
+available" notice. The request names only this extension's public add-on ID; it
+includes no settings, browsing data, or user identifiers. Like any network
+service, Mozilla receives ordinary connection metadata such as the user's IP
+address. The Chrome version asks the browser itself and makes no such request.
 
 The developer does not otherwise share, sell, or transfer user data. Browser
 settings sync is provided by the browser vendor under the user's browser account.

@@ -12,7 +12,6 @@ export const SITE_BLACKLIST_KEY = "siteBlacklist";
 export function normalizeSiteEntry(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const text = raw.trim();
-  if (!text) return null;
   let host: string;
   try {
     host = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(text) ? text : `http://${text}`).hostname;

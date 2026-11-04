@@ -4,6 +4,7 @@ import { api, ctxValid } from "../platform/browser.js";
 import { S } from "../state.js";
 import { hasVideos } from "../videos.js";
 import { onStreamPage } from "../live/detection.js";
+import { listenerOptions } from "../lifecycle.js";
 
 interface IconPayload {
   action: "icon";
@@ -49,3 +50,22 @@ export function updateBadge(): void {
     api.runtime.sendMessage(payload);
   } catch (e) {}
 }
+
+// An iframe that goes away (navigated, removed) hands the toolbar badge back, or its
+// speed lingers there and the background keeps refusing other frames. The top frame
+// sends nothing: a tab navigation already resets the badge, and a late clear could
+// wipe the next page's. Forgetting what was sent lets a page restored from the
+// back/forward cache report its badge again.
+window.addEventListener(
+  "pagehide",
+  () => {
+    if (!badgeHadVideo) return;
+    badgeHadVideo = false;
+    lastBadge = null;
+    if (window.top === window || !ctxValid()) return;
+    try {
+      api.runtime.sendMessage({ action: "icon", clear: true });
+    } catch (e) {}
+  },
+  listenerOptions(),
+);

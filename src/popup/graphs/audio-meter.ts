@@ -1,4 +1,3 @@
-import { byId } from "../dom.js";
 import { msg } from "../i18n.js";
 import { col, fitCanvas, levelMark, cornerReadout } from "./draw-util.js";
 import { A_MIN, A_MAX, A_WINDOW } from "./state.js";
@@ -11,7 +10,7 @@ function fmtLevel(db: number): string {
   return (v < 0 ? "−" + -v : String(v)) + " dB";
 }
 
-export function drawAudio(g: GraphState, t: number): void {
+export function drawAudio(g: GraphState, t: number, thr: number): void {
   const acx = g.acx;
   const { w, h } = fitCanvas(g.aCanvas, acx);
   if (!w) return;
@@ -35,7 +34,6 @@ export function drawAudio(g: GraphState, t: number): void {
     (bottom - fullH * frac(db)) * (1 - c) + (center + halfAmp * frac(db)) * c;
   const baseY = inY(A_MIN); // the −100 dB baseline
   const xFor = (ts: number) => pw * (1 - (t - ts) / A_WINDOW);
-  const thr = Number(byId<HTMLInputElement>("acThreshold").value);
 
   // Scale grid (behind the waveform): −100 dB sits on the baseline — silence —
   // which slides to the centre as the compressor mirrors; 0 dB (loudest) at the
@@ -71,7 +69,7 @@ export function drawAudio(g: GraphState, t: number): void {
     // Over-threshold highlight on the input — what actually gets compressed.
     // Faint at the threshold, ramping through the knee, solid only near 0 dB;
     // fades in with the compressor and morphs with the input.
-    if (!Number.isNaN(thr) && c > 0.01) {
+    if (c > 0.01) {
       const yThr = inY(thr),
         yLoud = inY(A_MAX);
       const knee = g.knee;
@@ -156,7 +154,7 @@ export function drawAudio(g: GraphState, t: number): void {
   // Threshold guide (level above which the input is compressed) — amber dashed,
   // drawn inside the plot like the buffer's target line. The value sits at the
   // right end, nudged above or below the line so it never clips at the edges.
-  if (!Number.isNaN(thr) && c > 0.01) {
+  if (c > 0.01) {
     const y = inY(thr),
       yy = Math.round(y) + 0.5;
     acx.save();

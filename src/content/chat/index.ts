@@ -5,6 +5,7 @@
 // through the viewer's apply exports.
 import { S } from "../state.js";
 import { STORE } from "../platform/storage.js";
+import { mutateStoredMap } from "../../shared/map-mutation.js";
 import { getDomain } from "../core/domain.js";
 import { onStreamPage } from "../live/detection.js";
 import { chatPlatform } from "./platform.js";
@@ -110,51 +111,51 @@ function panelPrefs(): ChatPanelPrefs {
   return S.viewerChatPanelSites[getDomain()] ?? {};
 }
 
+// Both per-site maps go through the background's serialized map write, like
+// every other per-site map: a whole-map write from this tab's copy would drop
+// sites another tab saved meanwhile.
 function persistPanelPrefs(patch: ChatPanelPrefs): void {
   const domain = getDomain();
-  const map = {
-    ...S.viewerChatPanelSites,
-    [domain]: { ...S.viewerChatPanelSites[domain], ...patch },
-  };
-  S.viewerChatPanelSites = map;
-  STORE.set({ viewerChatPanelSites: map });
+  const prefs = { ...S.viewerChatPanelSites[domain], ...patch };
+  S.viewerChatPanelSites = { ...S.viewerChatPanelSites, [domain]: prefs };
+  mutateStoredMap("viewerChatPanelSites", { [domain]: prefs }, []);
 }
 
 function persistSideWidth(width: number): void {
   const domain = getDomain();
   const format = ctx?.format() ?? "theater";
-  const map = {
-    ...S.viewerChatSideWidths,
-    [domain]: { ...S.viewerChatSideWidths[domain], [format]: clampSideWidth(width) },
-  };
-  S.viewerChatSideWidths = map;
-  STORE.set({ viewerChatSideWidths: map });
+  const widths = { ...S.viewerChatSideWidths[domain], [format]: clampSideWidth(width) };
+  S.viewerChatSideWidths = { ...S.viewerChatSideWidths, [domain]: widths };
+  mutateStoredMap("viewerChatSideWidths", { [domain]: widths }, []);
 }
 
 // Set the chat mode directly (the on-video button and its mode menu). Persists
-// and applies in the same frame; the storage echo re-runs the same idempotent
-// apply.
+// and applies in the same frame; the storage echo then finds nothing to change.
 export function setChatMode(mode: ViewerChatMode): void {
   S.viewerChatMode = mode;
   STORE.set({ viewerChatMode: mode });
-  updateViewerChat();
-  ctx?.relayoutSmooth();
+  if (updateViewerChat()) ctx?.relayoutSmooth();
 }
 
 // Reconcile mounted surfaces with the configured mode. Idempotent — safe to
-// call on mount, on a mode change, and on live-state flips.
-export function updateViewerChat(): void {
+// call on mount, on a mode change, and on live-state flips. Reports whether the
+// viewer needs a new layout pass: a surface came or went, or the side column's
+// width changed under it (saved from another tab).
+export function updateViewerChat(): boolean {
   const want = desiredMode();
+  let changed = false;
   if (want !== "side" && side) {
     side.destroy();
     side = null;
     liveSideWidth = null;
+    changed = true;
   }
   if (want !== "overlay" && panel) {
     panel.destroy();
     panel = null;
+    changed = true;
   }
-  if (!ctx) return;
+  if (!ctx) return changed;
   if (want === "side" && !side) {
     side = mountSideChat(ctx.overlay, {
       onResize: (w) => {
@@ -176,19 +177,23 @@ export function updateViewerChat(): void {
         ctx?.relayout();
       },
     });
+    if (side) changed = true;
   }
   if (want === "overlay" && !panel) {
     // null when the popout URL can't be built yet — chatSatisfied() stays false
     // and the viewer's guard retries, so overlay recovers like side mode.
     panel = mountChatPanel(ctx.overlay, { prefs: panelPrefs, persist: persistPanelPrefs });
     if (panel && ctx.nativeSurface) panel.elevate();
+    if (panel) changed = true;
   }
   // The on-video toggle exists whenever chat COULD be shown, whatever the mode.
   if (chatAvailable(ctx.liveHint) && !fab) {
     fab = mountChatFab(ctx.overlay, setChatMode);
     if (ctx.nativeSurface) fab.elevate();
+    changed = true;
   }
   fab?.applyMode();
+  return changed || (!!side && side.el.style.width !== `${sideChatWidth(ctx.format())}px`);
 }
 
 export function mountViewerChat(context: ChatContext): void {

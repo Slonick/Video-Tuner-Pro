@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   alarmListener: null as ((a: { name: string }) => void) | null,
   alarmsCreated: [] as unknown[],
   session: {} as Record<string, unknown>,
+  sessionUnreadable: false,
   installType: "development",
   reloads: 0,
 }));
@@ -19,8 +20,11 @@ vi.mock("../src/shared/extension-api.js", () => ({
     },
     storage: {
       session: {
-        get: (_keys: string[], cb: (items: Record<string, unknown>) => void) =>
-          cb({ ...h.session }),
+        // Only the requested keys come back; a failed read calls back without items.
+        get: (keys: string[], cb: (items?: Record<string, unknown>) => void) => {
+          if (h.sessionUnreadable) return cb(undefined);
+          cb(Object.fromEntries(keys.filter((k) => k in h.session).map((k) => [k, h.session[k]])));
+        },
         set: (obj: Record<string, unknown>, cb?: () => void) => {
           Object.assign(h.session, obj);
           cb?.();
@@ -40,8 +44,16 @@ vi.mock("../src/shared/extension-api.js", () => ({
 }));
 
 let stamp = "build-1";
-vi.stubGlobal("fetch", (() =>
-  Promise.resolve({ text: () => Promise.resolve(stamp) })) as unknown as typeof fetch);
+// Serves the packaged stamp. A request that doesn't bypass the HTTP cache gets the
+// copy the browser cached from the first build.
+function fetchStamp(url: string, init?: RequestInit) {
+  if (url !== "chrome-extension://x/build-stamp.txt") {
+    return Promise.reject(new TypeError("Failed to fetch"));
+  }
+  const body = init?.cache === "no-store" ? stamp : "build-1";
+  return Promise.resolve({ text: () => Promise.resolve(body) });
+}
+vi.stubGlobal("fetch", fetchStamp as unknown as typeof fetch);
 
 import { initDevReload } from "../src/background/dev-reload.js";
 
@@ -51,6 +63,7 @@ describe("dev hot-reload", () => {
   beforeEach(() => {
     h.alarmsCreated = [];
     h.session = {};
+    h.sessionUnreadable = false;
     h.reloads = 0;
     stamp = "build-1";
   });
@@ -68,7 +81,7 @@ describe("dev hot-reload", () => {
   it("seeds the loaded stamp, then reloads only when a new build lands", async () => {
     h.installType = "development";
     await initDevReload();
-    expect(h.alarmsCreated).toHaveLength(1);
+    expect(h.alarmsCreated).toEqual([["vtp-dev-reload", { periodInMinutes: 0.5 }]]);
     await flush();
     expect(h.session.vtpDevBuildStamp).toBe("build-1");
     expect(h.reloads).toBe(0);
@@ -90,6 +103,16 @@ describe("dev hot-reload", () => {
     stamp = "build-9";
     h.alarmListener!({ name: "some-other-alarm" });
     await flush();
+    expect(h.reloads).toBe(0);
+  });
+
+  it("seeds the stamp when the session read comes back without items", async () => {
+    h.installType = "development";
+    h.sessionUnreadable = true;
+    await initDevReload();
+    await flush();
+
+    expect(h.session.vtpDevBuildStamp).toBe("build-1");
     expect(h.reloads).toBe(0);
   });
 });

@@ -22,6 +22,7 @@ vi.mock("../src/content/videos.js", () => ({
 }));
 vi.mock("../src/content/viewer.js", () => ({
   VIEWER_LAYOUT_EVENT: "vtp-viewer-layout",
+  VIEWER_RAISE_EVENT: "vtp-viewer-raise",
   viewerAnchorVideo: () => h.anchor,
 }));
 vi.mock("../src/content/live/detection.js", () => ({ onStreamPage: () => h.onStream }));
@@ -707,5 +708,42 @@ describe("badge notice", () => {
 
     expect(h.primaryCalls).toBe(0);
     expect(badgeNotice()?.textContent).toBe("+0:10");
+  });
+});
+
+describe("badge over a lifted native player", () => {
+  it("re-appends its top-layer popover when the viewer re-raises the player", () => {
+    // jsdom has no Popover API; the badge only lifts itself when the methods exist.
+    const calls: string[] = [];
+    let open = false;
+    Object.assign(HTMLElement.prototype, {
+      showPopover: () => {
+        open = true;
+        calls.push("show");
+      },
+      hidePopover: () => {
+        open = false;
+        calls.push("hide");
+      },
+    });
+    const player = realVideo();
+    player.setAttribute("data-vtp-viewer-player", "");
+    let host: HTMLElement | null = null;
+    try {
+      updateTimeBadge({ video: realVideo(), stream: false, anchor: player });
+      host = document.querySelector<HTMLElement>("[data-vtp-badge]")!;
+      expect(host.getAttribute("popover")).toBe("manual");
+      const matches = host.matches.bind(host);
+      host.matches = (s: string) => (s === ":popover-open" ? open : matches(s));
+      calls.length = 0;
+
+      document.dispatchEvent(new Event("vtp-viewer-raise"));
+      expect(calls).toEqual(["hide", "show"]);
+    } finally {
+      updateTimeBadge({ video: realVideo(), stream: false, anchor: realVideo() }); // un-lifts it
+      if (host) Reflect.deleteProperty(host, "matches");
+      Reflect.deleteProperty(HTMLElement.prototype, "showPopover");
+      Reflect.deleteProperty(HTMLElement.prototype, "hidePopover");
+    }
   });
 });

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { act } from "react";
 import { mountApp, byId, flush, wait, setSlider } from "./mocks/mount-popup.js";
 
 // Drive the speed card through the real <App/>: control the content-script replies,
@@ -95,6 +96,16 @@ describe("slider", () => {
 
 describe("live lock", () => {
   const speedThumb = () => byId("speedSlider").querySelector('[role="slider"]')!;
+  // Only intervals are faked: mountApp/flush still settle on real setTimeout.
+  const fakeIntervals = () => vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  const tick = (ms: number) =>
+    act(async () => {
+      vi.advanceTimersByTime(ms);
+    });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("locks the controls and shows the warning on a live stream", async () => {
     await mountApp({
@@ -170,18 +181,23 @@ describe("live lock", () => {
     expect(document.querySelector(".speed-section")?.classList.contains("locked")).toBe(false);
   });
 
-  it("does not keep polling speed on a non-live page", async () => {
+  it("polls a non-live page for liveness every 1.5 s", async () => {
+    fakeIntervals();
     const { sendSpy } = await mountApp({ tab: YT });
     const getSpeedCalls = () =>
       sendSpy.mock.calls.filter((c) => (c[1] as { action: string }).action === "getSpeed").length;
     const before = getSpeedCalls();
 
-    await wait(1100);
-
+    await tick(1499);
     expect(getSpeedCalls()).toBe(before);
+    await tick(1);
+    expect(getSpeedCalls()).toBe(before + 1);
+    await tick(1500);
+    expect(getSpeedCalls()).toBe(before + 2);
   });
 
   it("detects when an open non-live popup becomes live", async () => {
+    fakeIntervals();
     let calls = 0;
     await mountApp({
       tab: YT,
@@ -197,13 +213,15 @@ describe("live lock", () => {
     });
     expect(byId("liveWarn").style.display).toBe("none");
 
-    await wait(1700);
+    await tick(1500);
+    await flush();
 
     expect(byId("liveWarn").style.display).toBe("inline-flex");
     expect(readout()).toBe("105%");
   });
 
-  it("keeps polling speed while live so the catch-up readout updates", async () => {
+  it("keeps polling speed every second while live so the catch-up readout updates", async () => {
+    fakeIntervals();
     let speed = 1;
     const { sendSpy } = await mountApp({
       tab: YT,
@@ -222,9 +240,10 @@ describe("live lock", () => {
     const before = getSpeedCalls();
     speed = 1.05;
 
-    await wait(1100);
+    await tick(1000);
+    await flush();
 
-    expect(getSpeedCalls()).toBeGreaterThan(before);
+    expect(getSpeedCalls()).toBe(before + 1);
     expect(readout()).toBe("105%");
   });
 });

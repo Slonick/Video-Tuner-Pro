@@ -63,8 +63,11 @@ function recompute(): void {
 }
 
 LOCAL.get([SYNC_META_KEY, SYNC_MASTER_KEY], (r) => {
-  prefs = normalizeConfig(r[SYNC_META_KEY]);
-  if (typeof r[SYNC_MASTER_KEY] === "boolean") master = r[SYNC_MASTER_KEY] as boolean;
+  // A failed read passes undefined; throwing here would leave every whenReady()
+  // caller waiting forever, so fall back to the defaults instead.
+  const items: Items = storageOk() && r ? r : {};
+  prefs = normalizeConfig(items[SYNC_META_KEY]);
+  if (typeof items[SYNC_MASTER_KEY] === "boolean") master = items[SYNC_MASTER_KEY] as boolean;
   recompute();
   ready = true;
   while (readyWaiters.length) readyWaiters.shift()!();
@@ -114,15 +117,23 @@ export function subscribe(keys: string[], cb: DoneCb): () => void {
   return () => api.storage.onChanged.removeListener(listener);
 }
 
+// Keep only the changes that arrived in the area each key currently routes to.
+// The other area still changes underneath: migration leaves a stale copy behind,
+// and the browser keeps syncing other devices' edits into storage.sync even for
+// categories this device keeps local. Live listeners must ignore both, as reads do.
+export function routedChanges<T>(changes: Record<string, T>, area: string): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const k in changes) {
+    if ((HAS_SYNC ? areaForKey(k, cfg) : "local") === area) out[k] = changes[k];
+  }
+  return out;
+}
+
 // --- Multi-area fan-out, collapsed to a single callback ----------------------
 function routedMerge(syncItems: Items, localItems: Items): Items {
   const out: Items = {};
   const keys = new Set([...Object.keys(syncItems), ...Object.keys(localItems)]);
   for (const k of keys) {
-    if (k === SYNC_META_KEY || k === SYNC_MASTER_KEY) {
-      if (k in localItems) out[k] = localItems[k];
-      continue;
-    }
     const area = areaForKey(k, cfg);
     if (area === "sync" && k in syncItems) out[k] = syncItems[k];
     if (area === "local" && k in localItems) out[k] = localItems[k];
@@ -130,7 +141,7 @@ function routedMerge(syncItems: Items, localItems: Items): Items {
   return out;
 }
 
-function fanGet(plan: Array<["sync" | "local", string[] | null]>, cb: GetCb): void {
+function fanGet(plan: Array<["sync" | "local", string[]]>, cb: GetCb): void {
   const out: Items = {};
   if (!plan.length) {
     cb(out);
@@ -138,7 +149,7 @@ function fanGet(plan: Array<["sync" | "local", string[] | null]>, cb: GetCb): vo
   }
   let pending = plan.length;
   for (const [name, keys] of plan) {
-    areaObj(name).get(keys as string[], (items) => {
+    areaObj(name).get(keys, (items) => {
       if (storageOk()) Object.assign(out, items);
       if (--pending === 0) cb(out);
     });
@@ -229,16 +240,16 @@ function commitMaster(next: boolean): void {
   recompute();
 }
 
-function persistPrefs(next: SyncConfig, done?: DoneCb): void {
-  areaSet(LOCAL, { [SYNC_META_KEY]: next }, (ok) => done?.(ok));
+function persistPrefs(next: SyncConfig, done: ResultCb): void {
+  areaSet(LOCAL, { [SYNC_META_KEY]: next }, done);
 }
-function persistMaster(next: boolean, done?: DoneCb): void {
-  areaSet(LOCAL, { [SYNC_MASTER_KEY]: next }, (ok) => done?.(ok));
+function persistMaster(next: boolean, done: ResultCb): void {
+  areaSet(LOCAL, { [SYNC_MASTER_KEY]: next }, done);
 }
 
 // Copy one category's stored keys to the newly-routed area. We deliberately keep
 // the source copy: storage.onChanged remove events look identical to a user reset
-// for live content scripts, while the router ignores the stale area anyway.
+// for live content scripts, while reads and routedChanges() ignore the stale area.
 function migrateCategory(cat: Category, from: Area, to: Area, done: ResultCb): void {
   const keys = KEYS_BY_CATEGORY[cat];
   from.get(keys, (items) => {
@@ -285,15 +296,10 @@ export function setCategorySync(cat: Category, synced: boolean, done?: DoneCb): 
 // and sync; categories already kept local don't move. Preferences are untouched,
 // so turning the switch back on restores exactly what was synced before.
 export function setMasterSync(on: boolean, done?: DoneCb): void {
-  if (master === on) {
-    persistMaster(on, (ok) => {
-      if (ok) commitMaster(on);
-      done?.(ok);
-    });
-    return;
-  }
   const cats = (Object.keys(prefs) as Category[]).filter((c) => prefs[c]);
-  if (!HAS_SYNC || !cats.length) {
+  // Nothing to migrate when the switch already has this value, there's no sync
+  // area, or no category is synced — just record it.
+  if (master === on || !HAS_SYNC || !cats.length) {
     persistMaster(on, (ok) => {
       if (ok) commitMaster(on);
       done?.(ok);

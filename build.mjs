@@ -52,13 +52,17 @@ const jsEntries = {
 // HTML/CSS page bundles: each <dir>/<name>.html links a bundled <name>.js/.css.
 const PAGES = ["popup/popup", "options/options"];
 
+// Build stamp for the dev hot-reload (see src/background/dev-reload.ts): an
+// unpacked install watches this file and reloads itself when a build lands.
+function writeBuildStamp(out) {
+  writeFileSync(join(out, "build-stamp.txt"), String(Date.now()) + "\n");
+}
+
 function copyStatics(out, target) {
   cpSync(join(SRC, "_locales"), join(out, "_locales"), { recursive: true });
   cpSync(join(SRC, "icons"), join(out, "icons"), { recursive: true });
   writeFileSync(join(out, "manifest.json"), JSON.stringify(manifestFor(target), null, 2) + "\n");
-  // Build stamp for the dev hot-reload (see src/background/dev-reload.ts): an
-  // unpacked install watches this file and reloads itself when a build lands.
-  writeFileSync(join(out, "build-stamp.txt"), String(Date.now()) + "\n");
+  writeBuildStamp(out);
   // Each page's .html: drop comments and collapse indentation (it links .css/.js).
   for (const page of PAGES) {
     let html = readFileSync(join(SRC, page + ".html"), "utf8");
@@ -115,12 +119,24 @@ async function buildTarget(target) {
     jsx: "automatic", // React 17+ automatic runtime — no `import React` needed
     minify: !DEV,
     sourcemap: DEV ? "inline" : false,
-    legalComments: "none",
+    // Emit non-ASCII text (the bundled locale strings) as UTF-8, not \uXXXX escapes.
+    charset: "utf8",
+    // Keep bundled dependencies' license notices (React's MIT headers).
+    legalComments: "eof",
     logLevel: "warning",
   };
 
   if (DEV) {
-    const cJs = await context(js);
+    // Restamp after every successful rebuild so the unpacked extension reloads itself.
+    const stamp = {
+      name: "build-stamp",
+      setup(build) {
+        build.onEnd((result) => {
+          if (!result.errors.length) writeBuildStamp(out);
+        });
+      },
+    };
+    const cJs = await context({ ...js, plugins: [stamp] });
     await cJs.watch();
     buildCss(out);
     // Lightning CSS has no watcher of its own — rebuild on any .css change under

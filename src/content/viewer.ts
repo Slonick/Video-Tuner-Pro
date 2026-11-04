@@ -11,14 +11,19 @@ import {
   fetchSponsorSegments,
   SPONSOR_COLORS,
 } from "./markers.js";
-import { api } from "./platform/browser.js";
+import { api, ctxValid } from "./platform/browser.js";
 import { addFullscreenChangeListener, currentFullscreenElement } from "./platform/fullscreen.js";
 import { i18n } from "./platform/i18n.js";
 import { ensureGlassFilter, GLASS_REFRACTION } from "../shared/glass.js";
 import { isLive, isVkLiveChannelPage, onStreamPage } from "./live/detection.js";
 import { normalizeViewerFit, type ViewerFitMode } from "./core/resolve.js";
 import { showBadgeNotice } from "./badge/overlay.js";
-import { LAUNCHER_TOP_LAYER_ATTR, listenerObjectOptions, listenerOptions } from "./lifecycle.js";
+import {
+  LAUNCHER_TOP_LAYER_ATTR,
+  contentSignal,
+  listenerObjectOptions,
+  listenerOptions,
+} from "./lifecycle.js";
 import {
   animateChatLayout,
   applyChatPanelSettings,
@@ -41,6 +46,9 @@ import { applyChatFrameSkin } from "./chat/skin.js";
 
 export type ViewerFormat = "normal" | "theater";
 export const VIEWER_LAYOUT_EVENT = "vtp-viewer-layout";
+// Fired once the player popover was re-shown on top of the top layer: the badge
+// and launcher re-append their own popovers above it.
+export const VIEWER_RAISE_EVENT = "vtp-viewer-raise";
 
 const ATTR = "data-vtp-viewer"; // on <html>: "normal" | "theater" — state marker
 const OVERLAY = "data-vtp-viewer-overlay";
@@ -49,6 +57,8 @@ const PLAYER_SURFACE = "data-vtp-viewer-player";
 const PLAYER_SURFACE_FORMAT = "data-vtp-viewer-player-format";
 const PLAYER_SURFACE_VIDEO = "data-vtp-viewer-player-video";
 const PLAYER_SURFACE_STRETCH = "data-vtp-viewer-player-stretch";
+const PLAYER_SURFACE_STYLE = "data-vtp-viewer-player-style";
+const DIALOG_ELEVATED = "data-vtp-viewer-dialog";
 const FRACTION = 0.86; // the normal box's share of the viewport
 const BAR_HIDE_MS = 2600; // control-bar auto-hide, mirrors the launcher FAB
 const CLOSE_EVENT = "vtp-viewer-close";
@@ -209,17 +219,39 @@ const QUALITY_VIDEO_ATTR = "data-vtp-quality-video";
 const QUALITY_PICK_ATTR = "data-vtp-quality-pick";
 const QUALITY_RESP_ATTR = "data-vtp-quality-response";
 
-// A previous instance (extension reload re-injects us) may have left its
-// overlay up — drop it. (Its adopted video can't be returned — the old
-// instance lost the spot; the site's player recreates one on demand.)
+// A previous instance (an extension update re-injects us) may have left its
+// viewer up. A press on its dim still reaches that instance after its teardown,
+// and closing it that way restores the page like a user close — without an
+// auto-reopen. Then strip whatever is left: Firefox unloads the old instance
+// without running any of its code. (An adopted video can't be returned from
+// here — the site's player recreates one on demand.)
 try {
-  document.querySelectorAll(`[${OVERLAY}]`).forEach((n) => n.remove());
-  document.documentElement.removeAttribute(ATTR);
+  const root = document.documentElement;
+  document.querySelectorAll(`[${OVERLAY}]`).forEach((n) => {
+    n.dispatchEvent(new Event("pointerdown"));
+    n.remove();
+  });
+  if (root.hasAttribute(ATTR) && root.style.overflow === "hidden") root.style.overflow = "";
+  root.removeAttribute(ATTR);
+  document.querySelectorAll(`style[${PLAYER_SURFACE_STYLE}]`).forEach((n) => n.remove());
+  // Dropping the popover attribute also takes a shown popover out of the top layer.
+  for (const el of document.querySelectorAll(`[${PLAYER_SURFACE}],[${DIALOG_ELEVATED}]`)) {
+    for (const attr of ["popover", PLAYER_SURFACE, PLAYER_SURFACE_FORMAT, DIALOG_ELEVATED]) {
+      el.removeAttribute(attr);
+    }
+  }
+  for (const attr of [PLAYER_SURFACE_VIDEO, PLAYER_SURFACE_STRETCH]) {
+    document.querySelectorAll(`[${attr}]`).forEach((n) => n.removeAttribute(attr));
+  }
 } catch (e) {
   /* ignore */
 }
 
 document.addEventListener(CLOSE_EVENT, () => exitViewer(), listenerOptions());
+// Teardown (an extension update) orphans this instance: hand the page back at
+// once — nothing of ours would be left to close a lifted player. enter() refuses
+// in a dead context, so the forced-exit reopen can't bring the viewer back.
+contentSignal.addEventListener("abort", involuntaryExitViewer, { once: true });
 document.addEventListener(
   "keydown",
   (e) => {
@@ -257,7 +289,9 @@ document.addEventListener(
     }
     if (e.key === "Tab") {
       closeViewerMenus();
-      trapViewerFocus(e);
+      // A lifted native player — with the only playback controls — sits outside
+      // the overlay; trapping focus there would lock the keyboard out of it.
+      if (!playerSurface) trapViewerFocus(e);
       return;
     }
     if (!S.keyboardEnabled) return;
@@ -440,6 +474,7 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
   if (!(root instanceof Document || root instanceof ShadowRoot)) return false;
 
   const style = document.createElement("style");
+  style.setAttribute(PLAYER_SURFACE_STYLE, "");
   style.textContent =
     `[${PLAYER_SURFACE}]:popover-open{display:block!important;position:fixed!important;` +
     `box-sizing:border-box!important;margin:0!important;padding:0!important;border:0!important;` +
@@ -559,10 +594,13 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
     if (!open) recoverPlayerSurface();
     // Site menus portaled to page-level dialog layers (Twitch's settings and
     // sub menus) would open UNDER the lifted player — lift them too, in the
-    // same mutation batch so the menu never paints hidden. Only when the batch
-    // actually touched such a layer (this observer sees every DOM mutation);
-    // the guard tick stays as the periodic fallback.
-    if (mutations.some(touchesPageDialogLayer)) elevatePageDialogLayers();
+    // same mutation batch so the menu never paints hidden. Only on Twitch (the
+    // layers are its own), and only when the batch actually touched such a
+    // layer (this observer sees every DOM mutation); the guard tick stays as
+    // the periodic fallback.
+    if (chatPlatform() === "twitch" && mutations.some(touchesPageDialogLayer)) {
+      elevatePageDialogLayers();
+    }
   });
   playerSurfaceObserver.observe(document.documentElement, { childList: true, subtree: true });
   return true;
@@ -575,7 +613,6 @@ function mountPlayerSurface(v: HTMLVideoElement): boolean {
 // Twitch uses .tw-dialog-layer for player menus and a bare ReactModalPortal
 // for the sub/gift modals.
 const PAGE_DIALOG_LAYERS = ".tw-dialog-layer,.ReactModalPortal";
-const DIALOG_ELEVATED = "data-vtp-viewer-dialog";
 
 // Whether a mutation batch entry added/removed nodes in (or as) a dialog layer.
 function touchesPageDialogLayer(m: MutationRecord): boolean {
@@ -630,6 +667,16 @@ function restorePageDialogLayers(): void {
   }
 }
 
+function raisePageDialogLayers(): void {
+  for (const layer of document.querySelectorAll<HTMLElement>(`[${DIALOG_ELEVATED}]`)) {
+    try {
+      if (!layer.matches(":popover-open")) continue;
+      layer.hidePopover?.();
+      layer.showPopover?.();
+    } catch {}
+  }
+}
+
 // YouTube rebuilds its top layer while a page is still loading or navigating,
 // which force-closes every open popover — ours included. That closure is not a
 // user action: put the surface back instead of tearing the session down. The
@@ -650,9 +697,12 @@ function reshowPlayerSurface(): boolean {
   } catch {
     return false;
   }
-  // The re-shown player landed on top of the top layer — put the chat surfaces
-  // back above it.
+  // The re-shown player landed on top of the top layer — put everything we
+  // lifted back above it, in stacking order: chat, page dialog layers, then the
+  // badge and launcher (through the event).
   raiseChatPopovers();
+  raisePageDialogLayers();
+  document.dispatchEvent(new Event(VIEWER_RAISE_EVENT));
   notifyViewerLayout();
   return true;
 }
@@ -1094,7 +1144,6 @@ function animateSurfaceFrom(first: SurfaceFrame | null): Animation | null {
   if (!canAnimate(shell) || !first) return null;
   const last = shell.getBoundingClientRect();
   if (!visibleRect(last)) return null;
-  const finalCss = desiredShellCss;
   const finalRadius = shell.style.borderRadius || "0px";
   const token = ++surfaceTransitionToken;
   layoutPaused = true;
@@ -1126,7 +1175,9 @@ function animateSurfaceFrom(first: SurfaceFrame | null): Animation | null {
       surfaceTransitionTimer = null;
     }
     if (surfaceTransition === anim) surfaceTransition = null;
-    shell.style.cssText = finalCss;
+    // The current layout, not the one the flight started from: a sizeVideo()
+    // meanwhile (metadata, a resize, chat mounting) has already rewritten it.
+    shell.style.cssText = desiredShellCss;
     layoutPaused = false;
     layoutBar();
     notifyViewerLayout();
@@ -1496,8 +1547,9 @@ function relayoutViewerChatAnimated(): void {
 // closed — enter() mounts chat from the current S values anyway.
 export function applyViewerChatMode(): void {
   if (!fmt) return;
-  updateViewerChat();
-  relayoutViewerChatAnimated();
+  // Our own chat writes echo back through storage into this hook; reflowing for
+  // an echo that changed nothing would restart the animation already running.
+  if (updateViewerChat()) relayoutViewerChatAnimated();
 }
 
 export function applyViewerChatSettings(): void {
@@ -2570,8 +2622,8 @@ function guard(): void {
     try {
       open = playerSurface.matches(":popover-open");
     } catch {}
-    if (!video?.isConnected || !overlay || !playerSurface.isConnected) {
-      if (!(playerSurface.isConnected && overlay && adoptReplacedSurfaceVideo())) {
+    if (!video?.isConnected || !overlay?.isConnected || !playerSurface.isConnected) {
+      if (!(playerSurface.isConnected && overlay?.isConnected && adoptReplacedSurfaceVideo())) {
         involuntaryExitViewer();
       }
       return;
@@ -2589,7 +2641,7 @@ function guard(): void {
   }
   if (
     !video ||
-    !overlay ||
+    !overlay?.isConnected ||
     !surfaceVideo?.isConnected ||
     !surfaceShell?.isConnected ||
     video.parentElement !== surfaceShell ||
@@ -2624,12 +2676,16 @@ function wireVideo(v: HTMLVideoElement): void {
   if (!media) return;
   const opt = { signal: media.signal };
   for (const ev of ["play", "pause"]) v.addEventListener(ev, handleViewerPlayState, opt);
+  v.addEventListener("loadedmetadata", sizeVideo, opt); // the real aspect may arrive late
+  v.addEventListener("ended", exitViewer, opt); // the show is over — hand the page back
+  // A lifted player remains in its site-owned DOM with its own controls, seek
+  // bar and resize logic: our bar, markers and spinner don't exist there, and
+  // the bare-video style guard would fight the site's inline writes.
+  if (playerSurface) return;
   v.addEventListener("volumechange", syncVolume, opt);
   for (const ev of ["timeupdate", "durationchange", "loadedmetadata"]) {
     v.addEventListener(ev, syncTime, opt);
   }
-  v.addEventListener("loadedmetadata", sizeVideo, opt); // the real aspect may arrive late
-  v.addEventListener("ended", exitViewer, opt); // the show is over — hand the page back
   v.addEventListener(
     "durationchange",
     () => {
@@ -2646,23 +2702,17 @@ function wireVideo(v: HTMLVideoElement): void {
     },
     opt,
   );
-  if (!playerSurface) {
-    surfaceVideo?.addEventListener(
-      "click",
-      () => (v.paused ? v.play()?.catch(() => {}) : v.pause()),
-      opt,
-    );
-  }
+  surfaceVideo?.addEventListener(
+    "click",
+    () => (v.paused ? v.play()?.catch(() => {}) : v.pause()),
+    opt,
+  );
   for (const ev of ["waiting", "stalled"]) {
     v.addEventListener(ev, () => setViewerLoading(true), opt);
   }
   for (const ev of ["playing", "canplay", "canplaythrough", "timeupdate", "pause"]) {
     v.addEventListener(ev, () => setViewerLoading(false), opt);
   }
-  // A lifted player remains in its site-owned DOM with its own controls and
-  // resize logic. Do not fight the site's inline writes with the bare-video
-  // style guard used by the fallback surface.
-  if (playerSurface) return;
   styleGuard?.disconnect();
   if (styleGuardFrame != null) {
     cancelAnimationFrame(styleGuardFrame);
@@ -2913,7 +2963,7 @@ async function enter(
   target?: HTMLVideoElement,
   opts: { liveHint?: boolean; autoTriggered?: boolean } = {},
 ): Promise<void> {
-  if (window.top !== window || S.siteDisabled) return;
+  if (window.top !== window || S.siteDisabled || !ctxValid()) return;
   const v = target ?? primaryVideo();
   if (!v || currentFullscreenElement() || fmt || exiting || overlay || isDrmVideo(v)) return;
   const wasPlayingAtEntry = !v.paused && !v.ended;
@@ -2976,7 +3026,6 @@ async function enter(
   overlay = document.createElement("div");
   overlay.setAttribute(OVERLAY, "");
   overlay.setAttribute("role", "dialog");
-  overlay.setAttribute("aria-modal", "true");
   overlay.setAttribute("aria-label", i18n("viewerDialogLabel") || "Pop-out video viewer");
   Object.assign(overlay.style, {
     position: "fixed",
@@ -3000,12 +3049,15 @@ async function enter(
   } as Partial<CSSStyleDeclaration>);
   overlay.appendChild(backdropEl);
   hookGlobal();
-  // Chapters depend on the SITE player's UI, so read them before the video
-  // leaves it.
-  pendingChapters =
-    isYouTube() && Number.isFinite(v.duration) ? readYouTubeChapters(v.duration) : [];
   const keepsNativePlayer = mountPlayerSurface(v);
   if (!keepsNativePlayer) {
+    // Modal only while the overlay holds the video and its controls: a lifted
+    // native player sits outside it.
+    overlay.setAttribute("aria-modal", "true");
+    // Chapters feed our own seek bar and depend on the SITE player's UI, so
+    // read them before the video leaves it.
+    pendingChapters =
+      isYouTube() && Number.isFinite(v.duration) ? readYouTubeChapters(v.duration) : [];
     surfaceShell = document.createElement("div");
     Object.assign(surfaceShell.style, {
       position: "absolute",
@@ -3115,6 +3167,9 @@ async function enter(
 export function exitViewer(): void {
   if (!fmt || exiting) return;
   const involuntary = exitInvoluntarily;
+  // A user close also dismisses what plays now: the page can move on inside the
+  // lifted player (YouTube's Next) after the session opened.
+  const exitIdentity = involuntary ? "" : autoOpenIdentity();
   exiting = true;
   // Chat goes first: the video animates back to its page rect, not to the
   // gutter-adjusted box.
@@ -3200,10 +3255,13 @@ export function exitViewer(): void {
       }
     }
     if (video) {
-      // Use the identity captured on entry. The URL may already point at the
-      // next SPA video by the time the close animation finishes.
+      // Use identities captured before the close animation: the URL may already
+      // point at the next SPA video by the time it finishes.
       if (shouldResumeAuto) forgetAutoOpen(video, videoAutoIdentity);
-      else rememberAutoOpen(video, videoAutoIdentity);
+      else {
+        rememberAutoOpen(video, videoAutoIdentity);
+        if (exitIdentity) rememberAutoOpen(video, exitIdentity);
+      }
       if (playerSurface) {
         unmountPlayerSurface();
       } else {

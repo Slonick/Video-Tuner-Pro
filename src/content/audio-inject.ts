@@ -18,11 +18,10 @@
 // Everything is wrapped defensively (try/catch, no-op on failure), matching
 // inject.ts: a broken hook must never break the page's own audio.
 const RATE_ATTR = "data-vtp-audiorate";
-const BRIDGE_VERSION = "2026-07-07-active-bridge";
+const BRIDGE_VERSION = "2026-11-04-bounded-tracking";
 type AudioBridgeWindow = typeof window & {
   __vtpAudioBridgeInstalled?: boolean | string;
   __vtpAudioBridgeCleanup?: () => void;
-  __vtpAudioNativePlay?: HTMLMediaElement["play"];
 };
 
 function isActiveBridge(): boolean {
@@ -56,11 +55,14 @@ export function applyRate(media: HTMLMediaElement, rate: number): void {
   }
 }
 
-// The detached <audio> elements we've captured. Kept so a speed change made while
+// The detached <audio> elements that are playing. Kept so a speed change made while
 // a track is already playing can re-apply to them (refreshTracked, driven by the
-// attribute observer). Bounded by how many bare audio elements a page plays.
+// attribute observer). An element leaves the set as soon as it stops: the browser
+// keeps a playing element alive anyway, so the set never pins audio the page dropped.
 const tracked = new Set<HTMLAudioElement>();
 const trackedCleanup = new WeakMap<HTMLAudioElement, () => void>();
+// How a page stops a track: pauses it, lets it finish, or swaps/clears its source.
+const STOP_EVENTS = ["pause", "ended", "emptied", "abort"];
 
 // Capture a detached <audio> as it starts playing and bring it to the current
 // rate. Connected media is left to the isolated script so neither world fights the
@@ -85,11 +87,18 @@ export function captureOnPlay(media: unknown): void {
       media.removeEventListener("play", reapply);
       media.removeEventListener("loadeddata", reapply);
       media.removeEventListener("ratechange", reapply);
-      media.removeEventListener("ended", release);
+      for (const type of STOP_EVENTS) media.removeEventListener(type, stop);
+      media.removeEventListener("error", release);
       tracked.delete(media);
       trackedCleanup.delete(media);
     };
-    media.addEventListener("ended", release);
+    // A source swap or a pause→play restart queues these behind the page's next
+    // play() — an element that is playing again stays tracked.
+    const stop = () => {
+      if (media.paused) release();
+    };
+    for (const type of STOP_EVENTS) media.addEventListener(type, stop);
+    media.addEventListener("error", release);
     trackedCleanup.set(media, release);
   }
   const rate = desiredRate();
@@ -128,15 +137,20 @@ export function install(): void {
   const cleanup: Array<() => void> = [];
   try {
     const proto = HTMLMediaElement.prototype;
-    const nativePlay = win.__vtpAudioNativePlay || proto.play;
-    win.__vtpAudioNativePlay = nativePlay;
+    // Wrap whatever play() is current: after an update, a page wrapper installed over
+    // the previous bridge must stay in the chain (its cleanup restores only its own hook).
+    const nativePlay = proto.play;
     const hookedPlay = function (this: HTMLMediaElement, ...args: unknown[]): Promise<void> {
       try {
         captureOnPlay(this);
       } catch (e) {
         /* never let our hook break the page's own playback */
       }
-      return nativePlay.apply(this, args as []);
+      const result = nativePlay.apply(this, args as []);
+      // A play() refused up front (autoplay policy, unsupported source) leaves the
+      // element paused and fires none of the events that would release it.
+      if (this.paused) trackedCleanup.get(this as HTMLAudioElement)?.();
+      return result;
     };
     proto.play = hookedPlay;
     cleanup.push(() => {

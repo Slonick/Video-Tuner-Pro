@@ -114,11 +114,11 @@ export const SpeedCard = memo(function SpeedCard({ speed: s, domain, live, force
             onDown={() => s.nudge(-s.speedStep)}
             downId="speedDown"
             downLabel="Slower"
-            downTitle={msg("tipSlower")}
+            downTitle={msg("tipSlower", String(stepPct))}
             onUp={() => s.nudge(s.speedStep)}
             upId="speedUp"
             upLabel="Faster"
-            upTitle={msg("tipFaster")}
+            upTitle={msg("tipFaster", String(stepPct))}
             onReset={s.resetManual}
             resetId="speedReset"
             resetTitle={msg("tipResetSpeed")}
@@ -158,7 +158,13 @@ export const SpeedCard = memo(function SpeedCard({ speed: s, domain, live, force
             <div className="list-group">
               <div className="extra-row">
                 <span>{msg("onVideoLabel")}</span>
-                <StoredToggle id="onVideoToggle" storageKey="showRemaining" defaultOn />
+                <StoredToggle
+                  id="onVideoToggle"
+                  storageKey="showRemaining"
+                  defaultOn
+                  ariaLabel={msg("onVideoLabel")}
+                  disabled={live}
+                />
               </div>
 
               <div className="extra-row" id="superTheaterRow">
@@ -166,7 +172,13 @@ export const SpeedCard = memo(function SpeedCard({ speed: s, domain, live, force
                   <span>{msg("superTheaterLabel")}</span>
                   <span className="extra-sub">{msg("superTheaterHint")}</span>
                 </span>
-                <StoredToggle id="superTheaterToggle" storageKey="superTheater" defaultOn={false} />
+                <StoredToggle
+                  id="superTheaterToggle"
+                  storageKey="superTheater"
+                  defaultOn={false}
+                  ariaLabel={msg("superTheaterLabel")}
+                  disabled={live && !s.isYouTube}
+                />
               </div>
 
               <div className="extra-row">
@@ -211,7 +223,13 @@ export const SpeedCard = memo(function SpeedCard({ speed: s, domain, live, force
                     </span>
                   </InfoTip>
                 </span>
-                <StoredToggle id="kbdToggle" storageKey="keyboard" defaultOn />
+                <StoredToggle
+                  id="kbdToggle"
+                  storageKey="keyboard"
+                  defaultOn
+                  ariaLabel={msg("kbdLabel")}
+                  disabled={live}
+                />
               </div>
 
               <div className="extra-row">
@@ -219,7 +237,13 @@ export const SpeedCard = memo(function SpeedCard({ speed: s, domain, live, force
                   <span>{msg("audioSpeedLabel")}</span>
                   <span className="extra-sub">{msg("audioSpeedHint")}</span>
                 </span>
-                <StoredToggle id="audioSpeedToggle" storageKey="audioSpeed" defaultOn={false} />
+                <StoredToggle
+                  id="audioSpeedToggle"
+                  storageKey="audioSpeed"
+                  defaultOn={false}
+                  ariaLabel={msg("audioSpeedLabel")}
+                  disabled={live}
+                />
               </div>
             </div>
           </div>

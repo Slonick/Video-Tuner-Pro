@@ -35,6 +35,25 @@ describe("resolveSpeed", () => {
     });
   });
 
+  it("ignores channel entries saved for other channels", () => {
+    expect(resolveSpeed(["UC1"], D, {}, { UC1: 2.0, UC9: 3.0 }, undefined)).toEqual({
+      speed: 2.0,
+      scope: "channel",
+    });
+    expect(resolveSpeed(["UC1"], D, { [D]: 1.5 }, { UC9: 3.0 }, undefined)).toEqual({
+      speed: 1.5,
+      scope: "site",
+    });
+  });
+
+  it("a cleared (null) alias does not shadow the other key form", () => {
+    const channels = { UC1: 2.0, "@handle": null } as unknown as Record<string, number>;
+    expect(resolveSpeed(["UC1", "@handle"], D, {}, channels, undefined)).toEqual({
+      speed: 2.0,
+      scope: "channel",
+    });
+  });
+
   it("falls to the site speed when no channel speed", () => {
     expect(resolveSpeed(["UC1"], D, { [D]: 1.5 }, {}, 1.25)).toEqual({ speed: 1.5, scope: "site" });
   });
@@ -205,6 +224,13 @@ describe("resolveViewerAuto", () => {
   it("defaults to off with nothing saved", () => {
     expect(resolveViewerAuto([], D, {}, {}, undefined)).toEqual({ mode: "off", scope: null });
   });
+
+  it("coerces an unknown stored mode to off, keeping its scope", () => {
+    expect(resolveViewerAuto([], D, {}, {}, "fullscreen")).toEqual({
+      mode: "off",
+      scope: "global",
+    });
+  });
 });
 
 describe("resolveViewerFit", () => {
@@ -242,5 +268,12 @@ describe("resolveViewerFit", () => {
 
   it("defaults to contain with nothing saved", () => {
     expect(resolveViewerFit([], D, {}, {}, undefined)).toEqual({ mode: "contain", scope: null });
+  });
+
+  it("coerces an unknown stored fit to contain, keeping its scope", () => {
+    expect(resolveViewerFit([], D, {}, {}, "stretch")).toEqual({
+      mode: "contain",
+      scope: "global",
+    });
   });
 });
