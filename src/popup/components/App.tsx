@@ -41,13 +41,14 @@ export function App() {
   );
 
   // A disabled site unmounts the cards so their hooks stop messaging and polling
-  // the dormant content script; the site card then is the whole popup.
+  // the dormant content script; the site card then is the whole popup. The cards
+  // also wait for the tab: a click before it is known would be sent nowhere.
   return (
     <>
       <GlassBackdrop />
       <Header />
       <SiteToggle domain={tab?.domain ?? ""} rule={site.rule} onChange={site.setDisabled} />
-      {site.rule === null && <PopupCards tab={tab} />}
+      {tab && site.loaded && site.rule === null && <PopupCards tab={tab} />}
     </>
   );
 }

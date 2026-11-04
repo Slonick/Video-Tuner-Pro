@@ -28,6 +28,17 @@ describe("speed buttons & readout", () => {
     expect(readout()).toBe("100%");
   });
 
+  it("offers no speed controls until the tab is known, so an early click can't be lost", async () => {
+    const { resolveTab, lastCall } = await mountApp({ tab: YT, deferTab: true });
+    expect(document.getElementById("speedUp")).toBeNull();
+
+    resolveTab();
+    await flush();
+    click("speedUp");
+    await flush();
+    expect(lastCall("setSpeed")).toMatchObject({ speed: 1.05 });
+  });
+
   it("the ⟲ button reverts a manual change to the saved speed", async () => {
     const { replies } = await mountApp({ tab: YT });
     document.querySelector<HTMLElement>('.btn-speed[data-percent="175"]')!.click();

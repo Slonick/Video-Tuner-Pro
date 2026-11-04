@@ -14,11 +14,13 @@ import {
 
 export interface UseSiteBlacklist {
   rule: string | null;
+  // False until the stored list has been read: `rule` is not meaningful before.
+  loaded: boolean;
   setDisabled: (off: boolean) => void;
 }
 
 export function useSiteBlacklist(domain: string): UseSiteBlacklist {
-  const [list, setList] = useState<string[]>([]);
+  const [list, setList] = useState<string[] | null>(null);
   useStored([SITE_BLACKLIST_KEY], (r) => setList(normalizeSiteList(r[SITE_BLACKLIST_KEY])));
 
   // Read-modify-write against the freshest stored list, not the rendered one — the
@@ -36,5 +38,5 @@ export function useSiteBlacklist(domain: string): UseSiteBlacklist {
     [domain],
   );
 
-  return { rule: matchingSite(domain, list), setDisabled };
+  return { rule: matchingSite(domain, list ?? []), loaded: list !== null, setDisabled };
 }
