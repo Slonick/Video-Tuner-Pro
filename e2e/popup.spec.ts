@@ -37,7 +37,28 @@ async function openPopup(page: Page, playVideo = false): Promise<Frame> {
     })
     .toBe(true);
   await frame!.locator("#speedUp").waitFor();
+  await frameSettled(page, frame!);
   return frame!;
+}
+
+// The panel is centred with translate(-50%) and animates open, so its controls move
+// in page coordinates while it scales in or adopts a new content height. Playwright's
+// stability check only sees the element inside the frame; wait until the iframe has
+// taken the popup's reported height and its open animation is over.
+async function frameSettled(page: Page, popup: Frame): Promise<void> {
+  await expect
+    .poll(async () => {
+      const content = await popup.evaluate(() =>
+        Math.ceil(document.documentElement.getBoundingClientRect().height),
+      );
+      return page.evaluate((h) => {
+        const f = document
+          .querySelector("[data-vtp-launcher]")
+          ?.shadowRoot?.querySelector("iframe");
+        return !!f && parseFloat(f.style.height) === h && f.getAnimations().length === 0;
+      }, content);
+    })
+    .toBe(true);
 }
 
 test.beforeEach(async ({ serviceWorker }) => {
@@ -59,6 +80,7 @@ test("the first-open guide can be dismissed and stays dismissed", async ({
   const popup = await openPopup(page);
   const guide = popup.getByRole("dialog", { name: "Quick tour" });
   await expect(guide).toBeVisible();
+  await frameSettled(page, popup);
   await guide.locator(".tour-skip").click();
   await expect(guide).toHaveCount(0);
   await expect
