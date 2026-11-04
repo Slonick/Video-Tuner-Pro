@@ -68,6 +68,16 @@ async function frameSettled(page: Page, popup: Frame): Promise<void> {
     .toBe(true);
 }
 
+// A locked card (live page, audio not routed yet, viewer unavailable) ignores a header
+// click by design, and the audio cards stay locked until the playing video reaches Web
+// Audio. Wait until the card can open, as a user would see it unlocked, then open it.
+async function expandCard(popup: Frame, section: string): Promise<void> {
+  const card = popup.locator(section);
+  await expect(card).not.toHaveClass(/\b(locked|is-disabled|audio-locked)\b/);
+  await card.locator(".sec-main").click();
+  await expect(card).toHaveClass(/\bis-overlay\b/);
+}
+
 test.beforeEach(async ({ serviceWorker }) => {
   await clearAll(serviceWorker);
   // Past the first-open walkthrough — its modal overlay would otherwise intercept
@@ -160,7 +170,7 @@ test("the expanded popup keeps a four-digit preset centered and inside its cell"
 }) => {
   await setStorage(serviceWorker, { overlayButton: "always" });
   const popup = await openPopup(page);
-  await popup.locator(".speed-section .sec-main").click();
+  await expandCard(popup, ".speed-section");
 
   const preset = popup.locator('.btn-speed[data-percent="1600"]');
   await expect(preset).toBeVisible();
@@ -201,7 +211,7 @@ test("expanded speed settings toggle and persist through real popup clicks", asy
 }) => {
   await setStorage(serviceWorker, { overlayButton: "always" });
   const popup = await openPopup(page);
-  await popup.locator(".speed-section .sec-main").click();
+  await expandCard(popup, ".speed-section");
   await expect(popup.locator("#speedBody")).toHaveClass(/open/);
 
   await popup.locator("#onVideoToggle").click();
@@ -242,7 +252,7 @@ test("viewer mode, auto-open, backdrop, and fit controls work from the popup", a
 }) => {
   await setStorage(serviceWorker, { overlayButton: "always" });
   const popup = await openPopup(page);
-  await popup.locator(".viewer-auto-section .sec-main").click();
+  await expandCard(popup, ".viewer-auto-section");
   await expect(popup.locator("#viewerAutoVisual")).toBeVisible();
 
   await popup.locator("#viewerAutoVisual .viewer-auto-state.is-viewer").click();
@@ -280,7 +290,7 @@ test("auto-slow and compressor controls persist their real popup interactions", 
   const popup = await openPopup(page, true);
 
   await popup.locator("#autoSlowToggle").click();
-  await popup.locator(".autoslow-section .sec-main").click();
+  await expandCard(popup, ".autoslow-section");
   const floor = popup.locator("#asFloor [role=slider]");
   const knee = popup.locator("#asKnee [role=slider]");
   await floor.focus();
@@ -294,7 +304,7 @@ test("auto-slow and compressor controls persist their real popup interactions", 
   await expect
     .poll(() => popup.locator(".autoslow-section").evaluate((el) => el.getAnimations().length))
     .toBe(0);
-  await popup.locator(".audio-section .sec-main").click();
+  await expandCard(popup, ".audio-section");
   await expect(popup.locator("#audioBody")).toHaveClass(/open/);
   await popup.locator("#audioCompToggle").click();
   await popup.locator('.audio-section .btn-preset[data-preset="0"]').click();
