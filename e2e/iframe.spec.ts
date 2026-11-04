@@ -1,4 +1,12 @@
-import { test, expect, setStorage, clearAll, readStored, uiMessage } from "./fixtures/extension.js";
+import {
+  test,
+  expect,
+  setStorage,
+  clearAll,
+  readStored,
+  uiMessage,
+  popupActive,
+} from "./fixtures/extension.js";
 import type { Frame, Page } from "@playwright/test";
 
 test.beforeEach(async ({ serviceWorker }) => {
@@ -51,7 +59,7 @@ test("the embedded player's launcher opens the popup in the top frame", async ({
       () => !!document.querySelector("[data-vtp-launcher]")?.shadowRoot?.querySelector("iframe"),
     ),
   ).toBe(false);
-  await popup!.locator("#speedUp").waitFor();
+  await popupActive(popup!);
 
   await expect(popup!.locator("#viewerAutoToggle")).toBeDisabled();
   // Popup strings follow navigator.language (honours --lang), not chrome.i18n.
