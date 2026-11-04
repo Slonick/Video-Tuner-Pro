@@ -87,8 +87,12 @@ test("the first-open guide can be dismissed and stays dismissed", async ({
     .poll(async () => (await readStored(serviceWorker, "popupGuideSeen")).popupGuideSeen)
     .toBe(true);
 
-  // Closing removes the popup frame; reopening builds a fresh one.
-  await page.keyboard.press("Escape");
+  // Closing removes the popup frame; reopening builds a fresh one. Focus is inside
+  // the out-of-process popup frame after the click, and a CDP key press there never
+  // completes once the frame is removed, so fire the popup's own Escape handler.
+  await popup.evaluate(() =>
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
+  );
   await expect.poll(() => popup.isDetached()).toBe(true);
   await page.keyboard.press("KeyO");
   let reopened: Frame | undefined;
