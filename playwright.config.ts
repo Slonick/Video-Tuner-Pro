@@ -12,10 +12,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  // Retry once on CI so a failing test re-runs WITH a trace captured.
+  // Retry once on CI: a pass on retry still fails the gate (failOnFlakyTests).
   retries: process.env.CI ? 1 : 0,
-  // A retry is diagnostic, not permission to merge a race. Keep the trace from
-  // the second attempt but leave the CI gate red whenever the first one failed.
+  // A retry is diagnostic, not permission to merge a race. Leave the CI gate red
+  // whenever the first attempt failed.
   failOnFlakyTests: !!process.env.CI,
   timeout: 30_000,
   // Generous on purpose: each value-poll waits for the extension to load, read
@@ -41,8 +41,9 @@ export default defineConfig({
     // snapshots + console + network) and a screenshot, both surfaced in the HTML
     // report so a red run has everything needed to debug it. (No `video`: the
     // loaded-extension context is created manually and doesn't honour recordVideo;
-    // the trace's filmstrip covers it.)
-    trace: "on-first-retry",
+    // the trace's filmstrip covers it.) Traced from the first attempt: a flaky test
+    // usually passes on retry, so a retry-only trace would show nothing.
+    trace: "retain-on-first-failure",
     screenshot: "only-on-failure",
   },
 });

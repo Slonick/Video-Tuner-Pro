@@ -2,7 +2,13 @@
 // persistent context and exposes its id + service worker. Headless extension
 // loading needs the new headless mode, so we pass --headless=new manually and
 // leave Playwright's own headless flag off.
-import { test as base, chromium, type BrowserContext, type Worker } from "@playwright/test";
+import {
+  test as base,
+  chromium,
+  type BrowserContext,
+  type Frame,
+  type Worker,
+} from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -97,6 +103,13 @@ export async function clearStorage(sw: Worker): Promise<void> {
 // language from the OS and ignores --lang, so a literal fails on a non-English host.
 export async function uiMessage(sw: Worker, key: string): Promise<string> {
   return sw.evaluate((k) => chrome.i18n.getMessage(k), key);
+}
+
+// The popup's cards are inert until it knows its host tab. Playwright doesn't treat
+// inert as unactionable (hit-testing still finds the element), so a click before
+// then reaches nothing. Wait for the live cards before driving them.
+export async function popupActive(popup: Frame): Promise<void> {
+  await popup.locator(".popup-grid:not([inert])").waitFor();
 }
 
 // The routed store (shared/store.ts) splits keys between sync and local; the

@@ -10,6 +10,7 @@ import {
   openExtensionPage,
   sendToContent,
   setStorage,
+  popupActive,
 } from "./fixtures/extension.js";
 import type { Frame, Page } from "@playwright/test";
 
@@ -72,7 +73,7 @@ test("configure in options → use via popup → persist across reload", async (
       return !!popup;
     })
     .toBe(true);
-  await popup!.locator("#speedUp").waitFor();
+  await popupActive(popup!);
   await expect(popup!.locator("#currentSpeedPct")).toContainText("150%");
   const preset175 = popup!.locator('.btn-speed[data-percent="175"]');
   await expect(preset175).toBeEnabled();
