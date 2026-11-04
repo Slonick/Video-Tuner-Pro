@@ -103,7 +103,9 @@ function PopupCards({ tab }: { tab: ActiveTab | null }) {
 
   return (
     <>
-      <div className="popup-grid">
+      {/* Laid out at once so the panel keeps its height, but inert until the tab is
+          known: a click before then would be sent to no tab and silently lost. */}
+      <div className="popup-grid" inert={!tab}>
         <div className="group-label">
           <span>{msg("groupVideo") || "Video"}</span>
         </div>

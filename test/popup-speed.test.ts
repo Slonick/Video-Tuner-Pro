@@ -28,6 +28,18 @@ describe("speed buttons & readout", () => {
     expect(readout()).toBe("100%");
   });
 
+  it("keeps the controls inert until the tab is known, so an early click can't be lost", async () => {
+    const { resolveTab, lastCall } = await mountApp({ tab: YT, deferTab: true });
+    expect(byId("speedUp").closest("[inert]")).not.toBeNull();
+
+    resolveTab();
+    await flush();
+    expect(byId("speedUp").closest("[inert]")).toBeNull();
+    click("speedUp");
+    await flush();
+    expect(lastCall("setSpeed")).toMatchObject({ speed: 1.05 });
+  });
+
   it("the ⟲ button reverts a manual change to the saved speed", async () => {
     const { replies } = await mountApp({ tab: YT });
     document.querySelector<HTMLElement>('.btn-speed[data-percent="175"]')!.click();
