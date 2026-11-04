@@ -37,13 +37,14 @@ export default defineConfig({
   },
   use: {
     baseURL: `http://localhost:${PORT}`,
-    // Full diagnostics on failure — a step-by-step trace (filmstrip + DOM
-    // snapshots + console + network) and a screenshot, both surfaced in the HTML
-    // report so a red run has everything needed to debug it. (No `video`: the
-    // loaded-extension context is created manually and doesn't honour recordVideo;
-    // the trace's filmstrip covers it.) Traced from the first attempt: a flaky test
-    // usually passes on retry, so a retry-only trace would show nothing.
-    trace: "retain-on-first-failure",
+    // Full diagnostics on failure — a step-by-step trace (DOM snapshots + console +
+    // network) and a screenshot, both surfaced in the HTML report so a red run has
+    // everything needed to debug it. (No `video`: the loaded-extension context is
+    // created manually and doesn't honour recordVideo.) Traced from the first
+    // attempt: a flaky test usually passes on retry, so a retry-only trace would
+    // show nothing. No trace screencast: on a single-core CI runner it costs enough
+    // frames to fail the viewer cadence test.
+    trace: { mode: "retain-on-first-failure", screenshots: false },
     screenshot: "only-on-failure",
   },
 });
