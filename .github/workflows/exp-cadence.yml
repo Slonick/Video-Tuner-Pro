@@ -28,6 +28,7 @@ jobs:
             node build.mjs >/dev/null
             AB_LABEL="$2" npx playwright test e2e/viewer-cadence.spec.ts --repeat-each=6 --retries=0 --reporter=list 2>&1 | grep "FPS " || true
           }
+          for round in 1 2; do
             run /tmp/src-new NEW
             run /tmp/src-old/src OLD
           done
